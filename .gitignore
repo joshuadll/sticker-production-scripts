@@ -1,0 +1,10 @@
+# Adobe source files
+*.psd
+*.ai
+*.psb
+
+# Dependencies
+node_modules/
+
+# macOS
+.DS_Store
