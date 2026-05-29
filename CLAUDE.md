@@ -38,6 +38,70 @@ Working area: 19 × 26.7 cm (A4 minus margins)
 Grid: 1 square = 1 inch = 2.5 cm
 Caption font: Kalam Regular, 16pt, tracking -20
 
+## Script structure conventions
+Every script must follow this pattern — no exceptions:
+
+1. `CONFIG` object at top with all tuneable values, including `dryRun: false`
+2. Pure helper functions (no Adobe API calls — logic only, easy to reason about)
+3. DOM helper functions (thin wrappers around Adobe API calls)
+4. `log(msg)` function that writes to both `$.writeln` and `CONFIG.logPath` file
+5. `main()` wrapped in try/catch with history snapshot + undo on failure
+
+**dryRun flag** — every script must support it. When true, log what would happen without touching any layer or file.
+```javascript
+if (CONFIG.dryRun) {
+    log("Would resize: " + layer.name + " to " + targetPx + "px");
+} else {
+    resizeLayer(layer, targetPx);
+}
+```
+
+**History snapshot + undo on catch** — wrap all destructive work:
+```javascript
+var snapshot = doc.activeHistoryState;
+try {
+    doWork();
+} catch (e) {
+    doc.activeHistoryState = snapshot;
+    alert("Error on line " + e.line + ": " + e.message);
+}
+```
+
+**File logger** — always included, never rely solely on $.writeln:
+```javascript
+function log(msg) {
+    $.writeln(msg);
+    var f = new File(CONFIG.logPath);
+    f.open("a");
+    f.writeln(msg);
+    f.close();
+}
+```
+
+**Defensive guards** — validate every assumption before acting. Include the layer name and what was expected in the error message:
+```javascript
+if (!layer || !layer.name) {
+    log("SKIP: expected named layer at index " + i + ", got null");
+    continue;
+}
+```
+
+**Pure vs DOM separation** — keep logic functions free of Adobe API calls so they can be reasoned about independently:
+```javascript
+// Pure — no Adobe API, contains only logic
+function parseLayerName(name) { ... }
+function getTargetPx(categoryCode) { ... }
+
+// DOM — thin, contains only Adobe API calls
+function resizeLayer(layer, targetPx) { ... }
+```
+
+## Testing conventions
+See docs/testing.md for full details.
+When scaffolding any new step script, always create the corresponding integration
+test runner in tests/integration/ alongside it. See docs/testing.md for the
+exact file structure and shell runner pattern.
+
 ## Photoshop API patterns (non-obvious)
 Run action:         app.doAction("White Base_Cutline", "Cutline")
 Move layer below:   layer.move(targetLayer, ElementPlacement.PLACEAFTER)

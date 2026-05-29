@@ -1,0 +1,8 @@
+{
+  "name": "sticker-production-scripts",
+  "version": "1.0.0",
+  "description": "ExtendScript automation for Photoshop and Illustrator sticker production pipeline",
+  "scripts": {
+    "test": "bash tests/integration/run-all.sh"
+  }
+}
