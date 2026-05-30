@@ -88,6 +88,29 @@ function convertToSmartObject() {
     );
 }
 
+// Finds a top-level layer by exact name. Returns null if not found.
+function findLayerByName(doc, name) {
+    for (var i = 0; i < doc.layers.length; i++) {
+        if (doc.layers[i].name === name) return doc.layers[i];
+    }
+    return null;
+}
+
+// Returns true if the element uses the plate caption treatment.
+// Reads CONFIG.captionPlateCodes — an array of [styleCode, catCode] pairs.
+// e.g. [["GC", "LM"]] means only GC-LM uses the plate treatment.
+function isCaptionPlate(parsed) {
+    if (!parsed || !parsed.styleCode || !parsed.catCode) return false;
+    var codes = CONFIG.captionPlateCodes;
+    if (!codes) return false;
+    for (var i = 0; i < codes.length; i++) {
+        if (codes[i][0] === parsed.styleCode && codes[i][1] === parsed.catCode) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Resizes layer so its longest edge equals targetPx, anchored at centre.
 // Caller must set ruler units to PIXELS first.
 // Returns false if layer has zero bounds (hidden or empty).

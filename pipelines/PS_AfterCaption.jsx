@@ -1,5 +1,6 @@
 #target photoshop
 #include "../utils/psUtils.jsx"
+#include "../photoshop/Step3B_CaptionWhite.jsx"
 #include "../photoshop/Step4_WhiteEdge.jsx"
 #include "../photoshop/Step5_Silhouette.jsx"
 
@@ -12,15 +13,31 @@ var CONFIG = {
     templateWidthCm: 42,
     templateDPI:     300,
 
-    // BridgeTalk handoff — paths for the AI pipeline.
-    // ⚠️  CONFIRM aiTemplatePath location with artist before first run.
-    aiTemplatePath:     "",  // e.g. "/Volumes/Team Drive/Production Assets/Production_File_Template.ai"
-    bridgeTalkTimeout:  20,  // seconds to wait for Illustrator to respond
-
-    // For automated testing only — leave empty ("") for normal interactive use.
+    // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,
 
-    logPath: ""  // resolved below
+    logPath: "", // resolved below
+
+    // ── Step 3B: Caption white base + grouping ─────────────────────────────────
+
+    whiteRectPadH:     20,   // net horizontal padding around text (after expand→contract)
+    whiteExpandPx:     25,   // expand amount to fill letter counter holes (must be > ~20px)
+    whiteSmoothPx:     8,    // smoothing radius for rounded pill ends
+    whiteHeightPlate:  118,  // px: plate-treatment White height (1 cm at 300 DPI, 1-line)
+    whiteHeightPlate2: 189,  // px: plate-treatment White height (1.6 cm at 300 DPI, 2-line)
+    platePaddingTop:   10,   // px: Caption plate sits this many px above text top
+    whiteRectPadV:     6,    // px: vertical padding above Caption plate for White base
+
+    // [styleCode, catCode] pairs that use the plate treatment.
+    // Must match CONFIG.captionPlateCodes in PS_ToCaption.jsx.
+    captionPlateCodes: [["GC", "LM"]],
+
+    // ── BridgeTalk handoff ─────────────────────────────────────────────────────
+
+    // ⚠️  CONFIRM aiTemplatePath location with artist before first run.
+    aiTemplatePath:    "",   // e.g. "/Volumes/Team Drive/.../Production_File_Template.ai"
+    aiPipelinePath:    "",   // e.g. "/path/to/pipelines/AI_ToCutlines.jsx"
+    bridgeTalkTimeout: 20    // seconds to wait for Illustrator to respond
 };
 
 CONFIG.logPath = ($.fileName
@@ -30,17 +47,19 @@ CONFIG.logPath = ($.fileName
 // ─── BRIDGETALK HANDOFF ───────────────────────────────────────────────────────
 
 function handOffToIllustrator(psdPath) {
-    if (!CONFIG.aiTemplatePath) {
-        log("[pipeline] WARN: aiTemplatePath not set — skipping BridgeTalk handoff.");
-        scriptAlert("BridgeTalk handoff skipped: CONFIG.aiTemplatePath is empty.\n"
-            + "Set the path to Production_File_Template.ai and re-run.\n"
+    if (!CONFIG.aiPipelinePath) {
+        log("[pipeline] WARN: aiPipelinePath not set — skipping BridgeTalk handoff.");
+        scriptAlert("BridgeTalk handoff skipped: CONFIG.aiPipelinePath is empty.\n"
+            + "Set the path to AI_ToCutlines.jsx and re-run.\n"
             + "Log: " + CONFIG.logPath);
         return;
     }
 
     var bt = new BridgeTalk();
     bt.target = "illustrator";
-    bt.body = 'openTemplateAndImport("'
+    bt.body = '$.evalFile(new File("'
+        + CONFIG.aiPipelinePath.replace(/\\/g, "/") + '"));'
+        + 'openTemplateAndImport("'
         + CONFIG.aiTemplatePath.replace(/\\/g, "/") + '","'
         + psdPath.replace(/\\/g, "/") + '");';
     bt.onError = function(e) {
@@ -74,17 +93,35 @@ function main() {
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
+    // ── Step 3B: Caption white base + grouping ─────────────────────
+    log("[pipeline] --- Step 3B: Caption white + grouping ---");
+    var snapshotA = doc.activeHistoryState;
+    var captionWhiteResult;
+
+    try {
+        captionWhiteResult = runCaptionWhite(doc);
+    } catch (e) {
+        doc.activeHistoryState = snapshotA;
+        log("[pipeline] ERROR | step 3B line " + e.line + ": " + e.message
+            + " — rolled back. Caption T layers are still present and untouched.");
+        scriptAlert("ERROR in Step 3B (Caption white).\nLine " + e.line + ": " + e.message
+            + "\n\nRolled back — caption T layers preserved.\n"
+            + "Fix the issue and re-run.\nLog: " + CONFIG.logPath);
+        return;
+    }
+    log("[pipeline] step 3B complete | " + captionWhiteResult.grouped + " element(s) grouped.");
+
     // ── Step 4: White Edge ─────────────────────────────────────────
     log("[pipeline] --- Step 4: White Edge ---");
-    var snapshotA = doc.activeHistoryState;
+    var snapshotB = doc.activeHistoryState;
     var whiteEdgeResult;
 
     try {
         whiteEdgeResult = runWhiteEdge(doc);
     } catch (e) {
-        doc.activeHistoryState = snapshotA;
+        doc.activeHistoryState = snapshotB;
         log("[pipeline] ERROR | step 4 line " + e.line + ": " + e.message
-            + " — rolled back.");
+            + " — rolled back to post-grouping state.");
         scriptAlert("ERROR in Step 4 (White Edge).\nLine " + e.line + ": " + e.message
             + "\n\nRolled back. Log: " + CONFIG.logPath);
         return;
@@ -93,13 +130,13 @@ function main() {
 
     // ── Step 5: Silhouette ─────────────────────────────────────────
     log("[pipeline] --- Step 5: Silhouette ---");
-    var snapshotB = doc.activeHistoryState;
+    var snapshotC = doc.activeHistoryState;
     var silhouetteResult;
 
     try {
         silhouetteResult = runSilhouette(doc);
     } catch (e) {
-        doc.activeHistoryState = snapshotB;
+        doc.activeHistoryState = snapshotC;
         log("[pipeline] ERROR | step 5 line " + e.line + ": " + e.message
             + " — rolled back to post-white-edge state.");
         scriptAlert("ERROR in Step 5 (Silhouette).\nLine " + e.line + ": " + e.message
@@ -126,11 +163,19 @@ function main() {
     log("[pipeline] === PS_AfterCaption done ===");
 
     var msg = "Done.\n\n"
+        + "  Grouped:     " + captionWhiteResult.grouped + " element(s).\n"
         + "  White Edge:  " + whiteEdgeResult.processed + " element(s).\n"
         + "  Silhouette:  " + silhouetteResult.processed + " element(s).\n\n"
         + "Illustrator is opening the production template.\n"
         + "Wait for it to finish placing elements, then do Deepnest.\n\n"
         + "Log: " + CONFIG.logPath;
+
+    if (captionWhiteResult.skipped.length > 0) {
+        msg += "\n\nGrouping skipped (" + captionWhiteResult.skipped.length + "):";
+        for (var s = 0; s < captionWhiteResult.skipped.length; s++) {
+            msg += "\n  - " + captionWhiteResult.skipped[s];
+        }
+    }
 
     scriptAlert(msg);
 }

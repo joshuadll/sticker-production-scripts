@@ -19,7 +19,8 @@ sticker-production-scripts/
 ├── photoshop/
 │   ├── Step1_CombineElements.jsx
 │   ├── Step2_AutoResize.jsx
-│   ├── Step3_AutoCaption.jsx
+│   ├── Step3A_CaptionText.jsx   ← places T layers; artist reviews before Step 3B
+│   ├── Step3B_CaptionWhite.jsx  ← adds White pill + Caption plate; groups all layers
 │   ├── Step4_WhiteEdge.jsx
 │   └── Step5_Silhouette.jsx
 ├── illustrator/

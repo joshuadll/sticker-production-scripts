@@ -2,7 +2,7 @@
 #include "../utils/psUtils.jsx"
 #include "../photoshop/Step1_CombineElements.jsx"
 #include "../photoshop/Step2_AutoResize.jsx"
-// #include "../photoshop/Step3_AutoCaption.jsx"  — uncomment when implemented
+#include "../photoshop/Step3A_CaptionText.jsx"
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 // All tuneable values live here. Step files contain functions only.
@@ -38,7 +38,28 @@ var CONFIG = {
         "IC": 540,  // Cultural icon / symbol        1.8 in
         "FD": 525,  // Food / local cuisine          1.75 in (midpoint 1.5–2)
         "ST": 450   // Stamp (style code, no cat)    1.5 in
-    }
+    },
+
+    // ── Step 3A: Caption text ──────────────────────────────────────────────────
+
+    // ⚠️  Confirm PostScript font name on artist machine: run app.fonts in PS
+    // to list installed fonts. "Kalam-Regular" is the expected value.
+    captionFont:             "Kalam-Regular",
+
+    // ⚠️  GC-LM caption font — confirm with artist whether:
+    //   (a) a different font is used for plate captions, or
+    //   (b) the caption is embedded in the plate artwork (no T layer needed).
+    // Defaults to captionFont until confirmed.
+    captionFontPlate:        "Kalam-Regular",
+
+    captionSizePt:           16,     // pt — doubled from 8pt actual (double-A4 template)
+    captionTracking:         -20,    // thousandths of an em
+    captionGap:              10,     // px: gap between element bottom and text top
+    captionBaselineOffsetPx: 55,     // approx ascender for 16pt Kalam at 300 DPI — tune if off
+
+    // [styleCode, catCode] pairs that use the plate treatment.
+    // Extend this array (no code change) when new plate-style categories are added.
+    captionPlateCodes: [["GC", "LM"]]
 };
 
 CONFIG.logPath = ($.fileName
@@ -138,23 +159,50 @@ function main() {
     }
     log("[pipeline] step 2 complete | " + resizeResult.resized + " element(s) resized.");
 
+    // ── Step 3A: Caption text ──────────────────────────────────────
+    log("[pipeline] --- Step 3A: Caption text ---");
+    var snapshotC = doc.activeHistoryState;
+    var captionResult;
+
+    try {
+        captionResult = runCaptionText(doc);
+    } catch (e) {
+        doc.activeHistoryState = snapshotC;
+        log("[pipeline] ERROR | step 3A line " + e.line + ": " + e.message
+            + " — rolled back to post-resize state. All elements preserved.");
+        scriptAlert("ERROR in Step 3A (Caption text).\nLine " + e.line + ": " + e.message
+            + "\n\nAll elements preserved. Rolled back to post-resize state.\n"
+            + "Fix the issue and re-run.\nLog: " + CONFIG.logPath);
+        return;
+    }
+    log("[pipeline] step 3A complete | " + captionResult.placed + " caption(s) placed.");
+
     // ── Completion summary ─────────────────────────────────────────
     log("[pipeline] === PS_ToCaption done ===");
 
     var msg = "Done.\n\n"
         + "  Combined:  " + combineResult.placed + " element(s) from "
         + combineResult.fileCount + " file(s).\n"
-        + "  Resized:   " + resizeResult.resized + " element(s).";
+        + "  Resized:   " + resizeResult.resized + " element(s).\n"
+        + "  Captions:  " + captionResult.placed + " T layer(s) placed.";
 
     if (resizeResult.skipped.length > 0) {
-        msg += "\n  Skipped (" + resizeResult.skipped.length + "):";
+        msg += "\n\n  Resize skipped (" + resizeResult.skipped.length + "):";
         for (var s = 0; s < resizeResult.skipped.length; s++) {
             msg += "\n    - " + resizeResult.skipped[s];
         }
     }
 
-    msg += "\n\nLog: " + CONFIG.logPath
-        + "\n\nReview elements, then run Step 3 (auto-caption).";
+    if (captionResult.skipped.length > 0) {
+        msg += "\n\n  Caption skipped (" + captionResult.skipped.length + "):";
+        for (var c = 0; c < captionResult.skipped.length; c++) {
+            msg += "\n    - " + captionResult.skipped[c];
+        }
+    }
+
+    msg += "\n\nReview and adjust caption positions."
+        + "\nWhen done, run PS_AfterCaption to add white bases and proceed.\n\n"
+        + "Log: " + CONFIG.logPath;
 
     scriptAlert(msg);
 }

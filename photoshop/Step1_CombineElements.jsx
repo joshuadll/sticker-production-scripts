@@ -92,6 +92,10 @@ function runCombine(templateDoc, folder) {
                 totalPlaced++;
             }
 
+            // Bring over "Caption plate" group if present (used by GC-LM plate treatment).
+            // One per SKU — if multiple source PSDs contain one, the last wins (with warning).
+            pickUpCaptionPlate(sourceDoc, templateDoc, fileName);
+
             sourceDoc.close(SaveOptions.DONOTSAVECHANGES);
             log("[step1] closed | " + fileName);
 
@@ -104,4 +108,43 @@ function runCombine(templateDoc, folder) {
     }
 
     return { placed: totalPlaced, fileCount: files.length };
+}
+
+// If the source PSD contains a top-level layer/group named "Caption plate",
+// duplicate it to the template as a plain layer (no SO conversion).
+// If the template already has one (from a previous source PSD), replace it with a warning.
+function pickUpCaptionPlate(sourceDoc, templateDoc, fileName) {
+    var captionPlateName = "Caption plate";
+    var sourcePlate = null;
+
+    for (var i = 0; i < sourceDoc.layers.length; i++) {
+        if (sourceDoc.layers[i].name === captionPlateName) {
+            sourcePlate = sourceDoc.layers[i];
+            break;
+        }
+    }
+
+    if (!sourcePlate) return; // no Caption plate in this source PSD — that's fine
+
+    if (CONFIG.dryRun) {
+        log("[step1] [DRY RUN] would bring over | \"" + captionPlateName
+            + "\" from " + fileName);
+        return;
+    }
+
+    // Check if template already has a Caption plate (from a previous source PSD).
+    var existing = findLayerByName(templateDoc, captionPlateName);
+    if (existing) {
+        log("[step1] WARN | \"" + captionPlateName
+            + "\" already exists in template — replacing with version from " + fileName
+            + ". (Multiple source PSDs contained a Caption plate — only one per SKU expected.)");
+        existing.remove();
+    }
+
+    sourcePlate.duplicate(templateDoc, ElementPlacement.PLACEATBEGINNING);
+    app.activeDocument = templateDoc;
+    templateDoc.activeLayer.name = captionPlateName;
+    app.activeDocument = sourceDoc;
+
+    log("[step1] brought over | \"" + captionPlateName + "\" from " + fileName);
 }
