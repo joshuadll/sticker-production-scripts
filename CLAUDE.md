@@ -29,9 +29,11 @@ sticker-production-scripts/
 │   ├── Step9_PeelingTabHalfcut.jsx
 │   └── Step10_AssetExportFinalFile.jsx
 ├── pipelines/
-│   ├── PS_ToCaption.jsx     ← Steps 1 → 2 → 3 (stop before manual caption pass)
-│   ├── PS_AfterCaption.jsx  ← Steps 4 → 5 (white edge + silhouette)
-│   └── AI_Pipeline.jsx      ← Steps 6 → 8a → 8b → 9 → 10
+│   ├── PS_ToCaption.jsx        ← Steps 1 → 2 → 3      (stop: artist reviews captions)
+│   ├── PS_AfterCaption.jsx     ← Steps 4 → 5 → BridgeTalk → AI Step 6
+│   │                                                   (stop: artist does Deepnest manually)
+│   ├── AI_AfterDeepnest.jsx    ← Step 8a Simplify      (stop: artist pencil refinements)
+│   └── AI_AfterPencil.jsx      ← Steps 8b → 9 → 10    (done)
 ├── tests/integration/
 └── docs/
 ```
@@ -171,6 +173,36 @@ try {
     log("[pipeline] ERROR | step 1 line " + e.line + ": " + e.message);
     scriptAlert("ERROR in Step 1.\n" + e.message + "\nLog: " + CONFIG.logPath);
     return;
+}
+```
+
+### BridgeTalk handoff (PS → AI) — used at end of PS_AfterCaption.jsx
+
+PS_AfterCaption knows the output PSD path after Step 5 saves it.
+It sends that path + the AI template path to Illustrator via BridgeTalk.
+The AI pipeline's `openTemplateAndImport()` function receives both and proceeds.
+
+```javascript
+// In PS_AfterCaption.jsx CONFIG:
+// aiTemplatePath: "/path/to/Production_File_Template.ai"  // ⚠️ CONFIRM location
+// bridgeTalkTimeout: 20  // seconds
+
+function handOffToIllustrator(psdPath) {
+    var bt = new BridgeTalk();
+    bt.target = "illustrator";
+    bt.body = 'openTemplateAndImport("'
+        + CONFIG.aiTemplatePath.replace(/\\/g, "/") + '","'
+        + psdPath.replace(/\\/g, "/") + '");';
+    bt.onError = function(e) { log("[pipeline] BridgeTalk error: " + e.body); };
+    bt.send(CONFIG.bridgeTalkTimeout);
+    log("[pipeline] BridgeTalk: handed off to Illustrator.");
+}
+
+// In AI_AfterDeepnest.jsx / AI pipeline entry point:
+function openTemplateAndImport(templatePath, psdPath) {
+    var doc = app.open(new File(templatePath));
+    placePsd(doc, psdPath);  // implemented in Step6_CreateCutlines.jsx
+    log("[ai-pipeline] template opened, PSD placed: " + psdPath);
 }
 ```
 
