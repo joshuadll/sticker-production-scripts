@@ -1,5 +1,5 @@
 #!/bin/bash
-# Integration test for ProductionFileScript.jsx (Steps 1 + 2: combine + resize)
+# Integration test for PS_ToCaption.jsx (Steps 1 + 2: combine + resize)
 #
 # FIXTURES REQUIRED — place these before running:
 #
@@ -31,7 +31,7 @@ STEP="step1-2"
 APP="Adobe Photoshop 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/photoshop/ProductionFileScript.jsx"
+SCRIPT="$REPO_ROOT/pipelines/PS_ToCaption.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 TEMPLATE_FIXTURE="$FIXTURE_DIR/resize-area-template.psd"
 SOURCE_FIXTURE="$FIXTURE_DIR/source-psds"
@@ -40,7 +40,7 @@ EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step1-2-expected.txt"
 # The script writes its log to the same folder as the JSX file being run.
 # Since we run a temp copy from /tmp, the log lands there.
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
-LOG="/tmp/ProductionFileScript.log"
+LOG="/tmp/PS_ToCaption.log"
 
 # ── Pre-flight checks ────────────────────────────────────────────────────────
 

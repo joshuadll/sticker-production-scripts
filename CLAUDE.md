@@ -1,13 +1,78 @@
 # Sticker Production Scripts — Claude Code Context
 
-## Language and target
+## Language
 All scripts are ExtendScript (ES3). No let/const, no arrow functions, no template literals.
-Always include `#target photoshop` or `#target illustrator` at top of file.
 Always wrap main() in try/catch that alerts error with line number.
-Put all tuneable values in a CONFIG object at the top of every file.
 
 ## Average SKU
 27 elements per SKU. 1–5 working PSD files per SKU.
+
+---
+
+## Project architecture
+
+```
+sticker-production-scripts/
+├── utils/
+│   ├── psUtils.jsx          ← shared Photoshop helpers (#included by PS pipelines)
+│   └── aiUtils.jsx          ← shared Illustrator helpers (#included by AI pipelines)
+├── photoshop/
+│   ├── Step1_CombineElements.jsx
+│   ├── Step2_AutoResize.jsx
+│   ├── Step3_AutoCaption.jsx
+│   ├── Step4_WhiteEdge.jsx
+│   └── Step5_Silhouette.jsx
+├── illustrator/
+│   ├── Step6_CreateCutlines.jsx
+│   ├── Step8a_SimplifyCutlines.jsx
+│   ├── Step8b_OffsetPathQA.jsx
+│   ├── Step9_PeelingTabHalfcut.jsx
+│   └── Step10_AssetExportFinalFile.jsx
+├── pipelines/
+│   ├── PS_ToCaption.jsx     ← Steps 1 → 2 → 3 (stop before manual caption pass)
+│   ├── PS_AfterCaption.jsx  ← Steps 4 → 5 (white edge + silhouette)
+│   └── AI_Pipeline.jsx      ← Steps 6 → 8a → 8b → 9 → 10
+├── tests/integration/
+└── docs/
+```
+
+**There are two kinds of files — they have different rules:**
+
+### Pipeline scripts (pipelines/*.jsx)
+The only files artists run. These own CONFIG and main().
+- Must have `#target photoshop` or `#target illustrator` at top
+- Must have a `CONFIG` object with all tuneable values, including `dryRun`, `suppressAlerts`, `logPath`
+- Must have `main()` with validation, history snapshots, and try/catch per phase
+- `#include` utils first, then step files, then define CONFIG, then main()
+
+```javascript
+#target photoshop
+#include "../utils/psUtils.jsx"
+#include "../photoshop/Step1_CombineElements.jsx"
+#include "../photoshop/Step2_AutoResize.jsx"
+
+var CONFIG = { dryRun: false, skipLayerName: "Guide", ... };
+CONFIG.logPath = new File($.fileName).parent.fsName + "/PipelineName.log";
+
+function main() { ... }
+main();
+```
+
+### Step files (photoshop/*.jsx, illustrator/*.jsx)
+Contain one phase function each. No `#target`, no `CONFIG`, no `main()`.
+- Export exactly one named function: `runCombine()`, `runResize()`, `runCaption()`, etc.
+- All functions assume `CONFIG` and utils are already in scope (provided by the pipeline)
+- Log prefix must be `[stepN]` e.g. `log("[step1] placed | " + name)`
+
+### Shared utils (utils/*.jsx)
+Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()`.
+- psUtils.jsx: NAME_REGEX, parseLayerName, getTargetPx, needsCaption, longestEdge,
+  scalePercent, log, scriptAlert, isValidTemplate, clearNonGuideLayers,
+  convertToSmartObject, resizeLayerToTarget
+- aiUtils.jsx: NAME_REGEX, parseLayerName, mmToPoints, boundsCenter, isCaption,
+  log, scriptAlert, findLayer, findPathInLayer
+
+---
 
 ## Element naming convention (Photoshop layer groups)
 Format: `[Display Name] [STYLE-CAT]`
@@ -25,7 +90,7 @@ Category resize targets:
 Working file stack: Asset > Margin > Offset Path > Halfcut > Cutlines > Stickers > Grid > Color Block
 Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
 
-## Cutline path names (set by Step 4 script)
+## Cutline path names (set by Step 6 script)
 Main element: `[Display Name]`  e.g. `Horseshoe Bend`
 Caption:       `[Display Name] caption`  e.g. `Horseshoe Bend caption`
 Caption detection: path.name.match(/ caption$/)
@@ -38,69 +103,112 @@ Working area: 19 × 26.7 cm (A4 minus margins)
 Grid: 1 square = 1 inch = 2.5 cm
 Caption font: Kalam Regular, 16pt, tracking -20
 
+---
+
 ## Script structure conventions
-Every script must follow this pattern — no exceptions:
 
-1. `CONFIG` object at top with all tuneable values, including `dryRun: false`
-2. Pure helper functions (no Adobe API calls — logic only, easy to reason about)
-3. DOM helper functions (thin wrappers around Adobe API calls)
-4. `log(msg)` function that writes to both `$.writeln` and `CONFIG.logPath` file
-5. `main()` wrapped in try/catch with history snapshot + undo on failure
+### Pipeline script pattern (the only one with main())
 
-**dryRun flag** — every script must support it. When true, log what would happen without touching any layer or file.
+```javascript
+#target photoshop
+#include "../utils/psUtils.jsx"
+#include "../photoshop/StepN_Name.jsx"
+
+var CONFIG = {
+    dryRun:           false,
+    skipLayerName:    "Guide",   // CONFIRM with artist before first run
+    templateWidthCm:  42,
+    templateDPI:      300,
+    sourceFolderPath: "",        // testing only — leave empty for interactive use
+    suppressAlerts:   false,     // testing only — suppresses alert() dialogs
+    logPath:          ""         // resolved below
+};
+CONFIG.logPath = ($.fileName
+    ? new File($.fileName).parent.fsName
+    : Folder.desktop.fsName) + "/PipelineName.log";
+
+function main() {
+    // 1. Validate document
+    // 2. Init log
+    // 3. Resolve source folder (dialog or CONFIG.sourceFolderPath)
+    // 4. Per phase: take snapshot → call step function → catch + rollback on error
+    // 5. Completion alert
+}
+main();
+```
+
+### Step file pattern (phase function only)
+
+```javascript
+// StepN_Name.jsx — Phase function only.
+// #included by pipeline scripts. Requires: psUtils.jsx (or aiUtils.jsx), CONFIG in scope.
+
+function runStepN(doc /*, other args */) {
+    // ... work ...
+    log("[stepN] resized | " + layer.name + " -> " + targetPx + "px");
+    return { /* result summary */ };
+}
+```
+
+### dryRun flag — every step function must support it
+
 ```javascript
 if (CONFIG.dryRun) {
-    log("Would resize: " + layer.name + " to " + targetPx + "px");
+    log("[stepN] [DRY RUN] would place | " + name);
 } else {
-    resizeLayer(layer, targetPx);
-}
-```
-
-**History snapshot + undo on catch** — wrap all destructive work:
-```javascript
-var snapshot = doc.activeHistoryState;
-try {
     doWork();
-} catch (e) {
-    doc.activeHistoryState = snapshot;
-    alert("Error on line " + e.line + ": " + e.message);
 }
 ```
 
-**File logger** — always included, never rely solely on $.writeln:
+### History snapshots — one per phase in the pipeline, not in step files
+
 ```javascript
-function log(msg) {
-    $.writeln(msg);
-    var f = new File(CONFIG.logPath);
-    f.open("a");
-    f.writeln(msg);
-    f.close();
+var snapshotA = doc.activeHistoryState;
+try {
+    combineResult = runCombine(doc, folder);
+} catch (e) {
+    doc.activeHistoryState = snapshotA;
+    log("[pipeline] ERROR | step 1 line " + e.line + ": " + e.message);
+    scriptAlert("ERROR in Step 1.\n" + e.message + "\nLog: " + CONFIG.logPath);
+    return;
 }
 ```
 
-**Defensive guards** — validate every assumption before acting. Include the layer name and what was expected in the error message:
+### Defensive guards — validate every assumption before acting
+
 ```javascript
 if (!layer || !layer.name) {
-    log("SKIP: expected named layer at index " + i + ", got null");
+    log("[stepN] SKIP | unnamed layer at index " + i);
     continue;
 }
 ```
 
-**Pure vs DOM separation** — keep logic functions free of Adobe API calls so they can be reasoned about independently:
-```javascript
-// Pure — no Adobe API, contains only logic
-function parseLayerName(name) { ... }
-function getTargetPx(categoryCode) { ... }
+### Log format — prefix every line with [stepN] or [pipeline]
 
-// DOM — thin, contains only Adobe API calls
-function resizeLayer(layer, targetPx) { ... }
 ```
+[pipeline] === PS_ToCaption start ===
+[step1] found | 3 PSD file(s)
+[step1] placed | Horseshoe Bend [WC-LM] from source.psd -> resize to 690px
+[step2] resized | Horseshoe Bend [WC-LM] -> 690px
+[step2] SKIP | Orlando Stamp [ST] — zero bounds
+[pipeline] === PS_ToCaption done ===
+```
+
+---
 
 ## Testing conventions
 See docs/testing.md for full details.
-When scaffolding any new step script, always create the corresponding integration
-test runner in tests/integration/ alongside it. See docs/testing.md for the
-exact file structure and shell runner pattern.
+When scaffolding any new step, always create the corresponding integration
+test runner in tests/integration/ alongside it.
+
+The shared fixture for all Photoshop integration tests:
+  tests/integration/fixtures/resize-area-template.psd  ← one file, used by all PS runners
+  tests/integration/fixtures/source-psds/              ← source PSDs for combine tests
+
+Test runners patch CONFIG via perl injection (sourceFolderPath + suppressAlerts)
+and run the pipeline script, not individual step files.
+
+---
 
 ## Photoshop API patterns (non-obvious)
 Run action:         app.doAction("White Base_Cutline", "Cutline")
@@ -116,12 +224,14 @@ Suppress dialogs:   app.playbackDisplayDialogs = DialogModes.NO (restore to Dial
 ## Final file naming
 [STK_CODE]_final.ai — parse STK code as everything before first space in working filename
 
-## Spec pages (read these when building each script)
-Step 1:     docs/step1-white-edge.md
-Step 2a:    docs/step2a-auto-resize.md
-Step 2b:    docs/step2b-auto-caption.md
-Step 3:     docs/step3-silhouette.md
-Step 4:     docs/step4-cut-lines.md
-Step 6:     docs/step6-offset-path-qa.md
-Step 7:     docs/step7-peeling-tab.md
-Steps 8-9:  docs/steps8-9-asset-export.md
+## Spec pages (read before building each script)
+Step 1:     docs/step1-combine.md
+Step 2:     docs/step2-auto-resize.md
+Step 3:     docs/step3-auto-caption.md
+Step 4:     docs/step4-white-edge.md
+Step 5:     docs/step5-silhouette.md
+Step 6:     docs/step6-cut-lines.md
+Step 8a:    docs/step8a-simplify.md
+Step 8b:    docs/step8b-offset-path-qa.md
+Step 9:     docs/step9-peeling-tab.md
+Step 10:    docs/step10-asset-export-final-file.md
