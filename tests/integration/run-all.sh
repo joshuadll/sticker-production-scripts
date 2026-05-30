@@ -7,6 +7,12 @@ PASS=0
 FAIL=0
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Unit tests first — these catch shared utility bugs before running integration tests.
+for runner in "$DIR"/run-test*.sh; do
+    bash "$runner" && PASS=$((PASS+1)) || FAIL=$((FAIL+1))
+done
+
+# Integration tests (require fixture files and a running Adobe app).
 for runner in "$DIR"/run-step*.sh; do
     bash "$runner" && PASS=$((PASS+1)) || FAIL=$((FAIL+1))
 done
