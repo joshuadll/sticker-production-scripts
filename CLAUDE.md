@@ -34,6 +34,7 @@ sticker-production-scripts/
 │   │                                                   (stop: artist reviews captions)
 │   ├── PS_AfterCaption.jsx     ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Step 6
 │   │                                                   (stop: artist does Deepnest manually)
+│   ├── AI_ToCutlines.jsx       ← Step 6 entry point (called by BridgeTalk from PS_AfterCaption)
 │   ├── AI_AfterDeepnest.jsx    ← Step 8a Simplify      (stop: artist pencil refinements)
 │   └── AI_AfterPencil.jsx      ← Steps 8b → 9 → 10    (done)
 ├── tests/integration/
@@ -76,6 +77,7 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   log, scriptAlert, isValidTemplate, clearNonGuideLayers,
   convertToSmartObject, resizeLayerToTarget, loadLayerTransparency
 - aiUtils.jsx: NAME_REGEX, parseLayerName, mmToPoints, boundsCenter, isCaption,
+  blackCmyk, redCmyk, setStrokeStyle,
   log, scriptAlert, findLayer, findPathInLayer
 
 ---
@@ -196,31 +198,34 @@ try {
 
 ### BridgeTalk handoff (PS → AI) — used at end of PS_AfterCaption.jsx
 
-PS_AfterCaption knows the output PSD path after Step 5 saves it.
-It sends that path + the AI template path to Illustrator via BridgeTalk.
-The AI pipeline's `openTemplateAndImport()` function receives both and proceeds.
+Before sending, PS_AfterCaption exports two sidecar files next to the PSD:
+- `{name}_silhouette.png` — flat black PNG of Silhouette layer (Image Trace input)
+- `{name}_elements.txt`   — PSD dimensions + `displayName|styleCode|left|top|right|bottom` per element
+
+Then sends all three paths to AI_ToCutlines.jsx via BridgeTalk.
 
 ```javascript
 // In PS_AfterCaption.jsx CONFIG:
-// aiTemplatePath: "/path/to/Production_File_Template.ai"  // ⚠️ CONFIRM location
+// aiTemplatePath:  "/path/to/Production_File_Template.ai"  // ⚠️ CONFIRM location
+// aiPipelinePath:  "/path/to/pipelines/AI_ToCutlines.jsx"  // ⚠️ CONFIRM location
 // bridgeTalkTimeout: 20  // seconds
 
-function handOffToIllustrator(psdPath) {
+function handOffToIllustrator(doc) {
+    var silhPngPath  = exportSilhouettePng(doc);   // → {name}_silhouette.png
+    var elementsPath = writeElementsFile(doc);     // → {name}_elements.txt
+    function esc(p) { return p.replace(/\\/g, "/").replace(/"/g, '\\"'); }
     var bt = new BridgeTalk();
     bt.target = "illustrator";
-    bt.body = 'openTemplateAndImport("'
-        + CONFIG.aiTemplatePath.replace(/\\/g, "/") + '","'
-        + psdPath.replace(/\\/g, "/") + '");';
-    bt.onError = function(e) { log("[pipeline] BridgeTalk error: " + e.body); };
+    bt.body = '$.evalFile(new File("' + esc(CONFIG.aiPipelinePath) + '"));'
+        + 'openTemplateAndImport("' + esc(CONFIG.aiTemplatePath) + '","'
+        + esc(silhPngPath) + '","' + esc(elementsPath) + '");';
     bt.send(CONFIG.bridgeTalkTimeout);
-    log("[pipeline] BridgeTalk: handed off to Illustrator.");
 }
 
-// In AI_AfterDeepnest.jsx / AI pipeline entry point:
-function openTemplateAndImport(templatePath, psdPath) {
+// In AI_ToCutlines.jsx — entry point called by BridgeTalk:
+function openTemplateAndImport(templatePath, silhPngPath, elementsFilePath) {
     var doc = app.open(new File(templatePath));
-    placePsd(doc, psdPath);  // implemented in Step6_CreateCutlines.jsx
-    log("[ai-pipeline] template opened, PSD placed: " + psdPath);
+    runCreateCutlines(doc, silhPngPath, elementsFilePath);
 }
 ```
 
