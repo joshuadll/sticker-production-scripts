@@ -22,7 +22,7 @@ sticker-production-scripts/
 │   ├── Step2B_WhiteEdge.jsx     ← adds white edge to each SO (before caption review)
 │   ├── Step3A_CaptionText.jsx   ← places T layers; artist reviews before Step 3B
 │   ├── Step3B_CaptionWhite.jsx  ← adds White pill + Caption plate; groups all layers
-│   └── Step5_Silhouette.jsx
+│   └── Step5_Silhouette.jsx     ← groups elements → loads transparency → fills black (NOT clip/merge)
 ├── illustrator/
 │   ├── Step6_CreateCutlines.jsx
 │   ├── Step8a_SimplifyCutlines.jsx
@@ -71,8 +71,10 @@ Contain one phase function each. No `#target`, no `CONFIG`, no `main()`.
 ### Shared utils (utils/*.jsx)
 Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()`.
 - psUtils.jsx: NAME_REGEX, parseLayerName, getTargetPx, needsCaption, longestEdge,
-  scalePercent, log, scriptAlert, isValidTemplate, clearNonGuideLayers,
-  convertToSmartObject, resizeLayerToTarget
+  scalePercent, isCaptionPlate, findLayerByName, findTextLayerByDisplayName,
+  solidBlack, solidWhite, selectLayerById, addLayerToSelectionById,
+  log, scriptAlert, isValidTemplate, clearNonGuideLayers,
+  convertToSmartObject, resizeLayerToTarget, loadLayerTransparency
 - aiUtils.jsx: NAME_REGEX, parseLayerName, mmToPoints, boundsCenter, isCaption,
   log, scriptAlert, findLayer, findPathInLayer
 
@@ -90,14 +92,28 @@ Category resize targets:
   TL: 3 in / 900px | LM: 2.3 in / 690px | MP: 1.8–2 in / ~570px
   TR: 1.8–2 in / ~570px | IC: 1.8 in / 540px | FD: 1.5–2 in / ~525px | ST: 1.5 in / 450px
 
+## Photoshop layer stack — state handed off to Illustrator (after Step 5)
+The PSD imported by Step 6 has exactly three top-level layers:
+  Silhouette         ← flat black pixel layer; Image Traced by Step 6 to generate cut paths
+  Elements           ← LayerSet containing all [Display Name] [STYLE-CAT] element groups
+  Guide              ← locked; excluded from grouping by CONFIG.skipLayerName
+
+Step 5 implementation note: Silhouette is produced by loading the Elements group
+transparency as a pixel selection and filling a new layer with black — NOT by the
+manual duplicate → clipping mask → merge sequence. Do not change this approach.
+
+PS_AfterCaption BridgeTalk exports (written before handoff, sibling to PSD):
+  {name}_silhouette.png  ← flat black PNG of Silhouette layer only (for Image Trace)
+  {name}_elements.txt    ← PSD dimensions + element name|styleCode|bounds per line
+
 ## Illustrator layer names (exact strings, no case-insensitive fallback needed)
 Working file stack: Asset > Margin > Offset Path > Halfcut > Cutlines > Stickers > Grid > Color Block
 Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
 
 ## Cutline path names (set by Step 6 script)
-Main element: `[Display Name]`  e.g. `Horseshoe Bend`
-Caption:       `[Display Name] caption`  e.g. `Horseshoe Bend caption`
-Caption detection: path.name.match(/ caption$/)
+One path per element: `[Display Name]`  e.g. `Horseshoe Bend`
+Caption pill is part of the element silhouette — no separate caption path.
+Stamp elements get a path from Stamp Cutline Template.ai (same name convention).
 
 ## Key confirmed values
 Cut line stroke: 0.25pt black, no fill
@@ -257,6 +273,19 @@ Suppress dialogs:   app.playbackDisplayDialogs = DialogModes.NO (restore to Dial
 
 ## Final file naming
 [STK_CODE]_final.ai — parse STK code as everything before first space in working filename
+
+## Notion references
+Manual playbook (source of truth for what each step does):
+  https://www.notion.so/2c60fc586739806cbf25ec60a90416be
+
+Automation project page (ROI estimates, phasing, time breakdowns):
+  https://www.notion.so/36d0fc586739811084f9f96b0820447a
+
+Playbook step → script step mapping:
+  Playbook 1 (White Edge + SO)   → Step 2B_WhiteEdge
+  Playbook 2 (Resize + Caption)  → Step 2A + Step 3A + Step 3B
+  Playbook 3 (Silhouette)        → Step 5_Silhouette
+  Playbook 4 (Cut Lines)         → Step 6_CreateCutlines (Illustrator)
 
 ## Spec pages (read before building each script)
 Step 1:     docs/step1-combine.md

@@ -46,9 +46,100 @@ CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
     : Folder.desktop.fsName) + "/PS_AfterCaption.log";
 
+// ─── SILHOUETTE PNG EXPORT ────────────────────────────────────────────────────
+
+// Exports the Silhouette layer as a flat PNG sidecar next to the PSD.
+// Returns the PNG file path, or null on failure.
+function exportSilhouettePng(doc) {
+    var silLayer = findLayerByName(doc, "Silhouette");
+    if (!silLayer) {
+        log("[pipeline] ERROR | Silhouette layer not found — cannot export PNG.");
+        return null;
+    }
+
+    var pngPath = doc.fullName.fsName.replace(/\.psd$/i, "_silhouette.png");
+
+    // Store and override layer visibility — only Silhouette visible during export.
+    var i;
+    var layers = doc.layers;
+    var visibilities = [];
+    for (i = 0; i < layers.length; i++) {
+        visibilities[i] = layers[i].visible;
+        layers[i].visible = false;
+    }
+    silLayer.visible = true;
+
+    var opts = new PNGSaveOptions();
+    opts.compression = 0;
+    opts.interlaced  = false;
+    doc.saveAs(new File(pngPath), opts, true); // true = asCopy
+
+    // Restore visibility.
+    for (i = 0; i < layers.length; i++) {
+        layers[i].visible = visibilities[i];
+    }
+
+    log("[pipeline] exported silhouette PNG: " + pngPath);
+    return pngPath;
+}
+
+// ─── ELEMENTS SIDECAR ────────────────────────────────────────────────────────
+
+// Writes a text sidecar next to the PSD with PSD dimensions and element bounds.
+// Used by AI_ToCutlines.jsx for positional path naming after Image Trace.
+// Format:
+//   width:{px}
+//   height:{px}
+//   {displayName}|{styleCode}|{left_px}|{top_px}|{right_px}|{bottom_px}
+//
+// Returns the sidecar file path, or null on failure.
+function writeElementsFile(doc) {
+    var elementsGroup = findLayerByName(doc, "Elements");
+    if (!elementsGroup) {
+        log("[pipeline] ERROR | Elements group not found — cannot write elements sidecar.");
+        return null;
+    }
+
+    var prevUnits = app.preferences.rulerUnits;
+    app.preferences.rulerUnits = Units.PIXELS;
+
+    var psdW = Math.round(doc.width.as("px"));
+    var psdH = Math.round(doc.height.as("px"));
+
+    var lines = ["width:" + psdW, "height:" + psdH];
+    var i;
+    for (i = 0; i < elementsGroup.layerSets.length; i++) {
+        var grp    = elementsGroup.layerSets[i];
+        var parsed = parseLayerName(grp.name);
+        if (!parsed) continue;
+
+        var b = grp.bounds; // [left, top, right, bottom] UnitValues
+        lines.push(
+            parsed.displayName + "|"
+            + parsed.styleCode + "|"
+            + Math.round(b[0].as("px")) + "|"
+            + Math.round(b[1].as("px")) + "|"
+            + Math.round(b[2].as("px")) + "|"
+            + Math.round(b[3].as("px"))
+        );
+    }
+
+    app.preferences.rulerUnits = prevUnits;
+
+    var txtPath = doc.fullName.fsName.replace(/\.psd$/i, "_elements.txt");
+    var f = new File(txtPath);
+    f.open("w");
+    f.write(lines.join("\n"));
+    f.close();
+
+    log("[pipeline] wrote elements sidecar: " + txtPath
+        + " (" + (lines.length - 2) + " element(s))");
+    return txtPath;
+}
+
 // ─── BRIDGETALK HANDOFF ───────────────────────────────────────────────────────
 
-function handOffToIllustrator(psdPath) {
+function handOffToIllustrator(doc) {
     if (!CONFIG.aiPipelinePath) {
         log("[pipeline] WARN: aiPipelinePath not set — skipping BridgeTalk handoff.");
         scriptAlert("BridgeTalk handoff skipped: CONFIG.aiPipelinePath is empty.\n"
@@ -57,18 +148,32 @@ function handOffToIllustrator(psdPath) {
         return;
     }
 
+    // Export silhouette PNG and elements sidecar — inputs for Step 6.
+    var silhPngPath    = exportSilhouettePng(doc);
+    var elementsPath   = writeElementsFile(doc);
+
+    if (!silhPngPath || !elementsPath) {
+        log("[pipeline] ERROR | export failed — BridgeTalk handoff aborted.");
+        scriptAlert("BridgeTalk handoff aborted: could not export silhouette PNG or elements sidecar.\n"
+            + "Check that the Silhouette and Elements layers exist.\n"
+            + "Log: " + CONFIG.logPath);
+        return;
+    }
+
+    function esc(p) { return p.replace(/\\/g, "/").replace(/"/g, '\\"'); }
+
     var bt = new BridgeTalk();
     bt.target = "illustrator";
-    bt.body = '$.evalFile(new File("'
-        + CONFIG.aiPipelinePath.replace(/\\/g, "/") + '"));'
+    bt.body = '$.evalFile(new File("' + esc(CONFIG.aiPipelinePath) + '"));'
         + 'openTemplateAndImport("'
-        + CONFIG.aiTemplatePath.replace(/\\/g, "/") + '","'
-        + psdPath.replace(/\\/g, "/") + '");';
+        + esc(CONFIG.aiTemplatePath) + '","'
+        + esc(silhPngPath)           + '","'
+        + esc(elementsPath)          + '");';
     bt.onError = function(e) {
         log("[pipeline] BridgeTalk error: " + e.body);
     };
     bt.send(CONFIG.bridgeTalkTimeout);
-    log("[pipeline] BridgeTalk: handed off to Illustrator | psd: " + psdPath);
+    log("[pipeline] BridgeTalk: handed off to Illustrator | silh: " + silhPngPath);
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
@@ -139,9 +244,10 @@ function main() {
     // ── BridgeTalk → Illustrator ───────────────────────────────────
     log("[pipeline] --- BridgeTalk handoff → Illustrator (Step 6) ---");
     if (!CONFIG.dryRun) {
-        handOffToIllustrator(doc.fullName.fsName);
+        handOffToIllustrator(doc);
     } else {
-        log("[pipeline] [DRY RUN] would hand off to Illustrator: " + doc.fullName.fsName);
+        log("[pipeline] [DRY RUN] would export silhouette PNG + elements sidecar"
+            + " and hand off to Illustrator: " + doc.fullName.fsName);
     }
 
     // ── Completion summary ─────────────────────────────────────────

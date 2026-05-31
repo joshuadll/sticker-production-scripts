@@ -37,6 +37,8 @@ function boundsCenter(bounds) {
 }
 
 // Returns true if a path item is a caption path (name ends with " caption").
+// NOTE: Step 6 does not produce separate caption paths — caption is part of the
+// element silhouette. This helper is retained for potential use in Steps 8b/9.
 function isCaption(pathItem) {
     return (/\scaption$/).test(pathItem.name);
 }
@@ -74,8 +76,33 @@ function findPathInLayer(layer, name) {
     return null;
 }
 
-// Add helpers here as Illustrator steps are implemented.
-// Expected additions:
-//   setStrokeStyle(path, weightPt, colour)   — Step 6: cut line stroke (0.25pt black)
-//   createOffsetPath(path, offsetMm)          — Step 6/8: 1mm offset path
-//   getCompoundPathItems(layer)               — Step 8/9: compound path iteration
+// ─── COLOUR HELPERS ───────────────────────────────────────────────────────────
+
+// Returns a CMYKColor set to 100% black.
+function blackCmyk() {
+    var c = new CMYKColor();
+    c.cyan = 0; c.magenta = 0; c.yellow = 0; c.black = 100;
+    return c;
+}
+
+// Returns a CMYKColor set to 100% red (used for QA stroke).
+function redCmyk() {
+    var c = new CMYKColor();
+    c.cyan = 0; c.magenta = 100; c.yellow = 100; c.black = 0;
+    return c;
+}
+
+// ─── PATH STYLE HELPERS ───────────────────────────────────────────────────────
+
+// Applies stroke style to a PathItem or CompoundPathItem.
+// colorObj must be a CMYKColor (or RGBColor) instance.
+function setStrokeStyle(path, weightPt, colorObj) {
+    path.stroked    = true;
+    path.strokeWidth = weightPt;
+    path.strokeColor = colorObj;
+    path.filled     = false;
+}
+
+// Expected additions for Steps 8b/9:
+//   createOffsetPath(path, offsetMm)     — 1mm offset path
+//   getCompoundPathItems(layer)          — compound path iteration

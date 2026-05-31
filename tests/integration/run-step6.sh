@@ -1,0 +1,146 @@
+#!/bin/bash
+# Integration test for Step 6 (Create Cut Lines).
+# Runs AI_ToCutlines.jsx against a pre-exported silhouette PNG + elements sidecar.
+# Checks that the Cutlines layer was created and paths were named.
+#
+# FIXTURES REQUIRED:
+#   tests/integration/fixtures/step6-template.ai
+#     A copy of Production_File_Template.ai (the blank AI template).
+#     Obtain from the Team Drive and save here.
+#
+#   tests/integration/fixtures/step6-silhouette.png
+#     A flat black PNG of a silhouette layer from a real Resize Area PSD.
+#     Export by running PS_AfterCaption.jsx on a captioned fixture PSD
+#     and copying the generated *_silhouette.png file here.
+#
+#   tests/integration/fixtures/step6-elements.txt
+#     The elements sidecar for the matching PSD.
+#     Copy the generated *_elements.txt file here.
+#
+# GOLDEN FILE WORKFLOW — first run:
+#   1. Run this script (SKIP diff if no golden file yet)
+#   2. Verify the log looks correct (named paths, no unmatched)
+#   3. Commit: cp "$LOG" tests/integration/expected/step6-expected.txt
+
+set -euo pipefail
+
+STEP="step6"
+APP="Adobe Illustrator 2024"
+
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+SCRIPT="$REPO_ROOT/pipelines/AI_ToCutlines.jsx"
+FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
+TEMPLATE_FIXTURE="$FIXTURE_DIR/step6-template.ai"
+PNG_FIXTURE="$FIXTURE_DIR/step6-silhouette.png"
+ELEMENTS_FIXTURE="$FIXTURE_DIR/step6-elements.txt"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step6-expected.txt"
+
+TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
+LOG="/tmp/AI_ToCutlines.log"
+
+# ── Pre-flight ───────────────────────────────────────────────────────────────
+
+for FIXTURE in "$TEMPLATE_FIXTURE" "$PNG_FIXTURE" "$ELEMENTS_FIXTURE"; do
+    if [ ! -f "$FIXTURE" ]; then
+        echo "SKIP [$STEP]: fixture not found: $FIXTURE"
+        echo "  See script header for fixture creation instructions."
+        exit 0
+    fi
+done
+
+# ── Prepare temp script ──────────────────────────────────────────────────────
+# Inject fixture paths and suppress alerts.
+
+rm -f "$LOG" "$TEMP_SCRIPT"
+
+perl -pe '
+    s|suppressAlerts:\s*false|suppressAlerts: true|;
+    s|stampTemplatePath:\s*""|stampTemplatePath: "__skip__"|;
+' "$SCRIPT" > "$TEMP_SCRIPT"
+
+# ── Run script via osascript ─────────────────────────────────────────────────
+
+echo "[$STEP] Opening template and running cutlines script..."
+osascript << EOF
+tell application "$APP"
+    do javascript "openTemplateAndImport(\"$TEMPLATE_FIXTURE\",\"$PNG_FIXTURE\",\"$ELEMENTS_FIXTURE\");" & " " & (read POSIX file "$TEMP_SCRIPT")
+end tell
+EOF
+
+rm -f "$TEMP_SCRIPT"
+
+# ── Wait for log ─────────────────────────────────────────────────────────────
+
+TIMEOUT=120
+ELAPSED=0
+until [ -f "$LOG" ] || [ "$ELAPSED" -ge "$TIMEOUT" ]; do
+    sleep 1
+    ELAPSED=$((ELAPSED + 1))
+done
+
+if [ ! -f "$LOG" ]; then
+    echo "FAIL [$STEP]: log not written after ${TIMEOUT}s — script may have crashed."
+    exit 1
+fi
+
+# ── Verify key log lines ─────────────────────────────────────────────────────
+
+FAIL=0
+
+if grep -q "\[step6\] created Cutlines layer" "$LOG" || grep -q "\[step6\] placed silhouette PNG" "$LOG"; then
+    echo "PASS [$STEP]: Cutlines layer created / PNG placed."
+else
+    echo "FAIL [$STEP]: Cutlines layer or PNG placement not found in log."
+    FAIL=1
+fi
+
+if grep -q "\[step6\] done |" "$LOG"; then
+    echo "PASS [$STEP]: Step 6 completed."
+else
+    echo "FAIL [$STEP]: '[step6] done |' not found in log."
+    FAIL=1
+fi
+
+if grep -q "unmatched=0" "$LOG"; then
+    echo "PASS [$STEP]: No unmatched paths."
+else
+    UNMATCHED=$(grep "unmatched=" "$LOG" | tail -1)
+    echo "WARN [$STEP]: unmatched paths found — $UNMATCHED"
+    echo "  This may indicate a coordinate transform issue. Review the log."
+fi
+
+if [ "$FAIL" -ne 0 ]; then
+    echo "  Log contents:"
+    cat "$LOG"
+    exit 1
+fi
+
+# ── Diff against golden file ─────────────────────────────────────────────────
+
+strip_variable_lines() {
+    grep -Ev "^\[ai-pipeline\] (template:|=== AI_ToCutlines (start|done))"
+}
+
+if [ ! -f "$EXPECTED" ]; then
+    echo ""
+    echo "NOTE [$STEP]: no golden file yet — this is expected on first run."
+    echo "  Log written to: $LOG"
+    echo "  Review the log. If correct, commit it as the golden file:"
+    echo ""
+    echo "    cp \"$LOG\" \"$EXPECTED\""
+    echo "    git add \"$EXPECTED\""
+    echo "    git commit -m 'Add golden output for step6'"
+    echo ""
+    exit 0
+fi
+
+if diff -u <(strip_variable_lines < "$EXPECTED") <(strip_variable_lines < "$LOG"); then
+    echo "PASS [$STEP]"
+    exit 0
+else
+    echo "FAIL [$STEP]: output differs from golden file (diff above)."
+    echo "  If the change is intentional:"
+    echo "    cp \"$LOG\" \"$EXPECTED\""
+    echo "    git add \"$EXPECTED\" && git commit -m 'Update step6 golden output: <reason>'"
+    exit 1
+fi
