@@ -286,21 +286,7 @@ function createPillFromRect(doc, x1, y1, x2, y2) {
     return layer;
 }
 
-// Loads a layer's transparency channel as the active selection (non-destructive;
-// does not rasterise the layer). Equivalent to Ctrl+clicking the layer thumbnail.
-function loadLayerTransparency(layer) {
-    app.activeDocument.activeLayer = layer;
-    var desc    = new ActionDescriptor();
-    var selRef  = new ActionReference();
-    selRef.putProperty(charIDToTypeID("Chnl"), charIDToTypeID("fsel"));
-    desc.putReference(charIDToTypeID("null"), selRef);
-    var lyrRef  = new ActionReference();
-    lyrRef.putProperty(charIDToTypeID("Chnl"), charIDToTypeID("Trsp"));
-    lyrRef.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
-    desc.putReference(charIDToTypeID("T   "), lyrRef);
-    desc.putBoolean(charIDToTypeID("Invr"), false);
-    executeAction(charIDToTypeID("setd"), desc, DialogModes.NO);
-}
+// loadLayerTransparency() is defined in psUtils.jsx.
 
 // Sets an elliptical marquee selection (replaces current selection).
 // Coordinates are in pixels; ruler must be set to PIXELS before calling.

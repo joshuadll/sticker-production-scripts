@@ -6,17 +6,15 @@
 // sees the final element — with white edge — when reviewing caption positions.
 //
 // For each top-level SO that matches the element naming convention, the script:
-//   1. Sets it as the active layer
-//   2. Runs the "White Base_Cutline" action from the "Cutline" action set
-//      (creates a pixel layer named "White Base_Cutline" above the SO)
-//   3. Moves that layer to just below the SO
+//   1. Loads the SO's transparency as a selection
+//   2. Expands the selection by CONFIG.whiteEdgePx to form the border
+//   3. Creates a white-filled pixel layer named "White Base_Cutline" below the SO
 //
-// Prerequisites: Action file White edges.atn must be loaded in Photoshop.
+// No action file dependency — fully self-contained.
 //
 // CONFIG values used:
-//   actionSet:          "Cutline"           — action set name
-//   actionName:         "White Base_Cutline" — action name within set
-//   whiteEdgeLayerName: "White Base_Cutline" — exact name of the created layer
+//   whiteEdgePx:        border width in pixels  ⚠️ confirm with artist
+//   whiteEdgeLayerName: "White Base_Cutline"    — name of the created layer
 //
 // Returns: { processed, skipped[] }
 
@@ -24,10 +22,8 @@ function runWhiteEdge(doc) {
     var processed = 0;
     var skipped   = [];
 
-    // Suppress dialogs fired by the action (e.g. "Move command not available").
-    // Always restore, even on error.
-    var origDialogs = app.playbackDisplayDialogs;
-    app.playbackDisplayDialogs = DialogModes.NO;
+    var origUnits = app.preferences.rulerUnits;
+    app.preferences.rulerUnits = Units.PIXELS;
 
     try {
         // First pass: collect layer names to avoid index-shift as WBC layers are added.
@@ -73,43 +69,52 @@ function runWhiteEdge(doc) {
         }
 
     } finally {
-        app.playbackDisplayDialogs = origDialogs;
+        app.preferences.rulerUnits = origUnits;
     }
 
     return { processed: processed, skipped: skipped };
 }
 
-// Runs the white edge action on soLayer and moves the resulting White Base_Cutline
-// layer to just below soLayer in the document layer stack.
+// Creates a white-filled border layer below soLayer by:
+//   1. Loading the SO's transparency as a selection
+//   2. Expanding by CONFIG.whiteEdgePx to form the border
+//   3. Filling a new layer with white
+//   4. Moving it to just below the SO
+//
+// Guard: if a layer named CONFIG.whiteEdgeLayerName already sits directly
+// below soLayer, the step is skipped (prevents double-application on re-run).
 function applyWhiteEdge(doc, soLayer) {
-    doc.activeLayer = soLayer;
-
-    app.doAction(CONFIG.actionName, CONFIG.actionSet);
-
-    // The action creates a layer named CONFIG.whiteEdgeLayerName above the active layer.
-    // doc.activeLayer is typically set to the new layer after the action runs;
-    // fall back to a name-based search if not.
-    var wbcLayer = null;
-    if (doc.activeLayer && doc.activeLayer.name === CONFIG.whiteEdgeLayerName) {
-        wbcLayer = doc.activeLayer;
-    } else {
-        // Fallback: find the first top-level layer with the expected name.
-        // Risk: could find a WBC from a previous element if the action didn't
-        // make the new layer active. Log a warning so this is visible.
-        wbcLayer = findLayerByName(doc, CONFIG.whiteEdgeLayerName);
-        if (wbcLayer) {
-            log("[step3] WARN | \"" + soLayer.name
-                + "\" — action did not set activeLayer; found WBC by name (may be wrong layer).");
+    // Re-run guard: skip if WBC already exists directly below this SO.
+    for (var i = 0; i < doc.layers.length; i++) {
+        if (doc.layers[i] === soLayer) {
+            var next = (i + 1 < doc.layers.length) ? doc.layers[i + 1] : null;
+            if (next && next.name === CONFIG.whiteEdgeLayerName) {
+                log("[step3] SKIP | \"" + soLayer.name
+                    + "\" — White Base_Cutline already present. Skipping re-application.");
+                return;
+            }
+            break;
         }
     }
 
-    if (!wbcLayer) {
-        throw new Error("\"" + CONFIG.whiteEdgeLayerName
-            + "\" not found after running action on \"" + soLayer.name + "\". "
-            + "Ensure White edges.atn is loaded and the action set is named \""
-            + CONFIG.actionSet + "\".");
-    }
+    // Load SO's transparency as a selection (Ctrl+click equivalent, no rasterising).
+    loadLayerTransparency(soLayer);
 
-    // Move WBC to just below the SO in the layer panel.
+    // Expand to create border width.
+    doc.selection.expand(CONFIG.whiteEdgePx);
+
+    // Create white layer, fill, deselect.
+    doc.activeLayer = soLayer;
+    var wbcLayer    = doc.artLayers.add();
+    wbcLayer.name   = CONFIG.whiteEdgeLayerName;
+
+    var white = new SolidColor();
+    white.rgb.red   = 255;
+    white.rgb.green = 255;
+    white.rgb.blue  = 255;
+    doc.selection.fill(white);
+    doc.selection.deselect();
+
+    // Move to just below the SO.
     wbcLayer.move(soLayer, ElementPlacement.PLACEAFTER);
 }

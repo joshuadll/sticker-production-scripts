@@ -32,6 +32,23 @@ function getTargetPx(parsed) {
     return null;
 }
 
+// Loads a layer's transparency channel as the active selection without rasterising.
+// Equivalent to Ctrl+clicking the layer thumbnail in the Layers panel.
+// Ruler units do not affect this operation.
+function loadLayerTransparency(layer) {
+    app.activeDocument.activeLayer = layer;
+    var desc   = new ActionDescriptor();
+    var selRef = new ActionReference();
+    selRef.putProperty(charIDToTypeID("Chnl"), charIDToTypeID("fsel"));
+    desc.putReference(charIDToTypeID("null"), selRef);
+    var lyrRef = new ActionReference();
+    lyrRef.putProperty(charIDToTypeID("Chnl"), charIDToTypeID("Trsp"));
+    lyrRef.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+    desc.putReference(charIDToTypeID("T   "), lyrRef);
+    desc.putBoolean(charIDToTypeID("Invr"), false);
+    executeAction(charIDToTypeID("setd"), desc, DialogModes.NO);
+}
+
 // Returns true if the element should receive a caption (WC and GC styles only).
 function needsCaption(parsed) {
     if (!parsed) return false;

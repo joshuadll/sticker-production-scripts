@@ -42,10 +42,10 @@ var CONFIG = {
     },
 
     // ── Step 3: White edge ────────────────────────────────────────────────────
-    // ⚠️  White edges.atn must be loaded in Photoshop before running this script.
-    actionSet:          "Cutline",            // action set name in Actions panel
-    actionName:         "White Base_Cutline", // action name within the set
-    whiteEdgeLayerName: "White Base_Cutline", // exact name of the layer the action creates
+    // ⚠️  Confirm whiteEdgePx with artist — ask for the border width they use.
+    // At 300 DPI: 30px ≈ 2.5mm, 40px ≈ 3.4mm. Typical range: 25–40px.
+    whiteEdgePx:        30,               // ⚠️ confirm with artist
+    whiteEdgeLayerName: "White Base_Cutline", // name given to the created layer
 
     // ── Step 3A: Caption text ──────────────────────────────────────────────────
 
