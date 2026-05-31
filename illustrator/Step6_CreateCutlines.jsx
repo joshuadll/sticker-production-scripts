@@ -37,12 +37,13 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     var cutlinesLayer = findLayer(doc, CONFIG.cutlinesLayerName);
     if (!cutlinesLayer) {
         cutlinesLayer = doc.layers.add();
-        cutlinesLayer.name = CONFIG.cutlinesLayerName;
+        cutlinesLayer.name  = CONFIG.cutlinesLayerName;
+        cutlinesLayer.color = UIColors.MAGENTA; // matches manual workflow; cosmetic only
         var stickersLayer = findLayer(doc, CONFIG.stickersLayerName);
         if (stickersLayer) {
             cutlinesLayer.move(stickersLayer, ElementPlacement.PLACEBEFORE);
         }
-        log("[step6] created Cutlines layer above Stickers.");
+        log("[step6] created Cutlines layer (Magenta) above Stickers.");
     }
 
     // ── 3. Place silhouette PNG into Cutlines layer ───────────────────────────
@@ -74,14 +75,15 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     log("[step6] scaled to " + Math.round(pngWidth) + "pt wide, centred on artboard.");
 
     // ── 4. Image Trace ────────────────────────────────────────────────────────
-    // ⚠️  executeMenuCommand IDs are Illustrator-internal strings — verify on
-    //     first run. If "imageTraceMake" fails, check Object > Image Trace > Make.
+    // ActionDescriptor approach: sets preset atomically and suppresses the
+    // "Tracing may proceed slowly" performance warning via DialogModes.NO.
     doc.selection = [placed];
-    app.executeMenuCommand("imageTraceMake");
+    var traceDesc = new ActionDescriptor();
+    traceDesc.putString(stringIDToTypeID("preset"), "Silhouettes");
+    executeAction(stringIDToTypeID("imageTrace"), traceDesc, DialogModes.NO);
 
-    var traceItem = doc.selection[0]; // ImageTraceItem
-    traceItem.preset = "Silhouettes"; // ⚠️  Must match Illustrator's built-in preset name exactly.
-    app.executeMenuCommand("imageTraceExpand");
+    // Expand the trace result to live paths.
+    app.executeMenuCommand("expandArt1");
 
     // Ungroup — trace result is a GroupItem; one ungroup gives PathItems.
     app.executeMenuCommand("ungroup");
