@@ -19,9 +19,9 @@ sticker-production-scripts/
 ├── photoshop/
 │   ├── Step1_CombineElements.jsx
 │   ├── Step2_AutoResize.jsx
+│   ├── Step3_WhiteEdge.jsx      ← adds white edge to each SO (before caption review)
 │   ├── Step3A_CaptionText.jsx   ← places T layers; artist reviews before Step 3B
 │   ├── Step3B_CaptionWhite.jsx  ← adds White pill + Caption plate; groups all layers
-│   ├── Step4_WhiteEdge.jsx
 │   └── Step5_Silhouette.jsx
 ├── illustrator/
 │   ├── Step6_CreateCutlines.jsx
@@ -30,8 +30,9 @@ sticker-production-scripts/
 │   ├── Step9_PeelingTabHalfcut.jsx
 │   └── Step10_AssetExportFinalFile.jsx
 ├── pipelines/
-│   ├── PS_ToCaption.jsx        ← Steps 1 → 2 → 3      (stop: artist reviews captions)
-│   ├── PS_AfterCaption.jsx     ← Steps 4 → 5 → BridgeTalk → AI Step 6
+│   ├── PS_ToCaption.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
+│   │                                                   (stop: artist reviews captions)
+│   ├── PS_AfterCaption.jsx     ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Step 6
 │   │                                                   (stop: artist does Deepnest manually)
 │   ├── AI_AfterDeepnest.jsx    ← Step 8a Simplify      (stop: artist pencil refinements)
 │   └── AI_AfterPencil.jsx      ← Steps 8b → 9 → 10    (done)

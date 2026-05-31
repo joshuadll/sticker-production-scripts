@@ -4,10 +4,15 @@
 // Runs after the artist's manual caption review pass (Step 3A → artist adjusts →
 // Step 3B). Finds each SO + T layer pair, creates a White pill base that follows
 // the T layer's shape (handles straight and curved text), adds a Caption plate for
-// GC-LM elements, then groups everything under the original element name.
+// GC-LM elements, then groups everything — including the White Base_Cutline added
+// by Step 3 (white edge) — under the original element name.
 //
-// Expects at top level: SO layers (NAME_REGEX), T layers (display name, LayerKind.TEXT),
-// and optionally a "Caption plate" group for GC-LM SKUs.
+// Expects at top level:
+//   • SO layers (NAME_REGEX) — each followed immediately by White Base_Cutline
+//   • T layers (display name, LayerKind.TEXT) — above the corresponding SO
+//   • Optionally a "Caption plate" group for GC-LM SKUs
+//
+// Stamp elements ([ST]) are grouped with their White Base_Cutline only (no caption).
 //
 // Returns: { grouped, skipped[] }
 
@@ -34,12 +39,34 @@ function runCaptionWhite(doc) {
 
             var parsed = parseLayerName(name);
             if (!parsed) continue;
-            if (!needsCaption(parsed)) continue; // ST skipped
 
             var soLayer = findLayerByName(doc, name);
             if (!soLayer) {
                 log("[step3B] SKIP | \"" + name + "\" — SO not found.");
                 skipped.push(name + " (SO not found)");
+                continue;
+            }
+
+            // ── Stamps: group SO + White Base_Cutline only, no caption ──────
+            if (parsed.styleCode === "ST") {
+                if (CONFIG.dryRun) {
+                    log("[step3B] [DRY RUN] would group stamp | " + name);
+                    grouped++;
+                    continue;
+                }
+                try {
+                    groupStamp(doc, soLayer, name);
+                    log("[step3B] grouped stamp | " + name);
+                    grouped++;
+                } catch (e) {
+                    log("[step3B] ERROR | \"" + name + "\" line " + e.line + ": " + e.message);
+                    skipped.push(name + " (error: " + e.message + ")");
+                }
+                continue;
+            }
+
+            if (!needsCaption(parsed)) {
+                // Unrecognised style code — skip silently (already logged by Step 3A).
                 continue;
             }
 
@@ -92,12 +119,42 @@ function runCaptionWhite(doc) {
     return { grouped: grouped, skipped: skipped };
 }
 
+// ─── STAMP PATH ───────────────────────────────────────────────────────────────
+// ST elements: SO + White Base_Cutline only (no caption layers).
+
+function groupStamp(doc, soLayer, groupName) {
+    var wbcLayer = findAdjacentCutline(doc, soLayer);
+    var layers   = wbcLayer ? [soLayer, wbcLayer] : [soLayer];
+    if (!wbcLayer) {
+        log("[step3B] WARN | \"" + groupName
+            + "\" — no White Base_Cutline found below SO. "
+            + "Ensure Step 3 (white edge) ran before this step.");
+    }
+    selectAndGroup(doc, layers, groupName);
+}
+
 // ─── STANDARD PATH ────────────────────────────────────────────────────────────
-// WC elements and GC non-LM: SO + T + White pill.
+// WC elements and GC non-LM: T + White pill + SO + White Base_Cutline.
 
 function groupStandard(doc, soLayer, textLayer, groupName) {
+    var wbcLayer   = findAdjacentCutline(doc, soLayer);
     var whiteLayer = createWhiteFromText(doc, textLayer);
-    selectAndGroup(doc, [soLayer, textLayer, whiteLayer], groupName);
+
+    // Group in z-stack order: T (top/front), White pill, SO, White Base_Cutline (bottom/back).
+    // Photoshop preserves relative positions, so passing [textLayer, whiteLayer, soLayer, wbcLayer]
+    // would reorder them. Instead, pass all four and rely on their existing z-order.
+    // selectAndGroup selects all four; Photoshop groups them preserving relative stack order.
+    var layers = wbcLayer
+        ? [textLayer, whiteLayer, soLayer, wbcLayer]
+        : [textLayer, whiteLayer, soLayer];
+
+    if (!wbcLayer) {
+        log("[step3B] WARN | \"" + groupName
+            + "\" — no White Base_Cutline below SO. "
+            + "Ensure Step 3 (white edge) ran before this step.");
+    }
+
+    selectAndGroup(doc, layers, groupName);
 }
 
 // ─── PLATE PATH ───────────────────────────────────────────────────────────────
@@ -142,9 +199,20 @@ function groupWithPlate(doc, soLayer, textLayer, groupName) {
             + "Place a group named \"Caption plate\" in the source PSD before running.");
     }
 
-    var layers = plateLayer
-        ? [soLayer, textLayer, plateLayer, whiteLayer]
-        : [soLayer, textLayer, whiteLayer];
+    var wbcLayer = findAdjacentCutline(doc, soLayer);
+    if (!wbcLayer) {
+        log("[step3B] WARN | \"" + groupName
+            + "\" — no White Base_Cutline below SO. "
+            + "Ensure Step 3 (white edge) ran before this step.");
+    }
+
+    // Z-order (top → bottom): T, White pill, Caption plate, SO, White Base_Cutline.
+    var layers = [];
+    layers.push(textLayer);
+    layers.push(whiteLayer);
+    if (plateLayer) layers.push(plateLayer);
+    layers.push(soLayer);
+    if (wbcLayer)   layers.push(wbcLayer);
 
     selectAndGroup(doc, layers, groupName);
 }
@@ -353,6 +421,22 @@ function findTextLayerByName(doc, displayName) {
         var layer = doc.layers[i];
         if (layer.kind === LayerKind.TEXT && layer.name === displayName) {
             return layer;
+        }
+    }
+    return null;
+}
+
+// Finds the White Base_Cutline layer immediately below soLayer in the stack.
+// Step 3 (white edge) always places it at soIndex + 1.
+// Returns null if not found or if the next layer has a different name.
+function findAdjacentCutline(doc, soLayer) {
+    for (var i = 0; i < doc.layers.length; i++) {
+        if (doc.layers[i] === soLayer) {
+            var next = (i + 1 < doc.layers.length) ? doc.layers[i + 1] : null;
+            if (next && next.name === CONFIG.whiteEdgeLayerName) {
+                return next;
+            }
+            return null; // next layer exists but is not a WBC
         }
     }
     return null;

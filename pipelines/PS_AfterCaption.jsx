@@ -1,7 +1,6 @@
 #target photoshop
 #include "../utils/psUtils.jsx"
 #include "../photoshop/Step3B_CaptionWhite.jsx"
-#include "../photoshop/Step4_WhiteEdge.jsx"
 #include "../photoshop/Step5_Silhouette.jsx"
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -19,6 +18,9 @@ var CONFIG = {
     logPath: "", // resolved below
 
     // ── Step 3B: Caption white base + grouping ─────────────────────────────────
+    // whiteEdgeLayerName must match CONFIG.whiteEdgeLayerName in PS_ToCaption.jsx
+    // so Step 3B can find the White Base_Cutline layers left by Step 3.
+    whiteEdgeLayerName: "White Base_Cutline",
 
     whiteRectPadH:     20,   // net horizontal padding around text (after expand→contract)
     whiteExpandPx:     25,   // expand amount to fill letter counter holes (must be > ~20px)
@@ -111,36 +113,19 @@ function main() {
     }
     log("[pipeline] step 3B complete | " + captionWhiteResult.grouped + " element(s) grouped.");
 
-    // ── Step 4: White Edge ─────────────────────────────────────────
-    log("[pipeline] --- Step 4: White Edge ---");
-    var snapshotB = doc.activeHistoryState;
-    var whiteEdgeResult;
-
-    try {
-        whiteEdgeResult = runWhiteEdge(doc);
-    } catch (e) {
-        doc.activeHistoryState = snapshotB;
-        log("[pipeline] ERROR | step 4 line " + e.line + ": " + e.message
-            + " — rolled back to post-grouping state.");
-        scriptAlert("ERROR in Step 4 (White Edge).\nLine " + e.line + ": " + e.message
-            + "\n\nRolled back. Log: " + CONFIG.logPath);
-        return;
-    }
-    log("[pipeline] step 4 complete | " + whiteEdgeResult.processed + " element(s).");
-
     // ── Step 5: Silhouette ─────────────────────────────────────────
     log("[pipeline] --- Step 5: Silhouette ---");
-    var snapshotC = doc.activeHistoryState;
+    var snapshotB = doc.activeHistoryState;
     var silhouetteResult;
 
     try {
         silhouetteResult = runSilhouette(doc);
     } catch (e) {
-        doc.activeHistoryState = snapshotC;
+        doc.activeHistoryState = snapshotB;
         log("[pipeline] ERROR | step 5 line " + e.line + ": " + e.message
-            + " — rolled back to post-white-edge state.");
+            + " — rolled back to post-grouping state.");
         scriptAlert("ERROR in Step 5 (Silhouette).\nLine " + e.line + ": " + e.message
-            + "\n\nRolled back to post-white-edge state. Log: " + CONFIG.logPath);
+            + "\n\nRolled back to post-grouping state. Log: " + CONFIG.logPath);
         return;
     }
     log("[pipeline] step 5 complete | " + silhouetteResult.processed + " element(s).");
@@ -164,7 +149,6 @@ function main() {
 
     var msg = "Done.\n\n"
         + "  Grouped:     " + captionWhiteResult.grouped + " element(s).\n"
-        + "  White Edge:  " + whiteEdgeResult.processed + " element(s).\n"
         + "  Silhouette:  " + silhouetteResult.processed + " element(s).\n\n"
         + "Illustrator is opening the production template.\n"
         + "Wait for it to finish placing elements, then do Deepnest.\n\n"

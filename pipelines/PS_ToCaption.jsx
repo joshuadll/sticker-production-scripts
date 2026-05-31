@@ -2,6 +2,7 @@
 #include "../utils/psUtils.jsx"
 #include "../photoshop/Step1_CombineElements.jsx"
 #include "../photoshop/Step2_AutoResize.jsx"
+#include "../photoshop/Step3_WhiteEdge.jsx"
 #include "../photoshop/Step3A_CaptionText.jsx"
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -39,6 +40,12 @@ var CONFIG = {
         "FD": 525,  // Food / local cuisine          1.75 in (midpoint 1.5–2)
         "ST": 450   // Stamp (style code, no cat)    1.5 in
     },
+
+    // ── Step 3: White edge ────────────────────────────────────────────────────
+    // ⚠️  White edges.atn must be loaded in Photoshop before running this script.
+    actionSet:          "Cutline",            // action set name in Actions panel
+    actionName:         "White Base_Cutline", // action name within the set
+    whiteEdgeLayerName: "White Base_Cutline", // exact name of the layer the action creates
 
     // ── Step 3A: Caption text ──────────────────────────────────────────────────
 
@@ -159,19 +166,37 @@ function main() {
     }
     log("[pipeline] step 2 complete | " + resizeResult.resized + " element(s) resized.");
 
+    // ── Step 3: White edge ─────────────────────────────────────────
+    log("[pipeline] --- Step 3: White edge ---");
+    var snapshotC = doc.activeHistoryState;
+    var whiteEdgeResult;
+
+    try {
+        whiteEdgeResult = runWhiteEdge(doc);
+    } catch (e) {
+        doc.activeHistoryState = snapshotC;
+        log("[pipeline] ERROR | step 3 line " + e.line + ": " + e.message
+            + " — rolled back to post-resize state.");
+        scriptAlert("ERROR in Step 3 (White edge).\nLine " + e.line + ": " + e.message
+            + "\n\nRolled back to post-resize state.\n"
+            + "Ensure White edges.atn is loaded, then re-run.\nLog: " + CONFIG.logPath);
+        return;
+    }
+    log("[pipeline] step 3 complete | " + whiteEdgeResult.processed + " element(s).");
+
     // ── Step 3A: Caption text ──────────────────────────────────────
     log("[pipeline] --- Step 3A: Caption text ---");
-    var snapshotC = doc.activeHistoryState;
+    var snapshotD = doc.activeHistoryState;
     var captionResult;
 
     try {
         captionResult = runCaptionText(doc);
     } catch (e) {
-        doc.activeHistoryState = snapshotC;
+        doc.activeHistoryState = snapshotD;
         log("[pipeline] ERROR | step 3A line " + e.line + ": " + e.message
-            + " — rolled back to post-resize state. All elements preserved.");
+            + " — rolled back to post-white-edge state. White edges preserved.");
         scriptAlert("ERROR in Step 3A (Caption text).\nLine " + e.line + ": " + e.message
-            + "\n\nAll elements preserved. Rolled back to post-resize state.\n"
+            + "\n\nWhite edges preserved. Rolled back to post-white-edge state.\n"
             + "Fix the issue and re-run.\nLog: " + CONFIG.logPath);
         return;
     }
@@ -181,10 +206,11 @@ function main() {
     log("[pipeline] === PS_ToCaption done ===");
 
     var msg = "Done.\n\n"
-        + "  Combined:  " + combineResult.placed + " element(s) from "
+        + "  Combined:    " + combineResult.placed + " element(s) from "
         + combineResult.fileCount + " file(s).\n"
-        + "  Resized:   " + resizeResult.resized + " element(s).\n"
-        + "  Captions:  " + captionResult.placed + " T layer(s) placed.";
+        + "  Resized:     " + resizeResult.resized + " element(s).\n"
+        + "  White edge:  " + whiteEdgeResult.processed + " element(s).\n"
+        + "  Captions:    " + captionResult.placed + " T layer(s) placed.";
 
     if (resizeResult.skipped.length > 0) {
         msg += "\n\n  Resize skipped (" + resizeResult.skipped.length + "):";

@@ -115,6 +115,7 @@ function placeCaptionText(doc, soLayer, displayName, font) {
     // Position in pixels (ruler is already PIXELS).
     ti.position = [centerX, baselineY];
 
-    // Place T layer just below the SO in the layer panel.
-    textLayer.move(soLayer, ElementPlacement.PLACEAFTER);
+    // Place T layer just above the SO so it ends up at the top of the group
+    // after Step 3B grouping (panel order: T → White → SO → White Base_Cutline).
+    textLayer.move(soLayer, ElementPlacement.PLACEBEFORE);
 }
