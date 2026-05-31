@@ -1,8 +1,8 @@
 #target photoshop
 #include "../utils/psUtils.jsx"
 #include "../photoshop/Step1_CombineElements.jsx"
-#include "../photoshop/Step2_AutoResize.jsx"
-#include "../photoshop/Step3_WhiteEdge.jsx"
+#include "../photoshop/Step2A_AutoResize.jsx"
+#include "../photoshop/Step2B_WhiteEdge.jsx"
 #include "../photoshop/Step3A_CaptionText.jsx"
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────

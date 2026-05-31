@@ -18,8 +18,8 @@ sticker-production-scripts/
 │   └── aiUtils.jsx          ← shared Illustrator helpers (#included by AI pipelines)
 ├── photoshop/
 │   ├── Step1_CombineElements.jsx
-│   ├── Step2_AutoResize.jsx
-│   ├── Step3_WhiteEdge.jsx      ← adds white edge to each SO (before caption review)
+│   ├── Step2A_AutoResize.jsx
+│   ├── Step2B_WhiteEdge.jsx     ← adds white edge to each SO (before caption review)
 │   ├── Step3A_CaptionText.jsx   ← places T layers; artist reviews before Step 3B
 │   ├── Step3B_CaptionWhite.jsx  ← adds White pill + Caption plate; groups all layers
 │   └── Step5_Silhouette.jsx
@@ -53,7 +53,7 @@ The only files artists run. These own CONFIG and main().
 #target photoshop
 #include "../utils/psUtils.jsx"
 #include "../photoshop/Step1_CombineElements.jsx"
-#include "../photoshop/Step2_AutoResize.jsx"
+#include "../photoshop/Step2A_AutoResize.jsx"
 
 var CONFIG = { dryRun: false, skipLayerName: "Guide", ... };
 CONFIG.logPath = new File($.fileName).parent.fsName + "/PipelineName.log";

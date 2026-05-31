@@ -1,4 +1,4 @@
-// Step2_AutoResize.jsx — Phase function only.
+// Step2A_AutoResize.jsx — Phase function only.
 // #included by pipeline scripts. Requires: psUtils.jsx, CONFIG in scope.
 //
 // Resizes every element Smart Object in the template to its correct
