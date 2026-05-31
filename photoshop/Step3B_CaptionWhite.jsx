@@ -25,27 +25,21 @@ function runCaptionWhite(doc) {
     var gcLmCount = 0;  // track how many GC-LM elements used the caption plate
 
     try {
-        // First pass: collect SO layer names.
-        var layerNames = [];
+        // Collect layer references upfront to avoid index-shift during grouping.
+        var layerRefs = [];
         for (var i = 0; i < doc.layers.length; i++) {
-            layerNames.push(doc.layers[i].name);
+            layerRefs.push(doc.layers[i]);
         }
 
-        for (var i = 0; i < layerNames.length; i++) {
-            var name = layerNames[i];
+        for (var i = 0; i < layerRefs.length; i++) {
+            var soLayer = layerRefs[i];
+            var name    = soLayer.name;
 
             if (name === CONFIG.skipLayerName) continue;
-            if (name === "Caption plate")      continue; // handled separately
+            if (name === "Caption plate")      continue;
 
             var parsed = parseLayerName(name);
             if (!parsed) continue;
-
-            var soLayer = findLayerByName(doc, name);
-            if (!soLayer) {
-                log("[step3B] SKIP | \"" + name + "\" — SO not found.");
-                skipped.push(name + " (SO not found)");
-                continue;
-            }
 
             // ── Stamps: group SO + White Base_Cutline only, no caption ──────
             if (parsed.styleCode === "ST") {
@@ -65,13 +59,10 @@ function runCaptionWhite(doc) {
                 continue;
             }
 
-            if (!needsCaption(parsed)) {
-                // Unrecognised style code — skip silently (already logged by Step 3A).
-                continue;
-            }
+            if (!needsCaption(parsed)) continue;
 
             // Find matching T layer: a TEXT layer whose name equals the display name.
-            var textLayer = findTextLayerByName(doc, parsed.displayName);
+            var textLayer = findTextLayerByDisplayName(doc, parsed.displayName);
             if (!textLayer) {
                 log("[step3B] SKIP | \"" + name + "\" — no T layer named \""
                     + parsed.displayName + "\" found. Run Step 3A first.");
@@ -79,8 +70,10 @@ function runCaptionWhite(doc) {
                 continue;
             }
 
+            var isPlate = isCaptionPlate(parsed);
+
             if (CONFIG.dryRun) {
-                var treatment = isCaptionPlate(parsed) ? "plate" : "standard";
+                var treatment = isPlate ? "plate" : "standard";
                 log("[step3B] [DRY RUN] would group | " + name
                     + " (" + treatment + ") — T layer: \"" + textLayer.name + "\"");
                 grouped++;
@@ -88,7 +81,7 @@ function runCaptionWhite(doc) {
             }
 
             try {
-                if (isCaptionPlate(parsed)) {
+                if (isPlate) {
                     groupWithPlate(doc, soLayer, textLayer, name);
                     gcLmCount++;
                 } else {
@@ -96,7 +89,6 @@ function runCaptionWhite(doc) {
                 }
                 log("[step3B] grouped | " + name);
                 grouped++;
-
             } catch (e) {
                 log("[step3B] ERROR | \"" + name + "\" line " + e.line + ": " + e.message);
                 skipped.push(name + " (error: " + e.message + ")");
@@ -238,15 +230,9 @@ function createWhiteFromText(doc, textLayer) {
     doc.selection.smooth(CONFIG.whiteSmoothPx);
 
     // Create White layer directly below the T layer, fill, deselect.
-    doc.activeLayer = textLayer;
     var whiteLayer  = doc.artLayers.add();
     whiteLayer.name = "White";
-
-    var white = new SolidColor();
-    white.rgb.red   = 255;
-    white.rgb.green = 255;
-    white.rgb.blue  = 255;
-    doc.selection.fill(white);
+    doc.selection.fill(solidWhite());
     doc.selection.deselect();
 
     whiteLayer.move(textLayer, ElementPlacement.PLACEAFTER);
@@ -261,14 +247,10 @@ function createPillFromRect(doc, x1, y1, x2, y2) {
     var h = y2 - y1;
     var r = h / 2; // radius = half height → fully rounded ends
 
-    doc.activeLayer = doc.layers[0]; // add new layer at top of stack
+    doc.activeLayer = doc.layers[0]; // add new layer at top of stack so it's above textLayer
     var layer       = doc.artLayers.add();
     layer.name      = "White";
-
-    var white = new SolidColor();
-    white.rgb.red   = 255;
-    white.rgb.green = 255;
-    white.rgb.blue  = 255;
+    var white       = solidWhite();
 
     // Centre rectangle body (between end caps).
     doc.selection.select([[x1+r, y1], [x2-r, y1], [x2-r, y2], [x1+r, y2]]);
@@ -375,42 +357,9 @@ function selectAndGroup(doc, layers, groupName) {
     doc.activeLayer.name = groupName;
 }
 
-function selectLayerById(layer) {
-    var desc = new ActionDescriptor();
-    var ref  = new ActionReference();
-    ref.putIdentifier(charIDToTypeID("Lyr "), layer.id);
-    desc.putReference(charIDToTypeID("null"), ref);
-    desc.putBoolean(stringIDToTypeID("makeVisible"), false);
-    executeAction(charIDToTypeID("slct"), desc, DialogModes.NO);
-}
-
-function addLayerToSelectionById(layer) {
-    var desc = new ActionDescriptor();
-    var ref  = new ActionReference();
-    ref.putIdentifier(charIDToTypeID("Lyr "), layer.id);
-    desc.putReference(charIDToTypeID("null"), ref);
-    desc.putBoolean(stringIDToTypeID("makeVisible"), false);
-    desc.putEnumerated(
-        stringIDToTypeID("selectionModifier"),
-        stringIDToTypeID("selectionModifierType"),
-        stringIDToTypeID("addToSelection")
-    );
-    executeAction(charIDToTypeID("slct"), desc, DialogModes.NO);
-}
+// selectLayerById, addLayerToSelectionById, findTextLayerByDisplayName defined in psUtils.jsx.
 
 // ─── UTILITY ──────────────────────────────────────────────────────────────────
-
-// Finds the first top-level TEXT layer whose name matches displayName.
-// Returns null if not found.
-function findTextLayerByName(doc, displayName) {
-    for (var i = 0; i < doc.layers.length; i++) {
-        var layer = doc.layers[i];
-        if (layer.kind === LayerKind.TEXT && layer.name === displayName) {
-            return layer;
-        }
-    }
-    return null;
-}
 
 // Finds the White Base_Cutline layer immediately below soLayer in the stack.
 // Step 3 (white edge) always places it at soIndex + 1.

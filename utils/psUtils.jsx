@@ -139,3 +139,59 @@ function resizeLayerToTarget(layer, targetPx) {
     layer.resize(pct, pct, AnchorPosition.MIDDLECENTER);
     return true;
 }
+
+// ─── COLOR HELPERS ────────────────────────────────────────────────────────────
+
+function solidBlack() {
+    var c = new SolidColor();
+    c.rgb.red = 0; c.rgb.green = 0; c.rgb.blue = 0;
+    return c;
+}
+
+function solidWhite() {
+    var c = new SolidColor();
+    c.rgb.red = 255; c.rgb.green = 255; c.rgb.blue = 255;
+    return c;
+}
+
+// ─── TEXT LAYER SEARCH ────────────────────────────────────────────────────────
+
+// Finds the first top-level TEXT layer whose name matches displayName.
+// Returns null if not found.
+function findTextLayerByDisplayName(doc, displayName) {
+    for (var i = 0; i < doc.layers.length; i++) {
+        var layer = doc.layers[i];
+        if (layer.kind === LayerKind.TEXT && layer.name === displayName) {
+            return layer;
+        }
+    }
+    return null;
+}
+
+// ─── LAYER SELECTION HELPERS ─────────────────────────────────────────────────
+// Used by Step3B (selectAndGroup) and Step5 (grouping fallback).
+
+// Selects a single layer by its internal ID (replaces current selection).
+function selectLayerById(layer) {
+    var desc = new ActionDescriptor();
+    var ref  = new ActionReference();
+    ref.putIdentifier(charIDToTypeID("Lyr "), layer.id);
+    desc.putReference(charIDToTypeID("null"), ref);
+    desc.putBoolean(stringIDToTypeID("makeVisible"), false);
+    executeAction(charIDToTypeID("slct"), desc, DialogModes.NO);
+}
+
+// Adds a layer to the current selection by its internal ID.
+function addLayerToSelectionById(layer) {
+    var desc = new ActionDescriptor();
+    var ref  = new ActionReference();
+    ref.putIdentifier(charIDToTypeID("Lyr "), layer.id);
+    desc.putReference(charIDToTypeID("null"), ref);
+    desc.putBoolean(stringIDToTypeID("makeVisible"), false);
+    desc.putEnumerated(
+        stringIDToTypeID("selectionModifier"),
+        stringIDToTypeID("selectionModifierType"),
+        stringIDToTypeID("addToSelection")
+    );
+    executeAction(charIDToTypeID("slct"), desc, DialogModes.NO);
+}

@@ -26,44 +26,37 @@ function runWhiteEdge(doc) {
     app.preferences.rulerUnits = Units.PIXELS;
 
     try {
-        // First pass: collect layer names to avoid index-shift as WBC layers are added.
-        var layerNames = [];
+        // Collect layer references upfront to avoid index-shift as WBC layers are added.
+        var layerRefs = [];
         for (var i = 0; i < doc.layers.length; i++) {
-            layerNames.push(doc.layers[i].name);
+            layerRefs.push(doc.layers[i]);
         }
 
-        for (var i = 0; i < layerNames.length; i++) {
-            var name = layerNames[i];
+        for (var i = 0; i < layerRefs.length; i++) {
+            var soLayer = layerRefs[i];
+            var name    = soLayer.name;
 
             if (name === CONFIG.skipLayerName) continue;
 
             var parsed = parseLayerName(name);
             if (!parsed) {
-                log("[step3] SKIP | \"" + name + "\" — no [STYLE-CAT] code.");
+                log("[step2B] SKIP | \"" + name + "\" — no [STYLE-CAT] code.");
                 skipped.push(name + " (no code)");
                 continue;
             }
 
-            // Re-find by name — earlier WBC insertions shift indices.
-            var soLayer = findLayerByName(doc, name);
-            if (!soLayer) {
-                log("[step3] SKIP | \"" + name + "\" — layer not found.");
-                skipped.push(name + " (not found)");
-                continue;
-            }
-
             if (CONFIG.dryRun) {
-                log("[step3] [DRY RUN] would add white edge | " + name);
+                log("[step2B] [DRY RUN] would add white edge | " + name);
                 processed++;
                 continue;
             }
 
             try {
                 applyWhiteEdge(doc, soLayer);
-                log("[step3] white edge | " + name);
+                log("[step2B] white edge | " + name);
                 processed++;
             } catch (e) {
-                log("[step3] ERROR | \"" + name + "\" line " + e.line + ": " + e.message);
+                log("[step2B] ERROR | \"" + name + "\" line " + e.line + ": " + e.message);
                 skipped.push(name + " (error: " + e.message + ")");
             }
         }
@@ -89,7 +82,7 @@ function applyWhiteEdge(doc, soLayer) {
         if (doc.layers[i] === soLayer) {
             var next = (i + 1 < doc.layers.length) ? doc.layers[i + 1] : null;
             if (next && next.name === CONFIG.whiteEdgeLayerName) {
-                log("[step3] SKIP | \"" + soLayer.name
+                log("[step2B] SKIP | \"" + soLayer.name
                     + "\" — White Base_Cutline already present. Skipping re-application.");
                 return;
             }
@@ -104,15 +97,9 @@ function applyWhiteEdge(doc, soLayer) {
     doc.selection.expand(CONFIG.whiteEdgePx);
 
     // Create white layer, fill, deselect.
-    doc.activeLayer = soLayer;
-    var wbcLayer    = doc.artLayers.add();
-    wbcLayer.name   = CONFIG.whiteEdgeLayerName;
-
-    var white = new SolidColor();
-    white.rgb.red   = 255;
-    white.rgb.green = 255;
-    white.rgb.blue  = 255;
-    doc.selection.fill(white);
+    var wbcLayer  = doc.artLayers.add();
+    wbcLayer.name = CONFIG.whiteEdgeLayerName;
+    doc.selection.fill(solidWhite());
     doc.selection.deselect();
 
     // Move to just below the SO.

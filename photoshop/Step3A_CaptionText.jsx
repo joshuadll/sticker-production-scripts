@@ -16,14 +16,15 @@ function runCaptionText(doc) {
     var skipped = [];
 
     try {
-        // First pass: collect SO layer names to avoid index-shift as T layers are added.
-        var layerNames = [];
+        // Collect layer references upfront to avoid index-shift as T layers are added.
+        var layerRefs = [];
         for (var i = 0; i < doc.layers.length; i++) {
-            layerNames.push(doc.layers[i].name);
+            layerRefs.push(doc.layers[i]);
         }
 
-        for (var i = 0; i < layerNames.length; i++) {
-            var name = layerNames[i];
+        for (var i = 0; i < layerRefs.length; i++) {
+            var soLayer = layerRefs[i];
+            var name    = soLayer.name;
 
             if (name === CONFIG.skipLayerName) continue;
 
@@ -40,11 +41,9 @@ function runCaptionText(doc) {
                 continue;
             }
 
-            // Re-find by name — earlier T layer insertions shift indices.
-            var soLayer = findLayerByName(doc, name);
-            if (!soLayer) {
-                log("[step3A] SKIP | \"" + name + "\" — not found at placement time.");
-                skipped.push(name + " (not found)");
+            // Re-run guard: skip if T layer already exists for this element.
+            if (findTextLayerByDisplayName(doc, parsed.displayName)) {
+                log("[step3A] SKIP | \"" + name + "\" — T layer already exists.");
                 continue;
             }
 
@@ -94,8 +93,6 @@ function placeCaptionText(doc, soLayer, displayName, font) {
     // approximately (elementBottom + captionGap). Tune if placement is off.
     var baselineY = bottom + CONFIG.captionGap + CONFIG.captionBaselineOffsetPx;
 
-    // Add layer above active layer, then immediately move it below SO.
-    doc.activeLayer = soLayer;
     var textLayer   = doc.artLayers.add();
     textLayer.kind  = LayerKind.TEXT;
 
@@ -105,12 +102,7 @@ function placeCaptionText(doc, soLayer, displayName, font) {
     ti.size          = new UnitValue(CONFIG.captionSizePt, "pt");
     ti.tracking      = CONFIG.captionTracking;
     ti.justification = Justification.CENTER;
-
-    var black = new SolidColor();
-    black.rgb.red   = 0;
-    black.rgb.green = 0;
-    black.rgb.blue  = 0;
-    ti.color = black;
+    ti.color         = solidBlack();
 
     // Position in pixels (ruler is already PIXELS).
     ti.position = [centerX, baselineY];
