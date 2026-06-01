@@ -83,6 +83,60 @@ function exportSilhouettePng(doc) {
     return pngPath;
 }
 
+// ─── CAPTION METADATA ────────────────────────────────────────────────────────
+
+// Returns caption region info for one element group, or null if it has no
+// caption sub-layers. Bounds are the union of the TEXT, "White" pill, and
+// "Caption plate" layers, in pixels. lines = caption line count (from the TEXT
+// layer's contents). Caller must have ruler units set to PIXELS.
+function captionInfo(grp) {
+    var left = null, top = null, right = null, bottom = null;
+    var lines = 1;
+    var found = false;
+
+    function absorb(layer) {
+        var b = layer.bounds;
+        var l = b[0].as("px"), t = b[1].as("px"), r = b[2].as("px"), bo = b[3].as("px");
+        if (left   === null || l  < left)   left   = l;
+        if (top    === null || t  < top)    top    = t;
+        if (right  === null || r  > right)  right  = r;
+        if (bottom === null || bo > bottom) bottom = bo;
+        found = true;
+    }
+
+    var a;
+    for (a = 0; a < grp.artLayers.length; a++) {
+        var al = grp.artLayers[a];
+        if (al.kind === LayerKind.TEXT) {
+            absorb(al);
+            var contents = "";
+            try { contents = al.textItem.contents; } catch (e) { contents = ""; }
+            if (contents) {
+                var parts = contents.split(/[\r\n]+/);
+                if (parts.length > lines) lines = parts.length;
+            }
+        } else if (al.name === "White") {
+            absorb(al);
+        }
+    }
+
+    var s;
+    for (s = 0; s < grp.layerSets.length; s++) {
+        if (grp.layerSets[s].name === "Caption plate") {
+            absorb(grp.layerSets[s]);
+        }
+    }
+
+    if (!found) return null;
+    return {
+        lines:  lines,
+        left:   Math.round(left),
+        top:    Math.round(top),
+        right:  Math.round(right),
+        bottom: Math.round(bottom)
+    };
+}
+
 // ─── ELEMENTS SIDECAR ────────────────────────────────────────────────────────
 
 // Writes a text sidecar next to the PSD with PSD dimensions and element bounds.
@@ -114,14 +168,26 @@ function writeElementsFile(doc) {
         if (!parsed) continue;
 
         var b = grp.bounds; // [left, top, right, bottom] UnitValues
-        lines.push(
+        var line =
             parsed.displayName + "|"
             + parsed.styleCode + "|"
             + Math.round(b[0].as("px")) + "|"
             + Math.round(b[1].as("px")) + "|"
             + Math.round(b[2].as("px")) + "|"
-            + Math.round(b[3].as("px"))
-        );
+            + Math.round(b[3].as("px"));
+
+        // Append caption metadata so Step 6 can build the plate parametrically.
+        // Format: |capLines|capLeft|capTop|capRight|capBottom  (px; zeros if none).
+        var cap = captionInfo(grp);
+        if (cap) {
+            line += "|" + cap.lines
+                + "|" + cap.left + "|" + cap.top
+                + "|" + cap.right + "|" + cap.bottom;
+        } else {
+            line += "|0|0|0|0|0";
+        }
+
+        lines.push(line);
     }
 
     app.preferences.rulerUnits = prevUnits;

@@ -80,7 +80,8 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   log, scriptAlert, isValidTemplate, clearNonGuideLayers,
   convertToSmartObject, resizeLayerToTarget, loadLayerTransparency
 - aiUtils.jsx: NAME_REGEX, parseLayerName, mmToPoints, boundsCenter, isCaption,
-  blackCmyk, redCmyk, setStrokeStyle,
+  blackCmyk, redCmyk, setStrokeStyle, strokeRecursive,
+  buildPlate, deriveCutline, assembleElementGroup,
   log, scriptAlert, findLayer, findPathInLayer
 
 ---
@@ -99,26 +100,36 @@ Category resize targets:
 
 ## Photoshop layer stack — state handed off to Illustrator (after Step 5)
 The PSD imported by Step 6 has exactly three top-level layers:
-  Silhouette         ← flat black pixel layer; Image Traced by Step 6 to generate cut paths
+  Silhouette         ← flat black pixel layer (element art only — captions excluded; see note)
   Elements           ← LayerSet containing all [Display Name] [STYLE-CAT] element groups
   Guide              ← locked; excluded from grouping by CONFIG.skipLayerName
 
-Step 5 implementation note: Silhouette is produced by loading the Elements group
-transparency as a pixel selection and filling a new layer with black — NOT by the
-manual duplicate → clipping mask → merge sequence. Do not change this approach.
+Step 5 implementation note: before loading transparency, Step 5 hides caption sub-layers
+(TEXT, "White" pill, "Caption plate") so the silhouette covers element art only. This is
+intentional — Step 6 rebuilds the caption parametrically and unites it with the traced
+element outline, producing a fused cutline (art + caption) identical in shape to the old
+single-pass trace. Deepnest still receives the full sticker outline. Visibility is restored
+after the fill.
 
 PS_AfterCaption BridgeTalk exports (written before handoff, sibling to PSD):
-  {name}_silhouette.png  ← flat black PNG of Silhouette layer only (for Image Trace)
-  {name}_elements.txt    ← PSD dimensions + element name|styleCode|bounds per line
+  {name}_silhouette.png  ← element-art-only flat black PNG (captions excluded; Step 6 adds them back)
+  {name}_elements.txt    ← PSD dimensions + per element:
+                           displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom
+                           (stamps write 0|0|0|0|0 for the cap fields)
 
 ## Illustrator layer names (exact strings, no case-insensitive fallback needed)
 Working file stack: Asset > Margin > Offset Path > Halfcut > Cutlines > Stickers > Grid > Color Block
 Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
 
-## Cutline path names (set by Step 6 script)
-One path per element: `[Display Name]`  e.g. `Horseshoe Bend`
-Caption pill is part of the element silhouette — no separate caption path.
-Stamp elements get a path from Stamp Cutline Template.ai (same name convention).
+## Cutline structure (set by Step 6 script)
+Each non-stamp element is a GroupItem named `[Display Name]` in the Cutlines layer:
+  [Display Name]          ← visible fused cutline path = Unite(element_outline, plate)
+  [Display Name] outline  ← element-art-only trace (hidden; separable component)
+  [Display Name] plate    ← parametric caption pill (hidden; separable component)
+
+The cutline is still one closed contour per sticker (nesting requires this). The components
+are kept separable so caption normalization in Step 8 is a re-Unite, not path surgery.
+Stamp elements: a placed copy of Stamp Cutline Template.ai named `[Display Name]` (no group).
 
 ## Key confirmed values
 Cut line stroke: 0.25pt black, no fill
@@ -202,8 +213,8 @@ try {
 ### BridgeTalk handoff (PS → AI) — used at end of PS_AfterCaption.jsx
 
 Before sending, PS_AfterCaption exports two sidecar files next to the PSD:
-- `{name}_silhouette.png` — flat black PNG of Silhouette layer (Image Trace input)
-- `{name}_elements.txt`   — PSD dimensions + `displayName|styleCode|left|top|right|bottom` per element
+- `{name}_silhouette.png` — element-art-only flat black PNG (captions excluded)
+- `{name}_elements.txt`   — PSD dimensions + `displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom` per element
 
 Then sends all three paths to AI_ToCutlines.jsx via BridgeTalk.
 

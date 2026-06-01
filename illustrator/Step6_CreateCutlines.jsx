@@ -88,22 +88,19 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     // Ungroup — trace result is a GroupItem; one ungroup gives PathItems.
     app.executeMenuCommand("ungroup");
 
-    log("[step6] Image Trace complete. " + doc.selection.length + " path(s) in selection.");
-
-    // ── 5. Apply stroke, collect PathItems ────────────────────────────────────
+    // ── 5. Collect traced PathItems ───────────────────────────────────────────
+    // Stroke is applied per-path below, only where the path ends up visible.
     var tracedPaths = [];
     var si;
     for (si = 0; si < doc.selection.length; si++) {
         var sel = doc.selection[si];
         if (sel.typename === "PathItem" || sel.typename === "CompoundPathItem") {
-            setStrokeStyle(sel, CONFIG.cutlineStrokePt, blackCmyk());
             tracedPaths.push(sel);
         }
     }
-    log("[step6] applied " + CONFIG.cutlineStrokePt + "pt stroke to "
-        + tracedPaths.length + " path(s).");
+    log("[step6] Image Trace complete. " + tracedPaths.length + " path(s) collected.");
 
-    // ── 6. Name paths by positional matching ──────────────────────────────────
+    // ── 6. Match and name paths ───────────────────────────────────────────────
     var named          = 0;
     var stampsReplaced = 0;
     var unmatched      = 0;
@@ -131,12 +128,21 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
                 stampsReplaced++;
                 log("[step6] stamp replaced | " + matched.displayName);
             } else {
+                setStrokeStyle(path, CONFIG.cutlineStrokePt, blackCmyk());
                 path.name = matched.displayName;
                 log("[step6] WARN | stamp path kept (no stampTemplatePath) | "
                     + matched.displayName);
                 named++;
             }
+        } else if (matched.caption) {
+            // element_outline (path) gets hidden inside _buildSeparableCutline;
+            // strokeRecursive there handles the cutline stroke.
+            _buildSeparableCutline(doc, cutlinesLayer, matched, path,
+                pngLeft, pngTop, pngWidth, pngHeight, elementsData);
+            log("[step6] named | " + matched.displayName);
+            named++;
         } else {
+            setStrokeStyle(path, CONFIG.cutlineStrokePt, blackCmyk());
             path.name = matched.displayName;
             log("[step6] named | " + path.name);
             named++;
@@ -181,42 +187,87 @@ function _readElementsFile(filePath) {
     var i;
     for (i = 2; i < lines.length; i++) {
         var parts = lines[i].split("|");
-        if (parts.length !== 6) continue;
-        elements.push({
+        if (parts.length < 6) continue;
+        var el = {
             displayName: parts[0],
             styleCode:   parts[1],
             left:        parseInt(parts[2], 10),
             top:         parseInt(parts[3], 10),
             right:       parseInt(parts[4], 10),
-            bottom:      parseInt(parts[5], 10)
-        });
+            bottom:      parseInt(parts[5], 10),
+            caption:     null
+        };
+        // Extended (separable) format appends: capLines|capL|capT|capR|capB.
+        if (parts.length >= 11) {
+            var capLines = parseInt(parts[6], 10);
+            var capL = parseInt(parts[7], 10);
+            if (capLines > 0 && (capL || parseInt(parts[9], 10))) {
+                el.caption = {
+                    lines:  capLines,
+                    left:   capL,
+                    top:    parseInt(parts[8],  10),
+                    right:  parseInt(parts[9],  10),
+                    bottom: parseInt(parts[10], 10)
+                };
+            }
+        }
+        elements.push(el);
     }
 
     return { psdWidth: psdWidth, psdHeight: psdHeight, elements: elements };
 }
 
-// Returns the element whose PSD bounds contain the given AI centroid, or null.
-// Transforms each element's PSD pixel bounds to AI document points using the
-// placed PNG's position and dimensions.
-function _findMatchingElement(center, data, pngLeft, pngTop, pngWidth, pngHeight) {
+// Transforms PSD pixel bounds (left, top, right, bottom) to AI document points
+// using the placed PNG's position and dimensions. Returns geometricBounds order
+// [aiLeft, aiTop, aiRight, aiBottom] (AI y increases upward).
+function _psBoundsToAi(left, top, right, bottom, data, pngLeft, pngTop, pngWidth, pngHeight) {
     var psdW = data.psdWidth;
     var psdH = data.psdHeight;
-    var els  = data.elements;
+    return [
+        pngLeft + (left   / psdW) * pngWidth,   // aiLeft
+        pngTop  - (top    / psdH) * pngHeight,  // aiTop
+        pngLeft + (right  / psdW) * pngWidth,   // aiRight
+        pngTop  - (bottom / psdH) * pngHeight   // aiBottom
+    ];
+}
+
+// Returns the element whose PSD bounds contain the given AI centroid, or null.
+function _findMatchingElement(center, data, pngLeft, pngTop, pngWidth, pngHeight) {
+    var els = data.elements;
     var i;
 
     for (i = 0; i < els.length; i++) {
         var el = els[i];
-        var aiLeft   = pngLeft + (el.left   / psdW) * pngWidth;
-        var aiRight  = pngLeft + (el.right  / psdW) * pngWidth;
-        var aiTop    = pngTop  - (el.top    / psdH) * pngHeight; // AI y increases upward
-        var aiBottom = pngTop  - (el.bottom / psdH) * pngHeight;
+        var ai = _psBoundsToAi(el.left, el.top, el.right, el.bottom,
+                     data, pngLeft, pngTop, pngWidth, pngHeight);
 
-        if (center.x >= aiLeft  && center.x <= aiRight &&
-            center.y <= aiTop   && center.y >= aiBottom) {
+        if (center.x >= ai[0] && center.x <= ai[2] &&
+            center.y <= ai[1] && center.y >= ai[3]) {
             return el;
         }
     }
     return null;
+}
+
+// Separable mode: builds the per-element bundle from a traced element-only
+// outline. Creates the parametric plate at the caption's AI bounds, derives the
+// fused cutline via boolean union, strokes it, and groups outline+plate+cutline.
+// element.caption must be present (caller checks). See aiUtils.jsx seams and
+// docs/caption-separability-architecture.md.
+function _buildSeparableCutline(doc, layer, element, elementOutline,
+        pngLeft, pngTop, pngWidth, pngHeight, data) {
+
+    doc.activeLayer = layer;
+    var cap = element.caption;
+
+    var aiBounds = _psBoundsToAi(cap.left, cap.top, cap.right, cap.bottom,
+                       data, pngLeft, pngTop, pngWidth, pngHeight);
+
+    var plate   = buildPlate(layer, aiBounds);
+    var cutline = deriveCutline(elementOutline, plate);
+
+    strokeRecursive(cutline, CONFIG.cutlineStrokePt, blackCmyk());
+    assembleElementGroup(layer, element.displayName, elementOutline, plate, cutline);
 }
 
 // Places a copy of CONFIG.stampTemplatePath, scaled to fit the element's AI bounds.
@@ -227,12 +278,9 @@ function _placeStampTemplate(doc, layer, element, tracedPath,
     var tmpl = doc.placedItems.add();
     tmpl.file = new File(CONFIG.stampTemplatePath);
 
-    var psdW = data.psdWidth;
-    var psdH = data.psdHeight;
-    var aiLeft   = pngLeft + (element.left   / psdW) * pngWidth;
-    var aiRight  = pngLeft + (element.right  / psdW) * pngWidth;
-    var aiTop    = pngTop  - (element.top    / psdH) * pngHeight;
-    var aiBottom = pngTop  - (element.bottom / psdH) * pngHeight;
+    var ai = _psBoundsToAi(element.left, element.top, element.right, element.bottom,
+                 data, pngLeft, pngTop, pngWidth, pngHeight);
+    var aiLeft = ai[0], aiTop = ai[1], aiRight = ai[2], aiBottom = ai[3];
 
     var targetW = aiRight - aiLeft;
     var targetH = aiTop   - aiBottom;
