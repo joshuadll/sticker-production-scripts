@@ -26,8 +26,9 @@ sticker-production-scripts/
 ├── illustrator/
 │   ├── Step6_CreateCutlines.jsx
 │   ├── Step7A_DeepnestExport.jsx    ← classifies paths by extent ratio → exports _regular.svg + _irregular.svg
-│   ├── Step8a_SimplifyCutlines.jsx
-│   ├── Step8b_OffsetPathQA.jsx
+│   ├── Step8a_SimplifyCutlines.jsx     ← native RDP simplify of trace cutlines
+│   ├── Step8b_CaptionNormalise.jsx      ← reset GC plate to spec → re-Unite cutline
+│   ├── Step8c_OffsetPathQA.jsx
 │   ├── Step9_PeelingTabHalfcut.jsx
 │   └── Step10_AssetExportFinalFile.jsx
 ├── pipelines/
@@ -38,8 +39,8 @@ sticker-production-scripts/
 │   ├── AI_ToCutlines.jsx       ← Step 6 entry point (called by BridgeTalk from PS_AfterCaption)
 │   ├── AI_Deepnest.jsx         ← Step 7A: classify cutlines → export _regular.svg + _irregular.svg for Deepnest
 │   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
-│   ├── AI_AfterDeepnest.jsx    ← Step 8a Simplify      (stop: artist pencil refinements)
-│   └── AI_AfterPencil.jsx      ← Steps 8b → 9 → 10    (done)
+│   ├── AI_AfterDeepnest.jsx    ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
+│   └── AI_AfterPencil.jsx      ← Steps 8c → 9 → 10    (done)
 ├── tests/integration/
 └── docs/
 ```
@@ -82,6 +83,8 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
 - aiUtils.jsx: NAME_REGEX, parseLayerName, mmToPoints, boundsCenter, isCaption,
   blackCmyk, redCmyk, setStrokeStyle, strokeRecursive,
   buildPlate, deriveCutline, assembleElementGroup,
+  findGroupMember, reuniteCutline, rebuildPlateToHeight,
+  rdpSimplify, simplifyPathItem,
   log, scriptAlert, findLayer, findPathInLayer
 
 ---
@@ -315,6 +318,7 @@ Step 5:     docs/step5-silhouette.md
 Step 6:     docs/step6-cut-lines.md
 Step 7A:    docs/step7a-deepnest-export.md
 Step 8a:    docs/step8a-simplify.md
-Step 8b:    docs/step8b-offset-path-qa.md
+Step 8b:    docs/step8b-caption-normalise.md
+Step 8c:    docs/step8c-offset-path-qa.md
 Step 9:     docs/step9-peeling-tab.md
 Step 10:    docs/step10-asset-export-final-file.md

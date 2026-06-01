@@ -1,6 +1,6 @@
 #target illustrator
 #include "../utils/aiUtils.jsx"
-#include "../illustrator/Step8b_OffsetPathQA.jsx"
+#include "../illustrator/Step8c_OffsetPathQA.jsx"
 #include "../illustrator/Step9_PeelingTabHalfcut.jsx"
 #include "../illustrator/Step10_AssetExportFinalFile.jsx"
 
@@ -42,23 +42,23 @@ function main() {
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
-    // ── Step 8b: Offset Path QA ────────────────────────────────────
-    log("[pipeline] --- Step 8b: Offset Path QA ---");
+    // ── Step 8c: Offset Path QA ────────────────────────────────────
+    log("[pipeline] --- Step 8c: Offset Path QA ---");
     var qaResult;
 
     try {
         qaResult = runOffsetPathQA(doc);
     } catch (e) {
-        log("[pipeline] ERROR | step 8b line " + e.line + ": " + e.message);
-        scriptAlert("ERROR in Step 8b (Offset Path QA).\nLine " + e.line + ": " + e.message
+        log("[pipeline] ERROR | step 8c line " + e.line + ": " + e.message);
+        scriptAlert("ERROR in Step 8c (Offset Path QA).\nLine " + e.line + ": " + e.message
             + "\n\nLog: " + CONFIG.logPath);
         return;
     }
-    log("[pipeline] step 8b complete | " + qaResult.checked + " path(s) checked, "
+    log("[pipeline] step 8c complete | " + qaResult.checked + " path(s) checked, "
         + qaResult.flagged + " flagged.");
 
     if (qaResult.flagged > 0) {
-        scriptAlert("Step 8b: " + qaResult.flagged + " path(s) flagged for review.\n"
+        scriptAlert("Step 8c: " + qaResult.flagged + " path(s) flagged for review.\n"
             + "Flagged paths are highlighted in red.\n"
             + "Fix them before continuing, then re-run this script.\n\n"
             + "Log: " + CONFIG.logPath);

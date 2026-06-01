@@ -183,6 +183,199 @@ function assembleElementGroup(layer, displayName, elementOutline, plate, cutline
     return grp;
 }
 
-// Expected additions for Steps 8b/9:
-//   createOffsetPath(path, offsetMm)     — 1mm offset path
-//   getCompoundPathItems(layer)          — compound path iteration
+// ─── SEPARABLE-GROUP MEMBER ACCESS ────────────────────────────────────────────
+// The per-element bundle (see assembleElementGroup) names its members
+// `{displayName}` (visible cutline), `{displayName} outline`, `{displayName} plate`.
+// These finders let Steps 8a/8b reach a member without assuming child order.
+
+// Returns the group member whose name is group.name + suffix ("" = cutline,
+// " outline", " plate"), or null. Matches the first item with that exact name.
+function findGroupMember(group, suffix) {
+    var want = group.name + suffix;
+    for (var i = 0; i < group.pageItems.length; i++) {
+        if (group.pageItems[i].name === want) return group.pageItems[i];
+    }
+    return null;
+}
+
+// ─── RE-UNITE (shared by Steps 8a + 8b) ───────────────────────────────────────
+
+// Re-derives the visible cutline as Unite(outline, plate) and swaps it into the
+// group, keeping outline/plate as separable (hidden) components. Used after
+// either input changes (8a simplifies outline; 8b resets plate). The boolean op
+// needs visible operands, so outline/plate are un-hidden for the op then restored.
+// Returns the new cutline item (PathItem/CompoundPathItem/GroupItem).
+function reuniteCutline(group, outline, plate, strokePt) {
+    var outlineHidden = outline.hidden;
+    var plateHidden   = plate.hidden;
+    outline.hidden = false;
+    plate.hidden   = false;
+
+    var oldCutline = findGroupMember(group, "");
+
+    var newCutline = deriveCutline(outline, plate);
+    strokeRecursive(newCutline, strokePt, blackCmyk());
+
+    if (oldCutline) oldCutline.remove();
+    newCutline.name = group.name;
+    newCutline.move(group, ElementPlacement.PLACEATBEGINNING);
+
+    outline.hidden = outlineHidden;
+    plate.hidden   = plateHidden;
+    return newCutline;
+}
+
+// ─── PLATE RESET (Step 8b) ────────────────────────────────────────────────────
+
+// Rebuilds a caption plate to a canonical absolute height (specHeightPt), anchored
+// at its top-centre (the junction with the element art) and preserving aspect so
+// the pill's corner radius stays proportional. Replaces the old plate in place,
+// keeping its name and hidden state. Returns the new plate PathItem.
+function rebuildPlateToHeight(plate, specHeightPt) {
+    var gb = plate.geometricBounds;          // [left, top, right, bottom] (AI y-up)
+    var left = gb[0], top = gb[1], right = gb[2], bottom = gb[3];
+    var curH = top - bottom;
+    if (curH <= 0) return plate;             // degenerate — leave untouched
+
+    var scale = specHeightPt / curH;
+    var newW  = (right - left) * scale;
+    var cx    = (left + right) / 2;
+
+    var newPlate = buildPlate(plate.parent,
+        [cx - newW / 2, top, cx + newW / 2, top - specHeightPt]);
+
+    newPlate.name   = plate.name;
+    newPlate.hidden = plate.hidden;
+    plate.remove();
+    return newPlate;
+}
+
+// ─── PATH SIMPLIFICATION (Step 8a) ────────────────────────────────────────────
+// Native Ramer–Douglas–Peucker anchor reduction + Catmull-Rom bezier refit with
+// corner preservation. Illustrator's Object>Path>Simplify is not scriptable
+// without a dialog, so this reproduces it deterministically. tolerance/cornerAngle
+// are supplied by the caller (CONFIG).
+
+// Perpendicular distance from point p to the line through a–b (all {x,y}).
+function _perpDistance(p, a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var len2 = dx * dx + dy * dy;
+    if (len2 === 0) {
+        var ex = p.x - a.x, ey = p.y - a.y;
+        return Math.sqrt(ex * ex + ey * ey);
+    }
+    var num = Math.abs(dy * p.x - dx * p.y + b.x * a.y - b.y * a.x);
+    return num / Math.sqrt(len2);
+}
+
+// Turn angle (deviation from straight, degrees 0..180) at cur between prev and next.
+function _turnAngle(prev, cur, next) {
+    var v1x = cur.x - prev.x, v1y = cur.y - prev.y;
+    var v2x = next.x - cur.x, v2y = next.y - cur.y;
+    var m1 = Math.sqrt(v1x * v1x + v1y * v1y);
+    var m2 = Math.sqrt(v2x * v2x + v2y * v2y);
+    if (m1 === 0 || m2 === 0) return 0;
+    var cos = (v1x * v2x + v1y * v2y) / (m1 * m2);
+    if (cos > 1) cos = 1; else if (cos < -1) cos = -1;
+    return Math.acos(cos) * 180 / Math.PI;
+}
+
+// Classic recursive RDP on an open polyline of {x,y}. Returns the kept points.
+function rdpSimplify(points, epsilon) {
+    if (points.length < 3) return points.slice(0);
+    var end = points.length - 1;
+    var dmax = 0, index = 0, i;
+    for (i = 1; i < end; i++) {
+        var d = _perpDistance(points[i], points[0], points[end]);
+        if (d > dmax) { dmax = d; index = i; }
+    }
+    if (dmax > epsilon) {
+        var r1 = rdpSimplify(points.slice(0, index + 1), epsilon);
+        var r2 = rdpSimplify(points.slice(index), epsilon);
+        return r1.slice(0, r1.length - 1).concat(r2);
+    }
+    return [points[0], points[end]];
+}
+
+// RDP for a closed polyline: split at the anchor farthest from anchors[0], RDP
+// each arc, recombine without repeating the shared endpoints.
+function _rdpClosed(anchors, epsilon) {
+    var n = anchors.length;
+    if (n < 4) return anchors.slice(0);
+    var far = 0, dmax = -1, i;
+    for (i = 1; i < n; i++) {
+        var dx = anchors[i].x - anchors[0].x;
+        var dy = anchors[i].y - anchors[0].y;
+        var d = dx * dx + dy * dy;
+        if (d > dmax) { dmax = d; far = i; }
+    }
+    var firstHalf  = anchors.slice(0, far + 1);
+    var secondHalf = anchors.slice(far).concat([anchors[0]]);
+    var k1 = rdpSimplify(firstHalf, epsilon);
+    var k2 = rdpSimplify(secondHalf, epsilon);
+    return k1.slice(0, k1.length - 1).concat(k2.slice(0, k2.length - 1));
+}
+
+// Rewrites a PathItem from a reduced anchor list, assigning Catmull-Rom handles
+// for smooth points and zero-length handles (sharp) for corners / open endpoints.
+function _applySmoothPath(path, anchors, cornerAngleDeg) {
+    var closed = path.closed;
+    var n = anchors.length;
+    var coords = [], i;
+    for (i = 0; i < n; i++) coords.push([anchors[i].x, anchors[i].y]);
+
+    path.setEntirePath(coords);
+    path.closed = closed; // setEntirePath can drop the closed flag
+
+    var pts = path.pathPoints;
+    for (i = 0; i < n; i++) {
+        var prev = anchors[(i - 1 + n) % n];
+        var cur  = anchors[i];
+        var next = anchors[(i + 1) % n];
+        var isEndpoint = (!closed && (i === 0 || i === n - 1));
+        var isCorner   = isEndpoint || _turnAngle(prev, cur, next) >= cornerAngleDeg;
+        var pp = pts[i];
+        if (isCorner) {
+            pp.leftDirection  = [cur.x, cur.y];
+            pp.rightDirection = [cur.x, cur.y];
+            pp.pointType = PointType.CORNER;
+        } else {
+            var tx = (next.x - prev.x) / 6;
+            var ty = (next.y - prev.y) / 6;
+            pp.rightDirection = [cur.x + tx, cur.y + ty];
+            pp.leftDirection  = [cur.x - tx, cur.y - ty];
+            pp.pointType = PointType.SMOOTH;
+        }
+    }
+}
+
+// Simplifies a PathItem (or each sub-path of a CompoundPathItem) in place.
+// tolerancePt is the RDP epsilon (points); cornerAngleDeg preserves sharp corners.
+// Returns the number of sub-paths actually reduced.
+function simplifyPathItem(path, tolerancePt, cornerAngleDeg) {
+    if (path.typename === "CompoundPathItem") {
+        var reduced = 0, i;
+        for (i = 0; i < path.pathItems.length; i++) {
+            reduced += simplifyPathItem(path.pathItems[i], tolerancePt, cornerAngleDeg);
+        }
+        return reduced;
+    }
+    if (path.typename !== "PathItem") return 0;
+
+    var pts = path.pathPoints;
+    if (pts.length < 4) return 0; // too few anchors to meaningfully reduce
+
+    var anchors = [], j;
+    for (j = 0; j < pts.length; j++) {
+        anchors.push({ x: pts[j].anchor[0], y: pts[j].anchor[1] });
+    }
+
+    var kept = path.closed ? _rdpClosed(anchors, tolerancePt)
+                           : rdpSimplify(anchors, tolerancePt);
+
+    if (kept.length >= anchors.length) return 0;            // no reduction
+    if (kept.length < (path.closed ? 3 : 2)) return 0;      // would collapse — bail
+
+    _applySmoothPath(path, kept, cornerAngleDeg);
+    return 1;
+}
