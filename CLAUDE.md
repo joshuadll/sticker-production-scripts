@@ -30,7 +30,8 @@ sticker-production-scripts/
 │   ├── Step8b_CaptionNormalise.jsx      ← reset GC plate to spec → re-Unite cutline
 │   ├── Step8c_OffsetPathQA.jsx
 │   ├── Step9_PeelingTabHalfcut.jsx
-│   └── Step10_AssetExportFinalFile.jsx
+│   ├── Step10_AssetExportFinalFile.jsx
+│   └── StepQA_NestingQuality.jsx       ← occupancy grid → NQI score (0-100); flags re-nest pockets
 ├── pipelines/
 │   ├── PS_ToCaption.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
 │   │                                                   (stop: artist reviews captions)
@@ -40,7 +41,8 @@ sticker-production-scripts/
 │   ├── AI_Deepnest.jsx         ← Step 7A: classify cutlines → export _regular.svg + _irregular.svg for Deepnest
 │   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
 │   ├── AI_AfterDeepnest.jsx    ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
-│   └── AI_AfterPencil.jsx      ← Steps 8c → 9 → 10    (done)
+│   ├── AI_AfterPencil.jsx      ← Steps 8c → 9 → 10    (done)
+│   └── AI_NestingQA.jsx        ← runs StepQA_NestingQuality; artist runs after Deepnest to gate re-nest
 ├── tests/integration/
 └── docs/
 ```
@@ -131,8 +133,12 @@ Each non-stamp element is a GroupItem named `[Display Name]` in the Cutlines lay
   [Display Name] plate    ← parametric caption pill (hidden; separable component)
 
 The cutline is still one closed contour per sticker (nesting requires this). The components
-are kept separable so caption normalization in Step 8 is a re-Unite, not path surgery.
+are kept separable so caption normalization in Steps 8a/8b is a re-Unite, not path surgery.
 Stamp elements: a placed copy of Stamp Cutline Template.ai named `[Display Name]` (no group).
+
+GroupItem.note carries caption metadata for Step 8b (set by Step 6, survives the Deepnest gap):
+  Format: "{styleCode}|{capLines}"  e.g. "GC|2"
+  Step 8b reads this to know plate spec (0.5cm / 0.8cm). Missing note → Step 8b skips (logs warn).
 
 ## Key confirmed values
 Cut line stroke: 0.25pt black, no fill
