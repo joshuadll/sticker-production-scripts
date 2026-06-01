@@ -29,7 +29,8 @@ sticker-production-scripts/
 │   ├── Step8a_SimplifyCutlines.jsx     ← native RDP simplify of trace cutlines
 │   ├── Step8b_CaptionNormalise.jsx      ← reset GC plate to spec → re-Unite cutline
 │   ├── Step8c_OffsetPathQA.jsx         ← spacing + margin QA (pure geometry; no offset layer created)
-│   ├── Step9_PeelingTabHalfcut.jsx     ← NOT YET BUILT (stub #include in AI_AfterPencil)
+│   ├── Step9A_Halfcut.jsx              ← GC/WC elements only: bezier ray → half-cut at plate junction
+│   ├── Step9B_PeelingTab.jsx           ← stamps/unnamed: tab asset + compound path + half-cut at flat edge
 │   ├── Step10_AssetExportFinalFile.jsx ← NOT YET BUILT (stub #include in AI_AfterPencil)
 │   └── StepQA_NestingQuality.jsx       ← occupancy grid → NQI score (0-100); flags re-nest pockets
 ├── pipelines/
@@ -41,8 +42,8 @@ sticker-production-scripts/
 │   ├── AI_Deepnest.jsx         ← Step 7A: classify cutlines → export _regular.svg + _irregular.svg for Deepnest
 │   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
 │   ├── AI_AfterDeepnest.jsx    ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
-│   ├── AI_AfterPencil.jsx      ← Steps 8c Offset Path QA → 9 → 10
-│   │                                  (8c built; 9/10 not built; stop after 8c if flagged > 0)
+│   ├── AI_AfterPencil.jsx      ← Steps 8c Offset Path QA → 9A Half-cut → 9B Peeling Tab → 10
+│   │                                  (8c + 9A + 9B built; 10 not built; halts after 8c if flagged > 0; 9B can be omitted if peeling tab is removed from process)
 │   └── AI_NestingQA.jsx        ← runs StepQA_NestingQuality; artist runs after Deepnest to gate re-nest
 ├── tests/integration/
 └── docs/
@@ -90,6 +91,7 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   rdpSimplify, simplifyPathItem,
   samplePathToPolygons, pointInPolygon, segmentsIntersect,
   polygonsOverlap, boundsWithin, minPolygonSetDistance,
+  parseNote, getOrCreateHalfcutLayer, drawHalfcutLine,
   log, scriptAlert, findLayer, findPathInLayer
 
 ---
@@ -125,7 +127,10 @@ PS_AfterCaption BridgeTalk exports (written before handoff, sibling to PSD):
                            displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom
                            (stamps write 0|0|0|0|0 for the cap fields)
 
-## Illustrator layer names (exact strings, no case-insensitive fallback needed)
+## Illustrator layer names (exact strings except where noted)
+Exceptions (case-insensitive search, consistent standard):
+- **Halfcut layer**: Steps 9A/9B search case-insensitively via `getOrCreateHalfcutLayer()` in aiUtils (seen as "Half cut", "Halfcut", "halfcut lines"); creates as "Halfcut" if absent.
+- **Stickers layer**: Standard is `"Sticker"` (singular). Scripts search case-insensitively with a plural fallback so existing files with "Stickers" don't break.
 Working file stack: Asset > Margin > Offset Path > Halfcut > Cutlines > Stickers > Grid > Color Block
 Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
 
@@ -144,17 +149,26 @@ The cutline is still one closed contour per sticker (nesting requires this). The
 are kept separable so caption normalization in Steps 8a/8b is a re-Unite, not path surgery.
 Stamp elements: a placed copy of Stamp Cutline Template.ai named `[Display Name]` (no group).
 
-GroupItem.note carries caption metadata for Step 8b (set by Step 6, survives the Deepnest gap):
+GroupItem.note carries caption metadata (set by Step 6, survives the Deepnest gap):
   Format: "{styleCode}|{capLines}"  e.g. "GC|2"
   Step 8b reads this to know plate spec (0.5cm / 0.8cm). Missing note → Step 8b skips (logs warn).
+  Step 9A reads this to select GC/WC elements (half-cut at plate junction); Step 9B reads this to skip GC/WC and process ST/missing (tab asset).
 
 ## Key confirmed values
 Cut line stroke: 0.25pt black, no fill
+Half-cut stroke: 0.25pt black, no fill (same weight as cut lines)
 Minimum spacing between elements: 2mm (checked by Step 8c via direct distance measurement)
 QA stroke colour: #ff0000
 Working area: 19 × 26.7 cm (A4 minus margins)
 Grid: 1 square = 1 inch = 2.5 cm
 Caption font: Kalam Regular, 16pt, tracking -20
+
+Half-cut functional requirement: the caption plate acts as a peeling tab — the artist grabs
+the caption and peels the element off the backing as a separate flake sticker. The half-cut
+must connect exactly to the outer cutline at both endpoints (where the Unite boundary
+transitions from element art to plate edge) so both pieces have clean edges when separated.
+Step 9A uses bezier ray intersection (_cutlineCrossingsAtY, coarse scan + bisection)
+to find these exact crossing points — not a bounding-box approximation.
 
 ---
 
@@ -334,5 +348,6 @@ Step 7A:    docs/step7a-deepnest-export.md
 Step 8a:    docs/step8a-simplify.md
 Step 8b:    docs/step8b-caption-normalise.md
 Step 8c:    docs/step8c-offset-path-qa.md
-Step 9:     docs/step9-peeling-tab.md
+Step 9A:    https://www.notion.so/36e0fc58673981af80e9f007b3b7d064 (Notion — half-cut lines for GC/WC elements)
+Step 9B:    https://www.notion.so/3720fc58673981599039d3243dbf2cd6 (Notion — peeling tab for stamps/unnamed elements)
 Step 10:    docs/step10-asset-export-final-file.md

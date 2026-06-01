@@ -1,7 +1,8 @@
 #target illustrator
 #include "../utils/aiUtils.jsx"
 #include "../illustrator/Step8c_OffsetPathQA.jsx"
-#include "../illustrator/Step9_PeelingTabHalfcut.jsx"
+#include "../illustrator/Step9A_Halfcut.jsx"
+#include "../illustrator/Step9B_PeelingTab.jsx"
 #include "../illustrator/Step10_AssetExportFinalFile.jsx"
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -15,21 +16,32 @@ var CONFIG = {
     peelingTabAssetPath: "",  // resolved from assetsFolder below
 
     // ── Step 8c: Spacing + Margin QA ─────────────────────────────────────────
-    // Layer names — must match the Production File Template exactly.
     cutlinesLayerName:    "Cutlines",
     marginLayerName:      "Margin",
 
-    // Minimum spacing between elements. 2mm is confirmed from the playbook.
     spacingThresholdMm:   2,
-    qaSpacingSampleSteps: 12,  // bezier samples/segment (12 → ~0.4mm spacing at sticker scale)
-    flagStrokePt:         1.0, // red stroke weight for flagged cut lines
+    qaSpacingSampleSteps: 12,
+    flagStrokePt:         1.0,
 
-    // Safe area for the margin check (A4 minus margins: 10mm top/left/right, 20mm
-    // bottom → 190 × 267 mm). Used only when the "Margin" layer has no rectangle.
     workingAreaWidthMm:  190,
     workingAreaHeightMm: 267,
     marginTopMm:         10,
     marginLeftMm:        10,
+
+    // ── Step 9A: Half-cut ─────────────────────────────────────────────────────
+    // Layer names — case-insensitive search; created as halfcutLayerName if absent.
+    halfcutLayerName:    "Halfcut",
+    halfcutStrokePt:     0.25,  // matches cut-line stroke weight
+    halfcutExtendMm:     0.5,   // half-cut extends past each end of the edge
+
+    // ── Step 9B: Peeling Tab ──────────────────────────────────────────────────
+    // Minimum straight-edge length for preferring PEEL HERE over half-circle tab.
+    peelingTabMinLengthMm:  15,
+
+    // Group names inside Peeling Tab Asset.ai.
+    // ⚠️  CONFIRM exact names with artist before first run.
+    peelingTabGroupName:    "PEEL HERE",
+    halfCircleGroupName:    "Half Circle",
 
     // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,
@@ -47,19 +59,17 @@ CONFIG.peelingTabAssetPath = CONFIG.assetsFolder + "/Peeling Tab Asset.ai";
 
 function main() {
 
-    // ── Validate document ──────────────────────────────────────────
     if (app.documents.length === 0) {
         scriptAlert("No document open.\nPlease open the production .ai file first.");
         return;
     }
     var doc = app.activeDocument;
 
-    // ── Init log ───────────────────────────────────────────────────
     log("[pipeline] === AI_AfterPencil start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
-    // ── Step 8c: Offset Path QA ────────────────────────────────────
+    // ── Step 8c: Offset Path QA ────────────────────────────────────────────────
     log("[pipeline] --- Step 8c: Offset Path QA ---");
     var qaResult;
 
@@ -82,21 +92,35 @@ function main() {
         return;
     }
 
-    // ── Step 9: Peeling Tab + Halfcut ─────────────────────────────
-    log("[pipeline] --- Step 9: Peeling Tab + Halfcut ---");
-    var peelingResult;
+    // ── Step 9A: Half-cut lines ────────────────────────────────────────────────
+    log("[pipeline] --- Step 9A: Half-cut ---");
+    var halfcutResult;
 
     try {
-        peelingResult = runPeelingTab(doc);
+        halfcutResult = runHalfcut(doc);
     } catch (e) {
-        log("[pipeline] ERROR | step 9 line " + e.line + ": " + e.message);
-        scriptAlert("ERROR in Step 9 (Peeling Tab).\nLine " + e.line + ": " + e.message
+        log("[pipeline] ERROR | step 9a line " + e.line + ": " + e.message);
+        scriptAlert("ERROR in Step 9A (Half-cut).\nLine " + e.line + ": " + e.message
             + "\n\nLog: " + CONFIG.logPath);
         return;
     }
-    log("[pipeline] step 9 complete | " + peelingResult.placed + " peeling tab(s) placed.");
+    log("[pipeline] step 9a complete | " + halfcutResult.placed + " half-cut(s) placed.");
 
-    // ── Step 10: Export Final File ─────────────────────────────────
+    // ── Step 9B: Peeling Tab ───────────────────────────────────────────────────
+    log("[pipeline] --- Step 9B: Peeling Tab ---");
+    var tabResult;
+
+    try {
+        tabResult = runPeelingTab(doc);
+    } catch (e) {
+        log("[pipeline] ERROR | step 9b line " + e.line + ": " + e.message);
+        scriptAlert("ERROR in Step 9B (Peeling Tab).\nLine " + e.line + ": " + e.message
+            + "\n\nLog: " + CONFIG.logPath);
+        return;
+    }
+    log("[pipeline] step 9b complete | " + tabResult.placed + " peeling tab(s) placed.");
+
+    // ── Step 10: Export Final File ─────────────────────────────────────────────
     log("[pipeline] --- Step 10: Export Final File ---");
     var exportResult;
 
@@ -110,14 +134,27 @@ function main() {
     }
     log("[pipeline] step 10 complete | exported: " + exportResult.outputPath);
 
-    // ── Completion summary ─────────────────────────────────────────
+    // ── Completion summary ─────────────────────────────────────────────────────
     log("[pipeline] === AI_AfterPencil done ===");
 
-    scriptAlert("Done.\n\n"
+    var summaryMsg = "Done.\n\n"
         + "  QA:           " + qaResult.checked + " path(s) checked.\n"
-        + "  Peeling tabs: " + peelingResult.placed + " placed.\n"
-        + "  Final file:   " + exportResult.outputPath + "\n\n"
-        + "Log: " + CONFIG.logPath);
+        + "  Half-cuts:    " + halfcutResult.placed + " placed.\n"
+        + "  Peeling tabs: " + tabResult.placed + " placed.\n"
+        + "  Final file:   " + exportResult.outputPath + "\n";
+
+    var allFlags = halfcutResult.flags.concat(tabResult.flags);
+    if (allFlags.length > 0) {
+        summaryMsg += "\n  Flagged for manual review (" + allFlags.length + "):\n";
+        var fi;
+        for (fi = 0; fi < allFlags.length; fi++) {
+            summaryMsg += "    - " + allFlags[fi].name
+                + ": " + allFlags[fi].reason + "\n";
+        }
+    }
+
+    summaryMsg += "\nLog: " + CONFIG.logPath;
+    scriptAlert(summaryMsg);
 }
 
 main();

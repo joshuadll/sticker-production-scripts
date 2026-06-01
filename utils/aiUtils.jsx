@@ -380,6 +380,47 @@ function simplifyPathItem(path, tolerancePt, cornerAngleDeg) {
     return 1;
 }
 
+// ─── STEP 9 SHARED HELPERS ────────────────────────────────────────────────────
+
+// Parses group.note "GC|2" → { styleCode, capLines }. Returns null for empty/missing.
+// Used by Step9A (filter GC/WC) and Step9B (filter everything else).
+function parseNote(note) {
+    if (!note || note === "") return null;
+    var parts = note.split("|");
+    return {
+        styleCode: parts[0],
+        capLines:  parts.length > 1 ? parseInt(parts[1], 10) : 1
+    };
+}
+
+// Returns the halfcut layer (case-insensitive match on CONFIG.halfcutLayerName).
+// Creates it above the Cutlines layer if absent.
+function getOrCreateHalfcutLayer(doc) {
+    var name = CONFIG.halfcutLayerName;
+    var i;
+    for (i = 0; i < doc.layers.length; i++) {
+        if (doc.layers[i].name.toLowerCase() === name.toLowerCase()) {
+            return doc.layers[i];
+        }
+    }
+    var newLayer = doc.layers.add();
+    newLayer.name = name;
+    var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
+    if (cutLayer) {
+        newLayer.move(cutLayer, ElementPlacement.PLACEBEFORE);
+    }
+    log("[step9] created halfcut layer: " + name);
+    return newLayer;
+}
+
+// Draws a 2-point straight PathItem on layer. Stroke: CONFIG.halfcutStrokePt, black, no fill.
+function drawHalfcutLine(layer, x1, y1, x2, y2) {
+    var line = layer.pathItems.add();
+    line.setEntirePath([[x1, y1], [x2, y2]]);
+    line.closed = false;
+    setStrokeStyle(line, CONFIG.halfcutStrokePt, blackCmyk());
+}
+
 // ─── PURE GEOMETRY (Step 8c QA) ───────────────────────────────────────────────
 // Point-space helpers (document points, AI y-up). NOTE: StepQA_NestingQuality.jsx
 // keeps its own private _qa_ sampling helpers in sheet-relative mm for the
