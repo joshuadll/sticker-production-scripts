@@ -379,3 +379,190 @@ function simplifyPathItem(path, tolerancePt, cornerAngleDeg) {
     _applySmoothPath(path, kept, cornerAngleDeg);
     return 1;
 }
+
+// ─── PURE GEOMETRY (Step 8c QA) ───────────────────────────────────────────────
+// Point-space helpers (document points, AI y-up). NOTE: StepQA_NestingQuality.jsx
+// keeps its own private _qa_ sampling helpers in sheet-relative mm for the
+// occupancy grid; these are general point-space versions, kept separate to avoid
+// refactoring that working step. Deterministic and unit-testable.
+
+// Cubic bezier point at parameter t. p0..p3 are [x, y] anchor/handle arrays.
+function _bezierPoint(p0, p1, p2, p3, t) {
+    var mt  = 1 - t;
+    var q0x = mt * p0[0] + t * p1[0], q0y = mt * p0[1] + t * p1[1];
+    var q1x = mt * p1[0] + t * p2[0], q1y = mt * p1[1] + t * p2[1];
+    var q2x = mt * p2[0] + t * p3[0], q2y = mt * p2[1] + t * p3[1];
+    var r0x = mt * q0x   + t * q1x,   r0y = mt * q0y   + t * q1y;
+    var r1x = mt * q1x   + t * q2x,   r1y = mt * q1y   + t * q2y;
+    return { x: mt * r0x + t * r1x, y: mt * r0y + t * r1y };
+}
+
+// Samples one PathItem's bezier segments into a closed polyline of {x, y}.
+function _sampleSubPath(subPath, stepsPerSeg) {
+    var pts = subPath.pathPoints;
+    if (!pts || pts.length < 2) return [];
+
+    var poly = [];
+    var n     = pts.length;
+    var limit = subPath.closed ? n : n - 1;
+    var i, j, t, pt;
+
+    for (i = 0; i < limit; i++) {
+        var next = (i + 1) % n;
+        var p0 = pts[i].anchor;
+        var p1 = pts[i].rightDirection;
+        var p2 = pts[next].leftDirection;
+        var p3 = pts[next].anchor;
+        for (j = 0; j < stepsPerSeg; j++) {
+            t  = j / stepsPerSeg;
+            pt = _bezierPoint(p0, p1, p2, p3, t);
+            poly.push(pt);
+        }
+    }
+    return poly;
+}
+
+// Samples a PathItem/CompoundPathItem/GroupItem into an array of closed polygons
+// (each [{x, y}, …] in document points). stepsPerSeg controls precision.
+function samplePathToPolygons(item, stepsPerSeg) {
+    var polys = [];
+    var i, sub;
+
+    if (item.typename === "PathItem") {
+        sub = _sampleSubPath(item, stepsPerSeg);
+        if (sub.length >= 3) polys.push(sub);
+
+    } else if (item.typename === "CompoundPathItem") {
+        for (i = 0; i < item.pathItems.length; i++) {
+            sub = _sampleSubPath(item.pathItems[i], stepsPerSeg);
+            if (sub.length >= 3) polys.push(sub);
+        }
+
+    } else if (item.typename === "GroupItem") {
+        // Pathfinder/offset results are sometimes wrapped in a group.
+        for (i = 0; i < item.pathItems.length; i++) {
+            sub = _sampleSubPath(item.pathItems[i], stepsPerSeg);
+            if (sub.length >= 3) polys.push(sub);
+        }
+        for (i = 0; i < item.compoundPathItems.length; i++) {
+            var cp = samplePathToPolygons(item.compoundPathItems[i], stepsPerSeg);
+            for (var k = 0; k < cp.length; k++) polys.push(cp[k]);
+        }
+        for (i = 0; i < item.groupItems.length; i++) {
+            var gp = samplePathToPolygons(item.groupItems[i], stepsPerSeg);
+            for (var m = 0; m < gp.length; m++) polys.push(gp[m]);
+        }
+    }
+    return polys;
+}
+
+// True if point pt {x, y} is inside polygon poly ([{x, y}, …]) — ray casting.
+function pointInPolygon(pt, poly) {
+    var inside = false;
+    var n = poly.length;
+    var i, j;
+    for (i = 0, j = n - 1; i < n; j = i++) {
+        var yi = poly[i].y, yj = poly[j].y;
+        if ((yi > pt.y) !== (yj > pt.y)) {
+            var xint = (poly[j].x - poly[i].x) * (pt.y - yi) / (yj - yi) + poly[i].x;
+            if (pt.x < xint) inside = !inside;
+        }
+    }
+    return inside;
+}
+
+// True if segment a-b intersects segment c-d (all {x, y}). Uses orientation signs.
+function segmentsIntersect(a, b, c, d) {
+    function cross(o, p, q) {
+        return (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+    }
+    var d1 = cross(c, d, a);
+    var d2 = cross(c, d, b);
+    var d3 = cross(a, b, c);
+    var d4 = cross(a, b, d);
+    if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+        ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+    return false;
+}
+
+// True if two polygon sets overlap: any edge crossing, or either contains a
+// vertex of the other (handles full containment with no edge crossing).
+function polygonsOverlap(polysA, polysB) {
+    var ai, bi, i, j;
+    for (ai = 0; ai < polysA.length; ai++) {
+        var A = polysA[ai];
+        for (bi = 0; bi < polysB.length; bi++) {
+            var B = polysB[bi];
+            // Edge-edge crossings.
+            for (i = 0; i < A.length; i++) {
+                var a1 = A[i], a2 = A[(i + 1) % A.length];
+                for (j = 0; j < B.length; j++) {
+                    var b1 = B[j], b2 = B[(j + 1) % B.length];
+                    if (segmentsIntersect(a1, a2, b1, b2)) return true;
+                }
+            }
+            // Containment (no crossing): one vertex inside the other.
+            if (pointInPolygon(A[0], B)) return true;
+            if (pointInPolygon(B[0], A)) return true;
+        }
+    }
+    return false;
+}
+
+// True if inner geometricBounds [left, top, right, bottom] (AI y-up) lies entirely
+// within outer geometricBounds. tolPt allows a small slack (sub-point rounding).
+function boundsWithin(inner, outer, tolPt) {
+    var t = tolPt || 0;
+    return inner[0] >= outer[0] - t &&   // left
+           inner[1] <= outer[1] + t &&   // top  (y-up: smaller is lower)
+           inner[2] <= outer[2] + t &&   // right
+           inner[3] >= outer[3] - t;     // bottom
+}
+
+// Minimum distance (points) from point p to segment a–b (all {x, y}).
+function _ptSegDist(p, a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var len2 = dx * dx + dy * dy;
+    if (len2 === 0) {
+        var ex = p.x - a.x, ey = p.y - a.y;
+        return Math.sqrt(ex * ex + ey * ey);
+    }
+    var tv = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+    if (tv < 0) tv = 0; else if (tv > 1) tv = 1;
+    var qx = a.x + tv * dx, qy = a.y + tv * dy;
+    var fx = p.x - qx, fy = p.y - qy;
+    return Math.sqrt(fx * fx + fy * fy);
+}
+
+// Minimum distance (points) between two sets of sampled polygons. Returns 0
+// immediately if either polygon set contains a vertex of the other (full
+// containment). Otherwise the exact minimum is the smallest point-to-edge
+// distance across all polygon pairs (both directions). Relies on the sample
+// density being fine enough relative to the spacing threshold — at 12 steps/
+// segment and typical sticker scales, samples are ~0.4 mm apart, well inside
+// the 2 mm QA threshold.
+function minPolygonSetDistance(polysA, polysB) {
+    var minD = Infinity;
+    var ai, bi, pi, qi, d;
+    for (ai = 0; ai < polysA.length; ai++) {
+        var A = polysA[ai];
+        for (bi = 0; bi < polysB.length; bi++) {
+            var B = polysB[bi];
+            var nA = A.length, nB = B.length;
+            if (pointInPolygon(A[0], B) || pointInPolygon(B[0], A)) return 0;
+            for (pi = 0; pi < nA; pi++) {
+                for (qi = 0; qi < nB; qi++) {
+                    d = _ptSegDist(A[pi], B[qi], B[(qi + 1) % nB]);
+                    if (d < minD) minD = d;
+                }
+            }
+            for (pi = 0; pi < nB; pi++) {
+                for (qi = 0; qi < nA; qi++) {
+                    d = _ptSegDist(B[pi], A[qi], A[(qi + 1) % nA]);
+                    if (d < minD) minD = d;
+                }
+            }
+        }
+    }
+    return minD;
+}

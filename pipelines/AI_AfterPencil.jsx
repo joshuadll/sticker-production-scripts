@@ -14,6 +14,23 @@ var CONFIG = {
     assetsFolder:        "",  // e.g. "/Volumes/Team Drive/Production Assets"
     peelingTabAssetPath: "",  // resolved from assetsFolder below
 
+    // ── Step 8c: Spacing + Margin QA ─────────────────────────────────────────
+    // Layer names — must match the Production File Template exactly.
+    cutlinesLayerName:    "Cutlines",
+    marginLayerName:      "Margin",
+
+    // Minimum spacing between elements. 2mm is confirmed from the playbook.
+    spacingThresholdMm:   2,
+    qaSpacingSampleSteps: 12,  // bezier samples/segment (12 → ~0.4mm spacing at sticker scale)
+    flagStrokePt:         1.0, // red stroke weight for flagged cut lines
+
+    // Safe area for the margin check (A4 minus margins: 10mm top/left/right, 20mm
+    // bottom → 190 × 267 mm). Used only when the "Margin" layer has no rectangle.
+    workingAreaWidthMm:  190,
+    workingAreaHeightMm: 267,
+    marginTopMm:         10,
+    marginLeftMm:        10,
+
     // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,
 
