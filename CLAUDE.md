@@ -31,7 +31,8 @@ sticker-production-scripts/
 │   ├── Step8c_OffsetPathQA.jsx         ← spacing + margin QA (pure geometry; no offset layer created)
 │   ├── Step9A_Halfcut.jsx              ← GC/WC elements only: bezier ray → half-cut at plate junction
 │   ├── Step9B_PeelingTab.jsx           ← stamps/unnamed: tab asset + compound path + half-cut at flat edge
-│   ├── Step10_AssetExportFinalFile.jsx ← NOT YET BUILT (stub #include in AI_AfterPencil)
+│   ├── Step10_AssetExport.jsx          ← JPEG previews (white+green) + per-element PNGs; temp clip groups, no persistent Asset layer
+│   ├── Step11_FinalFile.jsx            ← Save As {STK_CODE}_final.ai; strips non-production layers; renames halfcut layer
 │   └── StepQA_NestingQuality.jsx       ← occupancy grid → NQI score (0-100); flags re-nest pockets
 ├── pipelines/
 │   ├── PS_ToCaption.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
@@ -42,8 +43,8 @@ sticker-production-scripts/
 │   ├── AI_Deepnest.jsx         ← Step 7A: classify cutlines → export _regular.svg + _irregular.svg for Deepnest
 │   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
 │   ├── AI_AfterDeepnest.jsx    ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
-│   ├── AI_AfterPencil.jsx      ← Steps 8c Offset Path QA → 9A Half-cut → 9B Peeling Tab → 10
-│   │                                  (8c + 9A + 9B built; 10 not built; halts after 8c if flagged > 0; 9B can be omitted if peeling tab is removed from process)
+│   ├── AI_AfterPencil.jsx      ← Steps 8c → 9A → 9B → 10 (Asset Export) → 11 (Final File)
+│   │                                  (all steps built; halts after 8c if flagged > 0; 9B can be omitted if peeling tab is removed from process)
 │   └── AI_NestingQA.jsx        ← runs StepQA_NestingQuality; artist runs after Deepnest to gate re-nest
 ├── tests/integration/
 └── docs/
@@ -85,7 +86,7 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   log, scriptAlert, isValidTemplate, clearNonGuideLayers,
   convertToSmartObject, resizeLayerToTarget, loadLayerTransparency
 - aiUtils.jsx: NAME_REGEX, parseLayerName, mmToPoints, boundsCenter, isCaption,
-  blackCmyk, redCmyk, setStrokeStyle, strokeRecursive,
+  blackCmyk, whiteCmyk, redCmyk, setStrokeStyle, strokeRecursive,
   buildPlate, deriveCutline, assembleElementGroup,
   findGroupMember, reuniteCutline, rebuildPlateToHeight,
   rdpSimplify, simplifyPathItem,
@@ -129,9 +130,10 @@ PS_AfterCaption BridgeTalk exports (written before handoff, sibling to PSD):
 
 ## Illustrator layer names (exact strings except where noted)
 Exceptions (case-insensitive search, consistent standard):
-- **Halfcut layer**: Steps 9A/9B search case-insensitively via `getOrCreateHalfcutLayer()` in aiUtils (seen as "Half cut", "Halfcut", "halfcut lines"); creates as "Halfcut" if absent.
+- **Halfcut layer**: Steps 9A/9B search case-insensitively via `getOrCreateHalfcutLayer()` in aiUtils (seen as "Half cut", "Halfcut", "halfcut lines"); creates as "Halfcut" if absent. Step 11 standardises to `"Halfcut/Peeling Tab"` when saving the final file.
 - **Stickers layer**: Standard is `"Sticker"` (singular). Scripts search case-insensitively with a plural fallback so existing files with "Stickers" don't break.
-Working file stack: Asset > Margin > Offset Path > Halfcut > Cutlines > Stickers > Grid > Color Block
+- **Asset layer**: NOT created by the automated pipeline. Step 10 builds temporary clip groups per-export and discards them — the working file stays clean. (The manual workflow created a persistent Asset layer; the script does not.)
+Working file stack: Margin > Offset Path > Halfcut > Cutlines > Stickers > Grid > Color Block
 Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
 
 Step 8c does **pure-geometry QA** — no Offset Path layer is created. It measures
@@ -153,6 +155,7 @@ GroupItem.note carries caption metadata (set by Step 6, survives the Deepnest ga
   Format: "{styleCode}|{capLines}"  e.g. "GC|2"
   Step 8b reads this to know plate spec (0.5cm / 0.8cm). Missing note → Step 8b skips (logs warn).
   Step 9A reads this to select GC/WC elements (half-cut at plate junction); Step 9B reads this to skip GC/WC and process ST/missing (tab asset).
+  Step 10 reads this for PNG tab hiding: GC/WC → export directly (no tab on cutline); ST/null → check for compound sub-path tab to hide.
 
 ## Key confirmed values
 Cut line stroke: 0.25pt black, no fill
@@ -350,4 +353,4 @@ Step 8b:    docs/step8b-caption-normalise.md
 Step 8c:    docs/step8c-offset-path-qa.md
 Step 9A:    https://www.notion.so/36e0fc58673981af80e9f007b3b7d064 (Notion — half-cut lines for GC/WC elements)
 Step 9B:    https://www.notion.so/3720fc58673981599039d3243dbf2cd6 (Notion — peeling tab for stamps/unnamed elements)
-Step 10:    docs/step10-asset-export-final-file.md
+Step 10+11: https://www.notion.so/36d0fc58673981c1a808e6ee74384aca (Notion — asset export + final file)

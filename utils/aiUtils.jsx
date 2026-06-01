@@ -85,6 +85,13 @@ function blackCmyk() {
     return c;
 }
 
+// Returns a CMYKColor set to 0% ink (white).
+function whiteCmyk() {
+    var c = new CMYKColor();
+    c.cyan = 0; c.magenta = 0; c.yellow = 0; c.black = 0;
+    return c;
+}
+
 // Returns a CMYKColor set to 100% red (used for QA stroke).
 function redCmyk() {
     var c = new CMYKColor();

@@ -3,7 +3,8 @@
 #include "../illustrator/Step8c_OffsetPathQA.jsx"
 #include "../illustrator/Step9A_Halfcut.jsx"
 #include "../illustrator/Step9B_PeelingTab.jsx"
-#include "../illustrator/Step10_AssetExportFinalFile.jsx"
+#include "../illustrator/Step10_AssetExport.jsx"
+#include "../illustrator/Step11_FinalFile.jsx"
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,15 @@ var CONFIG = {
     // ⚠️  CONFIRM exact names with artist before first run.
     peelingTabGroupName:    "PEEL HERE",
     halfCircleGroupName:    "Half Circle",
+
+    // ── Step 10: Asset Export ─────────────────────────────────────────────────
+    colorBlockLayerName:   "Color Block",  // case-insensitive search
+    jpegQuality:           8,              // 0-100
+    // ⚠️  pngExportScale: pending artist confirmation — assumed 150 DPI for now.
+    pngExportScale:        150,            // DPI
+
+    // ── Step 11: Final File ───────────────────────────────────────────────────
+    finalHalfcutLayerName: "Halfcut/Peeling Tab",  // standardised output name
 
     // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,
@@ -120,19 +130,33 @@ function main() {
     }
     log("[pipeline] step 9b complete | " + tabResult.placed + " peeling tab(s) placed.");
 
-    // ── Step 10: Export Final File ─────────────────────────────────────────────
-    log("[pipeline] --- Step 10: Export Final File ---");
-    var exportResult;
+    // ── Step 10: Asset Export ──────────────────────────────────────────────────
+    log("[pipeline] --- Step 10: Asset Export ---");
+    var assetResult;
 
     try {
-        exportResult = runExport(doc);
+        assetResult = runAssetExport(doc);
     } catch (e) {
         log("[pipeline] ERROR | step 10 line " + e.line + ": " + e.message);
-        scriptAlert("ERROR in Step 10 (Export).\nLine " + e.line + ": " + e.message
+        scriptAlert("ERROR in Step 10 (Asset Export).\nLine " + e.line + ": " + e.message
             + "\n\nLog: " + CONFIG.logPath);
         return;
     }
-    log("[pipeline] step 10 complete | exported: " + exportResult.outputPath);
+    log("[pipeline] step 10 complete | " + assetResult.pngCount + " PNG(s) exported.");
+
+    // ── Step 11: Final File ────────────────────────────────────────────────────
+    log("[pipeline] --- Step 11: Final File ---");
+    var finalResult;
+
+    try {
+        finalResult = runFinalFile(doc);
+    } catch (e) {
+        log("[pipeline] ERROR | step 11 line " + e.line + ": " + e.message);
+        scriptAlert("ERROR in Step 11 (Final File).\nLine " + e.line + ": " + e.message
+            + "\n\nLog: " + CONFIG.logPath);
+        return;
+    }
+    log("[pipeline] step 11 complete | " + finalResult.outputPath);
 
     // ── Completion summary ─────────────────────────────────────────────────────
     log("[pipeline] === AI_AfterPencil done ===");
@@ -141,9 +165,14 @@ function main() {
         + "  QA:           " + qaResult.checked + " path(s) checked.\n"
         + "  Half-cuts:    " + halfcutResult.placed + " placed.\n"
         + "  Peeling tabs: " + tabResult.placed + " placed.\n"
-        + "  Final file:   " + exportResult.outputPath + "\n";
+        + "  PNGs:         " + assetResult.pngCount + " exported.\n"
+        + "  Final file:   " + finalResult.outputPath + "\n";
+    if (finalResult.layerCount !== 3) {
+        summaryMsg += "  WARNING: final file has " + finalResult.layerCount
+            + " layer(s) — expected 3. Check manually.\n";
+    }
 
-    var allFlags = halfcutResult.flags.concat(tabResult.flags);
+    var allFlags = halfcutResult.flags.concat(tabResult.flags).concat(assetResult.flags);
     if (allFlags.length > 0) {
         summaryMsg += "\n  Flagged for manual review (" + allFlags.length + "):\n";
         var fi;
