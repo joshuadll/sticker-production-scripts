@@ -1,6 +1,6 @@
 #target illustrator
 #include "../utils/aiUtils.jsx"
-#include "../illustrator/Step8b_OffsetPathQA.jsx"
+#include "../illustrator/Step8c_OffsetPathQA.jsx"
 #include "../illustrator/Step9_PeelingTabHalfcut.jsx"
 #include "../illustrator/Step10_AssetExportFinalFile.jsx"
 
@@ -13,6 +13,23 @@ var CONFIG = {
     // ⚠️  CONFIRM paths with artist before first run.
     assetsFolder:        "",  // e.g. "/Volumes/Team Drive/Production Assets"
     peelingTabAssetPath: "",  // resolved from assetsFolder below
+
+    // ── Step 8c: Spacing + Margin QA ─────────────────────────────────────────
+    // Layer names — must match the Production File Template exactly.
+    cutlinesLayerName:    "Cutlines",
+    marginLayerName:      "Margin",
+
+    // Minimum spacing between elements. 2mm is confirmed from the playbook.
+    spacingThresholdMm:   2,
+    qaSpacingSampleSteps: 12,  // bezier samples/segment (12 → ~0.4mm spacing at sticker scale)
+    flagStrokePt:         1.0, // red stroke weight for flagged cut lines
+
+    // Safe area for the margin check (A4 minus margins: 10mm top/left/right, 20mm
+    // bottom → 190 × 267 mm). Used only when the "Margin" layer has no rectangle.
+    workingAreaWidthMm:  190,
+    workingAreaHeightMm: 267,
+    marginTopMm:         10,
+    marginLeftMm:        10,
 
     // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,
@@ -42,23 +59,23 @@ function main() {
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
-    // ── Step 8b: Offset Path QA ────────────────────────────────────
-    log("[pipeline] --- Step 8b: Offset Path QA ---");
+    // ── Step 8c: Offset Path QA ────────────────────────────────────
+    log("[pipeline] --- Step 8c: Offset Path QA ---");
     var qaResult;
 
     try {
         qaResult = runOffsetPathQA(doc);
     } catch (e) {
-        log("[pipeline] ERROR | step 8b line " + e.line + ": " + e.message);
-        scriptAlert("ERROR in Step 8b (Offset Path QA).\nLine " + e.line + ": " + e.message
+        log("[pipeline] ERROR | step 8c line " + e.line + ": " + e.message);
+        scriptAlert("ERROR in Step 8c (Offset Path QA).\nLine " + e.line + ": " + e.message
             + "\n\nLog: " + CONFIG.logPath);
         return;
     }
-    log("[pipeline] step 8b complete | " + qaResult.checked + " path(s) checked, "
+    log("[pipeline] step 8c complete | " + qaResult.checked + " path(s) checked, "
         + qaResult.flagged + " flagged.");
 
     if (qaResult.flagged > 0) {
-        scriptAlert("Step 8b: " + qaResult.flagged + " path(s) flagged for review.\n"
+        scriptAlert("Step 8c: " + qaResult.flagged + " path(s) flagged for review.\n"
             + "Flagged paths are highlighted in red.\n"
             + "Fix them before continuing, then re-run this script.\n\n"
             + "Log: " + CONFIG.logPath);

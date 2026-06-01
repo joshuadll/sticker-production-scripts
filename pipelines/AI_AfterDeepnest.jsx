@@ -1,11 +1,24 @@
 #target illustrator
 #include "../utils/aiUtils.jsx"
 #include "../illustrator/Step8a_SimplifyCutlines.jsx"
+#include "../illustrator/Step8b_CaptionNormalise.jsx"
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 
 var CONFIG = {
     dryRun: false,
+
+    // Layer + stroke — must match the Production File Template / Step 6 output.
+    cutlinesLayerName: "Cutlines",
+    cutlineStrokePt:   0.25,
+
+    // Step 8a — Simplify. ⚠️ CONFIRM tuning with artist on a real trace.
+    simplifyToleranceMm:   0.2,   // RDP epsilon — higher = fewer anchors
+    simplifyCornerAngleDeg: 60,   // turns sharper than this stay hard corners
+
+    // Step 8b — Caption Normalisation (GC plates). Canonical plate heights.
+    plateHeightSingleLineCm: 0.5,
+    plateHeightTwoLineCm:    0.8,
 
     // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,
@@ -45,16 +58,33 @@ function main() {
     } catch (e) {
         log("[pipeline] ERROR | step 8a line " + e.line + ": " + e.message);
         scriptAlert("ERROR in Step 8a (Simplify Cutlines).\nLine " + e.line + ": " + e.message
-            + "\n\nNo changes committed. Log: " + CONFIG.logPath);
+            + "\n\nLog: " + CONFIG.logPath);
         return;
     }
-    log("[pipeline] step 8a complete | " + simplifyResult.simplified + " path(s) simplified.");
+    log("[pipeline] step 8a complete | " + simplifyResult.simplified + " path(s) simplified, "
+        + simplifyResult.skipped + " skipped.");
+
+    // ── Step 8b: Caption Normalisation ─────────────────────────────
+    log("[pipeline] --- Step 8b: Caption Normalisation ---");
+    var captionResult;
+
+    try {
+        captionResult = runCaptionNormalise(doc);
+    } catch (e) {
+        log("[pipeline] ERROR | step 8b line " + e.line + ": " + e.message);
+        scriptAlert("ERROR in Step 8b (Caption Normalisation).\nLine " + e.line + ": " + e.message
+            + "\n\nLog: " + CONFIG.logPath);
+        return;
+    }
+    log("[pipeline] step 8b complete | " + captionResult.normalized + " plate(s) normalised, "
+        + captionResult.skipped + " skipped.");
 
     // ── Completion summary ─────────────────────────────────────────
     log("[pipeline] === AI_AfterDeepnest done ===");
 
     scriptAlert("Done.\n\n"
-        + "  Simplified:  " + simplifyResult.simplified + " path(s).\n\n"
+        + "  Simplified:  " + simplifyResult.simplified + " cutline(s).\n"
+        + "  Normalised:  " + captionResult.normalized + " GC plate(s).\n\n"
         + "Review cutlines, make pencil refinements, then run AI_AfterPencil.\n\n"
         + "Log: " + CONFIG.logPath);
 }

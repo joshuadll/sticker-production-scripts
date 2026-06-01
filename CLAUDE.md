@@ -26,10 +26,12 @@ sticker-production-scripts/
 ├── illustrator/
 │   ├── Step6_CreateCutlines.jsx
 │   ├── Step7A_DeepnestExport.jsx    ← classifies paths by extent ratio → exports _regular.svg + _irregular.svg
-│   ├── Step8a_SimplifyCutlines.jsx
-│   ├── Step8b_OffsetPathQA.jsx
-│   ├── Step9_PeelingTabHalfcut.jsx
-│   └── Step10_AssetExportFinalFile.jsx
+│   ├── Step8a_SimplifyCutlines.jsx     ← native RDP simplify of trace cutlines
+│   ├── Step8b_CaptionNormalise.jsx      ← reset GC plate to spec → re-Unite cutline
+│   ├── Step8c_OffsetPathQA.jsx         ← spacing + margin QA (pure geometry; no offset layer created)
+│   ├── Step9_PeelingTabHalfcut.jsx     ← NOT YET BUILT (stub #include in AI_AfterPencil)
+│   ├── Step10_AssetExportFinalFile.jsx ← NOT YET BUILT (stub #include in AI_AfterPencil)
+│   └── StepQA_NestingQuality.jsx       ← occupancy grid → NQI score (0-100); flags re-nest pockets
 ├── pipelines/
 │   ├── PS_ToCaption.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
 │   │                                                   (stop: artist reviews captions)
@@ -38,8 +40,10 @@ sticker-production-scripts/
 │   ├── AI_ToCutlines.jsx       ← Step 6 entry point (called by BridgeTalk from PS_AfterCaption)
 │   ├── AI_Deepnest.jsx         ← Step 7A: classify cutlines → export _regular.svg + _irregular.svg for Deepnest
 │   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
-│   ├── AI_AfterDeepnest.jsx    ← Step 8a Simplify      (stop: artist pencil refinements)
-│   └── AI_AfterPencil.jsx      ← Steps 8b → 9 → 10    (done)
+│   ├── AI_AfterDeepnest.jsx    ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
+│   ├── AI_AfterPencil.jsx      ← Steps 8c Offset Path QA → 9 → 10
+│   │                                  (8c built; 9/10 not built; stop after 8c if flagged > 0)
+│   └── AI_NestingQA.jsx        ← runs StepQA_NestingQuality; artist runs after Deepnest to gate re-nest
 ├── tests/integration/
 └── docs/
 ```
@@ -82,6 +86,10 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
 - aiUtils.jsx: NAME_REGEX, parseLayerName, mmToPoints, boundsCenter, isCaption,
   blackCmyk, redCmyk, setStrokeStyle, strokeRecursive,
   buildPlate, deriveCutline, assembleElementGroup,
+  findGroupMember, reuniteCutline, rebuildPlateToHeight,
+  rdpSimplify, simplifyPathItem,
+  samplePathToPolygons, pointInPolygon, segmentsIntersect,
+  polygonsOverlap, boundsWithin, minPolygonSetDistance,
   log, scriptAlert, findLayer, findPathInLayer
 
 ---
@@ -121,6 +129,11 @@ PS_AfterCaption BridgeTalk exports (written before handoff, sibling to PSD):
 Working file stack: Asset > Margin > Offset Path > Halfcut > Cutlines > Stickers > Grid > Color Block
 Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
 
+Step 8c does **pure-geometry QA** — no Offset Path layer is created. It measures
+inter-cutline distance directly (< 2mm → fail) and checks cut-line bounds against
+the **Margin** layer rect (else computed from working area). Violations are flagged
+red on the cut line. No script writes the Margin or Offset Path layers.
+
 ## Cutline structure (set by Step 6 script)
 Each non-stamp element is a GroupItem named `[Display Name]` in the Cutlines layer:
   [Display Name]          ← visible fused cutline path = Unite(element_outline, plate)
@@ -128,12 +141,16 @@ Each non-stamp element is a GroupItem named `[Display Name]` in the Cutlines lay
   [Display Name] plate    ← parametric caption pill (hidden; separable component)
 
 The cutline is still one closed contour per sticker (nesting requires this). The components
-are kept separable so caption normalization in Step 8 is a re-Unite, not path surgery.
+are kept separable so caption normalization in Steps 8a/8b is a re-Unite, not path surgery.
 Stamp elements: a placed copy of Stamp Cutline Template.ai named `[Display Name]` (no group).
+
+GroupItem.note carries caption metadata for Step 8b (set by Step 6, survives the Deepnest gap):
+  Format: "{styleCode}|{capLines}"  e.g. "GC|2"
+  Step 8b reads this to know plate spec (0.5cm / 0.8cm). Missing note → Step 8b skips (logs warn).
 
 ## Key confirmed values
 Cut line stroke: 0.25pt black, no fill
-Offset path: 1mm exactly, Joins: Miter, Miter limit: 4
+Minimum spacing between elements: 2mm (checked by Step 8c via direct distance measurement)
 QA stroke colour: #ff0000
 Working area: 19 × 26.7 cm (A4 minus margins)
 Grid: 1 square = 1 inch = 2.5 cm
@@ -315,6 +332,7 @@ Step 5:     docs/step5-silhouette.md
 Step 6:     docs/step6-cut-lines.md
 Step 7A:    docs/step7a-deepnest-export.md
 Step 8a:    docs/step8a-simplify.md
-Step 8b:    docs/step8b-offset-path-qa.md
+Step 8b:    docs/step8b-caption-normalise.md
+Step 8c:    docs/step8c-offset-path-qa.md
 Step 9:     docs/step9-peeling-tab.md
 Step 10:    docs/step10-asset-export-final-file.md
