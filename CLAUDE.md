@@ -25,6 +25,7 @@ sticker-production-scripts/
 │   └── Step5_Silhouette.jsx     ← groups elements → loads transparency → fills black (NOT clip/merge)
 ├── illustrator/
 │   ├── Step6_CreateCutlines.jsx
+│   ├── Step7A_DeepnestExport.jsx    ← classifies paths by extent ratio → exports _regular.svg + _irregular.svg
 │   ├── Step8a_SimplifyCutlines.jsx
 │   ├── Step8b_OffsetPathQA.jsx
 │   ├── Step9_PeelingTabHalfcut.jsx
@@ -33,8 +34,10 @@ sticker-production-scripts/
 │   ├── PS_ToCaption.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
 │   │                                                   (stop: artist reviews captions)
 │   ├── PS_AfterCaption.jsx     ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Step 6
-│   │                                                   (stop: artist does Deepnest manually)
+│   │                                                   (stop: review cutlines, then run AI_Deepnest.jsx)
 │   ├── AI_ToCutlines.jsx       ← Step 6 entry point (called by BridgeTalk from PS_AfterCaption)
+│   ├── AI_Deepnest.jsx         ← Step 7A: classify cutlines → export _regular.svg + _irregular.svg for Deepnest
+│   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
 │   ├── AI_AfterDeepnest.jsx    ← Step 8a Simplify      (stop: artist pencil refinements)
 │   └── AI_AfterPencil.jsx      ← Steps 8b → 9 → 10    (done)
 ├── tests/integration/
@@ -299,6 +302,7 @@ Step 3:     docs/step3-auto-caption.md
 Step 4:     docs/step4-white-edge.md
 Step 5:     docs/step5-silhouette.md
 Step 6:     docs/step6-cut-lines.md
+Step 7A:    docs/step7a-deepnest-export.md
 Step 8a:    docs/step8a-simplify.md
 Step 8b:    docs/step8b-offset-path-qa.md
 Step 9:     docs/step9-peeling-tab.md
