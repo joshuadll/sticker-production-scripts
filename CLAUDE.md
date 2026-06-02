@@ -333,6 +333,12 @@ assets/Stamp Cutline Template.ai
 assets/Peeling Tab Asset.ai
 All paths resolve via: _root + "/assets/FileName.ai" where _root = new File($.fileName).parent.parent.fsName
 
+## Per-SKU source folder convention
+The source folder passed to PS_ToCaption may contain an optional file:
+  Caption_Plate.psd  ← GC-LM SKUs only; omit for WC-only SKUs
+Step 1 imports it automatically if present. It must contain the Caption plate
+artwork as the top-level group (L/C/R sub-layers), which Step 3B elongates per element.
+
 ## Final file naming
 [STK_CODE]_final.ai — parse STK code as everything before first space in working filename
 

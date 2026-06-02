@@ -79,10 +79,6 @@ function runCombine(templateDoc, folder) {
                 totalPlaced++;
             }
 
-            // Bring over "Caption plate" group if present (used by GC-LM plate treatment).
-            // One per SKU — if multiple source PSDs contain one, the last wins (with warning).
-            pickUpCaptionPlate(sourceDoc, templateDoc, fileName);
-
             sourceDoc.close(SaveOptions.DONOTSAVECHANGES);
             log("[step1] closed | " + fileName);
 
@@ -94,44 +90,41 @@ function runCombine(templateDoc, folder) {
         app.playbackDisplayDialogs = DialogModes.ERROR;
     }
 
+    importCaptionPlateFile(folder, templateDoc);
+
     return { placed: totalPlaced, fileCount: files.length };
 }
 
-// If the source PSD contains a top-level layer/group named "Caption plate",
-// duplicate it to the template as a plain layer (no SO conversion).
-// If the template already has one (from a previous source PSD), replace it with a warning.
-function pickUpCaptionPlate(sourceDoc, templateDoc, fileName) {
-    var captionPlateName = "Caption plate";
-    var sourcePlate = null;
-
-    for (var i = 0; i < sourceDoc.layers.length; i++) {
-        if (sourceDoc.layers[i].name === captionPlateName) {
-            sourcePlate = sourceDoc.layers[i];
-            break;
-        }
-    }
-
-    if (!sourcePlate) return; // no Caption plate in this source PSD — that's fine
+// Imports Caption_Plate.psd from the source folder into the template as a
+// top-level group named "Caption plate". Only needed for GC-LM SKUs — silently
+// skips if the file is absent (WC-only SKUs don't include it).
+function importCaptionPlateFile(folder, templateDoc) {
+    var plateFile = new File(folder.fsName + "/Caption_Plate.psd");
+    if (!plateFile.exists) return;
 
     if (CONFIG.dryRun) {
-        log("[step1] [DRY RUN] would bring over | \"" + captionPlateName
-            + "\" from " + fileName);
+        log("[step1] [DRY RUN] would import | Caption_Plate.psd");
         return;
     }
 
-    // Check if template already has a Caption plate (from a previous source PSD).
-    var existing = findLayerByName(templateDoc, captionPlateName);
-    if (existing) {
-        log("[step1] WARN | \"" + captionPlateName
-            + "\" already exists in template — replacing with version from " + fileName
-            + ". (Multiple source PSDs contained a Caption plate — only one per SKU expected.)");
-        existing.remove();
+    var plateDoc = app.open(plateFile);
+
+    var sourcePlate = (plateDoc.layers.length > 0) ? plateDoc.layers[0] : null;
+    if (!sourcePlate) {
+        plateDoc.close(SaveOptions.DONOTSAVECHANGES);
+        log("[step1] WARN | Caption_Plate.psd has no layers — skipping.");
+        return;
     }
 
     sourcePlate.duplicate(templateDoc, ElementPlacement.PLACEATBEGINNING);
-    app.activeDocument = templateDoc;
-    templateDoc.activeLayer.name = captionPlateName;
-    app.activeDocument = sourceDoc;
+    plateDoc.close(SaveOptions.DONOTSAVECHANGES);
 
-    log("[step1] brought over | \"" + captionPlateName + "\" from " + fileName);
+    app.activeDocument = templateDoc;
+
+    // Replace any existing Caption plate (re-run guard).
+    var existing = findLayerByName(templateDoc, "Caption plate");
+    if (existing && existing !== templateDoc.layers[0]) existing.remove();
+
+    templateDoc.layers[0].name = "Caption plate";
+    log("[step1] imported | Caption plate from Caption_Plate.psd");
 }

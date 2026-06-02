@@ -186,8 +186,8 @@ function groupWithPlate(doc, soLayer, textLayer, groupName) {
         plateLayer.translate(tCenterX - pCenterX, targetPlateTop - pTop);
     } else {
         log("[step3B] WARN | \"" + groupName
-            + "\" — no Caption plate layer found in template. "
-            + "Place a group named \"Caption plate\" in the source PSD before running.");
+            + "\" — no Caption plate layer found in working doc. "
+            + "Add Caption_Plate.psd to the source folder and re-run PS_ToCaption.");
     }
 
     var wbcLayer = findAdjacentCutline(doc, soLayer);
