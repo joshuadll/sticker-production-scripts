@@ -42,9 +42,10 @@ var CONFIG = {
     },
 
     // ── Step 3: White edge ────────────────────────────────────────────────────
-    // ⚠️  Confirm whiteEdgePx with artist — ask for the border width they use.
-    // At 300 DPI: 30px ≈ 2.5mm, 40px ≈ 3.4mm. Typical range: 25–40px.
-    whiteEdgePx:        30,               // ⚠️ confirm with artist
+    // Default 20px (≈ 1.7mm at 300 DPI) confirmed by artist as the majority case.
+    // To adjust a single element: delete its White Base_Cutline layer, change this
+    // value, re-run — the re-run guard skips all elements that still have their layer.
+    whiteEdgePx:        20,
     whiteEdgeLayerName: "White Base_Cutline", // name given to the created layer
 
     // ── Step 3A: Caption text ──────────────────────────────────────────────────
@@ -59,10 +60,9 @@ var CONFIG = {
     // Defaults to captionFont until confirmed.
     captionFontPlate:        "Kalam-Regular",
 
-    captionSizePt:           16,     // pt — doubled from 8pt actual (double-A4 template)
-    captionTracking:         -20,    // thousandths of an em
-    captionGap:              10,     // px: gap between element bottom and text top
-    captionBaselineOffsetPx: 55,     // approx ascender for 16pt Kalam at 300 DPI — tune if off
+    captionSizePt:    16,   // pt — doubled from 8pt actual (double-A4 template)
+    captionTracking:  -20,  // thousandths of an em
+    captionGap:       10,   // px: gap between element bottom and text top
 
     // [styleCode, catCode] pairs that use the plate treatment.
     // Extend this array (no code change) when new plate-style categories are added.

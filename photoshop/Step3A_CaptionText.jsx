@@ -88,11 +88,6 @@ function placeCaptionText(doc, soLayer, displayName, font) {
     var bottom  = bounds[3].as("px");
     var centerX = (left + right) / 2;
 
-    // Baseline Y = element bottom + gap + approximate ascender.
-    // captionBaselineOffsetPx is a tunable estimate; text top will land at
-    // approximately (elementBottom + captionGap). Tune if placement is off.
-    var baselineY = bottom + CONFIG.captionGap + CONFIG.captionBaselineOffsetPx;
-
     var textLayer   = doc.artLayers.add();
     textLayer.kind  = LayerKind.TEXT;
 
@@ -104,8 +99,14 @@ function placeCaptionText(doc, soLayer, displayName, font) {
     ti.justification = Justification.CENTER;
     ti.color         = solidBlack();
 
-    // Position in pixels (ruler is already PIXELS).
-    ti.position = [centerX, baselineY];
+    // Place at a rough baseline so Photoshop renders the text and bounds are readable.
+    ti.position = [centerX, bottom + CONFIG.captionGap];
+
+    // Read actual rendered bounds and shift so text top lands at elementBottom + captionGap.
+    // This replaces the fixed ascender estimate — works for any font or size.
+    var tb      = textLayer.bounds;
+    var textTop = tb[1].as("px");
+    ti.position = [centerX, bottom + CONFIG.captionGap + (bottom + CONFIG.captionGap - textTop)];
 
     // Place T layer just above the SO so it ends up at the top of the group
     // after Step 3B grouping (panel order: T → White → SO → White Base_Cutline).
