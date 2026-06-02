@@ -36,8 +36,6 @@ function runWhiteEdge(doc) {
             var soLayer = layerRefs[i];
             var name    = soLayer.name;
 
-            if (name === CONFIG.skipLayerName) continue;
-
             var parsed = parseLayerName(name);
             if (!parsed) {
                 log("[step2B] SKIP | \"" + name + "\" — no [STYLE-CAT] code.");

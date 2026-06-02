@@ -35,10 +35,10 @@ function runSilhouette(doc) {
     var elementsGroup = findLayerByName(doc, "Elements");
 
     if (!elementsGroup) {
-        // Collect all top-level layers except Guide.
+        // Collect only layers that match the element naming convention.
         var toGroup = [];
         for (var i = 0; i < doc.layers.length; i++) {
-            if (doc.layers[i].name !== CONFIG.skipLayerName) {
+            if (parseLayerName(doc.layers[i].name)) {
                 toGroup.push(doc.layers[i]);
             }
         }

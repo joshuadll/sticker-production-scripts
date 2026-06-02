@@ -21,8 +21,6 @@ function runResize(doc) {
                 continue;
             }
 
-            if (layer.name === CONFIG.skipLayerName) continue;
-
             var parsed = parseLayerName(layer.name);
             if (!parsed) {
                 log("[step2] SKIP | \"" + layer.name + "\" — no [STYLE-CAT] code.");

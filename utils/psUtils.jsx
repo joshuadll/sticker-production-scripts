@@ -86,11 +86,12 @@ function isValidTemplate(doc) {
     return Math.round(doc.width.as("cm")) === CONFIG.templateWidthCm;
 }
 
-// Removes all top-level layers except CONFIG.skipLayerName.
+// Removes top-level layers that match the element naming convention.
+// Leaves all other layers (Guide, Background, etc.) untouched.
 // Loops backwards to avoid index shifting on removal.
-function clearNonGuideLayers(doc) {
+function clearElementLayers(doc) {
     for (var i = doc.layers.length - 1; i >= 0; i--) {
-        if (doc.layers[i].name !== CONFIG.skipLayerName) {
+        if (parseLayerName(doc.layers[i].name)) {
             doc.layers[i].remove();
         }
     }

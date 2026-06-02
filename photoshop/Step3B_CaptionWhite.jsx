@@ -35,8 +35,7 @@ function runCaptionWhite(doc) {
             var soLayer = layerRefs[i];
             var name    = soLayer.name;
 
-            if (name === CONFIG.skipLayerName) continue;
-            if (name === "Caption plate")      continue;
+            if (name === "Caption plate") continue;
 
             var parsed = parseLayerName(name);
             if (!parsed) continue;

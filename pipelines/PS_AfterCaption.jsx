@@ -8,7 +8,6 @@
 var CONFIG = {
     dryRun: false,
 
-    skipLayerName:   "Guide",
     templateWidthCm: 42,
     templateDPI:     300,
 

@@ -11,12 +11,6 @@
 var CONFIG = {
     dryRun: false,
 
-    // ⚠️  CONFIRM WITH ARTIST before first run:
-    // Exact name of the sheet-boundary / guide layer in the Resize Area Template.
-    // This layer is preserved when the template is cleared on re-run.
-    // All other top-level layers are removed. Wrong name = that layer gets deleted.
-    skipLayerName:   "Guide",
-
     templateWidthCm: 42,
     templateDPI:     300,
 

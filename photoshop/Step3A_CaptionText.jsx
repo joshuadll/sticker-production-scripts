@@ -5,7 +5,7 @@
 // Leaves layers ungrouped and unlocked — artist reviews positions and
 // optionally curves text before running PS_AfterCaption (Step 3B).
 //
-// Skips: ST (stamps), layers without [STYLE-CAT] code, CONFIG.skipLayerName.
+// Skips: ST (stamps), layers without [STYLE-CAT] code.
 // Returns: { placed, skipped[] }
 
 function runCaptionText(doc) {
@@ -25,8 +25,6 @@ function runCaptionText(doc) {
         for (var i = 0; i < layerRefs.length; i++) {
             var soLayer = layerRefs[i];
             var name    = soLayer.name;
-
-            if (name === CONFIG.skipLayerName) continue;
 
             var parsed = parseLayerName(name);
             if (!parsed) {

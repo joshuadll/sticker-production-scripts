@@ -12,24 +12,11 @@ function runCombine(templateDoc, folder) {
     }
     log("[step1] found | " + files.length + " PSD file(s) in source folder.");
 
-    // Verify the skip layer exists before clearing — wrong name = data loss.
-    var skipLayerFound = false;
-    for (var g = 0; g < templateDoc.layers.length; g++) {
-        if (templateDoc.layers[g].name === CONFIG.skipLayerName) {
-            skipLayerFound = true;
-            break;
-        }
-    }
-    if (!skipLayerFound) {
-        log("[step1] WARN: layer \"" + CONFIG.skipLayerName + "\" not found in template. "
-            + "Update CONFIG.skipLayerName. Skipping clear step — old layers preserved.");
-    }
-
     if (CONFIG.dryRun) {
-        log("[step1] [DRY RUN] would clear non-\"" + CONFIG.skipLayerName + "\" layers from template.");
-    } else if (skipLayerFound) {
-        log("[step1] clearing template (preserving \"" + CONFIG.skipLayerName + "\" layer)...");
-        clearNonGuideLayers(templateDoc);
+        log("[step1] [DRY RUN] would clear element layers from template.");
+    } else {
+        log("[step1] clearing element layers from template...");
+        clearElementLayers(templateDoc);
         log("[step1] template cleared.");
     }
 
