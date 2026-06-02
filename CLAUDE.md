@@ -43,8 +43,8 @@ sticker-production-scripts/
 │   ├── AI_Deepnest.jsx         ← Step 7A: classify cutlines → export _regular.svg + _irregular.svg for Deepnest
 │   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
 │   ├── AI_AfterDeepnest.jsx    ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
-│   ├── AI_AfterPencil.jsx      ← Steps 8c → 9A → 9B → 10 (Asset Export) → 11 (Final File)
-│   │                                  (all steps built; halts after 8c if flagged > 0; 9B can be omitted if peeling tab is removed from process)
+│   ├── AI_AfterPencil.jsx      ← Steps 8c → 9A → 10 (Asset Export) → 11 (Final File)
+│   │                                  (Step 9B temporarily removed; peeling tab stays in workflow but pipeline placement TBD)
 │   └── AI_NestingQA.jsx        ← runs StepQA_NestingQuality; artist runs after Deepnest to gate re-nest
 ├── tests/integration/
 └── docs/
@@ -65,8 +65,10 @@ The only files artists run. These own CONFIG and main().
 #include "../photoshop/Step1_CombineElements.jsx"
 #include "../photoshop/Step2A_AutoResize.jsx"
 
-var CONFIG = { dryRun: false, skipLayerName: "Guide", ... };
-CONFIG.logPath = new File($.fileName).parent.fsName + "/PipelineName.log";
+var CONFIG = { dryRun: false, ... };
+var _root = $.fileName ? new File($.fileName).parent.parent.fsName : Folder.desktop.fsName;
+CONFIG.logPath = _root + "/pipelines/PipelineName.log";
+// Asset paths (if needed): CONFIG.someAssetPath = _root + "/assets/SomeFile.ai";
 
 function main() { ... }
 main();
@@ -83,7 +85,7 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
 - psUtils.jsx: NAME_REGEX, parseLayerName, getTargetPx, needsCaption, longestEdge,
   scalePercent, isCaptionPlate, findLayerByName, findTextLayerByDisplayName,
   solidBlack, solidWhite, selectLayerById, addLayerToSelectionById,
-  log, scriptAlert, isValidTemplate, clearNonGuideLayers,
+  log, scriptAlert, isValidTemplate, clearElementLayers,
   convertToSmartObject, resizeLayerToTarget, loadLayerTransparency
 - aiUtils.jsx: NAME_REGEX, parseLayerName, mmToPoints, boundsCenter, isCaption,
   blackCmyk, whiteCmyk, redCmyk, setStrokeStyle, strokeRecursive,
@@ -113,7 +115,7 @@ Category resize targets:
 The PSD imported by Step 6 has exactly three top-level layers:
   Silhouette         ← flat black pixel layer (element art only — captions excluded; see note)
   Elements           ← LayerSet containing all [Display Name] [STYLE-CAT] element groups
-  Guide              ← locked; excluded from grouping by CONFIG.skipLayerName
+  Guide              ← untouched; Step 5 groups only parseLayerName() matches, so any non-element layer is safe
 
 Step 5 implementation note: before loading transparency, Step 5 hides caption sub-layers
 (TEXT, "White" pill, "Caption plate") so the silhouette covers element art only. This is
@@ -186,16 +188,18 @@ to find these exact crossing points — not a bounding-box approximation.
 
 var CONFIG = {
     dryRun:           false,
-    skipLayerName:    "Guide",   // CONFIRM with artist before first run
     templateWidthCm:  42,
     templateDPI:      300,
     sourceFolderPath: "",        // testing only — leave empty for interactive use
     suppressAlerts:   false,     // testing only — suppresses alert() dialogs
     logPath:          ""         // resolved below
 };
-CONFIG.logPath = ($.fileName
-    ? new File($.fileName).parent.fsName
-    : Folder.desktop.fsName) + "/PipelineName.log";
+var _root = $.fileName
+    ? new File($.fileName).parent.parent.fsName
+    : Folder.desktop.fsName;
+CONFIG.logPath = _root + "/pipelines/PipelineName.log";
+// Asset paths resolve automatically — no manual config needed:
+// CONFIG.someAssetPath = _root + "/assets/SomeFile.ai";
 
 function main() {
     // 1. Validate document
@@ -253,10 +257,10 @@ Before sending, PS_AfterCaption exports two sidecar files next to the PSD:
 Then sends all three paths to AI_ToCutlines.jsx via BridgeTalk.
 
 ```javascript
-// In PS_AfterCaption.jsx CONFIG:
-// aiTemplatePath:  "/path/to/Production_File_Template.ai"  // ⚠️ CONFIRM location
-// aiPipelinePath:  "/path/to/pipelines/AI_ToCutlines.jsx"  // ⚠️ CONFIRM location
-// bridgeTalkTimeout: 20  // seconds
+// In PS_AfterCaption.jsx — paths are auto-resolved from _root ($.fileName):
+// CONFIG.aiTemplatePath = _root + "/assets/Production_File_Template.ai";
+// CONFIG.aiPipelinePath = _root + "/pipelines/AI_ToCutlines.jsx";
+// CONFIG.bridgeTalkTimeout = 20;  // seconds
 
 function handOffToIllustrator(doc) {
     var silhPngPath  = exportSilhouettePng(doc);   // → {name}_silhouette.png
@@ -320,9 +324,11 @@ Convert to SO:      executeAction(stringIDToTypeID("newPlacedLayer"), new Action
 Group layers:       executeAction(stringIDToTypeID("groupLayersEvent"), desc, DialogModes.NO)
 Suppress dialogs:   app.playbackDisplayDialogs = DialogModes.NO (restore to DialogModes.ERROR after)
 
-## Shared asset paths (update CONFIG.assetsFolder if location changes)
-[Team Drive]/Production Assets/Peeling Tab Asset.ai
-[Team Drive]/Production Assets/Stamp Cutline Template.ai
+## Shared asset paths (committed to repo — no config needed)
+assets/Production_File_Template.ai
+assets/Stamp Cutline Template.ai
+assets/Peeling Tab Asset.ai
+All paths resolve via: _root + "/assets/FileName.ai" where _root = new File($.fileName).parent.parent.fsName
 
 ## Final file naming
 [STK_CODE]_final.ai — parse STK code as everything before first space in working filename
