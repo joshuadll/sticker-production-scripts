@@ -14,7 +14,7 @@ var CONFIG = {
 
     // Step 8a — Simplify. ⚠️ CONFIRM tuning with artist on a real trace.
     simplifyToleranceMm:   0.2,   // RDP epsilon — higher = fewer anchors
-    simplifyCornerAngleDeg: 60,   // turns sharper than this stay hard corners
+    simplifyCornerAngleDeg: 90,   // turns sharper than this stay hard corners
 
     // Step 8b — Caption Normalisation (GC plates). Canonical plate heights.
     plateHeightSingleLineCm: 0.5,
