@@ -13,8 +13,8 @@ for runner in "$DIR"/run-test*.sh; do
 done
 
 # Integration tests (require fixture files and a running Adobe app).
-for runner in "$DIR"/run-step*.sh; do
-    bash "$runner" && PASS=$((PASS+1)) || FAIL=$((FAIL+1))
+for runner in "$DIR"/run-step*.sh "$DIR"/run-ps-*.sh "$DIR"/run-ai-*.sh; do
+    [ -f "$runner" ] && { bash "$runner" && PASS=$((PASS+1)) || FAIL=$((FAIL+1)); }
 done
 
 echo ""

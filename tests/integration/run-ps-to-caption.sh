@@ -1,5 +1,5 @@
 #!/bin/bash
-# Integration test for PS_ToCaption.jsx (Steps 1 + 2: combine + resize)
+# Integration test for PS_ToCaption.jsx (Steps 1 → 2A → 2B → 3A)
 #
 # FIXTURES REQUIRED — place these before running:
 #
@@ -12,29 +12,29 @@
 #   1. Run this script (it will SKIP the diff and print the log path)
 #   2. Verify the log looks correct
 #   3. Commit the golden file:
-#        cp "$LOG" tests/integration/expected/step1-2-expected.txt
-#        git add tests/integration/expected/step1-2-expected.txt
+#        cp "$LOG" tests/integration/expected/ps-to-caption-expected.txt
+#        git add tests/integration/expected/ps-to-caption-expected.txt
 #        git commit -m "Add golden output for step1-2"
 #
 # UPDATING THE GOLDEN FILE — after an intentional change:
 #   1. Verify the new output is correct
-#   2. cp "$LOG" tests/integration/expected/step1-2-expected.txt
+#   2. cp "$LOG" tests/integration/expected/ps-to-caption-expected.txt
 #   3. git add + commit with a message explaining why it changed
 
 set -euo pipefail
 
-STEP="step1-2"
+STEP="ps-to-caption"
 APP="Adobe Photoshop 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/PS_ToCaption.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 SOURCE_FIXTURE="$FIXTURE_DIR/source-psds"
-EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step1-2-expected.txt"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ps-to-caption-expected.txt"
 
 # The script writes its log to the same folder as the JSX file being run.
 # Since we run a temp copy from /tmp, the log lands there.
-TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
+TEMP_SCRIPT="/tmp/ps-to-caption-test.jsx"
 LOG="/tmp/PS_ToCaption.log"
 
 # ── Pre-flight checks ────────────────────────────────────────────────────────
