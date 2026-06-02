@@ -20,13 +20,14 @@ var CONFIG = {
     cutlinesLayerName: "Cutlines",
     stickersLayerName: "Stickers",
 
-    // ⚠️  CONFIRM with artist before first run.
-    stampTemplatePath: ""  // e.g. "/Volumes/Team Drive/.../Stamp Cutline Template.ai"
 };
 
-CONFIG.logPath = ($.fileName
-    ? new File($.fileName).parent.fsName
-    : Folder.desktop.fsName) + "/AI_ToCutlines.log";
+var _root = $.fileName
+    ? new File($.fileName).parent.parent.fsName
+    : Folder.desktop.fsName;
+
+CONFIG.logPath         = _root + "/pipelines/AI_ToCutlines.log";
+CONFIG.stampTemplatePath = _root + "/assets/Stamp Cutline Template.ai";
 
 // ─── ENTRY POINT (called by BridgeTalk from PS_AfterCaption.jsx) ──────────────
 

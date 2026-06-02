@@ -34,16 +34,16 @@ var CONFIG = {
     captionPlateCodes: [["GC", "LM"]],
 
     // ── BridgeTalk handoff ─────────────────────────────────────────────────────
-
-    // ⚠️  CONFIRM aiTemplatePath location with artist before first run.
-    aiTemplatePath:    "",   // e.g. "/Volumes/Team Drive/.../Production_File_Template.ai"
-    aiPipelinePath:    "",   // e.g. "/path/to/pipelines/AI_ToCutlines.jsx"
     bridgeTalkTimeout: 20    // seconds to wait for Illustrator to respond
 };
 
-CONFIG.logPath = ($.fileName
-    ? new File($.fileName).parent.fsName
-    : Folder.desktop.fsName) + "/PS_AfterCaption.log";
+var _root = $.fileName
+    ? new File($.fileName).parent.parent.fsName
+    : Folder.desktop.fsName;
+
+CONFIG.logPath        = _root + "/pipelines/PS_AfterCaption.log";
+CONFIG.aiTemplatePath = _root + "/assets/Production_File_Template.ai";
+CONFIG.aiPipelinePath = _root + "/pipelines/AI_ToCutlines.jsx";
 
 // ─── SILHOUETTE PNG EXPORT ────────────────────────────────────────────────────
 
