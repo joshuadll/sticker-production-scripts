@@ -2,9 +2,9 @@
 # Integration test for Step 3A (caption text placement).
 # Runs PS_ToCaption.jsx (Steps 1 + 2 + 3A) and verifies T layers were created.
 #
-# FIXTURES REQUIRED — same as run-step1-2.sh:
-#   tests/integration/fixtures/resize-area-template.psd
+# FIXTURES REQUIRED:
 #   tests/integration/fixtures/source-psds/  (≥1 source PSD)
+#   PS_ToCaption creates its own template document — no pre-opened PSD needed.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
@@ -22,7 +22,6 @@ APP="Adobe Photoshop 2024"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/PS_ToCaption.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
-TEMPLATE_FIXTURE="$FIXTURE_DIR/resize-area-template.psd"
 SOURCE_FIXTURE="$FIXTURE_DIR/source-psds"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step3a-expected.txt"
 
@@ -30,11 +29,6 @@ TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/PS_ToCaption.log"
 
 # ── Pre-flight checks ────────────────────────────────────────────────────────
-
-if [ ! -f "$TEMPLATE_FIXTURE" ]; then
-    echo "SKIP [$STEP]: fixture not found: $TEMPLATE_FIXTURE"
-    exit 0
-fi
 
 if [ ! -d "$SOURCE_FIXTURE" ] || [ -z "$(ls "$SOURCE_FIXTURE"/*.psd 2>/dev/null)" ]; then
     echo "SKIP [$STEP]: source fixture folder missing or empty: $SOURCE_FIXTURE"
@@ -52,11 +46,9 @@ perl -pe '
 
 # ── Run script via osascript ─────────────────────────────────────────────────
 
-echo "[$STEP] Opening template and running script..."
+echo "[$STEP] Running script..."
 osascript << EOF
 tell application "$APP"
-    open POSIX file "$TEMPLATE_FIXTURE"
-    delay 1
     do javascript file "$TEMP_SCRIPT"
 end tell
 EOF

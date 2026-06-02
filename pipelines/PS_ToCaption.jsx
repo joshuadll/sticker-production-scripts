@@ -11,8 +11,9 @@
 var CONFIG = {
     dryRun: false,
 
-    templateWidthCm: 42,
-    templateDPI:     300,
+    templateWidthCm:  42,
+    templateHeightCm: 59.4,
+    templateDPI:      300,
 
     // For automated testing only — leave empty ("") for normal interactive use.
     // When set, skips the folder-picker dialog.
@@ -67,23 +68,31 @@ CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
     : Folder.desktop.fsName) + "/PS_ToCaption.log";
 
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+function createTemplateDoc() {
+    var w = new UnitValue(CONFIG.templateWidthCm, "cm");
+    var h = new UnitValue(CONFIG.templateHeightCm, "cm");
+    var doc = app.documents.add(w, h, CONFIG.templateDPI, "Production Template",
+        NewDocumentMode.CMYK, DocumentFill.WHITE);
+    var guideLayer = doc.artLayers.add();
+    guideLayer.name = "Guide";
+    log("[pipeline] created new template document ("
+        + CONFIG.templateWidthCm + " x " + CONFIG.templateHeightCm + " cm, "
+        + CONFIG.templateDPI + " DPI).");
+    return doc;
+}
+
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 function main() {
 
-    // ── Validate document ──────────────────────────────────────────
-    if (app.documents.length === 0) {
-        scriptAlert("No document open.\nPlease open the Resize Area Template first.");
-        return;
-    }
-    var doc = app.activeDocument;
-
-    if (!isValidTemplate(doc)) {
-        scriptAlert("Active document does not look like the Resize Area Template.\n"
-            + "Expected: " + CONFIG.templateWidthCm + " cm wide. "
-            + "Got: " + Math.round(doc.width.as("cm")) + " cm.\n\n"
-            + "Please activate the Resize Area Template and try again.");
-        return;
+    // ── Get or create template document ───────────────────────────
+    var doc;
+    if (app.documents.length > 0 && isValidTemplate(app.activeDocument)) {
+        doc = app.activeDocument;
+    } else {
+        doc = createTemplateDoc();
     }
 
     // ── Init log ───────────────────────────────────────────────────

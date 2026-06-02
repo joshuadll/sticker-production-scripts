@@ -308,9 +308,12 @@ See docs/testing.md for full details.
 When scaffolding any new step, always create the corresponding integration
 test runner in tests/integration/ alongside it.
 
-The shared fixture for all Photoshop integration tests:
-  tests/integration/fixtures/resize-area-template.psd  ← one file, used by all PS runners
-  tests/integration/fixtures/source-psds/              ← source PSDs for combine tests
+Photoshop integration test fixtures:
+  tests/integration/fixtures/source-psds/              ← source PSDs for combine tests (≥1 required)
+  PS_ToCaption creates its own template document — no pre-opened PSD needed for run-step1-2 or run-step3a.
+  Derivative fixtures (for run-step3b / run-step5) are saved outputs of earlier pipeline runs:
+    tests/integration/fixtures/resize-area-template-captioned.psd  ← saved after PS_ToCaption
+    tests/integration/fixtures/resize-area-template-grouped.psd    ← saved after PS_AfterCaption step 3B
 
 Test runners patch CONFIG via perl injection (sourceFolderPath + suppressAlerts)
 and run the pipeline script, not individual step files.

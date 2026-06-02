@@ -3,14 +3,10 @@
 #
 # FIXTURES REQUIRED — place these before running:
 #
-#   tests/integration/fixtures/resize-area-template.psd
-#     Minimal Resize Area Template: 42 × 59.4 cm, 300 DPI.
-#     Must contain exactly one layer named per CONFIG.skipLayerName (default: "Guide").
-#     No element layers — the script will populate them.
-#
 #   tests/integration/fixtures/source-psds/
 #     One or more source PSDs, each with top-level LayerSet groups
 #     named per the Foundation convention e.g. "Horseshoe Bend [WC-LM]".
+#     PS_ToCaption creates its own template document — no pre-opened PSD needed.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (it will SKIP the diff and print the log path)
@@ -33,7 +29,6 @@ APP="Adobe Photoshop 2024"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/PS_ToCaption.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
-TEMPLATE_FIXTURE="$FIXTURE_DIR/resize-area-template.psd"
 SOURCE_FIXTURE="$FIXTURE_DIR/source-psds"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step1-2-expected.txt"
 
@@ -43,12 +38,6 @@ TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/PS_ToCaption.log"
 
 # ── Pre-flight checks ────────────────────────────────────────────────────────
-
-if [ ! -f "$TEMPLATE_FIXTURE" ]; then
-    echo "SKIP [$STEP]: fixture not found: $TEMPLATE_FIXTURE"
-    echo "  Create: 42×59.4 cm, 300 DPI PSD with a single layer named 'Guide' (or CONFIG.skipLayerName)"
-    exit 0
-fi
 
 if [ ! -d "$SOURCE_FIXTURE" ] || [ -z "$(ls "$SOURCE_FIXTURE"/*.psd 2>/dev/null)" ]; then
     echo "SKIP [$STEP]: source fixture folder missing or empty: $SOURCE_FIXTURE"
@@ -69,11 +58,9 @@ perl -pe '
 
 # ── Run script via osascript ─────────────────────────────────────────────────
 
-echo "[$STEP] Opening template and running script..."
+echo "[$STEP] Running script..."
 osascript << EOF
 tell application "$APP"
-    open POSIX file "$TEMPLATE_FIXTURE"
-    delay 1
     do javascript file "$TEMP_SCRIPT"
 end tell
 EOF
