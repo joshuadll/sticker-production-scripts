@@ -5,9 +5,10 @@
 #
 # FIXTURES REQUIRED:
 #   tests/integration/fixtures/resize-area-template-captioned.psd
-#     A Resize Area Template that has ALREADY had Steps 1–3A run on it
+#     A working PSD that has had Steps 1–3A run on it
 #     (i.e. it has SO layers + T layers at the top level, ungrouped).
-#     Create this by running PS_ToCaption.jsx on a fixture PSD and saving.
+#     Create this by running PS_ToCaption.jsx on source PSDs in a folder named
+#     "resize-area-template-captioned" — it will auto-save to that path.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)

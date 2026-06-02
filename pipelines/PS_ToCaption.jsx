@@ -83,6 +83,17 @@ function createTemplateDoc() {
     return doc;
 }
 
+function saveWorkingDoc(doc, folder) {
+    var savePath = folder.parent.fsName + "/" + folder.name + ".psd";
+    var saveFile = new File(savePath);
+    var opts = new PhotoshopSaveOptions();
+    opts.layers = true;
+    opts.embedColorProfile = true;
+    doc.saveAs(saveFile, opts, false);
+    log("[pipeline] saved | " + savePath);
+    return savePath;
+}
+
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 function main() {
@@ -205,6 +216,15 @@ function main() {
     }
     log("[pipeline] step 3A complete | " + captionResult.placed + " caption(s) placed.");
 
+    // ── Save working document ──────────────────────────────────────
+    var savedPath = null;
+    try {
+        savedPath = saveWorkingDoc(doc, folder);
+    } catch (e) {
+        log("[pipeline] WARN | auto-save failed line " + e.line + ": " + e.message
+            + " — save the document manually before running PS_AfterCaption.");
+    }
+
     // ── Completion summary ─────────────────────────────────────────
     log("[pipeline] === PS_ToCaption done ===");
 
@@ -231,7 +251,8 @@ function main() {
 
     msg += "\n\nReview and adjust caption positions."
         + "\nWhen done, run PS_AfterCaption to add white bases and proceed.\n\n"
-        + "Log: " + CONFIG.logPath;
+        + (savedPath ? "Saved: " + savedPath : "WARN: auto-save failed — save manually.")
+        + "\nLog: " + CONFIG.logPath;
 
     scriptAlert(msg);
 }

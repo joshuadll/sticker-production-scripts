@@ -83,6 +83,14 @@ if [ ! -f "$LOG" ]; then
     exit 1
 fi
 
+# ── Verify saved PSD ─────────────────────────────────────────────────────────
+EXPECTED_PSD="$FIXTURE_DIR/$(basename "$SOURCE_FIXTURE").psd"
+if [ -f "$EXPECTED_PSD" ]; then
+    echo "[$STEP] saved PSD found: $EXPECTED_PSD"
+else
+    echo "WARN [$STEP]: expected saved PSD not found: $EXPECTED_PSD"
+fi
+
 # ── Diff against golden file ─────────────────────────────────────────────────
 # Variable lines (folder name can vary by machine) are stripped before diffing.
 # Add further exclusions here if new variable lines are introduced.
