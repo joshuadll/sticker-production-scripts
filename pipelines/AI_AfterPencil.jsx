@@ -2,7 +2,6 @@
 #include "../utils/aiUtils.jsx"
 #include "../illustrator/Step8c_OffsetPathQA.jsx"
 #include "../illustrator/Step9A_Halfcut.jsx"
-#include "../illustrator/Step9B_PeelingTab.jsx"
 #include "../illustrator/Step10_AssetExport.jsx"
 #include "../illustrator/Step11_FinalFile.jsx"
 
@@ -10,11 +9,6 @@
 
 var CONFIG = {
     dryRun: false,
-
-    // Shared assets — update if location changes.
-    // ⚠️  CONFIRM paths with artist before first run.
-    assetsFolder:        "",  // e.g. "/Volumes/Team Drive/Production Assets"
-    peelingTabAssetPath: "",  // resolved from assetsFolder below
 
     // ── Step 8c: Spacing + Margin QA ─────────────────────────────────────────
     cutlinesLayerName:    "Cutlines",
@@ -35,15 +29,6 @@ var CONFIG = {
     halfcutStrokePt:     0.25,  // matches cut-line stroke weight
     halfcutExtendMm:     0.5,   // half-cut extends past each end of the edge
 
-    // ── Step 9B: Peeling Tab ──────────────────────────────────────────────────
-    // Minimum straight-edge length for preferring PEEL HERE over half-circle tab.
-    peelingTabMinLengthMm:  15,
-
-    // Group names inside Peeling Tab Asset.ai.
-    // ⚠️  CONFIRM exact names with artist before first run.
-    peelingTabGroupName:    "PEEL HERE",
-    halfCircleGroupName:    "Half Circle",
-
     // ── Step 10: Asset Export ─────────────────────────────────────────────────
     colorBlockLayerName:   "Color Block",  // case-insensitive search
     jpegQuality:           8,              // 0-100
@@ -62,8 +47,6 @@ var CONFIG = {
 CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
     : Folder.desktop.fsName) + "/AI_AfterPencil.log";
-
-CONFIG.peelingTabAssetPath = CONFIG.assetsFolder + "/Peeling Tab Asset.ai";
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
@@ -116,20 +99,6 @@ function main() {
     }
     log("[pipeline] step 9a complete | " + halfcutResult.placed + " half-cut(s) placed.");
 
-    // ── Step 9B: Peeling Tab ───────────────────────────────────────────────────
-    log("[pipeline] --- Step 9B: Peeling Tab ---");
-    var tabResult;
-
-    try {
-        tabResult = runPeelingTab(doc);
-    } catch (e) {
-        log("[pipeline] ERROR | step 9b line " + e.line + ": " + e.message);
-        scriptAlert("ERROR in Step 9B (Peeling Tab).\nLine " + e.line + ": " + e.message
-            + "\n\nLog: " + CONFIG.logPath);
-        return;
-    }
-    log("[pipeline] step 9b complete | " + tabResult.placed + " peeling tab(s) placed.");
-
     // ── Step 10: Asset Export ──────────────────────────────────────────────────
     log("[pipeline] --- Step 10: Asset Export ---");
     var assetResult;
@@ -162,17 +131,16 @@ function main() {
     log("[pipeline] === AI_AfterPencil done ===");
 
     var summaryMsg = "Done.\n\n"
-        + "  QA:           " + qaResult.checked + " path(s) checked.\n"
-        + "  Half-cuts:    " + halfcutResult.placed + " placed.\n"
-        + "  Peeling tabs: " + tabResult.placed + " placed.\n"
-        + "  PNGs:         " + assetResult.pngCount + " exported.\n"
-        + "  Final file:   " + finalResult.outputPath + "\n";
+        + "  QA:         " + qaResult.checked + " path(s) checked.\n"
+        + "  Half-cuts:  " + halfcutResult.placed + " placed.\n"
+        + "  PNGs:       " + assetResult.pngCount + " exported.\n"
+        + "  Final file: " + finalResult.outputPath + "\n";
     if (finalResult.layerCount !== 3) {
         summaryMsg += "  WARNING: final file has " + finalResult.layerCount
             + " layer(s) — expected 3. Check manually.\n";
     }
 
-    var allFlags = halfcutResult.flags.concat(tabResult.flags).concat(assetResult.flags);
+    var allFlags = halfcutResult.flags.concat(assetResult.flags);
     if (allFlags.length > 0) {
         summaryMsg += "\n  Flagged for manual review (" + allFlags.length + "):\n";
         var fi;
