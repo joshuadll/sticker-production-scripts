@@ -1,7 +1,10 @@
-# Adobe source files
+# Per-SKU working files — large, constantly changing, not for version control
 *.psd
 *.ai
 *.psb
+
+# Exception: shared template assets committed to the repo
+!assets/*.ai
 
 # Dependencies
 node_modules/
