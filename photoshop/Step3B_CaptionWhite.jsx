@@ -166,7 +166,7 @@ function groupWithPlate(doc, elementsGroup, soLayer, textLayer, groupName) {
     var tTop       = tBounds[1].as("px");
     var tCenterX   = (tLeft + tRight) / 2;
     var tWidth     = tRight - tLeft;
-    var targetWidth = tWidth + CONFIG.whiteRectPadH * 2;
+    var targetWidth = tWidth + CONFIG.plateWidthPadH * 2;
 
     // White base: pill sized to caption plate width, positioned below T.
     var whiteX1 = tCenterX - targetWidth / 2;
@@ -218,23 +218,38 @@ function groupWithPlate(doc, elementsGroup, soLayer, textLayer, groupName) {
 
 // ─── WHITE BASE HELPERS ───────────────────────────────────────────────────────
 
-// Creates a White pill layer by loading the T layer's transparency as a
-// selection, expanding (fills letter counter holes), contracting to net padding,
-// then smoothing for rounded ends. Works for straight and curved text.
+// Creates a White pill by morphological close of the text's actual coverage:
+// expand by a large radius so every glyph, counter hole, and (for 2-line text)
+// both lines merge into a single smooth blob, then contract back to leave even
+// padding. One path handles straight, multi-line, and curved/path text — the
+// shape is always a uniform-width band hugging the text, because it operates on
+// the glyph pixels themselves rather than a bounding box.
+//
+// Two independent knobs:
+//   whiteExpandPx  — merge radius. Must exceed the largest gap to be bridged
+//                    (inter-letter, inter-line, counter holes). Bigger = safer
+//                    merge; does NOT thicken the final band (contract undoes it).
+//   whiteRectPadH  — net padding (= expand - contract). Sets band thickness and
+//                    end-cap roundness. The resulting corner radius ≈ this value.
 function createWhiteFromText(doc, textLayer) {
     loadLayerTransparency(textLayer);
 
-    // Expand to fill letter counter holes (e.g. in 'o', 'e').
+    // Expand: merges glyphs + lines into one blob and rounds convex corners to
+    // radius = whiteExpandPx. Also fills letter counters (whiteExpandPx must
+    // exceed their radius).
     doc.selection.expand(CONFIG.whiteExpandPx);
 
-    // Contract to achieve target net padding around text.
+    // Contract back, leaving net padding = whiteExpandPx - contractAmt. The outer
+    // contour stays smooth; corner radius reduces to ~whiteRectPadH.
     var contractAmt = CONFIG.whiteExpandPx - CONFIG.whiteRectPadH;
     if (contractAmt > 0) {
         doc.selection.contract(contractAmt);
     }
 
-    // Smooth: rounds the ends of the selection naturally (pill effect).
-    doc.selection.smooth(CONFIG.whiteSmoothPx);
+    // Light smooth only to clean polygonal facets left by the selection ops.
+    if (CONFIG.whiteSmoothPx > 0) {
+        doc.selection.smooth(CONFIG.whiteSmoothPx);
+    }
 
     // Create White layer directly below the T layer, fill, deselect.
     var whiteLayer  = doc.artLayers.add();

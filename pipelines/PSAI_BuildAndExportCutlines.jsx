@@ -21,9 +21,10 @@ var CONFIG = {
     // so Step 3B can find the White Base_Cutline layers left by Step 3.
     whiteEdgeLayerName: "White Base_Cutline",
 
-    whiteRectPadH:     20,   // net horizontal padding around text (after expand→contract)
-    whiteExpandPx:     25,   // expand amount to fill letter counter holes (must be > ~20px)
-    whiteSmoothPx:     8,    // smoothing radius for rounded pill ends
+    whiteRectPadH:     28,   // px: net padding (= expand - contract); sets band thickness + end roundness
+    whiteExpandPx:     55,   // px: merge radius — must bridge inter-letter, inter-line, counter-hole gaps
+    whiteSmoothPx:     10,   // px: light cleanup of polygonal facets only (not the primary rounder)
+    plateWidthPadH:    20,   // px: GC-LM caption-plate horizontal padding (independent of pill padding)
     whiteHeightPlate:  118,  // px: plate-treatment White height (1 cm at 300 DPI, 1-line)
     whiteHeightPlate2: 189,  // px: plate-treatment White height (1.6 cm at 300 DPI, 2-line)
     platePaddingTop:   10,   // px: Caption plate sits this many px above text top
