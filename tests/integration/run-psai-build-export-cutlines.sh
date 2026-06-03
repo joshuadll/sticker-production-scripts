@@ -53,8 +53,9 @@ perl -pe '
 
 echo "[$STEP] Opening fixture and running script..."
 osascript << EOF
+set fixtureFile to POSIX file "$TEMPLATE_FIXTURE" as alias
 tell application "$APP"
-    open POSIX file "$TEMPLATE_FIXTURE"
+    open fixtureFile
     delay 1
     do javascript file (POSIX file "$TEMP_SCRIPT")
 end tell
