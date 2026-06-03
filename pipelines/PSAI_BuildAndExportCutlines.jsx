@@ -52,12 +52,13 @@ CONFIG.aiPipelinePath = _root + "/pipelines/AI_BuildCutlines.jsx";
 
 // ─── SILHOUETTE PNG EXPORT ────────────────────────────────────────────────────
 
-// Exports the Silhouette layer as a flat PNG sidecar next to the PSD.
-// Returns the PNG file path, or null on failure.
+// Builds a transient flat-black silhouette layer, exports it as a PNG sidecar
+// next to the PSD, then removes the layer (it is never saved into the working
+// file). Returns the PNG file path, or null on failure.
 function exportSilhouettePng(doc) {
-    var silLayer = findLayerByName(doc, "Silhouette");
+    var silLayer = createSilhouetteLayer(doc); // transient; removed below
     if (!silLayer) {
-        log("[pipeline] ERROR | Silhouette layer not found — cannot export PNG.");
+        log("[pipeline] ERROR | could not build silhouette — cannot export PNG.");
         return null;
     }
 
@@ -80,12 +81,13 @@ function exportSilhouettePng(doc) {
     opts.interlaced   = false;
     doc.exportDocument(new File(pngPath), ExportType.SAVEFORWEB, opts);
 
-    // Restore visibility.
+    // Restore visibility, then drop the transient layer.
     for (i = 0; i < layers.length; i++) {
         layers[i].visible = visibilities[i];
     }
+    silLayer.remove();
 
-    log("[pipeline] exported silhouette PNG: " + pngPath);
+    log("[pipeline] exported silhouette PNG (transient layer removed): " + pngPath);
     return pngPath;
 }
 
@@ -299,22 +301,25 @@ function exportElementPngs(doc) {
 // ─── BRIDGETALK HANDOFF ───────────────────────────────────────────────────────
 
 function handOffToIllustrator(doc) {
-    if (!CONFIG.aiPipelinePath) {
-        log("[pipeline] WARN: aiPipelinePath not set — skipping BridgeTalk handoff.");
-        scriptAlert("BridgeTalk handoff skipped: CONFIG.aiPipelinePath is empty.\n"
-            + "Set CONFIG.aiPipelinePath to AI_BuildCutlines.jsx and re-run.\n"
-            + "Log: " + CONFIG.logPath);
-        return;
-    }
-
-    // Export silhouette PNG and elements sidecar — inputs for Step 6.
+    // Export silhouette PNG and elements sidecar — inputs for Step 6. These are
+    // written regardless of BridgeTalk so the artist can run Illustrator manually
+    // if the handoff is disabled or fails.
     var silhPngPath    = exportSilhouettePng(doc);
     var elementsPath   = writeElementsFile(doc);
 
     if (!silhPngPath || !elementsPath) {
         log("[pipeline] ERROR | export failed — BridgeTalk handoff aborted.");
         scriptAlert("BridgeTalk handoff aborted: could not export silhouette PNG or elements sidecar.\n"
-            + "Check that the Silhouette and Elements layers exist.\n"
+            + "Check that the Elements group exists.\n"
+            + "Log: " + CONFIG.logPath);
+        return;
+    }
+
+    if (!CONFIG.aiPipelinePath) {
+        log("[pipeline] WARN: aiPipelinePath not set — sidecars written, skipping BridgeTalk handoff.");
+        scriptAlert("Sidecars exported (silhouette PNG + elements sidecar).\n"
+            + "BridgeTalk skipped: CONFIG.aiPipelinePath is empty.\n"
+            + "Set CONFIG.aiPipelinePath to AI_BuildCutlines.jsx and re-run to auto-hand off.\n"
             + "Log: " + CONFIG.logPath);
         return;
     }
@@ -377,8 +382,10 @@ function main() {
     }
     log("[pipeline] step 3B complete | " + captionWhiteResult.grouped + " element(s) grouped.");
 
-    // ── Step 5: Silhouette ─────────────────────────────────────────
-    log("[pipeline] --- Step 5: Silhouette ---");
+    // ── Step 5: Finalize Elements group ────────────────────────────
+    // (The silhouette raster is built transiently at export time — see
+    //  exportSilhouettePng / createSilhouetteLayer — and never saved.)
+    log("[pipeline] --- Step 5: Finalize Elements group ---");
     var snapshotB = doc.activeHistoryState;
     var silhouetteResult;
 
@@ -388,11 +395,11 @@ function main() {
         doc.activeHistoryState = snapshotB;
         log("[pipeline] ERROR | step 5 line " + e.line + ": " + e.message
             + " — rolled back to post-grouping state.");
-        scriptAlert("ERROR in Step 5 (Silhouette).\nLine " + e.line + ": " + e.message
+        scriptAlert("ERROR in Step 5 (Finalize Elements).\nLine " + e.line + ": " + e.message
             + "\n\nRolled back to post-grouping state. Log: " + CONFIG.logPath);
         return;
     }
-    log("[pipeline] step 5 complete | " + silhouetteResult.processed + " element(s).");
+    log("[pipeline] step 5 complete | Elements finalized.");
 
     // ── Save PSD ───────────────────────────────────────────────────
     if (!CONFIG.dryRun) {
@@ -421,7 +428,6 @@ function main() {
 
     var msg = "Done.\n\n"
         + "  Grouped:     " + captionWhiteResult.grouped + " element(s).\n"
-        + "  Silhouette:  " + silhouetteResult.processed + " element(s).\n"
         + "  Art PNGs:    " + (elemArtFolder ? elemArtFolder : "skipped") + "\n\n"
         + "Illustrator is opening the production template and will run cut lines automatically.\n"
         + "Wait for it to finish — it will alert you when SVGs are ready for Deepnest.\n\n"

@@ -11,7 +11,7 @@
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
-#   2. Verify the log looks correct (elements grouped, Silhouette created)
+#   2. Verify the log looks correct (elements grouped, transient silhouette built + exported)
 #   3. Commit:  cp "$LOG" tests/integration/expected/psai-build-export-cutlines-expected.txt
 
 set -euo pipefail
@@ -86,12 +86,14 @@ if [ ! -f "$LOG" ]; then
     exit 1
 fi
 
-# ── Verify Silhouette line appears in log ────────────────────────────────────
+# ── Verify the transient silhouette was built + exported ─────────────────────
+# (Silhouette is no longer a saved layer — it is built at export time and removed.)
 
-if grep -q "\[step5\] Silhouette created\." "$LOG"; then
-    echo "[$STEP] Silhouette created — OK"
+if grep -q "\[step5\] transient Silhouette built\." "$LOG" \
+   && grep -q "exported silhouette PNG (transient layer removed)" "$LOG"; then
+    echo "[$STEP] transient Silhouette built + exported — OK"
 else
-    echo "FAIL [$STEP]: '[step5] Silhouette created.' not found in log."
+    echo "FAIL [$STEP]: expected transient-silhouette build/export lines not found in log."
     echo "  Log contents:"
     cat "$LOG"
     exit 1

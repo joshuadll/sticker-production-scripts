@@ -22,7 +22,7 @@ sticker-production-scripts/
 │   ├── Step2B_WhiteEdge.jsx     ← adds white edge to each SO (before caption review)
 │   ├── Step3A_CaptionText.jsx   ← places T layers; artist reviews before Step 3B
 │   ├── Step3B_CaptionWhite.jsx  ← adds White pill + Caption plate; groups all layers
-│   └── Step5_Silhouette.jsx     ← groups elements → loads transparency → fills black (NOT clip/merge)
+│   └── Step5_Silhouette.jsx     ← finalizes Elements group; builds transient black silhouette at export (not saved)
 ├── illustrator/
 │   ├── Step6_CreateCutlines.jsx
 │   ├── Step7A_DeepnestExport.jsx    ← classifies paths by extent ratio → exports _regular.svg + _irregular.svg
@@ -122,16 +122,22 @@ Category resize targets:
   TR: 1.8–2 in / ~570px | IC: 1.8 in / 540px | FD: 1.5–2 in / ~525px | ST: 1.5 in / 450px
 
 ## Photoshop layer stack — state handed off to Illustrator (after Step 5)
-The PSD has exactly two meaningful top-level layers after Step 5:
-  Silhouette         ← flat black pixel layer (element art only — captions excluded; see note)
+The saved PSD has exactly one meaningful top-level layer after Step 5:
   Elements           ← LayerSet containing all [Display Name] [STYLE-CAT] element groups
 
-Step 5 implementation note: before loading transparency, Step 5 hides caption sub-layers
-(TEXT, "White" pill, "Caption plate") so the silhouette covers element art only. This is
-intentional — Step 6 rebuilds the caption parametrically and unites it with the traced
-element outline, producing a fused cutline (art + caption) identical in shape to the old
-single-pass trace. Deepnest still receives the full sticker outline. Visibility is restored
-after the fill.
+The silhouette is NOT a saved layer. It is built transiently at export time by
+createSilhouetteLayer() (in Step5_Silhouette.jsx), exported to {name}_silhouette.png by
+exportSilhouettePng(), then removed — the working PSD is never polluted with a black raster.
+Step 5's runSilhouette() phase only finalizes the Elements group (folds in any stray element
+layers Step 3B skipped).
+
+Silhouette implementation note: before loading transparency, createSilhouetteLayer hides
+caption sub-layers (TEXT, "White" pill, "Caption plate") so the silhouette covers element
+art only. This is intentional — Step 6 rebuilds the caption parametrically and unites it with
+the traced element outline, producing a fused cutline (art + caption) identical in shape to
+the old single-pass trace. Deepnest still receives the full sticker outline. To avoid the
+PS 2026 full-canvas-selection bug when loading a LayerSet's transparency, it duplicates +
+merges the Elements group to a flat ArtLayer and loads that layer's transparency.
 
 PSAI_BuildAndExportCutlines exports (written before BridgeTalk handoff, sibling to PSD):
   {name}_silhouette.png   ← element-art-only flat black PNG (captions excluded; Step 6 adds them back)

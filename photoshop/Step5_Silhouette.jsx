@@ -4,96 +4,102 @@
 // Runs after Step 3B (caption white + grouping). All top-level layers are
 // [Display Name] [STYLE-CAT] groups plus one Guide layer.
 //
-// Creates a flat black "Silhouette" pixel layer from element art only — caption
-// text, White pill, and Caption plate are hidden before loading transparency so
-// they are excluded. Step 6 rebuilds the caption region parametrically and unites
-// it with the traced element outline to form the final cutline.
+// This phase finalizes the Elements group (folds in any stray element layers
+// Step 3B skipped). It does NOT create a persistent Silhouette layer: the flat
+// black silhouette is generated transiently at export time by
+// createSilhouetteLayer() — see exportSilhouettePng() in the pipeline. Captions
+// (TEXT, "White" pill, "Caption plate") are excluded from the silhouette; Step 6
+// rebuilds the caption region parametrically and unites it with the traced
+// element outline to form the final cutline.
 //
-// Final layer stack:
-//   Silhouette  ← new flat black pixel layer (element art only)
-//   Elements    ← group of all element groups (original, untouched)
+// Final saved layer stack:
+//   Elements    ← group of all element groups
 //   Guide       ← untouched
 //
-// Idempotent: if Silhouette already exists, logs a warning and returns.
+// Idempotent: re-running is a no-op once every element is inside Elements.
 //
-// Returns: { processed }  (processed = 1 on success, 0 if already done)
+// Returns: { processed }  (processed = 1 on success, 0 if nothing to do)
 
 function runSilhouette(doc) {
 
-    // ── Idempotency guard ──────────────────────────────────────────────────────
-    if (findLayerByName(doc, "Silhouette")) {
-        log("[step5] SKIP | Silhouette layer already exists — already run.");
-        return { processed: 0 };
-    }
-
     if (CONFIG.dryRun) {
-        log("[step5] [DRY RUN] would create Silhouette layer.");
+        log("[step5] [DRY RUN] would finalize Elements group.");
         return { processed: 1 };
     }
 
-    // ── Step 1: Ensure "Elements" group exists ─────────────────────────────────
+    // ── Ensure "Elements" group exists ─────────────────────────────────────────
     var elementsGroup = findLayerByName(doc, "Elements");
 
     if (!elementsGroup) {
         // Elements should have been created by Step 3B. If absent, nothing to do.
         log("[step5] ERROR | Elements group not found — was Step 3B run?");
         return { processed: 0 };
-    } else {
-        // Move any remaining top-level element layers (skipped by Step3B because
-        // they had no T layer) into Elements. These are ArtLayers so move() works.
-        for (var ei = doc.layers.length - 1; ei >= 0; ei--) {
-            var elyr = doc.layers[ei];
-            if (elyr === elementsGroup) continue;
-            if (parseLayerName(elyr.name)) {
-                elyr.move(elementsGroup, ElementPlacement.PLACEATBEGINNING);
-                log("[step5] moved skipped element into Elements | " + elyr.name);
-            }
+    }
+
+    // Move any remaining top-level element layers (skipped by Step3B because
+    // they had no T layer) into Elements. These are ArtLayers so move() works.
+    for (var ei = doc.layers.length - 1; ei >= 0; ei--) {
+        var elyr = doc.layers[ei];
+        if (elyr === elementsGroup) continue;
+        if (parseLayerName(elyr.name)) {
+            elyr.move(elementsGroup, ElementPlacement.PLACEATBEGINNING);
+            log("[step5] moved skipped element into Elements | " + elyr.name);
         }
     }
 
-    // ── Step 2: Load Elements group transparency as selection ──────────────────
-    // Hide caption sub-layers before loading so the silhouette covers element art
-    // only. Step 6 rebuilds the caption region parametrically.
+    log("[step5] Elements group finalized.");
+    return { processed: 1 };
+}
+
+// ─── TRANSIENT SILHOUETTE ─────────────────────────────────────────────────────
+
+// Builds a flat black pixel layer covering element art only (captions excluded)
+// and returns it. The caller is responsible for removing it after use — this
+// layer is never saved into the working PSD. Returns the ArtLayer, or null if
+// the Elements group is missing or has empty bounds.
+function createSilhouetteLayer(doc) {
+    var elementsGroup = findLayerByName(doc, "Elements");
+    if (!elementsGroup) {
+        log("[step5] ERROR | Elements group not found — cannot build silhouette.");
+        return null;
+    }
+
+    // Hide caption sub-layers so the loaded transparency excludes them.
     var hiddenCaptionLayers = hideCaptionSublayers(elementsGroup);
     log("[step5] hid " + hiddenCaptionLayers.length + " caption sub-layer(s).");
 
     // Duplicate + merge the Elements group to get a temporary flat ArtLayer,
     // then load its transparency. Loading directly from a LayerSet in PS 2026
     // returns a full-canvas selection when the group has no pixel mask.
-    var dupGroup = elementsGroup.duplicate(elementsGroup, ElementPlacement.PLACEBEFORE);
+    var dupGroup     = elementsGroup.duplicate(elementsGroup, ElementPlacement.PLACEBEFORE);
     var stampedLayer = dupGroup.merge();
     loadLayerTransparency(stampedLayer);
     stampedLayer.remove();
 
     restoreVisibility(hiddenCaptionLayers);
 
-    // Check that something was selected (guard against empty group).
+    // Guard against an empty selection (empty group).
     var selBounds = doc.selection.bounds;
     var selW = selBounds[2] - selBounds[0];
     var selH = selBounds[3] - selBounds[1];
     if (selW === 0 || selH === 0) {
         doc.selection.deselect();
         log("[step5] ERROR | Elements group has empty bounds — nothing to silhouette.");
-        return { processed: 0 };
+        return null;
     }
 
-    // ── Step 3: Create new pixel layer above Elements ──────────────────────────
+    // Create a new pixel layer above Elements, fill the selection black.
     doc.activeLayer = elementsGroup;
     var silLayer = doc.artLayers.add();
     silLayer.kind = LayerKind.NORMAL;
-
-    // Move new layer above the Elements group (it starts above activeLayer).
     silLayer.move(elementsGroup, ElementPlacement.PLACEBEFORE);
 
-    // ── Step 4: Fill selection with black ──────────────────────────────────────
     doc.selection.fill(solidBlack());
     doc.selection.deselect();
 
-    // ── Step 5: Name the new layer ─────────────────────────────────────────────
     silLayer.name = "Silhouette";
-
-    log("[step5] Silhouette created.");
-    return { processed: 1 };
+    log("[step5] transient Silhouette built.");
+    return silLayer;
 }
 
 // ─── CAPTION SUBLAYER HELPERS ────────────────────────────────────────────────
