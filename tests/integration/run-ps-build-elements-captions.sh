@@ -17,7 +17,7 @@
 set -euo pipefail
 
 STEP="ps-build-elements-captions"
-APP="Adobe Photoshop 2024"
+APP="Adobe Photoshop 2026"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/PS_BuildElements.jsx"

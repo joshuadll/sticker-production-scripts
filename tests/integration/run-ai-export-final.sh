@@ -23,7 +23,7 @@
 set -euo pipefail
 
 STEP="ai-export-final"
-APP="Adobe Illustrator 2024"
+APP="Adobe Illustrator 2026"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_ExportFinal.jsx"

@@ -8,7 +8,7 @@
 set -euo pipefail
 
 STEP="psUtils-unit"
-APP="Adobe Photoshop 2024"
+APP="Adobe Photoshop 2026"
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/test-psUtils.jsx"
 LOG="$HOME/Desktop/test-psUtils.log"
 

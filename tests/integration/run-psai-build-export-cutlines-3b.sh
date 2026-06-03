@@ -18,7 +18,7 @@
 set -euo pipefail
 
 STEP="psai-build-export-cutlines-3b"
-APP="Adobe Photoshop 2024"
+APP="Adobe Photoshop 2026"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/PSAI_BuildAndExportCutlines.jsx"

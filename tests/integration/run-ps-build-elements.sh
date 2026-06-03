@@ -24,7 +24,7 @@
 set -euo pipefail
 
 STEP="ps-build-elements"
-APP="Adobe Photoshop 2024"
+APP="Adobe Photoshop 2026"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/PS_BuildElements.jsx"
@@ -61,7 +61,7 @@ perl -pe '
 echo "[$STEP] Running script..."
 osascript << EOF
 tell application "$APP"
-    do javascript file "$TEMP_SCRIPT"
+    do javascript (read POSIX file "$TEMP_SCRIPT")
 end tell
 EOF
 
