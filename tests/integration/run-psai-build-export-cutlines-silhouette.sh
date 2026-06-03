@@ -49,6 +49,7 @@ rm -f "$LOG" "$TEMP_SCRIPT"
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
     s|aiPipelinePath:\s*""|aiPipelinePath: "__skip__"|;
+    s|#include "\.\./|#include "$REPO_ROOT/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
 # ── Run script via osascript ─────────────────────────────────────────────────

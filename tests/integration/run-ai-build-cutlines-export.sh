@@ -46,6 +46,7 @@ rm -f "$LOG" "$TEMP_SCRIPT" "$REGULAR_SVG" "$IRREGULAR_SVG"
 
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
+    s|#include "\.\./|#include "$REPO_ROOT/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
 # ── Run script via osascript ─────────────────────────────────────────────────

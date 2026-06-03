@@ -48,12 +48,15 @@ fi
 # ── Prepare temp script with test CONFIG overrides ───────────────────────────
 # Injects sourceFolderPath (skips folder picker dialog) and
 # suppressAlerts (skips alert() dialogs for headless run).
+# Also rewrites #include paths to absolute so they resolve correctly
+# when the temp script runs from /tmp/ instead of pipelines/.
 
 rm -f "$LOG" "$TEMP_SCRIPT"
 
 perl -pe '
     s|sourceFolderPath:\s*""|sourceFolderPath: "'"$SOURCE_FIXTURE"'"|;
     s|suppressAlerts:\s*false|suppressAlerts: true|;
+    s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
 # ── Run script via osascript ─────────────────────────────────────────────────
