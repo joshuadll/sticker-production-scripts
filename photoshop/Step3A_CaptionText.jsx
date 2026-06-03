@@ -82,8 +82,22 @@ function placeCaptionText(doc, soLayer, displayName, font) {
     var bounds  = soLayer.bounds;
     var left    = bounds[0].as("px");
     var right   = bounds[2].as("px");
-    var bottom  = bounds[3].as("px");
     var centerX = (left + right) / 2;
+
+    // Use White Base_Cutline bottom as the reference so captionGap is measured
+    // from the visible white border edge. Pill top = refBottom + captionGap − penRadius,
+    // so a captionGap of ~15px (with penRadius ≈ 20px) gives ~5px overlap into the
+    // border — enough for a robust Unite in Step 6 without being visible.
+    var refBottom = bounds[3].as("px");
+    for (var j = 0; j < doc.layers.length; j++) {
+        if (doc.layers[j] === soLayer) {
+            var below = (j + 1 < doc.layers.length) ? doc.layers[j + 1] : null;
+            if (below && below.name === CONFIG.whiteEdgeLayerName) {
+                refBottom = below.bounds[3].as("px");
+            }
+            break;
+        }
+    }
 
     var textLayer   = doc.artLayers.add();
     textLayer.kind  = LayerKind.TEXT;
@@ -101,13 +115,13 @@ function placeCaptionText(doc, soLayer, displayName, font) {
     ti.color         = solidBlack();
 
     // Place at a rough baseline so Photoshop renders the text and bounds are readable.
-    ti.position = [centerX, bottom + CONFIG.captionGap];
+    ti.position = [centerX, refBottom + CONFIG.captionGap];
 
-    // Read actual rendered bounds and shift so text top lands at elementBottom + captionGap.
+    // Read actual rendered bounds and shift so text top lands at refBottom + captionGap.
     // This replaces the fixed ascender estimate — works for any font or size.
     var tb      = textLayer.bounds;
     var textTop = tb[1].as("px");
-    ti.position = [centerX, bottom + CONFIG.captionGap + (bottom + CONFIG.captionGap - textTop)];
+    ti.position = [centerX, refBottom + CONFIG.captionGap + (refBottom + CONFIG.captionGap - textTop)];
 
     // Place T layer just above the SO so it ends up at the top of the group
     // after Step 3B grouping (panel order: T → White → SO → White Base_Cutline).
