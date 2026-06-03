@@ -26,6 +26,7 @@ TEMPLATE_FIXTURE="$FIXTURE_DIR/elements-captioned-ungrouped.psd"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/psai-build-export-cutlines-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
+TEMP_FIXTURE="/tmp/${STEP}-fixture.psd"
 LOG="/tmp/PSAI_BuildAndExportCutlines.log"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
@@ -36,6 +37,9 @@ if [ ! -f "$TEMPLATE_FIXTURE" ]; then
     echo "  then saving the resulting document as: $TEMPLATE_FIXTURE"
     exit 0
 fi
+
+# Copy fixture so doc.save() in the pipeline doesn't corrupt the original.
+cp "$TEMPLATE_FIXTURE" "$TEMP_FIXTURE"
 
 # ── Prepare temp script ──────────────────────────────────────────────────────
 # Patches applied:
@@ -53,7 +57,7 @@ perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
     s|CONFIG\.logPath\s*=\s*_root[^;]+;|CONFIG.logPath = "/tmp/PSAI_BuildAndExportCutlines.log";|;
     s|CONFIG\.aiPipelinePath\s*=\s*_root[^;]+;|CONFIG.aiPipelinePath = "";|;
-    s|(var CONFIG\s*=)|app.open(new File("'"$TEMPLATE_FIXTURE"'"));\n$1|;
+    s|(var CONFIG\s*=)|app.open(new File("'"$TEMP_FIXTURE"'"));\n$1|;
     s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
@@ -66,7 +70,7 @@ tell application "$APP"
 end tell
 EOF
 
-rm -f "$TEMP_SCRIPT"
+rm -f "$TEMP_SCRIPT" "$TEMP_FIXTURE"
 
 # ── Wait for log ─────────────────────────────────────────────────────────────
 

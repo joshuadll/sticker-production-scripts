@@ -335,25 +335,36 @@ function elongateCaptionPlate(plateGroup, targetWidth) {
 
 // ─── LAYER SELECTION AND GROUPING ─────────────────────────────────────────────
 
-// Selects multiple layers and groups them into a new LayerSet.
-// Renames the resulting group to groupName.
+// Groups layers into a new LayerSet at the position of the topmost layer.
+// Uses the layerSets.add() + move approach — groupLayersEvent is unreliable
+// in PS 2026 when called from scripting.
 function selectAndGroup(doc, layers, groupName) {
     if (!layers || layers.length === 0) return;
 
-    // Select first layer.
-    selectLayerById(layers[0]);
-
-    // Add remaining layers to the selection.
-    for (var i = 1; i < layers.length; i++) {
-        addLayerToSelectionById(layers[i]);
+    // Find the layer above layers[0] as a position anchor. After grouping we
+    // move the group back to where layers[0] was in the stack.
+    var docLayers = doc.layers;
+    var anchorAbove = null;
+    for (var j = 0; j < docLayers.length; j++) {
+        if (docLayers[j] === layers[0]) {
+            anchorAbove = j > 0 ? docLayers[j - 1] : null;
+            break;
+        }
     }
 
-    // Group the selected layers.
-    executeAction(stringIDToTypeID("groupLayersEvent"),
-                  new ActionDescriptor(), DialogModes.NO);
+    // Create empty group (lands at the top of the doc) and move layers in.
+    // Iterating bottom-to-top with PLACEATBEGINNING preserves z-order.
+    var group = doc.layerSets.add();
+    group.name = groupName;
+    for (var i = layers.length - 1; i >= 0; i--) {
+        layers[i].move(group, ElementPlacement.PLACEATBEGINNING);
+    }
 
-    // The new group becomes the active layer — rename it.
-    doc.activeLayer.name = groupName;
+    // Reposition group to where layers[0] was; if it was already the topmost
+    // layer, doc.layerSets.add() already placed the group at the top.
+    if (anchorAbove) {
+        group.move(anchorAbove, ElementPlacement.PLACEAFTER);
+    }
 }
 
 // selectLayerById, addLayerToSelectionById, findTextLayerByDisplayName defined in psUtils.jsx.
