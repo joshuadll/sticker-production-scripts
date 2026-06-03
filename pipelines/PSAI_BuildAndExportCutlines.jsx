@@ -25,6 +25,9 @@ var CONFIG = {
     whitePenPadPx:          40,  // px: added to text height → pen diameter (margin above+below text, split top/bottom)
     whiteStraightSnapPx:    6,   // px: if the fitted spine stays within this of flat, force a perfectly straight pill
     whiteCurvedHeightPctile: 0.9,// quantile of per-slice heights used as curved-text line-height (accents included)
+    captionBorderOverlapPx: 15,  // px: the White pill is re-seated so it overlaps the element's white
+                                 //     border by this much, travelling along the pill-centre → art-centre
+                                 //     line. Re-seats to EXACT overlap (closes gaps and pulls back over-overlaps).
     plateWidthPadH:         20,  // px: GC-LM caption-plate horizontal padding (independent of pill padding)
     whiteHeightPlate:  118,  // px: plate-treatment White height (1 cm at 300 DPI, 1-line)
     whiteHeightPlate2: 189,  // px: plate-treatment White height (1.6 cm at 300 DPI, 2-line)

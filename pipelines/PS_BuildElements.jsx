@@ -62,9 +62,10 @@ var CONFIG = {
 
     captionSizePt:    16,   // pt — doubled from 8pt actual (double-A4 template)
     captionTracking:  -20,  // thousandths of an em
-    captionGap:       15,   // px: text top relative to white border bottom (WBC bounds[3]);
-                            //     pill top = wbc_bottom + captionGap − whitePenPadPx/2 (≈20px radius)
-                            //     → 15 − 20 = −5px → 5px overlap into border for robust Unite
+    captionGap:        5,   // px: text top below white border bottom (WBC bounds[3]) — this is only
+                            //     the REVIEW position the artist sees after Step 3A. Final placement is
+                            //     re-seated in Step 3B (snapCaptionToBorder, CONFIG.captionBorderOverlapPx),
+                            //     which slides text+pill along the pill→art centre line to an exact overlap.
 
     // [styleCode, catCode] pairs that use the plate treatment.
     // Extend this array (no code change) when new plate-style categories are added.

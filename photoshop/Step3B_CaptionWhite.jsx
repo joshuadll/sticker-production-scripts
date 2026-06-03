@@ -143,6 +143,11 @@ function groupStandard(doc, elementsGroup, soLayer, textLayer, groupName) {
     var wbcLayer   = findAdjacentCutline(doc, soLayer);
     var whiteLayer = createWhiteFromText(doc, textLayer);
 
+    // Re-seat text + pill so the pill overlaps the white border (falls back to the
+    // SO when no border layer exists). Travels along pill-centre → art-centre.
+    snapCaptionToBorder(doc, wbcLayer ? wbcLayer : soLayer, whiteLayer,
+        [textLayer, whiteLayer]);
+
     var layers = wbcLayer
         ? [textLayer, whiteLayer, soLayer, wbcLayer]
         : [textLayer, whiteLayer, soLayer];
@@ -204,6 +209,13 @@ function groupWithPlate(doc, elementsGroup, soLayer, textLayer, groupName) {
             + "\" — no White Base_Cutline below SO. "
             + "Ensure Step 3 (white edge) ran before this step.");
     }
+
+    // Re-seat the whole caption assembly (text + pill + plate) so the pill overlaps
+    // the white border. GC-LM sits below the element, so travel resolves to vertical.
+    var moveLayers = plateLayer
+        ? [textLayer, whiteLayer, plateLayer]
+        : [textLayer, whiteLayer];
+    snapCaptionToBorder(doc, wbcLayer ? wbcLayer : soLayer, whiteLayer, moveLayers);
 
     // Z-order (top → bottom): T, White pill, Caption plate, SO, White Base_Cutline.
     var layers = [];
@@ -285,6 +297,65 @@ function _percentile(arr, p) {
 function _layerBoundsPx(layer) {
     var b = layer.bounds;
     return [b[0].as("px"), b[1].as("px"), b[2].as("px"), b[3].as("px")];
+}
+
+// Re-seats the caption (text + pill, plus any extra layers) so the White pill
+// overlaps the element's white border by CONFIG.captionBorderOverlapPx. Travel is
+// along the line from the pill's centre toward the art's centre, so it handles
+// captions below, beside, or above the element with one rule. The element and its
+// border stay put; the caption assembly slides to meet them.
+//
+//   refLayer   — the white border (White Base_Cutline) the pill must fuse with;
+//                pass the SO as a fallback when no border layer exists.
+//   pillLayer  — the White pill (its leading edge is what overlaps the border).
+//   moveLayers — every layer that travels as one rigid unit (text, pill, plate…).
+//
+// Re-seats to EXACT overlap: applies the full translation whether the pill was
+// short of the border (closes the gap) or already past it (pulls it back).
+function snapCaptionToBorder(doc, refLayer, pillLayer, moveLayers) {
+    var rb = _layerBoundsPx(refLayer);
+    var pb = _layerBoundsPx(pillLayer);
+
+    var artCx  = (rb[0] + rb[2]) / 2, artCy  = (rb[1] + rb[3]) / 2;
+    var pillCx = (pb[0] + pb[2]) / 2, pillCy = (pb[1] + pb[3]) / 2;
+
+    var dx = artCx - pillCx, dy = artCy - pillCy;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-3) {
+        log("[step3B] WARN | caption centre coincides with art centre — snap skipped.");
+        return;
+    }
+    var dir = [dx / len, dy / len];
+
+    // Project the pill and border onto the travel axis. The pill's leading edge
+    // (max projection, toward the art) should land at the border's near edge
+    // (min projection) plus the overlap.
+    var pillProj   = _projExtent(pb, dir);
+    var borderProj = _projExtent(rb, dir);
+    var t = (borderProj.min + CONFIG.captionBorderOverlapPx) - pillProj.max;
+
+    var tx = t * dir[0], ty = t * dir[1];
+    for (var i = 0; i < moveLayers.length; i++) {
+        if (moveLayers[i]) moveLayers[i].translate(tx, ty);
+    }
+    log("[step3B] snapped caption | dir=(" + dir[0].toFixed(2) + "," + dir[1].toFixed(2)
+        + ") t=" + Math.round(t) + "px");
+}
+
+// Returns { min, max } of the bounding box's four corners projected (dot product)
+// onto a unit direction. Bounds are [L, T, R, B] px; dir is [x, y].
+function _projExtent(bnds, dir) {
+    var corners = [
+        [bnds[0], bnds[1]], [bnds[2], bnds[1]],
+        [bnds[2], bnds[3]], [bnds[0], bnds[3]]
+    ];
+    var mn = null, mx = null;
+    for (var i = 0; i < corners.length; i++) {
+        var d = corners[i][0] * dir[0] + corners[i][1] * dir[1];
+        if (mn === null || d < mn) mn = d;
+        if (mx === null || d > mx) mx = d;
+    }
+    return { min: mn, max: mx };
 }
 
 // Samples the text's vertical centre across vertical slices. Returns
