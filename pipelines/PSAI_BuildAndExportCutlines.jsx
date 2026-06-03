@@ -21,10 +21,10 @@ var CONFIG = {
     // so Step 3B can find the White Base_Cutline layers left by Step 3.
     whiteEdgeLayerName: "White Base_Cutline",
 
-    whiteRectPadH:     28,   // px: net padding (= expand - contract); sets band thickness + end roundness
-    whiteExpandPx:     55,   // px: merge radius — must bridge inter-letter, inter-line, counter-hole gaps
-    whiteSmoothPx:     10,   // px: light cleanup of polygonal facets only (not the primary rounder)
-    plateWidthPadH:    20,   // px: GC-LM caption-plate horizontal padding (independent of pill padding)
+    whiteSliceStepPx:    12,  // px: slice width for sampling the text centreline (smaller = finer spine)
+    whitePenPadPx:       14,  // px: added to detected text line-height → pen diameter (pill thickness beyond text)
+    whiteStraightSnapPx: 6,   // px: if the fitted spine stays within this of flat, force a perfectly straight pill
+    plateWidthPadH:      20,  // px: GC-LM caption-plate horizontal padding (independent of pill padding)
     whiteHeightPlate:  118,  // px: plate-treatment White height (1 cm at 300 DPI, 1-line)
     whiteHeightPlate2: 189,  // px: plate-treatment White height (1.6 cm at 300 DPI, 2-line)
     platePaddingTop:   10,   // px: Caption plate sits this many px above text top

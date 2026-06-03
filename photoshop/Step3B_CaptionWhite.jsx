@@ -218,47 +218,228 @@ function groupWithPlate(doc, elementsGroup, soLayer, textLayer, groupName) {
 
 // ─── WHITE BASE HELPERS ───────────────────────────────────────────────────────
 
-// Creates a White pill by morphological close of the text's actual coverage:
-// expand by a large radius so every glyph, counter hole, and (for 2-line text)
-// both lines merge into a single smooth blob, then contract back to leave even
-// padding. One path handles straight, multi-line, and curved/path text — the
-// shape is always a uniform-width band hugging the text, because it operates on
-// the glyph pixels themselves rather than a bounding box.
+// Creates a White pill by stroking the text's CENTERLINE with a round pen of
+// diameter = text line-height + whitePenPadPx. This is a capsule (stadium):
+// uniform thickness everywhere, true rounded ends, covering the full text height
+// including descenders — because the pen diameter is fixed, not derived from the
+// local ink profile.
 //
-// Two independent knobs:
-//   whiteExpandPx  — merge radius. Must exceed the largest gap to be bridged
-//                    (inter-letter, inter-line, counter holes). Bigger = safer
-//                    merge; does NOT thicken the final band (contract undoes it).
-//   whiteRectPadH  — net padding (= expand - contract). Sets band thickness and
-//                    end-cap roundness. The resulting corner radius ≈ this value.
+// One method handles straight, multi-line, and curved/path text with NO type
+// detection. The spine is recovered by sampling the text's vertical centre in
+// vertical slices, then low-pass-fitting a quadratic through those samples so
+// per-letter ascender/descender wobble averages out:
+//   • straight text   → fit collapses to a flat line → exact horizontal stadium
+//   • curved/arc text → fit follows the arc → capsule bends along the curve
+//   • two-line text   → slice centres sit mid-block, slice heights span both
+//                       lines → a tall straight stadium covering both rows
+//
+// Knobs (CONFIG):
+//   whiteSliceStepPx    — slice width for centreline sampling (smaller = finer)
+//   whitePenPadPx       — px added to detected line-height → pen diameter
+//   whiteStraightSnapPx — if the fitted spine stays within this of flat, force a
+//                         perfectly straight pill (kills micro-wobble on straight text)
 function createWhiteFromText(doc, textLayer) {
-    loadLayerTransparency(textLayer);
+    var spine = _sampleTextSpine(doc, textLayer); // { pts, lineHeight, bounds }
 
-    // Expand: merges glyphs + lines into one blob and rounds convex corners to
-    // radius = whiteExpandPx. Also fills letter counters (whiteExpandPx must
-    // exceed their radius).
-    doc.selection.expand(CONFIG.whiteExpandPx);
-
-    // Contract back, leaving net padding = whiteExpandPx - contractAmt. The outer
-    // contour stays smooth; corner radius reduces to ~whiteRectPadH.
-    var contractAmt = CONFIG.whiteExpandPx - CONFIG.whiteRectPadH;
-    if (contractAmt > 0) {
-        doc.selection.contract(contractAmt);
-    }
-
-    // Light smooth only to clean polygonal facets left by the selection ops.
-    if (CONFIG.whiteSmoothPx > 0) {
-        doc.selection.smooth(CONFIG.whiteSmoothPx);
-    }
-
-    // Create White layer directly below the T layer, fill, deselect.
     var whiteLayer  = doc.artLayers.add();
     whiteLayer.name = "White";
-    doc.selection.fill(solidWhite());
-    doc.selection.deselect();
 
+    // Degenerate sample (too few slices) → fall back to a bounding-box stadium.
+    if (!spine || spine.pts.length < 3 || spine.lineHeight <= 0) {
+        var b = spine ? spine.bounds : _layerBoundsPx(textLayer);
+        var fbR = (b[3] - b[1]) / 2 + CONFIG.whitePenPadPx / 2;
+        _fillCapsule(doc, _straightSpine(b[0], b[2], (b[1] + b[3]) / 2), fbR);
+    } else {
+        var radius = spine.lineHeight / 2 + CONFIG.whitePenPadPx / 2;
+        var fit    = _quadFitSpine(spine.pts, spine.bounds[0], spine.bounds[2]);
+        _fillCapsule(doc, fit, radius);
+    }
+
+    doc.selection.deselect();
     whiteLayer.move(textLayer, ElementPlacement.PLACEAFTER);
     return whiteLayer;
+}
+
+// Returns layer.bounds as plain px numbers [L, T, R, B] (ruler must be PIXELS).
+function _layerBoundsPx(layer) {
+    var b = layer.bounds;
+    return [b[0].as("px"), b[1].as("px"), b[2].as("px"), b[3].as("px")];
+}
+
+// Samples the text's vertical centre across vertical slices. Returns
+// { pts:[{x,y}...], lineHeight, bounds:[L,T,R,B] } in px, or null if no ink.
+// lineHeight = median slice height (single-line glyph height for arc text,
+// full block height for multi-line) → drives the pen diameter.
+function _sampleTextSpine(doc, textLayer) {
+    var bnds = _layerBoundsPx(textLayer);
+    var L = bnds[0], T = bnds[1], R = bnds[2], B = bnds[3];
+    if (R - L <= 0 || B - T <= 0) return null;
+
+    var step    = CONFIG.whiteSliceStepPx;
+    var pts     = [];
+    var heights = [];
+
+    var x;
+    for (x = L; x < R; x += step) {
+        var xb = (x + step < R) ? x + step : R;
+
+        // Intersect the text alpha with this column; read its vertical span.
+        loadLayerTransparency(textLayer);
+        try {
+            doc.selection.select(
+                [[x, T - 1], [xb, T - 1], [xb, B + 1], [x, B + 1]],
+                SelectionType.INTERSECT, 0, false);
+        } catch (eSel) { continue; }   // INTERSECT yielding empty throws
+
+        var sb;
+        try { sb = doc.selection.bounds; } catch (eB) { continue; } // empty slice
+        var st = sb[1].as("px"), sBot = sb[3].as("px");
+        if (sBot - st <= 0) continue;
+
+        pts.push({ x: (x + xb) / 2, y: (st + sBot) / 2 });
+        heights.push(sBot - st);
+    }
+
+    if (pts.length === 0) return null;
+
+    heights.sort(function (a, b) { return a - b; });
+    var lineHeight = heights[Math.floor(heights.length / 2)]; // median
+
+    return { pts: pts, lineHeight: lineHeight, bounds: bnds };
+}
+
+// Builds a smooth spine over [x0,x1] by least-squares quadratic fit of the
+// sampled centre points: y = a(x-xm)^2 + b(x-xm) + c (x shifted by mean for
+// conditioning). If the fit stays within whiteStraightSnapPx of a flat line, it
+// snaps to a perfectly straight spine. Returns an array of {x,y} samples.
+function _quadFitSpine(pts, x0, x1) {
+    var n = pts.length, i;
+
+    var xm = 0, ym = 0;
+    for (i = 0; i < n; i++) { xm += pts[i].x; ym += pts[i].y; }
+    xm /= n; ym /= n;
+
+    var S0 = n, S1 = 0, S2 = 0, S3 = 0, S4 = 0, Ty = 0, Txy = 0, Tx2y = 0;
+    for (i = 0; i < n; i++) {
+        var dx = pts[i].x - xm, y = pts[i].y;
+        var dx2 = dx * dx;
+        S1 += dx; S2 += dx2; S3 += dx2 * dx; S4 += dx2 * dx2;
+        Ty += y; Txy += dx * y; Tx2y += dx2 * y;
+    }
+
+    // Solve the 3x3 normal equations [[S4 S3 S2],[S3 S2 S1],[S2 S1 S0]]·[a,b,c]=[Tx2y,Txy,Ty]
+    var a = 0, b = 0, c = ym;
+    var sol = _solve3(S4, S3, S2, S3, S2, S1, S2, S1, S0, Tx2y, Txy, Ty);
+    if (sol) { a = sol[0]; b = sol[1]; c = sol[2]; }
+
+    function yAt(px) { var d = px - xm; return a * d * d + b * d + c; }
+
+    // Straightness check: max deviation of fit from a flat line at mean y.
+    var flat = ym, maxDev = 0;
+    var probes = 16, p;
+    for (p = 0; p <= probes; p++) {
+        var px = x0 + (x1 - x0) * (p / probes);
+        var dev = Math.abs(yAt(px) - flat);
+        if (dev > maxDev) maxDev = dev;
+    }
+    if (maxDev <= CONFIG.whiteStraightSnapPx) {
+        return _straightSpine(x0, x1, flat);
+    }
+
+    var out = [], M = 40;
+    for (p = 0; p <= M; p++) {
+        var sx = x0 + (x1 - x0) * (p / M);
+        out.push({ x: sx, y: yAt(sx) });
+    }
+    return out;
+}
+
+// Two-point horizontal spine at height y over [x0,x1].
+function _straightSpine(x0, x1, y) {
+    return [{ x: x0, y: y }, { x: x1, y: y }];
+}
+
+// Solves a 3x3 linear system by Cramer's rule. Returns [x,y,z] or null if singular.
+function _solve3(a11, a12, a13, a21, a22, a23, a31, a32, a33, b1, b2, b3) {
+    function det3(m11, m12, m13, m21, m22, m23, m31, m32, m33) {
+        return m11 * (m22 * m33 - m23 * m32)
+             - m12 * (m21 * m33 - m23 * m31)
+             + m13 * (m21 * m32 - m22 * m31);
+    }
+    var D = det3(a11, a12, a13, a21, a22, a23, a31, a32, a33);
+    if (Math.abs(D) < 1e-9) return null;
+    var Dx = det3(b1, a12, a13, b2, a22, a23, b3, a32, a33);
+    var Dy = det3(a11, b1, a13, a21, b2, a23, a31, b3, a33);
+    var Dz = det3(a11, a12, b1, a21, a22, b2, a31, a32, b3);
+    return [Dx / D, Dy / D, Dz / D];
+}
+
+// Offsets a spine polyline by ±radius into a closed capsule polygon (rounded
+// ends), selects it, and fills white. The active layer must already be the
+// target White layer.
+function _fillCapsule(doc, spine, radius) {
+    var poly = _capsulePolygon(spine, radius);
+    doc.selection.select(poly, SelectionType.REPLACE, 0, true);
+    doc.selection.fill(solidWhite());
+}
+
+// Builds the capsule outline: top edge (spine + r·normal) along the spine, a
+// semicircular cap around the last point, the bottom edge back, then a cap
+// around the first point. Returns an array of [x,y] for Selection.select().
+function _capsulePolygon(spine, r) {
+    var n = spine.length, i;
+    var top = [], bot = [];
+
+    for (i = 0; i < n; i++) {
+        // Local tangent from neighbours (forward/backward diff at the ends).
+        var p0 = spine[i > 0 ? i - 1 : i];
+        var p1 = spine[i < n - 1 ? i + 1 : i];
+        var tx = p1.x - p0.x, ty = p1.y - p0.y;
+        var len = Math.sqrt(tx * tx + ty * ty) || 1;
+        var nx = -ty / len, ny = tx / len;   // unit normal
+        top.push([spine[i].x + r * nx, spine[i].y + r * ny]);
+        bot.push([spine[i].x - r * nx, spine[i].y - r * ny]);
+    }
+
+    // Tangent directions at the two ends (outward = forward at end, back at start).
+    var endT  = _unit(spine[n - 1].x - spine[n - 2 >= 0 ? n - 2 : 0].x,
+                      spine[n - 1].y - spine[n - 2 >= 0 ? n - 2 : 0].y);
+    var startT = _unit(spine[0].x - spine[1 < n ? 1 : 0].x,
+                       spine[0].y - spine[1 < n ? 1 : 0].y);
+
+    var poly = [];
+    var k;
+    for (k = 0; k < top.length; k++) poly.push(top[k]);                // top L→R
+    _appendCap(poly, spine[n - 1], r, top[n - 1], bot[n - 1], endT);   // right cap
+    for (k = bot.length - 1; k >= 0; k--) poly.push(bot[k]);           // bottom R→L
+    _appendCap(poly, spine[0], r, bot[0], top[0], startT);             // left cap
+    return poly;
+}
+
+// Appends a semicircular arc of `steps` points around centre C (radius r), from
+// vector v0 to v1, sweeping through the outward direction `through`.
+function _appendCap(poly, C, r, fromPt, toPt, through) {
+    var steps = 10;
+    var a0 = Math.atan2(fromPt[1] - C.y, fromPt[0] - C.x);
+    var a1 = Math.atan2(toPt[1]   - C.y, toPt[0]   - C.x);
+    // Pick sweep direction (±π) whose midpoint aligns with the outward tangent.
+    var sweep = a1 - a0;
+    while (sweep <= -Math.PI) sweep += 2 * Math.PI;
+    while (sweep > Math.PI)  sweep -= 2 * Math.PI;
+    var midAng = a0 + sweep / 2;
+    if (Math.cos(midAng) * through[0] + Math.sin(midAng) * through[1] < 0) {
+        sweep += (sweep > 0 ? -2 * Math.PI : 2 * Math.PI);
+    }
+    var s;
+    for (s = 1; s < steps; s++) {
+        var ang = a0 + sweep * (s / steps);
+        poly.push([C.x + r * Math.cos(ang), C.y + r * Math.sin(ang)]);
+    }
+}
+
+function _unit(x, y) {
+    var len = Math.sqrt(x * x + y * y) || 1;
+    return [x / len, y / len];
 }
 
 // Creates a White pill layer from explicit pixel coordinates.
