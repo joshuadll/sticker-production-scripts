@@ -21,10 +21,11 @@ var CONFIG = {
     // so Step 3B can find the White Base_Cutline layers left by Step 3.
     whiteEdgeLayerName: "White Base_Cutline",
 
-    whiteSliceStepPx:    12,  // px: slice width for sampling the text centreline (smaller = finer spine)
-    whitePenPadPx:       14,  // px: added to detected text line-height → pen diameter (pill thickness beyond text)
-    whiteStraightSnapPx: 6,   // px: if the fitted spine stays within this of flat, force a perfectly straight pill
-    plateWidthPadH:      20,  // px: GC-LM caption-plate horizontal padding (independent of pill padding)
+    whiteSliceStepPx:       12,  // px: slice width for sampling the text centreline (smaller = finer spine)
+    whitePenPadPx:          40,  // px: added to text height → pen diameter (margin above+below text, split top/bottom)
+    whiteStraightSnapPx:    6,   // px: if the fitted spine stays within this of flat, force a perfectly straight pill
+    whiteCurvedHeightPctile: 0.9,// quantile of per-slice heights used as curved-text line-height (accents included)
+    plateWidthPadH:         20,  // px: GC-LM caption-plate horizontal padding (independent of pill padding)
     whiteHeightPlate:  118,  // px: plate-treatment White height (1 cm at 300 DPI, 1-line)
     whiteHeightPlate2: 189,  // px: plate-treatment White height (1.6 cm at 300 DPI, 2-line)
     platePaddingTop:   10,   // px: Caption plate sits this many px above text top

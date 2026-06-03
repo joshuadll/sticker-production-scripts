@@ -239,25 +239,46 @@ function groupWithPlate(doc, elementsGroup, soLayer, textLayer, groupName) {
 //   whiteStraightSnapPx — if the fitted spine stays within this of flat, force a
 //                         perfectly straight pill (kills micro-wobble on straight text)
 function createWhiteFromText(doc, textLayer) {
-    var spine = _sampleTextSpine(doc, textLayer); // { pts, lineHeight, bounds }
+    var spine = _sampleTextSpine(doc, textLayer); // { pts, heights, bounds }
 
     var whiteLayer  = doc.artLayers.add();
     whiteLayer.name = "White";
 
+    var bnds = spine ? spine.bounds : _layerBoundsPx(textLayer);
+    var boxH = bnds[3] - bnds[1];
+
     // Degenerate sample (too few slices) → fall back to a bounding-box stadium.
-    if (!spine || spine.pts.length < 3 || spine.lineHeight <= 0) {
-        var b = spine ? spine.bounds : _layerBoundsPx(textLayer);
-        var fbR = (b[3] - b[1]) / 2 + CONFIG.whitePenPadPx / 2;
-        _fillCapsule(doc, _straightSpine(b[0], b[2], (b[1] + b[3]) / 2), fbR);
+    if (!spine || spine.pts.length < 3) {
+        var fbR = boxH / 2 + CONFIG.whitePenPadPx / 2;
+        _fillCapsule(doc, _straightSpine(bnds[0], bnds[2], (bnds[1] + bnds[3]) / 2), fbR);
     } else {
-        var radius = spine.lineHeight / 2 + CONFIG.whitePenPadPx / 2;
-        var fit    = _quadFitSpine(spine.pts, spine.bounds[0], spine.bounds[2]);
-        _fillCapsule(doc, fit, radius);
+        var fit = _quadFitSpine(spine.pts, bnds[0], bnds[2]); // { spine, straight }
+
+        // Pen height = full text height. For straight text that's the bounding
+        // box (no single column spans accent-to-descender, but the whole box
+        // does). For curved text the box is inflated by the arc, so use a high
+        // percentile of per-slice heights (≈ one line, accents included) instead.
+        var penH = fit.straight
+            ? boxH
+            : _percentile(spine.heights, CONFIG.whiteCurvedHeightPctile);
+
+        var radius = penH / 2 + CONFIG.whitePenPadPx / 2;
+        _fillCapsule(doc, fit.spine, radius);
     }
 
     doc.selection.deselect();
     whiteLayer.move(textLayer, ElementPlacement.PLACEAFTER);
     return whiteLayer;
+}
+
+// Returns the p-quantile (0..1) of a numeric array. Array need not be sorted.
+function _percentile(arr, p) {
+    var a = arr.slice(0);
+    a.sort(function (x, y) { return x - y; });
+    var idx = Math.floor(p * (a.length - 1));
+    if (idx < 0) idx = 0;
+    if (idx > a.length - 1) idx = a.length - 1;
+    return a[idx];
 }
 
 // Returns layer.bounds as plain px numbers [L, T, R, B] (ruler must be PIXELS).
@@ -267,9 +288,9 @@ function _layerBoundsPx(layer) {
 }
 
 // Samples the text's vertical centre across vertical slices. Returns
-// { pts:[{x,y}...], lineHeight, bounds:[L,T,R,B] } in px, or null if no ink.
-// lineHeight = median slice height (single-line glyph height for arc text,
-// full block height for multi-line) → drives the pen diameter.
+// { pts:[{x,y}...], heights:[...], bounds:[L,T,R,B] } in px, or null if no ink.
+// heights = per-slice ink span; the caller picks a percentile for the pen size
+// on curved text (the bounding box is used for straight text instead).
 function _sampleTextSpine(doc, textLayer) {
     var bnds = _layerBoundsPx(textLayer);
     var L = bnds[0], T = bnds[1], R = bnds[2], B = bnds[3];
@@ -302,16 +323,14 @@ function _sampleTextSpine(doc, textLayer) {
 
     if (pts.length === 0) return null;
 
-    heights.sort(function (a, b) { return a - b; });
-    var lineHeight = heights[Math.floor(heights.length / 2)]; // median
-
-    return { pts: pts, lineHeight: lineHeight, bounds: bnds };
+    return { pts: pts, heights: heights, bounds: bnds };
 }
 
 // Builds a smooth spine over [x0,x1] by least-squares quadratic fit of the
 // sampled centre points: y = a(x-xm)^2 + b(x-xm) + c (x shifted by mean for
 // conditioning). If the fit stays within whiteStraightSnapPx of a flat line, it
-// snaps to a perfectly straight spine. Returns an array of {x,y} samples.
+// snaps to a perfectly straight spine. Returns { spine:[{x,y}...], straight:bool };
+// the straight flag tells the caller which pen-height metric to use.
 function _quadFitSpine(pts, x0, x1) {
     var n = pts.length, i;
 
@@ -343,7 +362,7 @@ function _quadFitSpine(pts, x0, x1) {
         if (dev > maxDev) maxDev = dev;
     }
     if (maxDev <= CONFIG.whiteStraightSnapPx) {
-        return _straightSpine(x0, x1, flat);
+        return { spine: _straightSpine(x0, x1, flat), straight: true };
     }
 
     var out = [], M = 40;
@@ -351,7 +370,7 @@ function _quadFitSpine(pts, x0, x1) {
         var sx = x0 + (x1 - x0) * (p / M);
         out.push({ x: sx, y: yAt(sx) });
     }
-    return out;
+    return { spine: out, straight: false };
 }
 
 // Two-point horizontal spine at height y over [x0,x1].
