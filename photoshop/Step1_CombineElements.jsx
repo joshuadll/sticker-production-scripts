@@ -1,8 +1,9 @@
 // Step1_CombineElements.jsx — Phase function only.
 // #included by pipeline scripts. Requires: psUtils.jsx, CONFIG in scope.
 //
-// Extracts all top-level element groups from source PSD files and places
+// Extracts all top-level element layers from source PSD files and places
 // each as a named Smart Object in the Resize Area Template.
+// Accepts both LayerSet (folder groups) and ArtLayer (Smart Objects / flat layers).
 
 function runCombine(templateDoc, folder) {
     var files = folder.getFiles("*.psd");
@@ -29,12 +30,15 @@ function runCombine(templateDoc, folder) {
             var sourceDoc = app.open(files[i]);
             log("[step1] opened | " + fileName);
 
-            // First pass: collect matching group names only.
+            // First pass: collect matching layer names only.
+            // Accepts LayerSet (folder group) or ArtLayer (Smart Object / flat layer).
             // Using names (not references) — indices can shift after duplications.
             var groupNames = [];
             for (var j = 0; j < sourceDoc.layers.length; j++) {
                 var srcLayer = sourceDoc.layers[j];
-                if (srcLayer.typename === "LayerSet" && NAME_REGEX.test(srcLayer.name)) {
+                var isElement = (srcLayer.typename === "LayerSet" || srcLayer.typename === "ArtLayer")
+                    && NAME_REGEX.test(srcLayer.name);
+                if (isElement) {
                     groupNames.push(srcLayer.name);
                 }
             }
