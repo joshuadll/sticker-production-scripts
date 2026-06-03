@@ -41,7 +41,7 @@ var _root = $.fileName
     ? new File($.fileName).parent.parent.fsName
     : Folder.desktop.fsName;
 
-CONFIG.logPath        = _root + "/pipelines/PS_FinaliseForAI.log";
+CONFIG.logPath        = _root + "/pipelines/PSAI_BuildAndExportCutlines.log";
 CONFIG.aiTemplatePath = _root + "/assets/Production_File_Template.ai";
 CONFIG.aiPipelinePath = _root + "/pipelines/AI_BuildCutlines.jsx";
 
@@ -208,7 +208,7 @@ function handOffToIllustrator(doc) {
     if (!CONFIG.aiPipelinePath) {
         log("[pipeline] WARN: aiPipelinePath not set — skipping BridgeTalk handoff.");
         scriptAlert("BridgeTalk handoff skipped: CONFIG.aiPipelinePath is empty.\n"
-            + "Set the path to AI_BuildCutlines.jsx and re-run.\n"
+            + "Set CONFIG.aiPipelinePath to AI_BuildCutlines.jsx and re-run.\n"
             + "Log: " + CONFIG.logPath);
         return;
     }
@@ -261,7 +261,7 @@ function main() {
     }
 
     // ── Init log ───────────────────────────────────────────────────
-    log("[pipeline] === PS_FinaliseForAI start ===");
+    log("[pipeline] === PSAI_BuildAndExportCutlines start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
@@ -316,7 +316,7 @@ function main() {
     }
 
     // ── Completion summary ─────────────────────────────────────────
-    log("[pipeline] === PS_FinaliseForAI done ===");
+    log("[pipeline] === PSAI_BuildAndExportCutlines done ===");
 
     var msg = "Done.\n\n"
         + "  Grouped:     " + captionWhiteResult.grouped + " element(s).\n"

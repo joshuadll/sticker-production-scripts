@@ -79,7 +79,7 @@ New: produce an **element-only** silhouette that **excludes** caption text, plat
 and white base — i.e. load transparency of just the image sub-layer of each
 element group (Step 3B leaves each group as `image + caption + [plate] + white base`).
 
-Outputs from `PS_FinaliseForAI.jsx` become:
+Outputs from `PSAI_BuildAndExportCutlines.jsx` become:
 
 | File | Change |
 |---|---|
@@ -128,7 +128,7 @@ the element↔plate junction.
 ## Implementation status (Phases 0–3 built, flag default OFF)
 
 Everything below is gated by `CONFIG.separableCaptions` (false by default) in both
-`PS_FinaliseForAI.jsx` and `AI_BuildCutlines.jsx`. With the flag off, behaviour is
+`PSAI_BuildAndExportCutlines.jsx` and `AI_BuildCutlines.jsx`. With the flag off, behaviour is
 byte-for-byte the legacy path.
 
 - **Phase 0 — seams** (`utils/aiUtils.jsx`): `buildPlate`, `deriveCutline`

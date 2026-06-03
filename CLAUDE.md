@@ -37,7 +37,7 @@ sticker-production-scripts/
 ├── pipelines/
 │   ├── PS_BuildElements.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
 │   │                                                   (stop: artist reviews captions)
-│   ├── PS_FinaliseForAI.jsx        ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Steps 6+7A
+│   ├── PSAI_BuildAndExportCutlines.jsx        ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Steps 6+7A
 │   ├── AI_BuildCutlines.jsx        ← Steps 6+7A: BridgeTalk entry → trace cutlines → export SVGs for Deepnest
 │   │                                   Direct run (after fixing unmatched paths): exports SVGs only
 │   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
@@ -123,7 +123,7 @@ element outline, producing a fused cutline (art + caption) identical in shape to
 single-pass trace. Deepnest still receives the full sticker outline. Visibility is restored
 after the fill.
 
-PS_FinaliseForAI BridgeTalk exports (written before handoff, sibling to PSD):
+PSAI_BuildAndExportCutlines BridgeTalk exports (written before handoff, sibling to PSD):
   {name}_silhouette.png  ← element-art-only flat black PNG (captions excluded; Step 6 adds them back)
   {name}_elements.txt    ← PSD dimensions + per element:
                            displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom
@@ -247,16 +247,16 @@ try {
 }
 ```
 
-### BridgeTalk handoff (PS → AI) — used at end of PS_FinaliseForAI.jsx
+### BridgeTalk handoff (PS → AI) — used at end of PSAI_BuildAndExportCutlines.jsx
 
-Before sending, PS_FinaliseForAI exports two sidecar files next to the PSD:
+Before sending, PSAI_BuildAndExportCutlines exports two sidecar files next to the PSD:
 - `{name}_silhouette.png` — element-art-only flat black PNG (captions excluded)
 - `{name}_elements.txt`   — PSD dimensions + `displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom` per element
 
 Then sends all three paths to AI_BuildCutlines.jsx via BridgeTalk.
 
 ```javascript
-// In PS_FinaliseForAI.jsx — paths are auto-resolved from _root ($.fileName):
+// In PSAI_BuildAndExportCutlines.jsx — paths are auto-resolved from _root ($.fileName):
 // CONFIG.aiTemplatePath = _root + "/assets/Production_File_Template.ai";
 // CONFIG.aiPipelinePath = _root + "/pipelines/AI_BuildCutlines.jsx";
 // CONFIG.bridgeTalkTimeout = 20;  // seconds
@@ -314,7 +314,7 @@ Photoshop integration test fixtures:
   PS_BuildElements creates its own template document — no pre-opened PSD needed for run-step1-2 or run-step3a.
   Derivative fixtures (for run-step3b / run-step5) are saved outputs of earlier pipeline runs:
     tests/integration/fixtures/resize-area-template-captioned.psd  ← saved after PS_BuildElements
-    tests/integration/fixtures/resize-area-template-grouped.psd    ← saved after PS_FinaliseForAI step 3B
+    tests/integration/fixtures/resize-area-template-grouped.psd    ← saved after PSAI_BuildAndExportCutlines step 3B
 
 Test runners patch CONFIG via perl injection (sourceFolderPath + suppressAlerts)
 and run the pipeline script, not individual step files.

@@ -58,7 +58,7 @@ function _runExportForNesting(doc) {
         + "Log: " + CONFIG.logPath);
 }
 
-// ─── ENTRY POINT: BridgeTalk from PS_FinaliseForAI.jsx ───────────────────────
+// ─── ENTRY POINT: BridgeTalk from PSAI_BuildAndExportCutlines.jsx ───────────────────────
 
 // Set by openTemplateAndImport so main() knows not to double-fire Step 7A.
 var _ranViaHandoff = false;
@@ -73,7 +73,7 @@ function openTemplateAndImport(templatePath, silhPngPath, elementsFilePath) {
 
     if (!templatePath) {
         log("[ai-pipeline] ERROR | templatePath is empty.");
-        scriptAlert("AI_BuildCutlines: CONFIG.aiTemplatePath is not set in PS_FinaliseForAI.jsx.\n"
+        scriptAlert("AI_BuildCutlines: CONFIG.aiTemplatePath is not set in PSAI_BuildAndExportCutlines.jsx.\n"
             + "Set it to the full path of Production_File_Template.ai and re-run.");
         return;
     }

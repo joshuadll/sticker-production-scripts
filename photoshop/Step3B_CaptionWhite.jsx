@@ -1,5 +1,5 @@
 // Step3B_CaptionWhite.jsx — Phase function only.
-// #included by PS_FinaliseForAI.jsx. Requires: psUtils.jsx, CONFIG in scope.
+// #included by PSAI_BuildAndExportCutlines.jsx. Requires: psUtils.jsx, CONFIG in scope.
 //
 // Runs after the artist's manual caption review pass (Step 3A → artist adjusts →
 // Step 3B). Finds each SO + T layer pair, creates a White pill base that follows

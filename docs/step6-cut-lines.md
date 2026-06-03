@@ -3,12 +3,12 @@
 ## What it does
 
 Opens the AI production template, places the silhouette PNG exported by
-`PS_FinaliseForAI.jsx`, runs Image Trace (Silhouettes preset), converts each
+`PSAI_BuildAndExportCutlines.jsx`, runs Image Trace (Silhouettes preset), converts each
 traced shape from fill to stroke (0.25pt black), and names each resulting path
 after its source element using positional matching against the elements sidecar
 file.
 
-## Input files (both produced by `PS_FinaliseForAI.jsx` before BridgeTalk)
+## Input files (both produced by `PSAI_BuildAndExportCutlines.jsx` before BridgeTalk)
 
 | File | Description |
 |---|---|
@@ -64,7 +64,7 @@ Script automates steps 1, 3–10. Artist still positions/sizes if needed after.
 
 ## Artist CONFIG (set before first run)
 
-In `PS_FinaliseForAI.jsx`:
+In `PSAI_BuildAndExportCutlines.jsx`:
 - `aiTemplatePath` — full path to `Production_File_Template.ai`
 - `aiPipelinePath` — full path to `pipelines/AI_BuildCutlines.jsx`
 

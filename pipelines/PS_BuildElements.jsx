@@ -222,7 +222,7 @@ function main() {
         savedPath = saveWorkingDoc(doc, folder);
     } catch (e) {
         log("[pipeline] WARN | auto-save failed line " + e.line + ": " + e.message
-            + " — save the document manually before running PS_FinaliseForAI.");
+            + " — save the document manually before running PSAI_BuildAndExportCutlines.");
     }
 
     // ── Completion summary ─────────────────────────────────────────
@@ -250,7 +250,7 @@ function main() {
     }
 
     msg += "\n\nReview and adjust caption positions."
-        + "\nWhen done, run PS_FinaliseForAI to add white bases and proceed.\n\n"
+        + "\nWhen done, run PSAI_BuildAndExportCutlines to add white bases and proceed.\n\n"
         + (savedPath ? "Saved: " + savedPath : "WARN: auto-save failed — save manually.")
         + "\nLog: " + CONFIG.logPath;
 

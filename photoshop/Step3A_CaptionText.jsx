@@ -3,7 +3,7 @@
 //
 // Creates a caption text layer (T) positioned below each eligible element.
 // Leaves layers ungrouped and unlocked — artist reviews positions and
-// optionally curves text before running PS_FinaliseForAI (Step 3B).
+// optionally curves text before running PSAI_BuildAndExportCutlines (Step 3B).
 //
 // Skips: ST (stamps), layers without [STYLE-CAT] code.
 // Returns: { placed, skipped[] }

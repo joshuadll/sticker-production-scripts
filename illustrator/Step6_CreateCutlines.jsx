@@ -1,7 +1,7 @@
 // Step6_CreateCutlines.jsx — Phase function only.
 // #included by AI_BuildCutlines.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
-// Places the silhouette PNG (exported by PS_FinaliseForAI) into the open AI
+// Places the silhouette PNG (exported by PSAI_BuildAndExportCutlines) into the open AI
 // template, runs Image Trace (Silhouettes preset), sets each path to 0.25pt
 // black stroke, and names each path by matching its centroid to element bounds
 // from the elements sidecar file.
@@ -157,7 +157,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-// Parses the elements sidecar text file produced by PS_FinaliseForAI.
+// Parses the elements sidecar text file produced by PSAI_BuildAndExportCutlines.
 // Format:
 //   width:{psdWidthPx}
 //   height:{psdHeightPx}

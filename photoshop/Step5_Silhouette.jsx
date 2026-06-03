@@ -1,5 +1,5 @@
 // Step5_Silhouette.jsx — Phase function only.
-// #included by PS_FinaliseForAI.jsx. Requires: psUtils.jsx, CONFIG in scope.
+// #included by PSAI_BuildAndExportCutlines.jsx. Requires: psUtils.jsx, CONFIG in scope.
 //
 // Runs after Step 3B (caption white + grouping). All top-level layers are
 // [Display Name] [STYLE-CAT] groups plus one Guide layer.
