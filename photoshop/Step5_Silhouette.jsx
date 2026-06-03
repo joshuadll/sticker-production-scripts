@@ -35,28 +35,41 @@ function runSilhouette(doc) {
     var elementsGroup = findLayerByName(doc, "Elements");
 
     if (!elementsGroup) {
-        // Collect only layers that match the element naming convention.
-        var toGroup = [];
+        // Count matching layers before we start moving any.
+        var matchCount = 0;
         for (var i = 0; i < doc.layers.length; i++) {
-            if (parseLayerName(doc.layers[i].name)) {
-                toGroup.push(doc.layers[i]);
-            }
+            if (parseLayerName(doc.layers[i].name)) matchCount++;
         }
 
-        if (toGroup.length === 0) {
+        if (matchCount === 0) {
             log("[step5] ERROR | no element layers found to group.");
             return { processed: 0 };
         }
 
-        // Create group and move layers in — iterating reverse with PLACEATBEGINNING
-        // preserves the original top-to-bottom z-order inside the group.
+        // Create the Elements group at the top of the document, then repeatedly
+        // find and move the topmost matching layer into it via PLACEATEND.
+        // Using the live doc.layers collection each iteration avoids stale
+        // references that break move() when the layers include nested LayerSets.
         var group = doc.layerSets.add();
         group.name = "Elements";
-        for (var j = toGroup.length - 1; j >= 0; j--) {
-            toGroup[j].move(group, ElementPlacement.PLACEATBEGINNING);
+        var moved = 0;
+        var safety = 0;
+        while (safety < 500) {
+            var found = null;
+            for (var k = 0; k < doc.layers.length; k++) {
+                if (doc.layers[k] === group) continue;
+                if (parseLayerName(doc.layers[k].name)) {
+                    found = doc.layers[k];
+                    break;
+                }
+            }
+            if (!found) break;
+            found.move(group, ElementPlacement.PLACEATEND);
+            moved++;
+            safety++;
         }
         elementsGroup = group;
-        log("[step5] grouped " + toGroup.length + " element(s) → Elements");
+        log("[step5] grouped " + moved + " element(s) → Elements");
     } else {
         log("[step5] Elements group already exists — skipping group step.");
     }
