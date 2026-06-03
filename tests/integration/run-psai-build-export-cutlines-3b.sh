@@ -4,11 +4,11 @@
 # executes for real. Checks that elements were grouped correctly.
 #
 # FIXTURES REQUIRED:
-#   tests/integration/fixtures/resize-area-template-captioned.psd
-#     A working PSD that has had Steps 1–3A run on it
+#   tests/integration/fixtures/production-template-step3a.psd
+#     A Production Template PSD that has had Steps 1–3A run on it
 #     (i.e. it has SO layers + T layers at the top level, ungrouped).
-#     Create this by running PS_BuildElements.jsx on source PSDs in a folder named
-#     "resize-area-template-captioned" — it will auto-save to that path.
+#     Create this by running PS_BuildElements.jsx on fixture source PSDs,
+#     then saving the resulting document to that path.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
@@ -23,7 +23,7 @@ APP="Adobe Photoshop 2026"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/PSAI_BuildAndExportCutlines.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
-TEMPLATE_FIXTURE="$FIXTURE_DIR/resize-area-template-captioned.psd"
+TEMPLATE_FIXTURE="$FIXTURE_DIR/production-template-step3a.psd"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/psai-build-export-cutlines-3b-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"

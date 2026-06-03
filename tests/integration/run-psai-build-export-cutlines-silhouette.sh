@@ -4,10 +4,10 @@
 # so only Step 5 executes for real. Checks that the Silhouette layer was created.
 #
 # FIXTURES REQUIRED:
-#   tests/integration/fixtures/resize-area-template-grouped.psd
-#     A Resize Area Template that has had Steps 1–3B run on it (all elements
+#   tests/integration/fixtures/production-template-step3b.psd
+#     A Production Template PSD that has had Steps 1–3B run on it (all elements
 #     are [Display Name] [STYLE-CAT] groups + Guide at top level).
-#     Create this by running PSAI_BuildAndExportCutlines.jsx on a captioned fixture PSD,
+#     Create this by running PSAI_BuildAndExportCutlines.jsx on production-template-step3a.psd,
 #     stopping after Step 3B completes, then saving.
 #
 # GOLDEN FILE WORKFLOW — first run:
@@ -23,7 +23,7 @@ APP="Adobe Photoshop 2026"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/PSAI_BuildAndExportCutlines.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
-TEMPLATE_FIXTURE="$FIXTURE_DIR/resize-area-template-grouped.psd"
+TEMPLATE_FIXTURE="$FIXTURE_DIR/production-template-step3b.psd"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/psai-build-export-cutlines-silhouette-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
@@ -33,8 +33,8 @@ LOG="/tmp/PSAI_BuildAndExportCutlines.log"
 
 if [ ! -f "$TEMPLATE_FIXTURE" ]; then
     echo "SKIP [$STEP]: fixture not found: $TEMPLATE_FIXTURE"
-    echo "  Create by running PSAI_BuildAndExportCutlines.jsx (Steps 1–3B) on fixture source PSDs,"
-    echo "  then save the result as: $TEMPLATE_FIXTURE"
+    echo "  Create from production-template-step3a.psd by running PSAI_BuildAndExportCutlines.jsx"
+    echo "  through Step 3B, then saving the result as: $TEMPLATE_FIXTURE"
     exit 0
 fi
 
