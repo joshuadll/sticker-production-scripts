@@ -324,22 +324,24 @@ test runner in tests/integration/ alongside it.
 
 Photoshop integration test fixtures:
   tests/integration/fixtures/source-psds/              ← source PSDs for combine tests (≥1 required)
-  PS_BuildElements creates its own template document — no pre-opened PSD needed for run-step1-2 or run-step3a.
-  Derivative fixtures (for run-step3b / run-step5) are saved outputs of earlier pipeline runs:
+  PS_BuildElements creates its own template document — no pre-opened PSD needed.
+  Derivative fixtures (for psai-build-export-cutlines-3b / psai-build-export-cutlines-silhouette) are saved outputs of earlier pipeline runs:
     tests/integration/fixtures/resize-area-template-captioned.psd  ← saved after PS_BuildElements
     tests/integration/fixtures/resize-area-template-grouped.psd    ← saved after PSAI_BuildAndExportCutlines step 3B
 
-Test runners patch CONFIG via perl injection (sourceFolderPath + suppressAlerts)
+Test runners are named after the pipeline they test (e.g. run-ps-build-elements.sh, run-ai-refine-cutlines.sh).
+They patch CONFIG via perl injection (sourceFolderPath + suppressAlerts + absolute #include paths)
 and run the pipeline script, not individual step files.
 
 ---
 
 ## Photoshop API patterns (non-obvious)
-Run action:         app.doAction("White Base_Cutline", "Cutline")
 Move layer below:   layer.move(targetLayer, ElementPlacement.PLACEAFTER)
 Convert to SO:      executeAction(stringIDToTypeID("newPlacedLayer"), new ActionDescriptor(), DialogModes.NO)
 Group layers:       executeAction(stringIDToTypeID("groupLayersEvent"), desc, DialogModes.NO)
 Suppress dialogs:   app.playbackDisplayDialogs = DialogModes.NO (restore to DialogModes.ERROR after)
+Load transparency:  putEnumerated("Chnl","Chnl","Trsp") form — the compound putProperty+putEnumerated form stopped working in PS 2026
+Live collection:    doc.layers re-indexes when layers are resized/added — always snapshot refs into an array before iterating if you modify layers in the loop
 
 ## Shared asset paths (committed to repo — no config needed)
 assets/Production_File_Template.ai

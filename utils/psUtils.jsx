@@ -72,6 +72,7 @@ function log(msg) {
     $.writeln(msg);
     var f = new File(CONFIG.logPath);
     f.open("a");
+    f.lineFeed = "Unix"; // ensure \n line endings so grep/diff work correctly
     f.writeln(msg);
     f.close();
 }

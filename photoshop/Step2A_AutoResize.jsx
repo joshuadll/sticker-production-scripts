@@ -15,8 +15,10 @@ function runResize(doc) {
     try {
         // Snapshot layer refs upfront — resizing layers can shift the live
         // doc.layers collection, causing iterations to skip elements.
+        log("[step2] doc.layers.length = " + doc.layers.length);
         var layerRefs = [];
         for (var i = 0; i < doc.layers.length; i++) {
+            log("[step2] layer[" + i + "] = " + doc.layers[i].name);
             layerRefs.push(doc.layers[i]);
         }
 
