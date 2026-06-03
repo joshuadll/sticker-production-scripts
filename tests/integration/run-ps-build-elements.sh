@@ -61,7 +61,7 @@ perl -pe '
 echo "[$STEP] Running script..."
 osascript << EOF
 tell application "$APP"
-    do javascript (read POSIX file "$TEMP_SCRIPT")
+    do javascript file (POSIX file "$TEMP_SCRIPT")
 end tell
 EOF
 

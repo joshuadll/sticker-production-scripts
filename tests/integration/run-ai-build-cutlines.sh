@@ -58,12 +58,17 @@ perl -pe '
     s|stampTemplatePath:\s*""|stampTemplatePath: "__skip__"|;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
+# Append the entry-point call so #include resolves correctly when run as a file.
+cat >> "$TEMP_SCRIPT" << JSEOF
+openTemplateAndImport("$TEMPLATE_FIXTURE","$PNG_FIXTURE","$ELEMENTS_FIXTURE");
+JSEOF
+
 # ── Run script via osascript ─────────────────────────────────────────────────
 
 echo "[$STEP] Opening template and running cutlines script..."
 osascript << EOF
 tell application "$APP"
-    do javascript "openTemplateAndImport(\"$TEMPLATE_FIXTURE\",\"$PNG_FIXTURE\",\"$ELEMENTS_FIXTURE\");" & " " & (read POSIX file "$TEMP_SCRIPT")
+    do javascript file (POSIX file "$TEMP_SCRIPT")
 end tell
 EOF
 

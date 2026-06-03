@@ -66,7 +66,7 @@ osascript << EOF
 tell application "$APP"
     open POSIX file "$TEMPLATE_FIXTURE"
     delay 1
-    do javascript file "$TEMP_SCRIPT"
+    do javascript file (POSIX file "$TEMP_SCRIPT")
 end tell
 EOF
 

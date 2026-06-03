@@ -51,7 +51,7 @@ echo "[$STEP] Opening fixture and running NQI check..."
 osascript << EOF
 tell application "$APP"
     set doc to open (POSIX file "$FIXTURE_AI")
-    do javascript (read POSIX file "$TEMP_SCRIPT")
+    do javascript file (POSIX file "$TEMP_SCRIPT")
 end tell
 EOF
 

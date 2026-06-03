@@ -51,7 +51,7 @@ echo "[$STEP] Opening fixture and running AfterDeepnest pipeline..."
 osascript << EOF
 tell application "$APP"
     open POSIX file "$AI_FIXTURE"
-    do javascript (read POSIX file "$TEMP_SCRIPT")
+    do javascript file (POSIX file "$TEMP_SCRIPT")
 end tell
 EOF
 
