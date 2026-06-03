@@ -90,6 +90,10 @@ function placeCaptionText(doc, soLayer, displayName, font) {
 
     var ti           = textLayer.textItem;
     ti.contents      = displayName;
+    // Explicitly name the layer to match displayName exactly. Without this,
+    // Photoshop auto-names it from ti.contents and may apply smart-quote
+    // conversion (straight apostrophe → curly), causing Step3B's search to fail.
+    textLayer.name   = displayName;
     ti.font          = font;
     ti.size          = new UnitValue(CONFIG.captionSizePt, "pt");
     ti.tracking      = CONFIG.captionTracking;

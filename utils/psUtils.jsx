@@ -163,9 +163,14 @@ function solidWhite() {
 function findTextLayerByDisplayName(doc, displayName) {
     for (var i = 0; i < doc.layers.length; i++) {
         var layer = doc.layers[i];
-        if (layer.kind === LayerKind.TEXT && layer.name === displayName) {
-            return layer;
-        }
+        if (layer.kind !== LayerKind.TEXT) continue;
+        if (layer.name === displayName) return layer;
+        // Fallback: compare text content directly. Photoshop may auto-name the
+        // layer with smart quotes (curly apostrophe) even when ti.contents was
+        // set with a straight apostrophe, causing a name mismatch.
+        try {
+            if (layer.textItem.contents === displayName) return layer;
+        } catch (e) {}
     }
     return null;
 }
