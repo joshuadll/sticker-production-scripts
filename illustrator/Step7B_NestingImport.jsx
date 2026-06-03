@@ -1,4 +1,4 @@
-// StepNest_ImportLayout.jsx — Phase function only.
+// Step7B_NestingImport.jsx — Phase function only.
 // #included by AI_ImportNesting.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
 // Opens each Deepnest output SVG, reads the nested path positions and rotations,
@@ -20,7 +20,7 @@
 //
 // Returns: { matched, unmatched, artPlaced }
 
-function runImportNesting(doc, svgFiles, artFolder) {
+function runNestingImport(doc, svgFiles, artFolder) {
 
     // ── 1. Find layers ────────────────────────────────────────────────────────────
     var cutlinesLayer = findLayer(doc, CONFIG.cutlinesLayerName);

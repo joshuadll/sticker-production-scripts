@@ -1,6 +1,6 @@
 #target illustrator
 #include "../utils/aiUtils.jsx"
-#include "../illustrator/StepNest_ImportLayout.jsx"
+#include "../illustrator/Step7B_NestingImport.jsx"
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 
@@ -66,7 +66,7 @@ function main() {
 
         // ── Run import ─────────────────────────────────────────────────────
         log("[pipeline] --- importing Deepnest layout ---");
-        var result = runImportNesting(doc, svgFiles, artFolder);
+        var result = runNestingImport(doc, svgFiles, artFolder);
 
         if (!result) {
             scriptAlert("Import failed — Cutlines layer not found.\n"

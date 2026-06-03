@@ -26,7 +26,7 @@ sticker-production-scripts/
 ├── illustrator/
 │   ├── Step6_CreateCutlines.jsx
 │   ├── Step7A_DeepnestExport.jsx    ← classifies paths by extent ratio → exports _regular.svg + _irregular.svg
-│   ├── StepNest_ImportLayout.jsx    ← reads Deepnest SVG(s), translates cutline GroupItems to nested positions,
+│   ├── Step7B_NestingImport.jsx    ← reads Deepnest SVG(s), applies full Deepnest transform (rotation + translation) to cutline GroupItems,
 │   │                                    places per-element PNGs into Stickers layer; called by AI_ImportNesting
 │   ├── Step8a_SimplifyCutlines.jsx     ← native RDP simplify of trace cutlines
 │   ├── Step8b_CaptionNormalise.jsx      ← reset GC plate to spec → re-Unite cutline
