@@ -41,11 +41,11 @@ function loadLayerTransparency(layer) {
     var selRef = new ActionReference();
     selRef.putProperty(charIDToTypeID("Chnl"), charIDToTypeID("fsel"));
     desc.putReference(charIDToTypeID("null"), selRef);
-    var lyrRef = new ActionReference();
-    lyrRef.putProperty(charIDToTypeID("Chnl"), charIDToTypeID("Trsp"));
-    lyrRef.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
-    desc.putReference(charIDToTypeID("T   "), lyrRef);
-    desc.putBoolean(charIDToTypeID("Invr"), false);
+    // Use putEnumerated("Chnl","Chnl","Trsp") — the compound putProperty+putEnumerated
+    // form stopped working in Photoshop 2026.
+    var trspRef = new ActionReference();
+    trspRef.putEnumerated(charIDToTypeID("Chnl"), charIDToTypeID("Chnl"), charIDToTypeID("Trsp"));
+    desc.putReference(charIDToTypeID("T   "), trspRef);
     executeAction(charIDToTypeID("setd"), desc, DialogModes.NO);
 }
 

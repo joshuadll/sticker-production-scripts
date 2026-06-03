@@ -36,6 +36,11 @@ var CONFIG = {
         "ST": 450   // Stamp (style code, no cat)    1.5 in
     },
 
+    // ── Step 2A: Grid layout (after resize) ───────────────────────────────────
+    // Padding on each side of a grid cell, in pixels.
+    // Cell size = largest category (TL = 900px) + 2 × gridPaddingPx.
+    gridPaddingPx: 60,
+
     // ── Step 3: White edge ────────────────────────────────────────────────────
     // Default 20px (≈ 1.7mm at 300 DPI) confirmed by artist as the majority case.
     // To adjust a single element: delete its White Base_Cutline layer, change this
