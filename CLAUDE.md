@@ -54,7 +54,8 @@ sticker-production-scripts/
 │   ├── AI_RefineCutlines.jsx       ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
 │   ├── AI_ExportFinal.jsx          ← Steps 8c → 9A → 10 (Asset Export) → 11 (Final File)
 │   │                                  (Step 9B temporarily removed; peeling tab stays in workflow but pipeline placement TBD)
-│   └── AI_NestingQA.jsx            ← runs StepQA_NestingQuality; artist runs after Deepnest to gate re-nest
+│   └── AI_NestingQA.jsx            ← runs StepQA_NestingQuality; artist runs AFTER manually adjusting the
+│                                       nested layout (not immediately after Deepnest auto-output) to gate re-nest
 ├── tests/integration/
 └── docs/
 ```
@@ -133,11 +134,13 @@ element outline, producing a fused cutline (art + caption) identical in shape to
 single-pass trace. Deepnest still receives the full sticker outline. Visibility is restored
 after the fill.
 
-PSAI_BuildAndExportCutlines BridgeTalk exports (written before handoff, sibling to PSD):
-  {name}_silhouette.png  ← element-art-only flat black PNG (captions excluded; Step 6 adds them back)
-  {name}_elements.txt    ← PSD dimensions + per element:
-                           displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom
-                           (stamps write 0|0|0|0|0 for the cap fields)
+PSAI_BuildAndExportCutlines exports (written before BridgeTalk handoff, sibling to PSD):
+  {name}_silhouette.png   ← element-art-only flat black PNG (captions excluded; Step 6 adds them back)
+  {name}_elements.txt     ← PSD dimensions + per element:
+                            displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom
+                            (stamps write 0|0|0|0|0 for the cap fields)
+  {name}_elements/        ← per-element trimmed PNGs (one per element group, transparent background)
+                            used by AI_ImportNesting / Step7B to populate the Stickers layer after Deepnest
 
 ## Illustrator layer names (exact strings except where noted)
 Exceptions (case-insensitive search, consistent standard):
