@@ -38,25 +38,29 @@ if [ ! -f "$TEMPLATE_FIXTURE" ]; then
 fi
 
 # ── Prepare temp script ──────────────────────────────────────────────────────
-# Suppress alerts and skip BridgeTalk (aiPipelinePath "__skip__" causes the
-# handoff function to bail out before sending, so the test ends after Step 5).
+# Patches applied:
+#   - Suppress alerts
+#   - Open the fixture PSD via app.open() injected before CONFIG, so the
+#     document is loaded synchronously before main() runs (avoids the
+#     timing issues of AppleScript's open + delay approach)
+#   - Blank out the runtime aiPipelinePath assignment so BridgeTalk is skipped
+#     (the literal CONFIG default is already "", but the runtime line overwrites it)
+#   - Rewrite #include paths to absolute so they resolve from /tmp/
 
 rm -f "$LOG" "$TEMP_SCRIPT"
 
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
-    s|aiPipelinePath:\s*""|aiPipelinePath: "__skip__"|;
+    s|CONFIG\.aiPipelinePath\s*=\s*_root[^;]+;|CONFIG.aiPipelinePath = "";|;
+    s|(var CONFIG\s*=)|app.open(new File("'"$TEMPLATE_FIXTURE"'"));\n$1|;
     s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
 # ── Run script via osascript ─────────────────────────────────────────────────
 
-echo "[$STEP] Opening fixture and running script..."
+echo "[$STEP] Running script (fixture opened by script itself)..."
 osascript << EOF
-set fixtureFile to POSIX file "$TEMPLATE_FIXTURE" as alias
 tell application "$APP"
-    open fixtureFile
-    delay 1
     do javascript file (POSIX file "$TEMP_SCRIPT")
 end tell
 EOF
