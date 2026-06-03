@@ -25,17 +25,29 @@ function runCaptionWhite(doc) {
     var gcLmCount = 0;  // track how many GC-LM elements used the caption plate
 
     try {
+        // Create the Elements wrapper group first so element sub-groups are built
+        // directly inside it. This avoids PS 2026's restriction on moving or
+        // duplicating LayerSets into another LayerSet.
+        var elementsGroup = findLayerByName(doc, "Elements");
+        if (!elementsGroup) {
+            elementsGroup = doc.layerSets.add();
+            elementsGroup.name = "Elements";
+        }
+
         // Collect layer references upfront to avoid index-shift during grouping.
+        // Iterate in REVERSE (bottom-to-top) so each sub-group added to the top
+        // of elementsGroup naturally lands in the correct z-order.
         var layerRefs = [];
         for (var i = 0; i < doc.layers.length; i++) {
             layerRefs.push(doc.layers[i]);
         }
 
-        for (var i = 0; i < layerRefs.length; i++) {
+        for (var i = layerRefs.length - 1; i >= 0; i--) {
             var soLayer = layerRefs[i];
             var name    = soLayer.name;
 
             if (name === "Caption plate") continue;
+            if (name === "Elements")      continue;
 
             var parsed = parseLayerName(name);
             if (!parsed) continue;
@@ -48,7 +60,7 @@ function runCaptionWhite(doc) {
                     continue;
                 }
                 try {
-                    groupStamp(doc, soLayer, name);
+                    groupStamp(doc, elementsGroup, soLayer, name);
                     log("[step3B] grouped stamp | " + name);
                     grouped++;
                 } catch (e) {
@@ -81,10 +93,10 @@ function runCaptionWhite(doc) {
 
             try {
                 if (isPlate) {
-                    groupWithPlate(doc, soLayer, textLayer, name);
+                    groupWithPlate(doc, elementsGroup, soLayer, textLayer, name);
                     gcLmCount++;
                 } else {
-                    groupStandard(doc, soLayer, textLayer, name);
+                    groupStandard(doc, elementsGroup, soLayer, textLayer, name);
                 }
                 log("[step3B] grouped | " + name);
                 grouped++;
@@ -113,7 +125,7 @@ function runCaptionWhite(doc) {
 // ─── STAMP PATH ───────────────────────────────────────────────────────────────
 // ST elements: SO + White Base_Cutline only (no caption layers).
 
-function groupStamp(doc, soLayer, groupName) {
+function groupStamp(doc, elementsGroup, soLayer, groupName) {
     var wbcLayer = findAdjacentCutline(doc, soLayer);
     var layers   = wbcLayer ? [soLayer, wbcLayer] : [soLayer];
     if (!wbcLayer) {
@@ -121,20 +133,16 @@ function groupStamp(doc, soLayer, groupName) {
             + "\" — no White Base_Cutline found below SO. "
             + "Ensure Step 3 (white edge) ran before this step.");
     }
-    selectAndGroup(doc, layers, groupName);
+    selectAndGroup(elementsGroup, layers, groupName);
 }
 
 // ─── STANDARD PATH ────────────────────────────────────────────────────────────
 // WC elements and GC non-LM: T + White pill + SO + White Base_Cutline.
 
-function groupStandard(doc, soLayer, textLayer, groupName) {
+function groupStandard(doc, elementsGroup, soLayer, textLayer, groupName) {
     var wbcLayer   = findAdjacentCutline(doc, soLayer);
     var whiteLayer = createWhiteFromText(doc, textLayer);
 
-    // Group in z-stack order: T (top/front), White pill, SO, White Base_Cutline (bottom/back).
-    // Photoshop preserves relative positions, so passing [textLayer, whiteLayer, soLayer, wbcLayer]
-    // would reorder them. Instead, pass all four and rely on their existing z-order.
-    // selectAndGroup selects all four; Photoshop groups them preserving relative stack order.
     var layers = wbcLayer
         ? [textLayer, whiteLayer, soLayer, wbcLayer]
         : [textLayer, whiteLayer, soLayer];
@@ -145,13 +153,13 @@ function groupStandard(doc, soLayer, textLayer, groupName) {
             + "Ensure Step 3 (white edge) ran before this step.");
     }
 
-    selectAndGroup(doc, layers, groupName);
+    selectAndGroup(elementsGroup, layers, groupName);
 }
 
 // ─── PLATE PATH ───────────────────────────────────────────────────────────────
 // GC-LM elements: SO + T + Caption plate (elongated) + White pill.
 
-function groupWithPlate(doc, soLayer, textLayer, groupName) {
+function groupWithPlate(doc, elementsGroup, soLayer, textLayer, groupName) {
     var tBounds    = textLayer.bounds;
     var tLeft      = tBounds[0].as("px");
     var tRight     = tBounds[2].as("px");
@@ -205,7 +213,7 @@ function groupWithPlate(doc, soLayer, textLayer, groupName) {
     layers.push(soLayer);
     if (wbcLayer)   layers.push(wbcLayer);
 
-    selectAndGroup(doc, layers, groupName);
+    selectAndGroup(elementsGroup, layers, groupName);
 }
 
 // ─── WHITE BASE HELPERS ───────────────────────────────────────────────────────
@@ -335,35 +343,20 @@ function elongateCaptionPlate(plateGroup, targetWidth) {
 
 // ─── LAYER SELECTION AND GROUPING ─────────────────────────────────────────────
 
-// Groups layers into a new LayerSet at the position of the topmost layer.
-// Uses the layerSets.add() + move approach — groupLayersEvent is unreliable
-// in PS 2026 when called from scripting.
-function selectAndGroup(doc, layers, groupName) {
+// Groups ArtLayers into a new sub-LayerSet inside elementsGroup.
+// Uses elementsGroup.layerSets.add() so the sub-group is created directly
+// inside Elements — avoiding PS 2026's restriction on moving or duplicating
+// a LayerSet into another LayerSet. Callers iterate in reverse (bottom-to-top)
+// so each new sub-group at position 0 of elementsGroup gives the correct final z-order.
+function selectAndGroup(elementsGroup, layers, groupName) {
     if (!layers || layers.length === 0) return;
 
-    // Find the layer above layers[0] as a position anchor. After grouping we
-    // move the group back to where layers[0] was in the stack.
-    var docLayers = doc.layers;
-    var anchorAbove = null;
-    for (var j = 0; j < docLayers.length; j++) {
-        if (docLayers[j] === layers[0]) {
-            anchorAbove = j > 0 ? docLayers[j - 1] : null;
-            break;
-        }
-    }
-
-    // Create empty group (lands at the top of the doc) and move layers in.
-    // Iterating bottom-to-top with PLACEATBEGINNING preserves z-order.
-    var group = doc.layerSets.add();
+    var group = elementsGroup.layerSets.add();
     group.name = groupName;
+
+    // Move ArtLayers in bottom-to-top order with PLACEATBEGINNING to preserve z-order.
     for (var i = layers.length - 1; i >= 0; i--) {
         layers[i].move(group, ElementPlacement.PLACEATBEGINNING);
-    }
-
-    // Reposition group to where layers[0] was; if it was already the topmost
-    // layer, doc.layerSets.add() already placed the group at the top.
-    if (anchorAbove) {
-        group.move(anchorAbove, ElementPlacement.PLACEAFTER);
     }
 }
 

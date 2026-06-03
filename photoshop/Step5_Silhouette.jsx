@@ -35,66 +35,20 @@ function runSilhouette(doc) {
     var elementsGroup = findLayerByName(doc, "Elements");
 
     if (!elementsGroup) {
-        // Collect element layers to group.
-        var toGroup = [];
-        for (var i = 0; i < doc.layers.length; i++) {
-            if (parseLayerName(doc.layers[i].name)) toGroup.push(doc.layers[i]);
-        }
-
-        if (toGroup.length === 0) {
-            log("[step5] ERROR | no element layers found to group.");
-            return { processed: 0 };
-        }
-
-        var grouped = false;
-
-        // Attempt 1: selectLayerById + groupLayersEvent.
-        // app.playbackDisplayDialogs = NO is required before executeAction calls
-        // in PS 2026 to prevent suppression of the underlying layer actions.
-        try {
-            var prevPlayback = app.playbackDisplayDialogs;
-            app.playbackDisplayDialogs = DialogModes.NO;
-            selectLayerById(toGroup[0]);
-            for (var si = 1; si < toGroup.length; si++) {
-                addLayerToSelectionById(toGroup[si]);
-            }
-            executeAction(stringIDToTypeID("groupLayersEvent"), new ActionDescriptor(), DialogModes.NO);
-            app.playbackDisplayDialogs = prevPlayback;
-            doc.activeLayer.name = "Elements";
-            elementsGroup = doc.activeLayer;
-            grouped = true;
-            log("[step5] grouped " + toGroup.length + " element(s) → Elements (groupLayersEvent)");
-        } catch (e1) {
-            app.playbackDisplayDialogs = DialogModes.ERROR;
-            log("[step5] WARN | groupLayersEvent failed (line " + e1.line + "): " + e1.message);
-        }
-
-        // Attempt 2: duplicate each element into a new group, then remove the original.
-        // Works around PS 2026 restrictions on layer.move() for nested LayerSets.
-        if (!grouped) {
-            try {
-                var elemGroup2 = doc.layerSets.add();
-                elemGroup2.name = "Elements";
-                for (var si2 = toGroup.length - 1; si2 >= 0; si2--) {
-                    var origName = toGroup[si2].name;
-                    var dup = toGroup[si2].duplicate(elemGroup2, ElementPlacement.PLACEATBEGINNING);
-                    dup.name = origName;
-                    toGroup[si2].remove();
-                }
-                elementsGroup = elemGroup2;
-                grouped = true;
-                log("[step5] grouped " + toGroup.length + " element(s) → Elements (duplicate)");
-            } catch (e2) {
-                log("[step5] WARN | duplicate approach failed (line " + e2.line + "): " + e2.message);
-            }
-        }
-
-        if (!grouped) {
-            log("[step5] ERROR | could not create Elements group — all methods failed.");
-            return { processed: 0 };
-        }
+        // Elements should have been created by Step 3B. If absent, nothing to do.
+        log("[step5] ERROR | Elements group not found — was Step 3B run?");
+        return { processed: 0 };
     } else {
-        log("[step5] Elements group already exists — skipping group step.");
+        // Move any remaining top-level element layers (skipped by Step3B because
+        // they had no T layer) into Elements. These are ArtLayers so move() works.
+        for (var ei = doc.layers.length - 1; ei >= 0; ei--) {
+            var elyr = doc.layers[ei];
+            if (elyr === elementsGroup) continue;
+            if (parseLayerName(elyr.name)) {
+                elyr.move(elementsGroup, ElementPlacement.PLACEATBEGINNING);
+                log("[step5] moved skipped element into Elements | " + elyr.name);
+            }
+        }
     }
 
     // ── Step 2: Load Elements group transparency as selection ──────────────────
