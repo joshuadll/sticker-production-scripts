@@ -35,41 +35,35 @@ function runSilhouette(doc) {
     var elementsGroup = findLayerByName(doc, "Elements");
 
     if (!elementsGroup) {
-        // Count matching layers before we start moving any.
-        var matchCount = 0;
+        // Collect element layers to group.
+        var toGroup = [];
         for (var i = 0; i < doc.layers.length; i++) {
-            if (parseLayerName(doc.layers[i].name)) matchCount++;
+            if (parseLayerName(doc.layers[i].name)) toGroup.push(doc.layers[i]);
         }
 
-        if (matchCount === 0) {
+        if (toGroup.length === 0) {
             log("[step5] ERROR | no element layers found to group.");
             return { processed: 0 };
         }
 
-        // Create the Elements group at the top of the document, then repeatedly
-        // find and move the topmost matching layer into it via PLACEATEND.
-        // Using the live doc.layers collection each iteration avoids stale
-        // references that break move() when the layers include nested LayerSets.
-        var group = doc.layerSets.add();
-        group.name = "Elements";
-        var moved = 0;
-        var safety = 0;
-        while (safety < 500) {
-            var found = null;
-            for (var k = 0; k < doc.layers.length; k++) {
-                if (doc.layers[k] === group) continue;
-                if (parseLayerName(doc.layers[k].name)) {
-                    found = doc.layers[k];
-                    break;
-                }
-            }
-            if (!found) break;
-            found.move(group, ElementPlacement.PLACEATEND);
-            moved++;
-            safety++;
+        // Select all element layers at once via the selectLayers action (PS 2021+).
+        // One-shot bulk selection works for both ArtLayers and LayerSets, unlike
+        // the slct action (used by selectLayerById) which silently fails for groups
+        // in PS 2026, and unlike layer.move(group, PLACE*) which fails when moving
+        // LayerSets into another LayerSet.
+        var idList = new ActionList();
+        for (var si = 0; si < toGroup.length; si++) {
+            idList.putInteger(toGroup[si].id);
         }
-        elementsGroup = group;
-        log("[step5] grouped " + moved + " element(s) → Elements");
+        var selDesc = new ActionDescriptor();
+        selDesc.putList(stringIDToTypeID("layerID"), idList);
+        executeAction(stringIDToTypeID("selectLayers"), selDesc, DialogModes.NO);
+
+        // Group the selected layers.
+        executeAction(stringIDToTypeID("groupLayersEvent"), new ActionDescriptor(), DialogModes.NO);
+        doc.activeLayer.name = "Elements";
+        elementsGroup = doc.activeLayer;
+        log("[step5] grouped " + toGroup.length + " element(s) → Elements");
     } else {
         log("[step5] Elements group already exists — skipping group step.");
     }
