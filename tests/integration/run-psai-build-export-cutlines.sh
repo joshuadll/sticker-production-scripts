@@ -3,9 +3,9 @@
 # BridgeTalk handoff to Illustrator is skipped — the test ends after the silhouette PNG is written.
 #
 # FIXTURES REQUIRED:
-#   tests/integration/fixtures/production-template-step3a.psd
-#     A Production Template PSD that has had Steps 1–3A run on it
-#     (i.e. it has SO layers + T layers at the top level, ungrouped).
+#   tests/integration/fixtures/elements-captioned-ungrouped.psd
+#     A Production Template PSD with all elements placed, resized, and caption
+#     text layers added (SO + T layers at the top level, not yet grouped).
 #     Create this by running PS_BuildElements.jsx on fixture source PSDs,
 #     then saving the resulting document to that path.
 #
@@ -22,7 +22,7 @@ APP="Adobe Photoshop 2026"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/PSAI_BuildAndExportCutlines.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
-TEMPLATE_FIXTURE="$FIXTURE_DIR/production-template-step3a.psd"
+TEMPLATE_FIXTURE="$FIXTURE_DIR/elements-captioned-ungrouped.psd"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/psai-build-export-cutlines-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
@@ -51,7 +51,7 @@ perl -pe '
 
 # ── Run script via osascript ─────────────────────────────────────────────────
 
-echo "[$STEP] Opening step-3A fixture and running script..."
+echo "[$STEP] Opening fixture and running script..."
 osascript << EOF
 tell application "$APP"
     open POSIX file "$TEMPLATE_FIXTURE"
