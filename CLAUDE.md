@@ -122,10 +122,9 @@ Category resize targets:
   TR: 1.8–2 in / ~570px | IC: 1.8 in / 540px | FD: 1.5–2 in / ~525px | ST: 1.5 in / 450px
 
 ## Photoshop layer stack — state handed off to Illustrator (after Step 5)
-The PSD imported by Step 6 has exactly three top-level layers:
+The PSD has exactly two meaningful top-level layers after Step 5:
   Silhouette         ← flat black pixel layer (element art only — captions excluded; see note)
   Elements           ← LayerSet containing all [Display Name] [STYLE-CAT] element groups
-  Guide              ← untouched; Step 5 groups only parseLayerName() matches, so any non-element layer is safe
 
 Step 5 implementation note: before loading transparency, Step 5 hides caption sub-layers
 (TEXT, "White" pill, "Caption plate") so the silhouette covers element art only. This is

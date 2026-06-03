@@ -95,8 +95,6 @@ function createTemplateDoc() {
     doc.selection.deselect();
     bgLayer.isBackgroundLayer = true;
 
-    var guideLayer = doc.artLayers.add();
-    guideLayer.name = "Guide";
     log("[pipeline] created new template document ("
         + CONFIG.templateWidthCm + " x " + CONFIG.templateHeightCm + " cm, "
         + CONFIG.templateDPI + " DPI).");

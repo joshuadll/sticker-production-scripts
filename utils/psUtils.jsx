@@ -88,7 +88,7 @@ function isValidTemplate(doc) {
 }
 
 // Removes top-level layers that match the element naming convention.
-// Leaves all other layers (Guide, Background, etc.) untouched.
+// Leaves all other layers (Background, etc.) untouched.
 // Loops backwards to avoid index shifting on removal.
 function clearElementLayers(doc) {
     for (var i = doc.layers.length - 1; i >= 0; i--) {
