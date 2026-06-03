@@ -202,6 +202,91 @@ function writeElementsFile(doc) {
     return txtPath;
 }
 
+// ─── PER-ELEMENT PNG EXPORT ───────────────────────────────────────────────────
+
+// Exports each element group as a separate PNG into {baseName}_elements/.
+// Each PNG is trimmed to the element's bounding box and saved on a transparent
+// background, so AI_ImportNesting can place it at the correct scale.
+// Returns the folder path string, or null on failure.
+function exportElementPngs(doc) {
+    var elementsGroup = findLayerByName(doc, "Elements");
+    if (!elementsGroup) {
+        log("[pipeline] WARN | Elements group not found — skipping element PNG export.");
+        return null;
+    }
+
+    var baseName   = doc.fullName.fsName.replace(/\.psd$/i, "");
+    var folderPath = baseName + "_elements";
+    var folder     = new Folder(folderPath);
+    if (!folder.exists) folder.create();
+
+    var prevUnits = app.preferences.rulerUnits;
+    app.preferences.rulerUnits = Units.PIXELS;
+
+    // Hide all top-level layers; show only the Elements group.
+    var topLayers = doc.layers;
+    var topVis    = [];
+    var i;
+    for (i = 0; i < topLayers.length; i++) {
+        topVis[i]            = topLayers[i].visible;
+        topLayers[i].visible = false;
+    }
+    elementsGroup.visible = true;
+
+    var count = 0;
+    var j, k, grp, parsed, safeName, pngPath, dup;
+
+    for (j = 0; j < elementsGroup.layerSets.length; j++) {
+        grp    = elementsGroup.layerSets[j];
+        parsed = parseLayerName(grp.name);
+        if (!parsed) continue;
+
+        // Show only this element group.
+        for (k = 0; k < elementsGroup.layerSets.length; k++) {
+            elementsGroup.layerSets[k].visible = false;
+        }
+        grp.visible = true;
+
+        safeName = parsed.displayName.replace(/[\/\\:*?"<>|]/g, "_");
+        pngPath  = folderPath + "/" + safeName + ".png";
+
+        if (CONFIG.dryRun) {
+            log("[pipeline] [DRY RUN] would export element PNG: " + safeName);
+            continue;
+        }
+
+        // Duplicate, trim to transparent bounds, export, close.
+        dup = null;
+        try {
+            dup = doc.duplicate();
+            dup.trim(TrimType.TRANSPARENT, true, true, true, true);
+            var pngOpts       = new PNGSaveOptions();
+            pngOpts.compression = 0;
+            pngOpts.interlaced  = false;
+            dup.saveAs(new File(pngPath), pngOpts, true); // true = asCopy
+            count++;
+            log("[pipeline] exported element PNG: " + safeName);
+        } catch (e) {
+            log("[pipeline] WARN | failed to export " + safeName + ": " + e.message);
+        }
+
+        if (dup) {
+            dup.close(SaveOptions.DONOTSAVECHANGES);
+        }
+        app.activeDocument = doc;
+    }
+
+    // Restore visibilities.
+    for (i = 0; i < topLayers.length; i++) {
+        topLayers[i].visible = topVis[i];
+    }
+
+    app.preferences.rulerUnits = prevUnits;
+
+    log("[pipeline] element PNGs: " + count + " file(s) → " + folderPath);
+    return folderPath;
+}
+
 // ─── BRIDGETALK HANDOFF ───────────────────────────────────────────────────────
 
 function handOffToIllustrator(doc) {
@@ -306,6 +391,13 @@ function main() {
         log("[pipeline] saved: " + doc.fullName.fsName);
     }
 
+    // ── Per-element PNG export ─────────────────────────────────────
+    log("[pipeline] --- Exporting per-element PNGs ---");
+    var elemArtFolder = exportElementPngs(doc);
+    if (elemArtFolder) {
+        log("[pipeline] element PNGs folder: " + elemArtFolder);
+    }
+
     // ── BridgeTalk → Illustrator ───────────────────────────────────
     log("[pipeline] --- BridgeTalk handoff → Illustrator (Step 6) ---");
     if (!CONFIG.dryRun) {
@@ -320,9 +412,12 @@ function main() {
 
     var msg = "Done.\n\n"
         + "  Grouped:     " + captionWhiteResult.grouped + " element(s).\n"
-        + "  Silhouette:  " + silhouetteResult.processed + " element(s).\n\n"
+        + "  Silhouette:  " + silhouetteResult.processed + " element(s).\n"
+        + "  Art PNGs:    " + (elemArtFolder ? elemArtFolder : "skipped") + "\n\n"
         + "Illustrator is opening the production template and will run cut lines automatically.\n"
         + "Wait for it to finish — it will alert you when SVGs are ready for Deepnest.\n\n"
+        + "After Deepnest: run AI_ImportNesting.jsx, selecting the Deepnest SVG(s)\n"
+        + "and the '_elements' folder shown above.\n\n"
         + "Log: " + CONFIG.logPath;
 
     if (captionWhiteResult.skipped.length > 0) {

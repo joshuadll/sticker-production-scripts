@@ -26,6 +26,8 @@ sticker-production-scripts/
 ├── illustrator/
 │   ├── Step6_CreateCutlines.jsx
 │   ├── Step7A_DeepnestExport.jsx    ← classifies paths by extent ratio → exports _regular.svg + _irregular.svg
+│   ├── StepNest_ImportLayout.jsx    ← reads Deepnest SVG(s), translates cutline GroupItems to nested positions,
+│   │                                    places per-element PNGs into Stickers layer; called by AI_ImportNesting
 │   ├── Step8a_SimplifyCutlines.jsx     ← native RDP simplify of trace cutlines
 │   ├── Step8b_CaptionNormalise.jsx      ← reset GC plate to spec → re-Unite cutline
 │   ├── Step8c_OffsetPathQA.jsx         ← spacing + margin QA (pure geometry; no offset layer created)
@@ -37,11 +39,18 @@ sticker-production-scripts/
 ├── pipelines/
 │   ├── PS_BuildElements.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
 │   │                                                   (stop: artist reviews captions)
-│   ├── PSAI_BuildAndExportCutlines.jsx ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Steps 6+7A
+│   ├── PSAI_BuildAndExportCutlines.jsx ← Steps 3B (caption white+group) → 5 → per-element PNG export → BridgeTalk → AI Steps 6+7A
+│   │                                       also exports {docName}_elements/ folder of per-element PNGs for AI_ImportNesting
 │   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
 │   ├── AI_BuildCutlines.jsx            ← BridgeTalk target + re-run entry (Steps 6+7A); not run directly by artist
 │   │                                       Re-run only: when Step 6 can't link a traced shape to an element,
 │   │                                       artist renames it in the Cutlines layer, then re-runs to export SVGs
+│   ├── AI_ImportNesting.jsx        ← run after Deepnest: reads nested SVG(s), applies full Deepnest transform
+│   │                                   (rotation + translation) to each cutline GroupItem, places artwork PNGs
+│   │                                   in Stickers layer at matching position/rotation
+│   │                                   Match: name-based (primary) → area-based fallback
+│   │                                   Rotation: anchor-direction comparison (PathItems); bbox-flip heuristic (stamps)
+│   │                                                   (stop: artist reviews layout for any unmatched elements)
 │   ├── AI_RefineCutlines.jsx       ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
 │   ├── AI_ExportFinal.jsx          ← Steps 8c → 9A → 10 (Asset Export) → 11 (Final File)
 │   │                                  (Step 9B temporarily removed; peeling tab stays in workflow but pipeline placement TBD)
