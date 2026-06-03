@@ -37,10 +37,11 @@ sticker-production-scripts/
 ├── pipelines/
 │   ├── PS_BuildElements.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
 │   │                                                   (stop: artist reviews captions)
-│   ├── PSAI_BuildAndExportCutlines.jsx        ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Steps 6+7A
-│   ├── AI_BuildCutlines.jsx        ← Steps 6+7A: BridgeTalk entry → trace cutlines → export SVGs for Deepnest
-│   │                                   Direct run (after fixing unmatched paths): exports SVGs only
+│   ├── PSAI_BuildAndExportCutlines.jsx ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Steps 6+7A
 │   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
+│   ├── AI_BuildCutlines.jsx            ← BridgeTalk target + re-run entry (Steps 6+7A); not run directly by artist
+│   │                                       Re-run only: when Step 6 can't link a traced shape to an element,
+│   │                                       artist renames it in the Cutlines layer, then re-runs to export SVGs
 │   ├── AI_RefineCutlines.jsx       ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
 │   ├── AI_ExportFinal.jsx          ← Steps 8c → 9A → 10 (Asset Export) → 11 (Final File)
 │   │                                  (Step 9B temporarily removed; peeling tab stays in workflow but pipeline placement TBD)
