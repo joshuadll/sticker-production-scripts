@@ -51,6 +51,7 @@ rm -f "$LOG" "$TEMP_SCRIPT"
 
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
+    s|CONFIG\.logPath\s*=\s*_root[^;]+;|CONFIG.logPath = "/tmp/PSAI_BuildAndExportCutlines.log";|;
     s|CONFIG\.aiPipelinePath\s*=\s*_root[^;]+;|CONFIG.aiPipelinePath = "";|;
     s|(var CONFIG\s*=)|app.open(new File("'"$TEMPLATE_FIXTURE"'"));\n$1|;
     s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
