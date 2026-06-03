@@ -321,8 +321,8 @@ function main() {
     var msg = "Done.\n\n"
         + "  Grouped:     " + captionWhiteResult.grouped + " element(s).\n"
         + "  Silhouette:  " + silhouetteResult.processed + " element(s).\n\n"
-        + "Illustrator is opening the production template.\n"
-        + "Wait for it to finish placing elements, then do Deepnest.\n\n"
+        + "Illustrator is opening the production template and will run cut lines automatically.\n"
+        + "Wait for it to finish — it will alert you when SVGs are ready for Deepnest.\n\n"
         + "Log: " + CONFIG.logPath;
 
     if (captionWhiteResult.skipped.length > 0) {

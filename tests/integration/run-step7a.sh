@@ -1,7 +1,7 @@
 #!/bin/bash
 # Integration test for Step 7A (Deepnest SVG Export).
-# Runs AI_ExportForNesting.jsx against a fixture .ai file that has named paths in a
-# Cutlines layer and checks that _regular.svg and _irregular.svg are produced.
+# Runs AI_BuildCutlines.jsx (direct/main() path) against a fixture .ai file that has
+# named paths in a Cutlines layer and checks that _regular.svg and _irregular.svg are produced.
 #
 # FIXTURES REQUIRED:
 #   tests/integration/fixtures/step7a-working.ai
@@ -20,13 +20,13 @@ STEP="step7a"
 APP="Adobe Illustrator 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/pipelines/AI_ExportForNesting.jsx"
+SCRIPT="$REPO_ROOT/pipelines/AI_BuildCutlines.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 FIXTURE_AI="$FIXTURE_DIR/step7a-working.ai"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step7a-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
-LOG="/tmp/AI_ExportForNesting.log"
+LOG="/tmp/AI_BuildCutlines.log"
 
 REGULAR_SVG="${FIXTURE_AI%.ai}_regular.svg"
 IRREGULAR_SVG="${FIXTURE_AI%.ai}_irregular.svg"
@@ -115,7 +115,7 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (=== AI_ExportForNesting (start|done)|document:)"
+    grep -Ev "^\[pipeline\] (=== AI_BuildCutlines .*(start|done)|document:|threshold:)"
 }
 
 if [ ! -f "$EXPECTED" ]; then

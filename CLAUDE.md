@@ -37,10 +37,9 @@ sticker-production-scripts/
 ├── pipelines/
 │   ├── PS_BuildElements.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
 │   │                                                   (stop: artist reviews captions)
-│   ├── PS_FinaliseForAI.jsx        ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Step 6
-│   │                                                   (stop: review cutlines, then run AI_ExportForNesting.jsx)
-│   ├── AI_BuildCutlines.jsx        ← Step 6 entry point (called by BridgeTalk from PS_FinaliseForAI)
-│   ├── AI_ExportForNesting.jsx     ← Step 7A: classify cutlines → export _regular.svg + _irregular.svg for Deepnest
+│   ├── PS_FinaliseForAI.jsx        ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Steps 6+7A
+│   ├── AI_BuildCutlines.jsx        ← Steps 6+7A: BridgeTalk entry → trace cutlines → export SVGs for Deepnest
+│   │                                   Direct run (after fixing unmatched paths): exports SVGs only
 │   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
 │   ├── AI_RefineCutlines.jsx       ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
 │   ├── AI_ExportFinal.jsx          ← Steps 8c → 9A → 10 (Asset Export) → 11 (Final File)
@@ -274,10 +273,12 @@ function handOffToIllustrator(doc) {
     bt.send(CONFIG.bridgeTalkTimeout);
 }
 
-// In AI_BuildCutlines.jsx — entry point called by BridgeTalk:
+// In AI_BuildCutlines.jsx — entry point called by BridgeTalk (runs Steps 6 + 7A):
 function openTemplateAndImport(templatePath, silhPngPath, elementsFilePath) {
     var doc = app.open(new File(templatePath));
-    runCreateCutlines(doc, silhPngPath, elementsFilePath);
+    var result = runCreateCutlines(doc, silhPngPath, elementsFilePath);
+    // Halts here if result.unmatched > 0 — artist renames paths, then re-runs directly.
+    // If unmatched == 0, continues automatically to runDeepnestExport(doc).
 }
 ```
 

@@ -1,5 +1,5 @@
 // Step7A_DeepnestExport.jsx — Phase function only.
-// #included by AI_ExportForNesting.jsx. Requires: aiUtils.jsx, CONFIG in scope.
+// #included by AI_BuildCutlines.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
 // Classifies every PathItem and CompoundPathItem in the Cutlines layer as
 // "regular" or "irregular" using the extent ratio:

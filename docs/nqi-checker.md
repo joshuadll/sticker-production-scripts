@@ -21,7 +21,7 @@ to `AI_RefineCutlines.jsx`.
 
 **Workflow:**
 ```
-AI_ExportForNesting.jsx
+AI_BuildCutlines.jsx
   → artist runs Deepnest externally on _regular.svg + _irregular.svg
   → artist imports nested results into the .ai file and joins them
   → run AI_NestingQA.jsx          ← this script
