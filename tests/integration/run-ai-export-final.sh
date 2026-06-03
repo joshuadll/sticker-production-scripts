@@ -18,18 +18,18 @@
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
 #   2. Verify the log looks correct (checked > 0, flagged > 0, no ERROR)
-#   3. Commit: cp "$LOG" tests/integration/expected/step8c-expected.txt
+#   3. Commit: cp "$LOG" tests/integration/expected/ai-export-final-expected.txt
 
 set -euo pipefail
 
-STEP="step8c"
+STEP="ai-export-final"
 APP="Adobe Illustrator 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_ExportFinal.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 AI_FIXTURE="$FIXTURE_DIR/step8c-cutlines.ai"
-EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step8c-expected.txt"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ai-export-final-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/AI_ExportFinal.log"
@@ -126,7 +126,7 @@ if [ ! -f "$EXPECTED" ]; then
     echo ""
     echo "    cp \"$LOG\" \"$EXPECTED\""
     echo "    git add \"$EXPECTED\""
-    echo "    git commit -m 'Add golden output for step8c'"
+    echo "    git commit -m 'Add golden output for ai-export-final'"
     echo ""
     exit 0
 fi
@@ -138,6 +138,6 @@ else
     echo "FAIL [$STEP]: output differs from golden file (diff above)."
     echo "  If the change is intentional:"
     echo "    cp \"$LOG\" \"$EXPECTED\""
-    echo "    git add \"$EXPECTED\" && git commit -m 'Update step8c golden output: <reason>'"
+    echo "    git add \"$EXPECTED\" && git commit -m 'Update ai-export-final golden output: <reason>'"
     exit 1
 fi

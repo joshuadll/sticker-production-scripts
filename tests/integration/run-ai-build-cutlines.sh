@@ -10,7 +10,7 @@
 #
 #   tests/integration/fixtures/step6-silhouette.png
 #     A flat black PNG of a silhouette layer from a real Resize Area PSD.
-#     Export by running PS_FinaliseForAI.jsx on a captioned fixture PSD
+#     Export by running PSAI_BuildAndExportCutlines.jsx on a captioned fixture PSD
 #     and copying the generated *_silhouette.png file here.
 #
 #   tests/integration/fixtures/step6-elements.txt
@@ -20,11 +20,11 @@
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
 #   2. Verify the log looks correct (named paths, no unmatched)
-#   3. Commit: cp "$LOG" tests/integration/expected/step6-expected.txt
+#   3. Commit: cp "$LOG" tests/integration/expected/ai-build-cutlines-expected.txt
 
 set -euo pipefail
 
-STEP="step6"
+STEP="ai-build-cutlines"
 APP="Adobe Illustrator 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -33,7 +33,7 @@ FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 TEMPLATE_FIXTURE="$FIXTURE_DIR/step6-template.ai"
 PNG_FIXTURE="$FIXTURE_DIR/step6-silhouette.png"
 ELEMENTS_FIXTURE="$FIXTURE_DIR/step6-elements.txt"
-EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step6-expected.txt"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ai-build-cutlines-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/AI_BuildCutlines.log"
@@ -129,7 +129,7 @@ if [ ! -f "$EXPECTED" ]; then
     echo ""
     echo "    cp \"$LOG\" \"$EXPECTED\""
     echo "    git add \"$EXPECTED\""
-    echo "    git commit -m 'Add golden output for step6'"
+    echo "    git commit -m 'Add golden output for ai-build-cutlines'"
     echo ""
     exit 0
 fi
@@ -141,6 +141,6 @@ else
     echo "FAIL [$STEP]: output differs from golden file (diff above)."
     echo "  If the change is intentional:"
     echo "    cp \"$LOG\" \"$EXPECTED\""
-    echo "    git add \"$EXPECTED\" && git commit -m 'Update step6 golden output: <reason>'"
+    echo "    git add \"$EXPECTED\" && git commit -m 'Update ai-build-cutlines golden output: <reason>'"
     exit 1
 fi

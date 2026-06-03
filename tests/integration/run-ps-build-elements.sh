@@ -96,7 +96,7 @@ fi
 # Add further exclusions here if new variable lines are introduced.
 
 strip_variable_lines() {
-    grep -Ev "^\[step1-2\] (template:|source folder:|=== ProductionFileScript (start|done))"
+    grep -Ev "^\[pipeline\] (template:|source folder:|=== PS_BuildElements (start|done))"
 }
 
 if [ ! -f "$EXPECTED" ]; then
@@ -107,7 +107,7 @@ if [ ! -f "$EXPECTED" ]; then
     echo ""
     echo "    cp \"$LOG\" \"$EXPECTED\""
     echo "    git add \"$EXPECTED\""
-    echo "    git commit -m 'Add golden output for step1-2'"
+    echo "    git commit -m 'Add golden output for ps-build-elements'"
     echo ""
     exit 0
 fi
@@ -119,6 +119,6 @@ else
     echo "FAIL [$STEP]: output differs from golden file (diff above)."
     echo "  If the change is intentional:"
     echo "    cp \"$LOG\" \"$EXPECTED\""
-    echo "    git add \"$EXPECTED\" && git commit -m 'Update step1-2 golden output: <reason>'"
+    echo "    git add \"$EXPECTED\" && git commit -m 'Update ps-build-elements golden output: <reason>'"
     exit 1
 fi

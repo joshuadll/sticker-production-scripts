@@ -1,6 +1,6 @@
 #!/bin/bash
 # Integration test for Step 3B (caption white base + grouping).
-# Runs PS_FinaliseForAI.jsx with Steps 4 and 5 in dryRun, so only Step 3B
+# Runs PSAI_BuildAndExportCutlines.jsx with Steps 4 and 5 in dryRun, so only Step 3B
 # executes for real. Checks that elements were grouped correctly.
 #
 # FIXTURES REQUIRED:
@@ -13,21 +13,21 @@
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
 #   2. Verify the log looks correct
-#   3. Commit:  cp "$LOG" tests/integration/expected/step3b-expected.txt
+#   3. Commit:  cp "$LOG" tests/integration/expected/psai-build-export-cutlines-3b-expected.txt
 
 set -euo pipefail
 
-STEP="step3b"
+STEP="psai-build-export-cutlines-3b"
 APP="Adobe Photoshop 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/pipelines/PS_FinaliseForAI.jsx"
+SCRIPT="$REPO_ROOT/pipelines/PSAI_BuildAndExportCutlines.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 TEMPLATE_FIXTURE="$FIXTURE_DIR/resize-area-template-captioned.psd"
-EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step3b-expected.txt"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/psai-build-export-cutlines-3b-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
-LOG="/tmp/PS_FinaliseForAI.log"
+LOG="/tmp/PSAI_BuildAndExportCutlines.log"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
@@ -89,7 +89,7 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (document:|=== PS_FinaliseForAI (start|done)|saved:)"
+    grep -Ev "^\[pipeline\] (document:|=== PSAI_BuildAndExportCutlines (start|done)|saved:)"
 }
 
 if [ ! -f "$EXPECTED" ]; then
@@ -100,7 +100,7 @@ if [ ! -f "$EXPECTED" ]; then
     echo ""
     echo "    cp \"$LOG\" \"$EXPECTED\""
     echo "    git add \"$EXPECTED\""
-    echo "    git commit -m 'Add golden output for step3b'"
+    echo "    git commit -m 'Add golden output for psai-build-export-cutlines-3b'"
     echo ""
     exit 0
 fi
@@ -112,6 +112,6 @@ else
     echo "FAIL [$STEP]: output differs from golden file (diff above)."
     echo "  If the change is intentional:"
     echo "    cp \"$LOG\" \"$EXPECTED\""
-    echo "    git add \"$EXPECTED\" && git commit -m 'Update step3b golden output: <reason>'"
+    echo "    git add \"$EXPECTED\" && git commit -m 'Update psai-build-export-cutlines-3b golden output: <reason>'"
     exit 1
 fi

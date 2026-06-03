@@ -10,20 +10,20 @@
 #   1. Run this script (SKIP diff if no golden file yet)
 #   2. Verify the log looks correct
 #   3. Commit the golden file:
-#        cp "$LOG" tests/integration/expected/step3a-expected.txt
-#        git add tests/integration/expected/step3a-expected.txt
-#        git commit -m "Add golden output for step3a"
+#        cp "$LOG" tests/integration/expected/ps-build-elements-captions-expected.txt
+#        git add tests/integration/expected/ps-build-elements-captions-expected.txt
+#        git commit -m "Add golden output for ps-build-elements-captions"
 
 set -euo pipefail
 
-STEP="step3a"
+STEP="ps-build-elements-captions"
 APP="Adobe Photoshop 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/PS_BuildElements.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 SOURCE_FIXTURE="$FIXTURE_DIR/source-psds"
-EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step3a-expected.txt"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ps-build-elements-captions-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/PS_BuildElements.log"
@@ -84,7 +84,7 @@ if [ ! -f "$EXPECTED" ]; then
     echo ""
     echo "    cp \"$LOG\" \"$EXPECTED\""
     echo "    git add \"$EXPECTED\""
-    echo "    git commit -m 'Add golden output for step3a'"
+    echo "    git commit -m 'Add golden output for ps-build-elements-captions'"
     echo ""
     exit 0
 fi
@@ -96,6 +96,6 @@ else
     echo "FAIL [$STEP]: output differs from golden file (diff above)."
     echo "  If the change is intentional:"
     echo "    cp \"$LOG\" \"$EXPECTED\""
-    echo "    git add \"$EXPECTED\" && git commit -m 'Update step3a golden output: <reason>'"
+    echo "    git add \"$EXPECTED\" && git commit -m 'Update ps-build-elements-captions golden output: <reason>'"
     exit 1
 fi

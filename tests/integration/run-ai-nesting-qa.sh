@@ -12,17 +12,17 @@
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
 #   2. Verify the log shows NQI score and correct pocket count
-#   3. Commit: cp "$LOG" tests/integration/expected/stepQA-expected.txt
+#   3. Commit: cp "$LOG" tests/integration/expected/ai-nesting-qa-expected.txt
 
 set -euo pipefail
 
-STEP="stepQA"
+STEP="ai-nesting-qa"
 APP="Adobe Illustrator 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_NestingQA.jsx"
 FIXTURE_AI="$REPO_ROOT/tests/integration/fixtures/stepQA-working.ai"
-EXPECTED="$REPO_ROOT/tests/integration/expected/stepQA-expected.txt"
+EXPECTED="$REPO_ROOT/tests/integration/expected/ai-nesting-qa-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/AI_NestingQA.log"
@@ -117,7 +117,7 @@ if [ ! -f "$EXPECTED" ]; then
     echo ""
     echo "    cp \"$LOG\" \"$EXPECTED\""
     echo "    git add \"$EXPECTED\""
-    echo "    git commit -m 'Add golden output for stepQA'"
+    echo "    git commit -m 'Add golden output for ai-nesting-qa'"
     echo ""
     exit 0
 fi
@@ -129,6 +129,6 @@ else
     echo "FAIL [$STEP]: output differs from golden file (diff above)."
     echo "  If the change is intentional:"
     echo "    cp \"$LOG\" \"$EXPECTED\""
-    echo "    git add \"$EXPECTED\" && git commit -m 'Update stepQA golden output: <reason>'"
+    echo "    git add \"$EXPECTED\" && git commit -m 'Update ai-nesting-qa golden output: <reason>'"
     exit 1
 fi
