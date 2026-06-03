@@ -71,7 +71,9 @@ function exportSilhouettePng(doc) {
     var opts = new PNGSaveOptions();
     opts.compression = 0;
     opts.interlaced  = false;
+    app.playbackDisplayDialogs = DialogModes.NO;
     doc.saveAs(new File(pngPath), opts, true); // true = asCopy
+    app.playbackDisplayDialogs = DialogModes.ERROR;
 
     // Restore visibility.
     for (i = 0; i < layers.length; i++) {
@@ -263,7 +265,9 @@ function exportElementPngs(doc) {
             var pngOpts       = new PNGSaveOptions();
             pngOpts.compression = 0;
             pngOpts.interlaced  = false;
+            app.playbackDisplayDialogs = DialogModes.NO;
             dup.saveAs(new File(pngPath), pngOpts, true); // true = asCopy
+            app.playbackDisplayDialogs = DialogModes.ERROR;
             count++;
             log("[pipeline] exported element PNG: " + safeName);
         } catch (e) {
