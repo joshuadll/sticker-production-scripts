@@ -161,18 +161,26 @@ function solidWhite() {
 // Finds the first top-level TEXT layer whose name matches displayName.
 // Returns null if not found.
 function findTextLayerByDisplayName(doc, displayName) {
-    var seen = [];
+    // Normalize curly/smart apostrophes (U+2018, U+2019) to straight (U+0027).
+    // Photoshop smart-quotes text content on placement, so the T layer name may
+    // use U+2019 while displayName (parsed from the SO layer) uses U+0027.
+    function norm(s) {
+        var r = "";
+        for (var ci = 0; ci < s.length; ci++) {
+            var code = s.charCodeAt(ci);
+            r += (code === 0x2018 || code === 0x2019) ? "'" : s.charAt(ci);
+        }
+        return r;
+    }
+    var normDisplay = norm(displayName);
     for (var i = 0; i < doc.layers.length; i++) {
         var layer = doc.layers[i];
         if (layer.kind !== LayerKind.TEXT) continue;
-        seen.push("\"" + layer.name + "\"");
-        if (layer.name === displayName) return layer;
+        if (norm(layer.name) === normDisplay) return layer;
         try {
-            if (layer.textItem.contents === displayName) return layer;
+            if (norm(layer.textItem.contents) === normDisplay) return layer;
         } catch (e) {}
     }
-    log("[psUtils] WARN | no T layer found for: \"" + displayName
-        + "\". Top-level TEXT layers visible: " + (seen.length ? seen.join(", ") : "(none)"));
     return null;
 }
 
