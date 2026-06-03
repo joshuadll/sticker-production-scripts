@@ -1,30 +1,29 @@
 #!/bin/bash
-# Integration test for Step 5 (silhouette creation).
-# Runs PSAI_BuildAndExportCutlines.jsx on a grouped fixture PSD with Step 3B in dryRun
-# so only Step 5 executes for real. Checks that the Silhouette layer was created.
+# Integration test for PSAI_BuildAndExportCutlines.jsx (Steps 3B → 5 → silhouette export).
+# BridgeTalk handoff to Illustrator is skipped — the test ends after the silhouette PNG is written.
 #
 # FIXTURES REQUIRED:
-#   tests/integration/fixtures/production-template-step3b.psd
-#     A Production Template PSD that has had Steps 1–3B run on it (all elements
-#     are [Display Name] [STYLE-CAT] groups + Guide at top level).
-#     Create this by running PSAI_BuildAndExportCutlines.jsx on production-template-step3a.psd,
-#     stopping after Step 3B completes, then saving.
+#   tests/integration/fixtures/production-template-step3a.psd
+#     A Production Template PSD that has had Steps 1–3A run on it
+#     (i.e. it has SO layers + T layers at the top level, ungrouped).
+#     Create this by running PS_BuildElements.jsx on fixture source PSDs,
+#     then saving the resulting document to that path.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
-#   2. Verify the log looks correct (Silhouette created, Elements grouped)
-#   3. Commit: cp "$LOG" tests/integration/expected/psai-build-export-cutlines-silhouette-expected.txt
+#   2. Verify the log looks correct (elements grouped, Silhouette created)
+#   3. Commit:  cp "$LOG" tests/integration/expected/psai-build-export-cutlines-expected.txt
 
 set -euo pipefail
 
-STEP="psai-build-export-cutlines-silhouette"
+STEP="psai-build-export-cutlines"
 APP="Adobe Photoshop 2026"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/PSAI_BuildAndExportCutlines.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
-TEMPLATE_FIXTURE="$FIXTURE_DIR/production-template-step3b.psd"
-EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/psai-build-export-cutlines-silhouette-expected.txt"
+TEMPLATE_FIXTURE="$FIXTURE_DIR/production-template-step3a.psd"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/psai-build-export-cutlines-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/PSAI_BuildAndExportCutlines.log"
@@ -33,28 +32,26 @@ LOG="/tmp/PSAI_BuildAndExportCutlines.log"
 
 if [ ! -f "$TEMPLATE_FIXTURE" ]; then
     echo "SKIP [$STEP]: fixture not found: $TEMPLATE_FIXTURE"
-    echo "  Create from production-template-step3a.psd by running PSAI_BuildAndExportCutlines.jsx"
-    echo "  through Step 3B, then saving the result as: $TEMPLATE_FIXTURE"
+    echo "  Create by running PS_BuildElements.jsx on fixture source PSDs,"
+    echo "  then saving the resulting document as: $TEMPLATE_FIXTURE"
     exit 0
 fi
 
 # ── Prepare temp script ──────────────────────────────────────────────────────
-# Suppress alerts. Patch Step 3B to dryRun by making CONFIG.dryRun true for
-# the 3B phase only — simplest approach is to run the whole script with dryRun
-# false but skip BridgeTalk, since Step 5 is the target and 3B is a no-op on
-# an already-grouped file (it will skip all elements it cannot find T layers for).
+# Suppress alerts and skip BridgeTalk (aiPipelinePath "__skip__" causes the
+# handoff function to bail out before sending, so the test ends after Step 5).
 
 rm -f "$LOG" "$TEMP_SCRIPT"
 
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
     s|aiPipelinePath:\s*""|aiPipelinePath: "__skip__"|;
-    s|#include "\.\./|#include "$REPO_ROOT/|g;
+    s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
 # ── Run script via osascript ─────────────────────────────────────────────────
 
-echo "[$STEP] Opening grouped template and running script..."
+echo "[$STEP] Opening step-3A fixture and running script..."
 osascript << EOF
 tell application "$APP"
     open POSIX file "$TEMPLATE_FIXTURE"
@@ -82,7 +79,7 @@ fi
 # ── Verify Silhouette line appears in log ────────────────────────────────────
 
 if grep -q "\[step5\] Silhouette created\." "$LOG"; then
-    echo "PASS [$STEP]: Silhouette created."
+    echo "[$STEP] Silhouette created — OK"
 else
     echo "FAIL [$STEP]: '[step5] Silhouette created.' not found in log."
     echo "  Log contents:"
@@ -104,7 +101,7 @@ if [ ! -f "$EXPECTED" ]; then
     echo ""
     echo "    cp \"$LOG\" \"$EXPECTED\""
     echo "    git add \"$EXPECTED\""
-    echo "    git commit -m 'Add golden output for psai-build-export-cutlines-silhouette'"
+    echo "    git commit -m 'Add golden output for psai-build-export-cutlines'"
     echo ""
     exit 0
 fi
@@ -116,6 +113,6 @@ else
     echo "FAIL [$STEP]: output differs from golden file (diff above)."
     echo "  If the change is intentional:"
     echo "    cp \"$LOG\" \"$EXPECTED\""
-    echo "    git add \"$EXPECTED\" && git commit -m 'Update psai-build-export-cutlines-silhouette golden output: <reason>'"
+    echo "    git add \"$EXPECTED\" && git commit -m 'Update psai-build-export-cutlines golden output: <reason>'"
     exit 1
 fi
