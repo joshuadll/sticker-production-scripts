@@ -68,10 +68,12 @@ function exportSilhouettePng(doc) {
     }
     silLayer.visible = true;
 
-    var opts = new ExportOptionsPNG24();
+    var opts = new ExportOptionsSaveForWeb();
+    opts.format      = SaveDocumentType.PNG;
+    opts.PNG8        = false;
     opts.transparency = false;
     opts.interlaced   = false;
-    doc.exportDocument(new File(pngPath), ExportType.PNG24, opts);
+    doc.exportDocument(new File(pngPath), ExportType.SAVEFORWEB, opts);
 
     // Restore visibility.
     for (i = 0; i < layers.length; i++) {
@@ -260,10 +262,12 @@ function exportElementPngs(doc) {
         try {
             dup = doc.duplicate();
             dup.trim(TrimType.TRANSPARENT, true, true, true, true);
-            var pngOpts       = new ExportOptionsPNG24();
+            var pngOpts       = new ExportOptionsSaveForWeb();
+            pngOpts.format       = SaveDocumentType.PNG;
+            pngOpts.PNG8         = false;
             pngOpts.transparency = true;
             pngOpts.interlaced   = false;
-            dup.exportDocument(new File(pngPath), ExportType.PNG24, pngOpts);
+            dup.exportDocument(new File(pngPath), ExportType.SAVEFORWEB, pngOpts);
             count++;
             log("[pipeline] exported element PNG: " + safeName);
         } catch (e) {
