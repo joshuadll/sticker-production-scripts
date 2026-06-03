@@ -57,7 +57,14 @@ function runSilhouette(doc) {
     var hiddenCaptionLayers = hideCaptionSublayers(elementsGroup);
     log("[step5] hid " + hiddenCaptionLayers.length + " caption sub-layer(s).");
 
-    loadLayerTransparency(elementsGroup);
+    // Duplicate + merge the Elements group to get a temporary flat ArtLayer,
+    // then load its transparency. Loading directly from a LayerSet in PS 2026
+    // returns a full-canvas selection when the group has no pixel mask.
+    var dupGroup = elementsGroup.duplicate(elementsGroup, ElementPlacement.PLACEBEFORE);
+    var stampedLayer = dupGroup.merge();
+    loadLayerTransparency(stampedLayer);
+    stampedLayer.remove();
+
     restoreVisibility(hiddenCaptionLayers);
 
     // Check that something was selected (guard against empty group).
