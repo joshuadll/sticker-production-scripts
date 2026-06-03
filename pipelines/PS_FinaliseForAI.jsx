@@ -17,7 +17,7 @@ var CONFIG = {
     logPath: "", // resolved below
 
     // ── Step 3B: Caption white base + grouping ─────────────────────────────────
-    // whiteEdgeLayerName must match CONFIG.whiteEdgeLayerName in PS_ToCaption.jsx
+    // whiteEdgeLayerName must match CONFIG.whiteEdgeLayerName in PS_BuildElements.jsx
     // so Step 3B can find the White Base_Cutline layers left by Step 3.
     whiteEdgeLayerName: "White Base_Cutline",
 
@@ -30,7 +30,7 @@ var CONFIG = {
     whiteRectPadV:     6,    // px: vertical padding above Caption plate for White base
 
     // [styleCode, catCode] pairs that use the plate treatment.
-    // Must match CONFIG.captionPlateCodes in PS_ToCaption.jsx.
+    // Must match CONFIG.captionPlateCodes in PS_BuildElements.jsx.
     captionPlateCodes: [["GC", "LM"]],
 
     // ── BridgeTalk handoff ─────────────────────────────────────────────────────
@@ -41,9 +41,9 @@ var _root = $.fileName
     ? new File($.fileName).parent.parent.fsName
     : Folder.desktop.fsName;
 
-CONFIG.logPath        = _root + "/pipelines/PS_AfterCaption.log";
+CONFIG.logPath        = _root + "/pipelines/PS_FinaliseForAI.log";
 CONFIG.aiTemplatePath = _root + "/assets/Production_File_Template.ai";
-CONFIG.aiPipelinePath = _root + "/pipelines/AI_ToCutlines.jsx";
+CONFIG.aiPipelinePath = _root + "/pipelines/AI_BuildCutlines.jsx";
 
 // ─── SILHOUETTE PNG EXPORT ────────────────────────────────────────────────────
 
@@ -139,7 +139,7 @@ function captionInfo(grp) {
 // ─── ELEMENTS SIDECAR ────────────────────────────────────────────────────────
 
 // Writes a text sidecar next to the PSD with PSD dimensions and element bounds.
-// Used by AI_ToCutlines.jsx for positional path naming after Image Trace.
+// Used by AI_BuildCutlines.jsx for positional path naming after Image Trace.
 // Format:
 //   width:{px}
 //   height:{px}
@@ -208,7 +208,7 @@ function handOffToIllustrator(doc) {
     if (!CONFIG.aiPipelinePath) {
         log("[pipeline] WARN: aiPipelinePath not set — skipping BridgeTalk handoff.");
         scriptAlert("BridgeTalk handoff skipped: CONFIG.aiPipelinePath is empty.\n"
-            + "Set the path to AI_ToCutlines.jsx and re-run.\n"
+            + "Set the path to AI_BuildCutlines.jsx and re-run.\n"
             + "Log: " + CONFIG.logPath);
         return;
     }
@@ -261,7 +261,7 @@ function main() {
     }
 
     // ── Init log ───────────────────────────────────────────────────
-    log("[pipeline] === PS_AfterCaption start ===");
+    log("[pipeline] === PS_FinaliseForAI start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
@@ -316,7 +316,7 @@ function main() {
     }
 
     // ── Completion summary ─────────────────────────────────────────
-    log("[pipeline] === PS_AfterCaption done ===");
+    log("[pipeline] === PS_FinaliseForAI done ===");
 
     var msg = "Done.\n\n"
         + "  Grouped:     " + captionWhiteResult.grouped + " element(s).\n"

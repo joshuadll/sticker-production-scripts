@@ -1,5 +1,5 @@
 // Step8c_OffsetPathQA.jsx — Phase function only.
-// #included by AI_AfterPencil.jsx. Requires: aiUtils.jsx, CONFIG in scope.
+// #included by AI_ExportFinal.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
 // Playbook §6 "Offset Path QA": after the manual pencil pass, check that every
 // cut line is at least 2mm from its neighbours and doesn't exceed the safe area.

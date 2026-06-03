@@ -1,5 +1,5 @@
 // Step11_FinalFile.jsx — Phase function only.
-// #included by AI_AfterPencil.jsx. Requires: aiUtils.jsx, CONFIG in scope.
+// #included by AI_ExportFinal.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
 // Saves the working .ai file as {STK_CODE}_final.ai (sibling on disk), then
 // strips all non-production layers and standardises the halfcut layer name.

@@ -1,10 +1,10 @@
 #!/bin/bash
 # Integration test for Step 3A (caption text placement).
-# Runs PS_ToCaption.jsx (Steps 1 + 2 + 3A) and verifies T layers were created.
+# Runs PS_BuildElements.jsx (Steps 1 + 2 + 3A) and verifies T layers were created.
 #
 # FIXTURES REQUIRED:
 #   tests/integration/fixtures/source-psds/  (≥1 source PSD)
-#   PS_ToCaption creates its own template document — no pre-opened PSD needed.
+#   PS_BuildElements creates its own template document — no pre-opened PSD needed.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
@@ -20,13 +20,13 @@ STEP="step3a"
 APP="Adobe Photoshop 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/pipelines/PS_ToCaption.jsx"
+SCRIPT="$REPO_ROOT/pipelines/PS_BuildElements.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 SOURCE_FIXTURE="$FIXTURE_DIR/source-psds"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step3a-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
-LOG="/tmp/PS_ToCaption.log"
+LOG="/tmp/PS_BuildElements.log"
 
 # ── Pre-flight checks ────────────────────────────────────────────────────────
 
@@ -73,7 +73,7 @@ fi
 # Strip variable lines (paths, timestamps) before diffing.
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (template:|source folder:|=== PS_ToCaption (start|done))"
+    grep -Ev "^\[pipeline\] (template:|source folder:|=== PS_BuildElements (start|done))"
 }
 
 if [ ! -f "$EXPECTED" ]; then

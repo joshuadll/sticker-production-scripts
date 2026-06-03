@@ -35,17 +35,17 @@ sticker-production-scripts/
 │   ├── Step11_FinalFile.jsx            ← Save As {STK_CODE}_final.ai; strips non-production layers; renames halfcut layer
 │   └── StepQA_NestingQuality.jsx       ← occupancy grid → NQI score (0-100); flags re-nest pockets
 ├── pipelines/
-│   ├── PS_ToCaption.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
+│   ├── PS_BuildElements.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
 │   │                                                   (stop: artist reviews captions)
-│   ├── PS_AfterCaption.jsx     ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Step 6
-│   │                                                   (stop: review cutlines, then run AI_Deepnest.jsx)
-│   ├── AI_ToCutlines.jsx       ← Step 6 entry point (called by BridgeTalk from PS_AfterCaption)
-│   ├── AI_Deepnest.jsx         ← Step 7A: classify cutlines → export _regular.svg + _irregular.svg for Deepnest
+│   ├── PS_FinaliseForAI.jsx        ← Steps 3B (caption white+group) → 5 → BridgeTalk → AI Step 6
+│   │                                                   (stop: review cutlines, then run AI_ExportForNesting.jsx)
+│   ├── AI_BuildCutlines.jsx        ← Step 6 entry point (called by BridgeTalk from PS_FinaliseForAI)
+│   ├── AI_ExportForNesting.jsx     ← Step 7A: classify cutlines → export _regular.svg + _irregular.svg for Deepnest
 │   │                                                   (stop: artist runs Deepnest manually on both SVGs then continues)
-│   ├── AI_AfterDeepnest.jsx    ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
-│   ├── AI_AfterPencil.jsx      ← Steps 8c → 9A → 10 (Asset Export) → 11 (Final File)
+│   ├── AI_RefineCutlines.jsx       ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
+│   ├── AI_ExportFinal.jsx          ← Steps 8c → 9A → 10 (Asset Export) → 11 (Final File)
 │   │                                  (Step 9B temporarily removed; peeling tab stays in workflow but pipeline placement TBD)
-│   └── AI_NestingQA.jsx        ← runs StepQA_NestingQuality; artist runs after Deepnest to gate re-nest
+│   └── AI_NestingQA.jsx            ← runs StepQA_NestingQuality; artist runs after Deepnest to gate re-nest
 ├── tests/integration/
 └── docs/
 ```
@@ -124,7 +124,7 @@ element outline, producing a fused cutline (art + caption) identical in shape to
 single-pass trace. Deepnest still receives the full sticker outline. Visibility is restored
 after the fill.
 
-PS_AfterCaption BridgeTalk exports (written before handoff, sibling to PSD):
+PS_FinaliseForAI BridgeTalk exports (written before handoff, sibling to PSD):
   {name}_silhouette.png  ← element-art-only flat black PNG (captions excluded; Step 6 adds them back)
   {name}_elements.txt    ← PSD dimensions + per element:
                            displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom
@@ -248,18 +248,18 @@ try {
 }
 ```
 
-### BridgeTalk handoff (PS → AI) — used at end of PS_AfterCaption.jsx
+### BridgeTalk handoff (PS → AI) — used at end of PS_FinaliseForAI.jsx
 
-Before sending, PS_AfterCaption exports two sidecar files next to the PSD:
+Before sending, PS_FinaliseForAI exports two sidecar files next to the PSD:
 - `{name}_silhouette.png` — element-art-only flat black PNG (captions excluded)
 - `{name}_elements.txt`   — PSD dimensions + `displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom` per element
 
-Then sends all three paths to AI_ToCutlines.jsx via BridgeTalk.
+Then sends all three paths to AI_BuildCutlines.jsx via BridgeTalk.
 
 ```javascript
-// In PS_AfterCaption.jsx — paths are auto-resolved from _root ($.fileName):
+// In PS_FinaliseForAI.jsx — paths are auto-resolved from _root ($.fileName):
 // CONFIG.aiTemplatePath = _root + "/assets/Production_File_Template.ai";
-// CONFIG.aiPipelinePath = _root + "/pipelines/AI_ToCutlines.jsx";
+// CONFIG.aiPipelinePath = _root + "/pipelines/AI_BuildCutlines.jsx";
 // CONFIG.bridgeTalkTimeout = 20;  // seconds
 
 function handOffToIllustrator(doc) {
@@ -274,7 +274,7 @@ function handOffToIllustrator(doc) {
     bt.send(CONFIG.bridgeTalkTimeout);
 }
 
-// In AI_ToCutlines.jsx — entry point called by BridgeTalk:
+// In AI_BuildCutlines.jsx — entry point called by BridgeTalk:
 function openTemplateAndImport(templatePath, silhPngPath, elementsFilePath) {
     var doc = app.open(new File(templatePath));
     runCreateCutlines(doc, silhPngPath, elementsFilePath);
@@ -293,12 +293,12 @@ if (!layer || !layer.name) {
 ### Log format — prefix every line with [stepN] or [pipeline]
 
 ```
-[pipeline] === PS_ToCaption start ===
+[pipeline] === PS_BuildElements start ===
 [step1] found | 3 PSD file(s)
 [step1] placed | Horseshoe Bend [WC-LM] from source.psd -> resize to 690px
 [step2] resized | Horseshoe Bend [WC-LM] -> 690px
 [step2] SKIP | Orlando Stamp [ST] — zero bounds
-[pipeline] === PS_ToCaption done ===
+[pipeline] === PS_BuildElements done ===
 ```
 
 ---
@@ -310,10 +310,10 @@ test runner in tests/integration/ alongside it.
 
 Photoshop integration test fixtures:
   tests/integration/fixtures/source-psds/              ← source PSDs for combine tests (≥1 required)
-  PS_ToCaption creates its own template document — no pre-opened PSD needed for run-step1-2 or run-step3a.
+  PS_BuildElements creates its own template document — no pre-opened PSD needed for run-step1-2 or run-step3a.
   Derivative fixtures (for run-step3b / run-step5) are saved outputs of earlier pipeline runs:
-    tests/integration/fixtures/resize-area-template-captioned.psd  ← saved after PS_ToCaption
-    tests/integration/fixtures/resize-area-template-grouped.psd    ← saved after PS_AfterCaption step 3B
+    tests/integration/fixtures/resize-area-template-captioned.psd  ← saved after PS_BuildElements
+    tests/integration/fixtures/resize-area-template-grouped.psd    ← saved after PS_FinaliseForAI step 3B
 
 Test runners patch CONFIG via perl injection (sourceFolderPath + suppressAlerts)
 and run the pipeline script, not individual step files.
@@ -334,7 +334,7 @@ assets/Peeling Tab Asset.ai
 All paths resolve via: _root + "/assets/FileName.ai" where _root = new File($.fileName).parent.parent.fsName
 
 ## Per-SKU source folder convention
-The source folder passed to PS_ToCaption may contain an optional file:
+The source folder passed to PS_BuildElements may contain an optional file:
   Caption_Plate.psd  ← GC-LM SKUs only; omit for WC-only SKUs
 Step 1 imports it automatically if present. It must contain the Caption plate
 artwork as the top-level group (L/C/R sub-layers), which Step 3B elongates per element.

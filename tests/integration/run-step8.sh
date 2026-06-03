@@ -1,6 +1,6 @@
 #!/bin/bash
 # Integration test for Step 8 (Simplify + Caption Normalisation).
-# Runs AI_AfterDeepnest.jsx against a saved Step-6 output .ai and checks that
+# Runs AI_RefineCutlines.jsx against a saved Step-6 output .ai and checks that
 # cutlines were simplified and GC plates normalised.
 #
 # FIXTURE REQUIRED:
@@ -21,13 +21,13 @@ STEP="step8"
 APP="Adobe Illustrator 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/pipelines/AI_AfterDeepnest.jsx"
+SCRIPT="$REPO_ROOT/pipelines/AI_RefineCutlines.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 AI_FIXTURE="$FIXTURE_DIR/step8-cutlines.ai"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step8-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
-LOG="/tmp/AI_AfterDeepnest.log"
+LOG="/tmp/AI_RefineCutlines.log"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
@@ -110,7 +110,7 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (document:|=== AI_AfterDeepnest (start|done))"
+    grep -Ev "^\[pipeline\] (document:|=== AI_RefineCutlines (start|done))"
 }
 
 if [ ! -f "$EXPECTED" ]; then

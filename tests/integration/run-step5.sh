@@ -1,13 +1,13 @@
 #!/bin/bash
 # Integration test for Step 5 (silhouette creation).
-# Runs PS_AfterCaption.jsx on a grouped fixture PSD with Step 3B in dryRun
+# Runs PS_FinaliseForAI.jsx on a grouped fixture PSD with Step 3B in dryRun
 # so only Step 5 executes for real. Checks that the Silhouette layer was created.
 #
 # FIXTURES REQUIRED:
 #   tests/integration/fixtures/resize-area-template-grouped.psd
 #     A Resize Area Template that has had Steps 1–3B run on it (all elements
 #     are [Display Name] [STYLE-CAT] groups + Guide at top level).
-#     Create this by running PS_AfterCaption.jsx on a captioned fixture PSD,
+#     Create this by running PS_FinaliseForAI.jsx on a captioned fixture PSD,
 #     stopping after Step 3B completes, then saving.
 #
 # GOLDEN FILE WORKFLOW — first run:
@@ -21,19 +21,19 @@ STEP="step5"
 APP="Adobe Photoshop 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/pipelines/PS_AfterCaption.jsx"
+SCRIPT="$REPO_ROOT/pipelines/PS_FinaliseForAI.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 TEMPLATE_FIXTURE="$FIXTURE_DIR/resize-area-template-grouped.psd"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step5-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
-LOG="/tmp/PS_AfterCaption.log"
+LOG="/tmp/PS_FinaliseForAI.log"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
 if [ ! -f "$TEMPLATE_FIXTURE" ]; then
     echo "SKIP [$STEP]: fixture not found: $TEMPLATE_FIXTURE"
-    echo "  Create by running PS_AfterCaption.jsx (Steps 1–3B) on fixture source PSDs,"
+    echo "  Create by running PS_FinaliseForAI.jsx (Steps 1–3B) on fixture source PSDs,"
     echo "  then save the result as: $TEMPLATE_FIXTURE"
     exit 0
 fi
@@ -92,7 +92,7 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (document:|=== PS_AfterCaption (start|done)|saved:)"
+    grep -Ev "^\[pipeline\] (document:|=== PS_FinaliseForAI (start|done)|saved:)"
 }
 
 if [ ! -f "$EXPECTED" ]; then

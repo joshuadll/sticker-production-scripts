@@ -1,5 +1,5 @@
 // Step8b_CaptionNormalise.jsx — Phase function only.
-// #included by AI_AfterDeepnest.jsx. Requires: aiUtils.jsx, CONFIG in scope.
+// #included by AI_RefineCutlines.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
 // Caption check (playbook §6): after nesting resized the stickers, the caption
 // plate drifted off spec. Resets each Gouache plate to its canonical absolute

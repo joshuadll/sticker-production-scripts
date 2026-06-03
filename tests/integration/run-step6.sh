@@ -1,6 +1,6 @@
 #!/bin/bash
 # Integration test for Step 6 (Create Cut Lines).
-# Runs AI_ToCutlines.jsx against a pre-exported silhouette PNG + elements sidecar.
+# Runs AI_BuildCutlines.jsx against a pre-exported silhouette PNG + elements sidecar.
 # Checks that the Cutlines layer was created and paths were named.
 #
 # FIXTURES REQUIRED:
@@ -10,7 +10,7 @@
 #
 #   tests/integration/fixtures/step6-silhouette.png
 #     A flat black PNG of a silhouette layer from a real Resize Area PSD.
-#     Export by running PS_AfterCaption.jsx on a captioned fixture PSD
+#     Export by running PS_FinaliseForAI.jsx on a captioned fixture PSD
 #     and copying the generated *_silhouette.png file here.
 #
 #   tests/integration/fixtures/step6-elements.txt
@@ -28,7 +28,7 @@ STEP="step6"
 APP="Adobe Illustrator 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/pipelines/AI_ToCutlines.jsx"
+SCRIPT="$REPO_ROOT/pipelines/AI_BuildCutlines.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 TEMPLATE_FIXTURE="$FIXTURE_DIR/step6-template.ai"
 PNG_FIXTURE="$FIXTURE_DIR/step6-silhouette.png"
@@ -36,7 +36,7 @@ ELEMENTS_FIXTURE="$FIXTURE_DIR/step6-elements.txt"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step6-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
-LOG="/tmp/AI_ToCutlines.log"
+LOG="/tmp/AI_BuildCutlines.log"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
@@ -118,7 +118,7 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    grep -Ev "^\[ai-pipeline\] (template:|=== AI_ToCutlines (start|done))"
+    grep -Ev "^\[ai-pipeline\] (template:|=== AI_BuildCutlines (start|done))"
 }
 
 if [ ! -f "$EXPECTED" ]; then

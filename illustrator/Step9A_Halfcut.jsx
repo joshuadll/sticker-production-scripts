@@ -1,5 +1,5 @@
 // Step9A_Halfcut.jsx — Phase function only.
-// #included by AI_AfterPencil.jsx. Requires: aiUtils.jsx, CONFIG in scope.
+// #included by AI_ExportFinal.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
 // Draws the half-cut line for every named GC/WC element (Phase 1 of Step 9).
 // Junction Y = top of the hidden "[Display Name] plate" subpath. Crossing X

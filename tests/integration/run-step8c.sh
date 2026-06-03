@@ -1,6 +1,6 @@
 #!/bin/bash
 # Integration test for Step 8c (Offset Path QA).
-# Runs AI_AfterPencil.jsx against a saved post-pencil .ai and checks that 1mm
+# Runs AI_ExportFinal.jsx against a saved post-pencil .ai and checks that 1mm
 # offset paths were built and the QA flagged a deliberately-too-close pair.
 #
 # FIXTURE REQUIRED:
@@ -11,7 +11,7 @@
 #     Illustrator nudging two elements together and File > Save As → this path.
 #
 # WHY THIS STOPS AFTER 8c:
-#   AI_AfterPencil halts after Step 8c when flagged > 0 (artist must fix, then
+#   AI_ExportFinal halts after Step 8c when flagged > 0 (artist must fix, then
 #   re-run). A fixture with a too-close pair therefore keeps Steps 9/10 — which
 #   need the shared Peeling Tab asset — out of the test path.
 #
@@ -26,13 +26,13 @@ STEP="step8c"
 APP="Adobe Illustrator 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/pipelines/AI_AfterPencil.jsx"
+SCRIPT="$REPO_ROOT/pipelines/AI_ExportFinal.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 AI_FIXTURE="$FIXTURE_DIR/step8c-cutlines.ai"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step8c-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
-LOG="/tmp/AI_AfterPencil.log"
+LOG="/tmp/AI_ExportFinal.log"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
@@ -115,7 +115,7 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (document:|=== AI_AfterPencil (start|done))"
+    grep -Ev "^\[pipeline\] (document:|=== AI_ExportFinal (start|done))"
 }
 
 if [ ! -f "$EXPECTED" ]; then

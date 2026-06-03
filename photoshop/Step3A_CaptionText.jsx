@@ -1,9 +1,9 @@
 // Step3A_CaptionText.jsx — Phase function only.
-// #included by PS_ToCaption.jsx. Requires: psUtils.jsx, CONFIG in scope.
+// #included by PS_BuildElements.jsx. Requires: psUtils.jsx, CONFIG in scope.
 //
 // Creates a caption text layer (T) positioned below each eligible element.
 // Leaves layers ungrouped and unlocked — artist reviews positions and
-// optionally curves text before running PS_AfterCaption (Step 3B).
+// optionally curves text before running PS_FinaliseForAI (Step 3B).
 //
 // Skips: ST (stamps), layers without [STYLE-CAT] code.
 // Returns: { placed, skipped[] }

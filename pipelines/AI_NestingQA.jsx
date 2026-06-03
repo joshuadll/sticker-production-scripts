@@ -100,7 +100,7 @@ function main() {
         if (!result.pass) {
             msg += "\nRework the nesting, then re-run this script.";
         } else {
-            msg += "\nContinue with AI_AfterDeepnest.";
+            msg += "\nContinue with AI_RefineCutlines.";
         }
 
         if (CONFIG.showOverlay && !CONFIG.dryRun) {

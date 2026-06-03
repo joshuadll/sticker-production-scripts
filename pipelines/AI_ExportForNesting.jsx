@@ -20,7 +20,7 @@ var CONFIG = {
 
 CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
-    : Folder.desktop.fsName) + "/AI_Deepnest.log";
+    : Folder.desktop.fsName) + "/AI_ExportForNesting.log";
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ function main() {
 
         var doc = app.activeDocument;
 
-        log("[pipeline] === AI_Deepnest start ===");
+        log("[pipeline] === AI_ExportForNesting start ===");
         log("[pipeline] dryRun: " + CONFIG.dryRun);
         log("[pipeline] document: " + doc.name);
         log("[pipeline] threshold: " + CONFIG.deepnestRectThreshold);
@@ -47,7 +47,7 @@ function main() {
             return;
         }
 
-        log("[pipeline] === AI_Deepnest done ===");
+        log("[pipeline] === AI_ExportForNesting done ===");
 
         var msg = "Done.\n\n"
             + "  Regular   (" + result.regular   + " paths): " + (result.regularPath   || "—") + "\n"
@@ -63,7 +63,7 @@ function main() {
 
     } catch (e) {
         log("[pipeline] FATAL | line " + e.line + ": " + e.message);
-        scriptAlert("AI_Deepnest failed.\nLine " + e.line + ": " + e.message
+        scriptAlert("AI_ExportForNesting failed.\nLine " + e.line + ": " + e.message
             + "\nLog: " + CONFIG.logPath);
     }
 }

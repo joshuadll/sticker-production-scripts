@@ -1,5 +1,5 @@
 // Step9B_PeelingTab.jsx — Phase function only.
-// #included by AI_AfterPencil.jsx. Requires: aiUtils.jsx, CONFIG in scope.
+// #included by AI_ExportFinal.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
 // Places the peeling tab asset and draws the half-cut line for stamp elements
 // and unnamed paths (Phase 2 of Step 9). These are elements without a caption

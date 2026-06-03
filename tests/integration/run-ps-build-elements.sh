@@ -1,41 +1,41 @@
 #!/bin/bash
-# Integration test for PS_ToCaption.jsx (Steps 1 → 2A → 2B → 3A)
+# Integration test for PS_BuildElements.jsx (Steps 1 → 2A → 2B → 3A)
 #
 # FIXTURES REQUIRED — place these before running:
 #
 #   tests/integration/fixtures/source-psds/
 #     One or more source PSDs, each with top-level LayerSet groups
 #     named per the Foundation convention e.g. "Horseshoe Bend [WC-LM]".
-#     PS_ToCaption creates its own template document — no pre-opened PSD needed.
+#     PS_BuildElements creates its own template document — no pre-opened PSD needed.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (it will SKIP the diff and print the log path)
 #   2. Verify the log looks correct
 #   3. Commit the golden file:
-#        cp "$LOG" tests/integration/expected/ps-to-caption-expected.txt
-#        git add tests/integration/expected/ps-to-caption-expected.txt
+#        cp "$LOG" tests/integration/expected/ps-build-elements-expected.txt
+#        git add tests/integration/expected/ps-build-elements-expected.txt
 #        git commit -m "Add golden output for step1-2"
 #
 # UPDATING THE GOLDEN FILE — after an intentional change:
 #   1. Verify the new output is correct
-#   2. cp "$LOG" tests/integration/expected/ps-to-caption-expected.txt
+#   2. cp "$LOG" tests/integration/expected/ps-build-elements-expected.txt
 #   3. git add + commit with a message explaining why it changed
 
 set -euo pipefail
 
-STEP="ps-to-caption"
+STEP="ps-build-elements"
 APP="Adobe Photoshop 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/pipelines/PS_ToCaption.jsx"
+SCRIPT="$REPO_ROOT/pipelines/PS_BuildElements.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 SOURCE_FIXTURE="$FIXTURE_DIR/source-psds"
-EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ps-to-caption-expected.txt"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ps-build-elements-expected.txt"
 
 # The script writes its log to the same folder as the JSX file being run.
 # Since we run a temp copy from /tmp, the log lands there.
-TEMP_SCRIPT="/tmp/ps-to-caption-test.jsx"
-LOG="/tmp/PS_ToCaption.log"
+TEMP_SCRIPT="/tmp/ps-build-elements-test.jsx"
+LOG="/tmp/PS_BuildElements.log"
 
 # ── Pre-flight checks ────────────────────────────────────────────────────────
 

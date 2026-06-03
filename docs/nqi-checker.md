@@ -17,15 +17,15 @@ individual judgement.
 
 After the artist imports Deepnest results back into the `.ai` file and manually
 joins the regular + irregular groups onto the Cutlines layer, before continuing
-to `AI_AfterDeepnest.jsx`.
+to `AI_RefineCutlines.jsx`.
 
 **Workflow:**
 ```
-AI_Deepnest.jsx
+AI_ExportForNesting.jsx
   → artist runs Deepnest externally on _regular.svg + _irregular.svg
   → artist imports nested results into the .ai file and joins them
   → run AI_NestingQA.jsx          ← this script
-  → PASS: continue with AI_AfterDeepnest.jsx
+  → PASS: continue with AI_RefineCutlines.jsx
   → FAIL: rework nesting in Illustrator, re-run AI_NestingQA.jsx
 ```
 

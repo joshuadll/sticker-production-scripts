@@ -10,7 +10,7 @@ Simplify. Set the preferred number."*
 Illustrator's **Object > Path > Simplify** cannot be driven from a script without
 its dialog, so Step 8a reproduces it natively (see *Algorithm*).
 
-Runs as the first phase of `pipelines/AI_AfterDeepnest.jsx`, immediately before
+Runs as the first phase of `pipelines/AI_RefineCutlines.jsx`, immediately before
 Step 8b (Caption Normalisation) and the manual pencil pass.
 
 ## Input / output
@@ -44,7 +44,7 @@ Bails (no change) if reduction would collapse the path below 3 anchors.
 
 ## Confirmed / tunable values
 
-| CONFIG (in `AI_AfterDeepnest.jsx`) | Default | Notes |
+| CONFIG (in `AI_RefineCutlines.jsx`) | Default | Notes |
 |---|---|---|
 | `simplifyToleranceMm` | 0.2 | RDP epsilon — higher drops more anchors. ⚠️ Tune on a real trace with the artist. |
 | `simplifyCornerAngleDeg` | 60 | Turns sharper than this stay corners. |
@@ -57,7 +57,7 @@ Playbook step 6 (Refinements) — the *Simplify* action, before the manual Penci
 ## Files
 
 - Step function: `illustrator/Step8a_SimplifyCutlines.jsx` (`runSimplify`)
-- Pipeline: `pipelines/AI_AfterDeepnest.jsx`
+- Pipeline: `pipelines/AI_RefineCutlines.jsx`
 - Utilities: `utils/aiUtils.jsx` (`simplifyPathItem`, `rdpSimplify`,
   `findGroupMember`, `reuniteCutline`, `deriveCutline`, `strokeRecursive`,
   `mmToPoints`, `findLayer`)

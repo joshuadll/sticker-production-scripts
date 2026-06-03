@@ -1,13 +1,13 @@
 #!/bin/bash
 # Integration test for Step 3B (caption white base + grouping).
-# Runs PS_AfterCaption.jsx with Steps 4 and 5 in dryRun, so only Step 3B
+# Runs PS_FinaliseForAI.jsx with Steps 4 and 5 in dryRun, so only Step 3B
 # executes for real. Checks that elements were grouped correctly.
 #
 # FIXTURES REQUIRED:
 #   tests/integration/fixtures/resize-area-template-captioned.psd
 #     A working PSD that has had Steps 1–3A run on it
 #     (i.e. it has SO layers + T layers at the top level, ungrouped).
-#     Create this by running PS_ToCaption.jsx on source PSDs in a folder named
+#     Create this by running PS_BuildElements.jsx on source PSDs in a folder named
 #     "resize-area-template-captioned" — it will auto-save to that path.
 #
 # GOLDEN FILE WORKFLOW — first run:
@@ -21,19 +21,19 @@ STEP="step3b"
 APP="Adobe Photoshop 2024"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/pipelines/PS_AfterCaption.jsx"
+SCRIPT="$REPO_ROOT/pipelines/PS_FinaliseForAI.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 TEMPLATE_FIXTURE="$FIXTURE_DIR/resize-area-template-captioned.psd"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/step3b-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
-LOG="/tmp/PS_AfterCaption.log"
+LOG="/tmp/PS_FinaliseForAI.log"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
 if [ ! -f "$TEMPLATE_FIXTURE" ]; then
     echo "SKIP [$STEP]: fixture not found: $TEMPLATE_FIXTURE"
-    echo "  Create by running PS_ToCaption.jsx on fixture source PSDs,"
+    echo "  Create by running PS_BuildElements.jsx on fixture source PSDs,"
     echo "  then save the result as: $TEMPLATE_FIXTURE"
     exit 0
 fi
@@ -89,7 +89,7 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (document:|=== PS_AfterCaption (start|done)|saved:)"
+    grep -Ev "^\[pipeline\] (document:|=== PS_FinaliseForAI (start|done)|saved:)"
 }
 
 if [ ! -f "$EXPECTED" ]; then

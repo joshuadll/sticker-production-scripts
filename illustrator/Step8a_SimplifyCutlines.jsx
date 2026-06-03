@@ -1,5 +1,5 @@
 // Step8a_SimplifyCutlines.jsx — Phase function only.
-// #included by AI_AfterDeepnest.jsx. Requires: aiUtils.jsx, CONFIG in scope.
+// #included by AI_RefineCutlines.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
 // Reduces the jagged anchor count of Image-Trace cutlines (playbook §6 "Simplify"),
 // run before the manual pencil pass. Native RDP + Catmull-Rom refit with corner

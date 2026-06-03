@@ -1,5 +1,5 @@
 // Step10_AssetExport.jsx — Phase function only.
-// #included by AI_AfterPencil.jsx. Requires: aiUtils.jsx, CONFIG in scope.
+// #included by AI_ExportFinal.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
 // Exports JPEG sheet previews (white + green BG) and per-element PNGs.
 // Temporary clip groups are built per-export and immediately discarded —

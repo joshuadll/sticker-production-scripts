@@ -28,7 +28,7 @@ var CONFIG = {
 
 CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
-    : Folder.desktop.fsName) + "/AI_AfterDeepnest.log";
+    : Folder.desktop.fsName) + "/AI_RefineCutlines.log";
 
 // ─── ENTRY POINT (called by BridgeTalk from previous pipeline if chained) ────
 // Not used in this pipeline — artist opens this script manually after Deepnest.
@@ -45,7 +45,7 @@ function main() {
     var doc = app.activeDocument;
 
     // ── Init log ───────────────────────────────────────────────────
-    log("[pipeline] === AI_AfterDeepnest start ===");
+    log("[pipeline] === AI_RefineCutlines start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
@@ -80,12 +80,12 @@ function main() {
         + captionResult.skipped + " skipped.");
 
     // ── Completion summary ─────────────────────────────────────────
-    log("[pipeline] === AI_AfterDeepnest done ===");
+    log("[pipeline] === AI_RefineCutlines done ===");
 
     scriptAlert("Done.\n\n"
         + "  Simplified:  " + simplifyResult.simplified + " cutline(s).\n"
         + "  Normalised:  " + captionResult.normalized + " GC plate(s).\n\n"
-        + "Review cutlines, make pencil refinements, then run AI_AfterPencil.\n\n"
+        + "Review cutlines, make pencil refinements, then run AI_ExportFinal.\n\n"
         + "Log: " + CONFIG.logPath);
 }
 

@@ -15,7 +15,7 @@ It exploits the separable-caption architecture
 anchor-splice surgery. This **must** run before the manual pencil pass — once the
 artist pencil-edits a cutline the invariant intentionally breaks.
 
-Runs as the second phase of `pipelines/AI_AfterDeepnest.jsx`, after Step 8a.
+Runs as the second phase of `pipelines/AI_RefineCutlines.jsx`, after Step 8a.
 
 ## Scope — Gouache only
 
@@ -51,7 +51,7 @@ For each GC GroupItem in the **Cutlines** layer:
 
 ## Confirmed / tunable values
 
-| CONFIG (in `AI_AfterDeepnest.jsx`) | Default |
+| CONFIG (in `AI_RefineCutlines.jsx`) | Default |
 |---|---|
 | `plateHeightSingleLineCm` | 0.5 |
 | `plateHeightTwoLineCm` | 0.8 |
@@ -65,7 +65,7 @@ before the manual Pencil.
 ## Files
 
 - Step function: `illustrator/Step8b_CaptionNormalise.jsx` (`runCaptionNormalise`)
-- Pipeline: `pipelines/AI_AfterDeepnest.jsx`
+- Pipeline: `pipelines/AI_RefineCutlines.jsx`
 - Utilities: `utils/aiUtils.jsx` (`rebuildPlateToHeight`, `reuniteCutline`,
   `buildPlate`, `deriveCutline`, `findGroupMember`, `mmToPoints`, `findLayer`)
 - Sets up the metadata: `illustrator/Step6_CreateCutlines.jsx` (`group.note`)

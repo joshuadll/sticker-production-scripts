@@ -42,7 +42,7 @@ for 2mm spacing; no DOM objects created.
 
 ## Confirmed / tunable values
 
-| CONFIG (in `AI_AfterPencil.jsx`) | Default | Notes |
+| CONFIG (in `AI_ExportFinal.jsx`) | Default | Notes |
 |---|---|---|
 | `spacingThresholdMm` | 2 | Confirmed from playbook ("2mm between elements"). |
 | `qaSpacingSampleSteps` | 12 | Bezier samples/segment. 12 → ~0.4mm sample spacing at sticker scale — well under 2mm threshold. |
@@ -59,7 +59,7 @@ Playbook step 6 (Refinements) — the *Offset Path* spacing check + the
 ## Files
 
 - Step function: `illustrator/Step8c_OffsetPathQA.jsx` (`runOffsetPathQA`)
-- Pipeline: `pipelines/AI_AfterPencil.jsx`
+- Pipeline: `pipelines/AI_ExportFinal.jsx`
 - Utilities: `utils/aiUtils.jsx` (`minPolygonSetDistance`, `_ptSegDist`,
   `samplePathToPolygons`, `pointInPolygon`, `boundsWithin`, `strokeRecursive`,
   `redCmyk`, `mmToPoints`, `findGroupMember`, `findLayer`)

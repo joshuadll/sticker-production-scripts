@@ -47,7 +47,7 @@ var CONFIG = {
 
 CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
-    : Folder.desktop.fsName) + "/AI_AfterPencil.log";
+    : Folder.desktop.fsName) + "/AI_ExportFinal.log";
 // CONFIG.peelingTabAssetPath = new File($.fileName).parent.parent.fsName + "/assets/Peeling Tab Asset.ai";
 //   ⚠️ uncomment above (and Step9B #include) when peeling tab confirmed in workflow
 
@@ -61,7 +61,7 @@ function main() {
     }
     var doc = app.activeDocument;
 
-    log("[pipeline] === AI_AfterPencil start ===");
+    log("[pipeline] === AI_ExportFinal start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
@@ -131,7 +131,7 @@ function main() {
     log("[pipeline] step 11 complete | " + finalResult.outputPath);
 
     // ── Completion summary ─────────────────────────────────────────────────────
-    log("[pipeline] === AI_AfterPencil done ===");
+    log("[pipeline] === AI_ExportFinal done ===");
 
     var summaryMsg = "Done.\n\n"
         + "  QA:         " + qaResult.checked + " path(s) checked.\n"

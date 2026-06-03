@@ -26,24 +26,24 @@ var _root = $.fileName
     ? new File($.fileName).parent.parent.fsName
     : Folder.desktop.fsName;
 
-CONFIG.logPath         = _root + "/pipelines/AI_ToCutlines.log";
+CONFIG.logPath         = _root + "/pipelines/AI_BuildCutlines.log";
 CONFIG.stampTemplatePath = _root + "/assets/Stamp Cutline Template.ai";
 
-// ─── ENTRY POINT (called by BridgeTalk from PS_AfterCaption.jsx) ──────────────
+// ─── ENTRY POINT (called by BridgeTalk from PS_FinaliseForAI.jsx) ─────────────
 
 // templatePath     — full path to Production_File_Template.ai
-// silhPngPath      — flat black PNG exported from the Silhouette layer by PS_AfterCaption
-// elementsFilePath — elements sidecar .txt written by PS_AfterCaption
+// silhPngPath      — flat black PNG exported from the Silhouette layer by PS_FinaliseForAI
+// elementsFilePath — elements sidecar .txt written by PS_FinaliseForAI
 function openTemplateAndImport(templatePath, silhPngPath, elementsFilePath) {
 
-    log("[ai-pipeline] === AI_ToCutlines start ===");
+    log("[ai-pipeline] === AI_BuildCutlines start ===");
     log("[ai-pipeline] template:       " + templatePath);
     log("[ai-pipeline] silhouette PNG: " + silhPngPath);
     log("[ai-pipeline] elements file:  " + elementsFilePath);
 
     if (!templatePath) {
         log("[ai-pipeline] ERROR | templatePath is empty.");
-        scriptAlert("AI_ToCutlines: CONFIG.aiTemplatePath is not set in PS_AfterCaption.jsx.\n"
+        scriptAlert("AI_BuildCutlines: CONFIG.aiTemplatePath is not set in PS_FinaliseForAI.jsx.\n"
             + "Set it to the full path of Production_File_Template.ai and re-run.");
         return;
     }
@@ -51,7 +51,7 @@ function openTemplateAndImport(templatePath, silhPngPath, elementsFilePath) {
     var templateFile = new File(templatePath);
     if (!templateFile.exists) {
         log("[ai-pipeline] ERROR | template not found: " + templatePath);
-        scriptAlert("AI_ToCutlines: template file not found:\n" + templatePath
+        scriptAlert("AI_BuildCutlines: template file not found:\n" + templatePath
             + "\nLog: " + CONFIG.logPath);
         return;
     }
@@ -62,7 +62,7 @@ function openTemplateAndImport(templatePath, silhPngPath, elementsFilePath) {
         doc = app.open(templateFile);
     } catch (e) {
         log("[ai-pipeline] ERROR | could not open template: " + e.message);
-        scriptAlert("AI_ToCutlines: failed to open template.\n" + e.message
+        scriptAlert("AI_BuildCutlines: failed to open template.\n" + e.message
             + "\nLog: " + CONFIG.logPath);
         return;
     }
@@ -84,7 +84,7 @@ function openTemplateAndImport(templatePath, silhPngPath, elementsFilePath) {
         return;
     }
 
-    log("[ai-pipeline] === AI_ToCutlines done ===");
+    log("[ai-pipeline] === AI_BuildCutlines done ===");
 
     var msg = "Done — cut lines created.\n\n"
         + "  Named:           " + result.named + " path(s)\n"

@@ -1,5 +1,5 @@
 // Step3B_CaptionWhite.jsx — Phase function only.
-// #included by PS_AfterCaption.jsx. Requires: psUtils.jsx, CONFIG in scope.
+// #included by PS_FinaliseForAI.jsx. Requires: psUtils.jsx, CONFIG in scope.
 //
 // Runs after the artist's manual caption review pass (Step 3A → artist adjusts →
 // Step 3B). Finds each SO + T layer pair, creates a White pill base that follows
@@ -187,7 +187,7 @@ function groupWithPlate(doc, soLayer, textLayer, groupName) {
     } else {
         log("[step3B] WARN | \"" + groupName
             + "\" — no Caption plate layer found in working doc. "
-            + "Add Caption_Plate.psd to the source folder and re-run PS_ToCaption.");
+            + "Add Caption_Plate.psd to the source folder and re-run PS_BuildElements.");
     }
 
     var wbcLayer = findAdjacentCutline(doc, soLayer);

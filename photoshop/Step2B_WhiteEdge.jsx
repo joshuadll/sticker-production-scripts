@@ -1,5 +1,5 @@
 // Step2B_WhiteEdge.jsx — Phase function only.
-// #included by PS_ToCaption.jsx. Requires: psUtils.jsx, CONFIG in scope.
+// #included by PS_BuildElements.jsx. Requires: psUtils.jsx, CONFIG in scope.
 //
 // Adds a white edge to every element Smart Object in the Resize Area Template.
 // Runs after Step 2 (resize), before Step 3A (caption text), so the artist
