@@ -46,24 +46,53 @@ function runSilhouette(doc) {
             return { processed: 0 };
         }
 
-        // Select all element layers at once via the selectLayers action (PS 2021+).
-        // One-shot bulk selection works for both ArtLayers and LayerSets, unlike
-        // the slct action (used by selectLayerById) which silently fails for groups
-        // in PS 2026, and unlike layer.move(group, PLACE*) which fails when moving
-        // LayerSets into another LayerSet.
-        var idList = new ActionList();
-        for (var si = 0; si < toGroup.length; si++) {
-            idList.putInteger(toGroup[si].id);
-        }
-        var selDesc = new ActionDescriptor();
-        selDesc.putList(stringIDToTypeID("layerID"), idList);
-        executeAction(stringIDToTypeID("selectLayers"), selDesc, DialogModes.NO);
+        var grouped = false;
 
-        // Group the selected layers.
-        executeAction(stringIDToTypeID("groupLayersEvent"), new ActionDescriptor(), DialogModes.NO);
-        doc.activeLayer.name = "Elements";
-        elementsGroup = doc.activeLayer;
-        log("[step5] grouped " + toGroup.length + " element(s) → Elements");
+        // Attempt 1: selectLayerById + groupLayersEvent.
+        // app.playbackDisplayDialogs = NO is required before executeAction calls
+        // in PS 2026 to prevent suppression of the underlying layer actions.
+        try {
+            var prevPlayback = app.playbackDisplayDialogs;
+            app.playbackDisplayDialogs = DialogModes.NO;
+            selectLayerById(toGroup[0]);
+            for (var si = 1; si < toGroup.length; si++) {
+                addLayerToSelectionById(toGroup[si]);
+            }
+            executeAction(stringIDToTypeID("groupLayersEvent"), new ActionDescriptor(), DialogModes.NO);
+            app.playbackDisplayDialogs = prevPlayback;
+            doc.activeLayer.name = "Elements";
+            elementsGroup = doc.activeLayer;
+            grouped = true;
+            log("[step5] grouped " + toGroup.length + " element(s) → Elements (groupLayersEvent)");
+        } catch (e1) {
+            app.playbackDisplayDialogs = DialogModes.ERROR;
+            log("[step5] WARN | groupLayersEvent failed (line " + e1.line + "): " + e1.message);
+        }
+
+        // Attempt 2: duplicate each element into a new group, then remove the original.
+        // Works around PS 2026 restrictions on layer.move() for nested LayerSets.
+        if (!grouped) {
+            try {
+                var elemGroup2 = doc.layerSets.add();
+                elemGroup2.name = "Elements";
+                for (var si2 = toGroup.length - 1; si2 >= 0; si2--) {
+                    var origName = toGroup[si2].name;
+                    var dup = toGroup[si2].duplicate(elemGroup2, ElementPlacement.PLACEATBEGINNING);
+                    dup.name = origName;
+                    toGroup[si2].remove();
+                }
+                elementsGroup = elemGroup2;
+                grouped = true;
+                log("[step5] grouped " + toGroup.length + " element(s) → Elements (duplicate)");
+            } catch (e2) {
+                log("[step5] WARN | duplicate approach failed (line " + e2.line + "): " + e2.message);
+            }
+        }
+
+        if (!grouped) {
+            log("[step5] ERROR | could not create Elements group — all methods failed.");
+            return { processed: 0 };
+        }
     } else {
         log("[step5] Elements group already exists — skipping group step.");
     }
