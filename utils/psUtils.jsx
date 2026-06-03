@@ -161,17 +161,18 @@ function solidWhite() {
 // Finds the first top-level TEXT layer whose name matches displayName.
 // Returns null if not found.
 function findTextLayerByDisplayName(doc, displayName) {
+    var seen = [];
     for (var i = 0; i < doc.layers.length; i++) {
         var layer = doc.layers[i];
         if (layer.kind !== LayerKind.TEXT) continue;
+        seen.push("\"" + layer.name + "\"");
         if (layer.name === displayName) return layer;
-        // Fallback: compare text content directly. Photoshop may auto-name the
-        // layer with smart quotes (curly apostrophe) even when ti.contents was
-        // set with a straight apostrophe, causing a name mismatch.
         try {
             if (layer.textItem.contents === displayName) return layer;
         } catch (e) {}
     }
+    log("[psUtils] WARN | no T layer found for: \"" + displayName
+        + "\". Top-level TEXT layers visible: " + (seen.length ? seen.join(", ") : "(none)"));
     return null;
 }
 
