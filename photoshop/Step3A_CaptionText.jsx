@@ -29,7 +29,6 @@ function runCaptionText(doc) {
             var parsed = parseLayerName(name);
             if (!parsed) {
                 log("[step3A] SKIP | \"" + name + "\" — no [STYLE-CAT] code.");
-                skipped.push(name + " (no code)");
                 continue;
             }
 

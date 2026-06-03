@@ -34,7 +34,6 @@ function runResize(doc) {
             var parsed = parseLayerName(layer.name);
             if (!parsed) {
                 log("[step2] SKIP | \"" + layer.name + "\" — no [STYLE-CAT] code.");
-                skipped.push(layer.name + " (no [STYLE-CAT] code)");
                 continue;
             }
 

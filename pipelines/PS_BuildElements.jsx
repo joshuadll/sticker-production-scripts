@@ -80,6 +80,21 @@ function createTemplateDoc() {
     var h = new UnitValue(CONFIG.templateHeightCm, "cm");
     var doc = app.documents.add(w, h, CONFIG.templateDPI, "Production Template",
         NewDocumentMode.CMYK, DocumentFill.WHITE);
+
+    // Fill Background with 50% gray so white edges are visible during review.
+    var bgLayer = doc.backgroundLayer;
+    bgLayer.isBackgroundLayer = false;
+    doc.activeLayer = bgLayer;
+    var gray = new SolidColor();
+    gray.cmyk.cyan    = 0;
+    gray.cmyk.magenta = 0;
+    gray.cmyk.yellow  = 0;
+    gray.cmyk.black   = 50;
+    doc.selection.selectAll();
+    doc.selection.fill(gray);
+    doc.selection.deselect();
+    bgLayer.isBackgroundLayer = true;
+
     var guideLayer = doc.artLayers.add();
     guideLayer.name = "Guide";
     log("[pipeline] created new template document ("
