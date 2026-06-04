@@ -277,6 +277,18 @@ function createWhiteFromText(doc, textLayer) {
     } else {
         var fit = _quadFitSpine(spine.pts, bnds[0], bnds[2]); // { spine, straight }
 
+        // Multi-line captions: the spine sampler reads each column's block-centre,
+        // which dips wherever a shorter second line sits. The quad fit turns that
+        // dip into a false frown, lifting the pill's ends up into the artwork. A
+        // stack of text lines is meant to be a tall straight stadium (see header),
+        // so when we detect a second line, override the fit to a flat spine at the
+        // block centre. Genuine single-line arcs (e.g. food captions) keep their
+        // curve — their pill follows the text and matches the round art beneath.
+        if (_isMultiLineText(doc, textLayer)) {
+            fit = { spine: _straightSpine(bnds[0], bnds[2], (bnds[1] + bnds[3]) / 2),
+                    straight: true };
+        }
+
         // Pen height = full text height. For straight text that's the bounding
         // box (no single column spans accent-to-descender, but the whole box
         // does). For curved text the box is inflated by the arc, so use a high
@@ -311,62 +323,164 @@ function _layerBoundsPx(layer) {
 }
 
 // Re-seats the caption (text + pill, plus any extra layers) so the White pill
-// overlaps the element's white border by CONFIG.captionBorderOverlapPx. Travel is
-// along the line from the pill's centre toward the art's centre, so it handles
-// captions below, beside, or above the element with one rule. The element and its
-// border stay put; the caption assembly slides to meet them.
+// overlaps the element's white border by CONFIG.captionBorderOverlapPx — measured
+// against the ACTUAL ink of both shapes, not their bounding boxes. The element and
+// its border stay put; the caption assembly slides toward them along ONE axis.
 //
 //   refLayer   — the white border (White Base_Cutline) the pill must fuse with;
 //                pass the SO as a fallback when no border layer exists.
 //   pillLayer  — the White pill (its leading edge is what overlaps the border).
 //   moveLayers — every layer that travels as one rigid unit (text, pill, plate…).
 //
-// Re-seats to EXACT overlap: applies the full translation whether the pill was
-// short of the border (closes the gap) or already past it (pulls it back).
+// Universal in direction. The caption may sit below, above, left, or right of the
+// element; the algorithm is identical, just measured along whichever axis separates
+// them. Two ideas make it work:
+//
+//   1. Travel axis = the dominant axis from the pill's centre to the art's centre
+//      (below/above → y, left/right → x). The pill only ever moves along this axis.
+//
+//   2. Why bin along the OTHER (cross) axis instead of comparing bounding boxes:
+//      both shapes are irregular. A round plate reaches furthest toward the caption
+//      at its centre; an arced caption reaches furthest toward the plate at its ends.
+//      Comparing bbox edges lines up points that are far apart on the cross axis —
+//      the boxes "touch" while the real ink has a gap. So we slice the overlap band
+//      into strips across the cross axis, read each shape's real leading edge per
+//      strip, and translate so the WORST strip (least overlap) reaches overlapPx.
+//      Anchoring the worst strip guarantees every strip overlaps by at least that
+//      much → a solid seam, no floating gap. (Anchoring the best strip would leave a
+//      one-point bridge while the rest float.)
 function snapCaptionToBorder(doc, refLayer, pillLayer, moveLayers) {
     var rb = _layerBoundsPx(refLayer);
     var pb = _layerBoundsPx(pillLayer);
 
-    var artCx  = (rb[0] + rb[2]) / 2, artCy  = (rb[1] + rb[3]) / 2;
-    var pillCx = (pb[0] + pb[2]) / 2, pillCy = (pb[1] + pb[3]) / 2;
+    // Direction from pill centre → art centre. Dominant component = travel axis.
+    var dx = (rb[0] + rb[2]) / 2 - (pb[0] + pb[2]) / 2;
+    var dy = (rb[1] + rb[3]) / 2 - (pb[1] + pb[3]) / 2;
+    var travelIsX = Math.abs(dx) > Math.abs(dy);
+    var sign      = travelIsX ? (dx >= 0 ? 1 : -1) : (dy >= 0 ? 1 : -1); // +1 toward larger coord
 
-    var dx = artCx - pillCx, dy = artCy - pillCy;
-    var len = Math.sqrt(dx * dx + dy * dy);
-    if (len < 1e-3) {
-        log("[step3B] WARN | caption centre coincides with art centre — snap skipped.");
-        return;
+    // Cross-axis band where both shapes exist — contact can only happen here.
+    var lo = travelIsX ? Math.max(rb[1], pb[1]) : Math.max(rb[0], pb[0]);
+    var hi = travelIsX ? Math.min(rb[3], pb[3]) : Math.min(rb[2], pb[2]);
+
+    var n = CONFIG.snapColumns || 9;
+    // pickMax = true → take the shape's MAX edge on the travel axis (right/bottom),
+    // false → MIN edge (left/top). The pill leads toward the art (extreme in +sign);
+    // the art faces the pill (extreme in −sign).
+    var pillEdge = (hi - lo > 4) ? _edgeProfile(doc, pillLayer, travelIsX, lo, hi, n, sign > 0) : [];
+    var artEdge  = (hi - lo > 4) ? _edgeProfile(doc, refLayer,  travelIsX, lo, hi, n, sign < 0) : [];
+
+    // Gap measured along the +sign travel direction: positive = pill short of art.
+    //   gap = sign · (artFacingEdge − pillLeadingEdge)
+    var maxGap = null;
+    for (var i = 0; i < pillEdge.length; i++) {
+        if (!pillEdge[i] || !artEdge[i]) continue;
+        var gap = sign * (artEdge[i].v - pillEdge[i].v);
+        if (maxGap === null || gap > maxGap) maxGap = gap;
     }
-    var dir = [dx / len, dy / len];
 
-    // Project the pill and border onto the travel axis. The pill's leading edge
-    // (max projection, toward the art) should land at the border's near edge
-    // (min projection) plus the overlap.
-    var pillProj   = _projExtent(pb, dir);
-    var borderProj = _projExtent(rb, dir);
-    var t = (borderProj.min + CONFIG.captionBorderOverlapPx) - pillProj.max;
-
-    var tx = t * dir[0], ty = t * dir[1];
-    for (var i = 0; i < moveLayers.length; i++) {
-        if (moveLayers[i]) moveLayers[i].translate(tx, ty);
+    var move; // signed distance to travel along +sign
+    if (maxGap === null) {
+        // No shared-ink strip (caption outside the art's cross-span, or an opaque
+        // ref layer). Fall back to bbox leading/facing edges.
+        var pLead = (sign > 0) ? (travelIsX ? pb[2] : pb[3]) : (travelIsX ? pb[0] : pb[1]);
+        var aFace = (sign > 0) ? (travelIsX ? rb[0] : rb[1]) : (travelIsX ? rb[2] : rb[3]);
+        move = sign * (aFace - pLead) + CONFIG.captionBorderOverlapPx;
+        log("[step3B] snapped caption (bbox fallback) | axis=" + (travelIsX ? "x" : "y")
+            + " sign=" + sign + " move=" + Math.round(sign * move) + "px");
+    } else {
+        // Drive the worst strip to exactly overlapPx of overlap.
+        move = maxGap + CONFIG.captionBorderOverlapPx;
+        log("[step3B] snapped caption | axis=" + (travelIsX ? "x" : "y") + " sign=" + sign
+            + " maxGap=" + Math.round(maxGap) + " move=" + Math.round(sign * move) + "px");
     }
-    log("[step3B] snapped caption | dir=(" + dir[0].toFixed(2) + "," + dir[1].toFixed(2)
-        + ") t=" + Math.round(t) + "px");
+
+    var t  = sign * move;
+    var tx = travelIsX ? t : 0;
+    var ty = travelIsX ? 0 : t;
+    for (var j = 0; j < moveLayers.length; j++) {
+        if (moveLayers[j]) moveLayers[j].translate(tx, ty);
+    }
 }
 
-// Returns { min, max } of the bounding box's four corners projected (dot product)
-// onto a unit direction. Bounds are [L, T, R, B] px; dir is [x, y].
-function _projExtent(bnds, dir) {
-    var corners = [
-        [bnds[0], bnds[1]], [bnds[2], bnds[1]],
-        [bnds[2], bnds[3]], [bnds[0], bnds[3]]
-    ];
-    var mn = null, mx = null;
-    for (var i = 0; i < corners.length; i++) {
-        var d = corners[i][0] * dir[0] + corners[i][1] * dir[1];
-        if (mn === null || d < mn) mn = d;
-        if (mx === null || d > mx) mx = d;
+// Samples a layer's real ink edge per strip across the cross axis [lo, hi].
+//   travelIsX — true: strips are y-rows, edge measured on x; false: x-columns, edge on y.
+//   pickMax   — true: take the MAX edge on the travel axis (right/bottom);
+//               false: the MIN edge (left/top).
+// Returns an array of length n: { c: strip-centre on cross axis, v: edge on travel
+// axis }, or null where a strip holds no ink. Uses the transparency selection so
+// concave/arced shapes are measured truthfully, not as bounding boxes.
+function _edgeProfile(doc, layer, travelIsX, lo, hi, n, pickMax) {
+    var out  = [];
+    var span = hi - lo;
+    if (span <= 0 || n < 1) return out;
+
+    var w    = span / n;
+    var docW = doc.width.as("px");
+    var docH = doc.height.as("px");
+
+    for (var i = 0; i < n; i++) {
+        var c0 = lo + i * w;
+        var c1 = c0 + w;
+        // Strip spans [c0,c1] on the cross axis, the full document on the travel axis.
+        var rect = travelIsX
+            ? [[0, c0], [docW, c0], [docW, c1], [0, c1]]   // y-row  (travel = x)
+            : [[c0, 0], [c1, 0], [c1, docH], [c0, docH]];  // x-col  (travel = y)
+
+        loadLayerTransparency(layer);  // selection = full layer ink
+        var b = null;
+        try {
+            doc.selection.select(rect, SelectionType.INTERSECT);
+            b = doc.selection.bounds;
+        } catch (e) {
+            b = null; // empty intersection → no ink in this strip
+        }
+
+        if (b) {
+            var loV = (travelIsX ? b[0] : b[1]).as("px"); // min edge on travel axis
+            var hiV = (travelIsX ? b[2] : b[3]).as("px"); // max edge on travel axis
+            out.push({ c: (c0 + c1) / 2, v: pickMax ? hiV : loV });
+        } else {
+            out.push(null);
+        }
     }
-    return { min: mn, max: mx };
+    try { doc.selection.deselect(); } catch (e2) {}
+    return out;
+}
+
+
+// Detects whether the caption is stacked on two (or more) lines, using a single
+// cheap probe: a thin horizontal band across the centre of the text's bounding box.
+// A single line has its ink (x-height) right at that vertical centre → band inked.
+// Two lines have the inter-line GAP at the centre → band empty. The band spans the
+// central 50% of the width so a word-space can't masquerade as an empty line.
+// Returns true when the centre band holds no ink (i.e. a gap between stacked lines).
+function _isMultiLineText(doc, textLayer) {
+    var b = _layerBoundsPx(textLayer);
+    var w = b[2] - b[0], h = b[3] - b[1];
+    if (w <= 0 || h <= 0) return false;
+
+    var cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+    var halfW  = w * 0.25;   // central 50% of width
+    var halfBand = h * 0.05; // thin ±5%-height band at the vertical centre
+
+    // loadLayerTransparency switches the active layer to textLayer; restore it
+    // afterwards so the caller's target layer (the White pill) stays active for Fill.
+    var prevActive = doc.activeLayer;
+    loadLayerTransparency(textLayer);
+    var inked = true;
+    try {
+        doc.selection.select(
+            [[cx - halfW, cy - halfBand], [cx + halfW, cy - halfBand],
+             [cx + halfW, cy + halfBand], [cx - halfW, cy + halfBand]],
+            SelectionType.INTERSECT, 0, false);
+        doc.selection.bounds; // throws if the intersection is empty
+    } catch (e) {
+        inked = false; // no ink at the vertical centre → gap between lines
+    }
+    try { doc.selection.deselect(); } catch (e2) {}
+    try { doc.activeLayer = prevActive; } catch (e3) {}
+    return !inked;
 }
 
 // Samples the text's vertical centre across vertical slices. Returns
