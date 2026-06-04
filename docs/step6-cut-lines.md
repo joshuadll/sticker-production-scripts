@@ -2,7 +2,8 @@
 
 ## What it does
 
-Opens the AI production template, places the silhouette PNG exported by
+Builds the working document in code (`buildWorkingDocument` in aiUtils.jsx — no
+template file), places the silhouette PNG exported by
 `PSAI_BuildAndExportCutlines.jsx`, runs Image Trace (Silhouettes preset), converts each
 traced shape from fill to stroke (0.25pt black), and names each resulting path
 after its source element using positional matching against the elements sidecar
@@ -14,11 +15,10 @@ file.
 |---|---|
 | `{name}_silhouette.png` | Flat black PNG of the Silhouette layer only |
 | `{name}_elements.txt` | PSD dimensions + one line per element: `displayName\|styleCode\|left\|top\|right\|bottom` (px) |
-| `Production_File_Template.ai` | Blank AI template with correct artboard, margins, layers |
 
 ## Output
 
-The AI template document is open with:
+The working document (built in code) contains:
 - A **Cutlines** layer (created above the Stickers layer) containing one
   named PathItem per element, 0.25pt black stroke, no fill.
 - Stamp elements (`[ST]`) have their traced path replaced with a scaled copy
@@ -65,7 +65,6 @@ Script automates steps 1, 3–10. Artist still positions/sizes if needed after.
 ## Artist CONFIG (set before first run)
 
 In `PSAI_BuildAndExportCutlines.jsx`:
-- `aiTemplatePath` — full path to `Production_File_Template.ai`
 - `aiPipelinePath` — full path to `pipelines/AI_BuildCutlines.jsx`
 
 In `pipelines/AI_BuildCutlines.jsx`:
