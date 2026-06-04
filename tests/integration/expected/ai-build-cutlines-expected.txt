@@ -1,0 +1,64 @@
+No document open.
+Open the working .ai file first.
+[ai-pipeline] === AI_BuildCutlines start ===
+[ai-pipeline] silhouette PNG: /Users/joshuadelallana/sticker-production-scripts/tests/integration/fixtures/step6-silhouette.png
+[ai-pipeline] elements file:  /Users/joshuadelallana/sticker-production-scripts/tests/integration/fixtures/step6-elements.txt
+[aiutils] built working document | A4 CMYK | Stickers > Grid > Color Block
+[ai-pipeline] working document built: Untitled-1
+[step6] loaded 26 element(s) from sidecar.
+[step6] created Cutlines layer (Magenta) above Stickers.
+[step6] placed silhouette PNG.
+[step6] scaled to 539pt wide, centred on artboard.
+[step6] Image Trace complete. 28 path(s) collected.
+[step6] named | Kroje
+[step6] named | Bratislava(text)
+[step6] named | Fujara
+[step6] stamp replaced | National Flower
+[step6] named | Slovakia Map
+[step6] named | Šúľance s Makom
+[step6] stamp replaced | UFO Observation Deck, Bridge SNP
+[step6] named | National Animal - Tatra chamois
+[step6] named | Tram
+[step6] named | Kroje
+[step6] named | Kraslice
+[step6] named | Bryndzové halušky
+[step6] named | Pirohy
+[step6] named | Čumil Statue
+[step6] named | Carpathian Wooden Churches
+[step6] named | Michael's Gate
+[step6] named | Orava Castle
+[step6] named | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
+[step6] named | Old Town Hall (Bratislava)
+[step6] named | The Blue Church - Church of St. Elizabeth
+[step6] named | Bojnice Castle
+[step6] named | Spiš Castle
+[step6] named | Slovak Paradise National Park
+[step6] named | St. Martin's Cathedral
+[step6] named | Devín Castle
+[step6] named | Štrbské Pleso
+[step6] named | Bratislava Castle
+[step6] named | Čumil Statue
+[step6] done | named=26 stamps=2 unmatched=0
+[ai-pipeline] step 6 complete | named: 26 | stamps: 2 | unmatched: 0
+[pipeline] --- Step 7A: Deepnest export ---
+[pipeline] threshold: 0.82
+[step7a] regular   | ratio=0.838 | Bratislava(text)
+[step7a] irregular | ratio=0.645 | Slovakia Map
+[step7a] classified: 1 regular, 1 irregular (threshold=0.82)
+[step7a] ERROR | export failed for /Untitled-1_regular.svg: the operation was cancelled
+[step7a] ERROR | export failed for /Untitled-1_irregular.svg: the operation was cancelled
+[step7a] exported: /Untitled-1_regular.svg
+[step7a] exported: /Untitled-1_irregular.svg
+[pipeline] === AI_BuildCutlines done ===
+Done.
+
+  Regular   (1 paths): /Untitled-1_regular.svg
+  Irregular (1 paths): /Untitled-1_irregular.svg
+
+Import each SVG into Deepnest:
+  Regular   → 90° increments, gap 1mm
+  Irregular → free rotation, gap 1.5mm
+
+Threshold used: 0.82  (see log for per-path ratios to calibrate)
+
+Log: /tmp/AI_BuildCutlines.log
