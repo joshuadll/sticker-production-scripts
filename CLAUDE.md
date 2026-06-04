@@ -361,9 +361,8 @@ assets/Stamp Cutline Template.ai
 assets/Peeling Tab Asset.ai
 All paths resolve via: _root + "/assets/FileName.ai" where _root = new File($.fileName).parent.parent.fsName
 
-Note: `assets/Production_File_Template.ai` is NOT used by the pipeline. The AI working
-document is built in code by `buildWorkingDocument()` (aiUtils.jsx); the template file
-remains in the repo only as a manual reference.
+Note: the AI working document is built in code by `buildWorkingDocument()` (aiUtils.jsx).
+The old `Production_File_Template.ai` is no longer used and has been removed from the repo.
 
 ## Per-SKU source folder convention
 The source folder passed to PS_BuildElements may contain an optional file:
