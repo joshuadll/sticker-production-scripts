@@ -165,8 +165,12 @@ function _bboxArea(bounds) {
     return Math.abs(bounds[2] - bounds[0]) * Math.abs(bounds[1] - bounds[3]);
 }
 
-// Hides top-level items whose names are NOT in keepNames (and hides non-Cutlines
-// layers), exports as SVG, then restores visibility.
+// Exports exactly the named cutlines in keepNames to a standalone SVG. Builds a
+// throwaway document the size of the working artboard, duplicates only the wanted
+// top-level items into it, exports, and discards the temp doc. This guarantees the
+// SVG contains ONLY the kept items — Illustrator's SVG export writes hidden items
+// as display:none (still present in the file and re-shown on reopen), so a
+// hide-then-export-whole-doc approach cannot produce disjoint files.
 function _exportSvgGroup(doc, keepNames, outputPath) {
     var cutlinesLayer = findLayer(doc, CONFIG.cutlinesLayerName);
     if (!cutlinesLayer) {
@@ -176,23 +180,20 @@ function _exportSvgGroup(doc, keepNames, outputPath) {
 
     var i;
 
-    // Hide every layer except Cutlines.
-    var layerVisible = [];
-    for (i = 0; i < doc.layers.length; i++) {
-        layerVisible.push(doc.layers[i].visible);
-        doc.layers[i].visible = (doc.layers[i].name === cutlinesLayer.name);
-    }
+    // Throwaway doc matching the working artboard so duplicated items keep position.
+    var ab = doc.artboards[0].artboardRect; // [left, top, right, bottom]
+    var abW = Math.abs(ab[2] - ab[0]);
+    var abH = Math.abs(ab[1] - ab[3]);
+    var tmp = app.documents.add(DocumentColorSpace.CMYK, abW, abH);
+    var tmpLayer = tmp.layers[0];
 
-    // Snapshot all top-level items (including unnamed artifacts) and hide any
-    // not in keepNames. Unnamed items have empty name so keepNames[""] is undefined -> hidden.
-    var allItems   = [];
-    var itemHidden = [];
+    var copied = 0;
     for (i = 0; i < cutlinesLayer.pageItems.length; i++) {
-        allItems.push(cutlinesLayer.pageItems[i]);
-    }
-    for (i = 0; i < allItems.length; i++) {
-        itemHidden.push(allItems[i].hidden);
-        allItems[i].hidden = !keepNames[allItems[i].name];
+        var src = cutlinesLayer.pageItems[i];
+        if (keepNames[src.name]) {
+            src.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
+            copied++;
+        }
     }
 
     var exportOk = false;
@@ -202,22 +203,14 @@ function _exportSvgGroup(doc, keepNames, outputPath) {
         svgOpts.preserveEditability  = false;
         svgOpts.includeFileInfo      = false;
         svgOpts.includeUnusedStyles  = false;
-        doc.exportFile(new File(outputPath), ExportType.SVG, svgOpts);
+        tmp.exportFile(new File(outputPath), ExportType.SVG, svgOpts);
         exportOk = true;
     } catch (e) {
         log("[step7a] ERROR | export failed for " + outputPath + ": " + e.message);
     }
 
-    // Restore item visibility.
-    for (i = 0; i < allItems.length; i++) {
-        allItems[i].hidden = itemHidden[i];
-    }
-
-    // Restore layer visibility.
-    for (i = 0; i < doc.layers.length; i++) {
-        doc.layers[i].visible = layerVisible[i];
-    }
-
+    tmp.close(SaveOptions.DONOTSAVECHANGES);
+    log("[step7a] export | " + copied + " item(s) -> " + outputPath);
     return exportOk;
 }
 

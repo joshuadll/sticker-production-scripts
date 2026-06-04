@@ -238,6 +238,16 @@ function buildPlate(layer, aiBounds) {
 // If the junction doesn't match expectations, swap this body — callers only
 // depend on the return value. See docs/caption-separability-architecture.md.
 function deriveCutline(outline, plate) {
+    // Snapshot the container's existing top-level items so we can identify and
+    // remove anything the Pathfinder op leaves behind. expandStyle in some AI
+    // versions strands the duplicated operands as unnamed filled siblings — if
+    // left in place they pollute the Cutlines layer (visible black blobs in
+    // exports, ghost paths in nesting). See docs/caption-separability-architecture.md.
+    var parent = outline.parent;
+    var before = [];
+    var i, j;
+    for (i = 0; i < parent.pageItems.length; i++) { before.push(parent.pageItems[i]); }
+
     var dupOutline = outline.duplicate();
     var dupPlate   = plate.duplicate();
 
@@ -257,7 +267,25 @@ function deriveCutline(outline, plate) {
     app.executeMenuCommand("expandStyle");
     app.userInteractionLevel = prevLevel;
 
-    return app.selection[0];
+    var result = app.selection[0];
+
+    // Remove every NEW top-level item that isn't the union result — these are the
+    // stranded duplicate operands. Collect first, then remove (live collection).
+    var leftovers = [];
+    for (i = 0; i < parent.pageItems.length; i++) {
+        var it = parent.pageItems[i];
+        if (it === result) { continue; }
+        var wasBefore = false;
+        for (j = 0; j < before.length; j++) {
+            if (before[j] === it) { wasBefore = true; break; }
+        }
+        if (!wasBefore) { leftovers.push(it); }
+    }
+    for (i = 0; i < leftovers.length; i++) {
+        try { leftovers[i].remove(); } catch (e) {}
+    }
+
+    return result;
 }
 
 // Assembles the per-element bundle as a GroupItem so the components ride along

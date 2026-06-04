@@ -64,6 +64,8 @@
 [step7a] regular   | ratio=0.838 | Bratislava(text)
 [step7a] irregular | ratio=0.645 | Slovakia Map
 [step7a] classified: 25 regular, 3 irregular (threshold=0.82)
+[step7a] export | 25 item(s) -> /tmp/ai-build-cutlines-working_regular.svg
+[step7a] export | 3 item(s) -> /tmp/ai-build-cutlines-working_irregular.svg
 [step7a] exported: /tmp/ai-build-cutlines-working_regular.svg
 [step7a] exported: /tmp/ai-build-cutlines-working_irregular.svg
 [pipeline] === AI_BuildCutlines done ===
