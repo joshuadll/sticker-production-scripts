@@ -35,44 +35,44 @@
 [step6] done | named=26 stamps=2 unmatched=0
 [pipeline] --- Step 7A: Deepnest export ---
 [pipeline] threshold: 0.82
-[step7a] regular   | ratio=0.95 | Čumil Statue
-[step7a] regular   | ratio=0.963 | Bratislava Castle
-[step7a] regular   | ratio=0.95 | Štrbské Pleso
-[step7a] regular   | ratio=0.952 | Devín Castle
-[step7a] regular   | ratio=0.969 | St. Martin's Cathedral
-[step7a] regular   | ratio=0.939 | Slovak Paradise National Park
-[step7a] regular   | ratio=0.941 | Spiš Castle
-[step7a] regular   | ratio=0.951 | Bojnice Castle
-[step7a] regular   | ratio=0.956 | The Blue Church - Church of St. Elizabeth
-[step7a] regular   | ratio=0.972 | Old Town Hall (Bratislava)
-[step7a] regular   | ratio=0.953 | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
-[step7a] regular   | ratio=0.953 | Orava Castle
-[step7a] regular   | ratio=0.955 | Michael's Gate
-[step7a] regular   | ratio=0.952 | Carpathian Wooden Churches
-[step7a] regular   | ratio=0.95 | Čumil Statue
-[step7a] regular   | ratio=0.917 | Pirohy
-[step7a] regular   | ratio=0.925 | Bryndzové halušky
-[step7a] regular   | ratio=0.931 | Kraslice
-[step7a] regular   | ratio=0.894 | Kroje
-[step7a] regular   | ratio=0.904 | Tram
-[step7a] regular   | ratio=0.98 | National Animal - Tatra chamois
+[step7a] regular   | ratio=1.194 | Čumil Statue
+[step7a] regular   | ratio=0.922 | Bratislava Castle
+[step7a] regular   | ratio=0.867 | Štrbské Pleso
+[step7a] regular   | ratio=0.89 | Devín Castle
+[step7a] regular   | ratio=0.907 | St. Martin's Cathedral
+[step7a] regular   | ratio=0.902 | Slovak Paradise National Park
+[step7a] regular   | ratio=0.881 | Spiš Castle
+[step7a] regular   | ratio=0.898 | Bojnice Castle
+[step7a] regular   | ratio=0.88 | The Blue Church - Church of St. Elizabeth
+[step7a] regular   | ratio=0.852 | Old Town Hall (Bratislava)
+[step7a] regular   | ratio=0.848 | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
+[step7a] regular   | ratio=0.886 | Orava Castle
+[step7a] regular   | ratio=0.878 | Michael's Gate
+[step7a] regular   | ratio=0.826 | Carpathian Wooden Churches
+[step7a] regular   | ratio=0.935 | Čumil Statue
+[step7a] irregular | ratio=0.753 | Pirohy
+[step7a] irregular | ratio=0.8 | Bryndzové halušky
+[step7a] irregular | ratio=0.722 | Kraslice
+[step7a] irregular | ratio=0.703 | Kroje
+[step7a] irregular | ratio=0.611 | Tram
+[step7a] irregular | ratio=0.405 | National Animal - Tatra chamois
 [step7a] irregular | ratio=0.785 | UFO Observation Deck, Bridge SNP
-[step7a] regular   | ratio=0.941 | Šúľance s Makom
+[step7a] regular   | ratio=0.82 | Šúľance s Makom
 [step7a] irregular | ratio=0.785 | National Flower
-[step7a] regular   | ratio=0.908 | Fujara
-[step7a] regular   | ratio=0.894 | Kroje
+[step7a] irregular | ratio=0.687 | Fujara
+[step7a] irregular | ratio=0.517 | Kroje
 [step7a] regular   | ratio=0.838 | Bratislava(text)
 [step7a] irregular | ratio=0.645 | Slovakia Map
-[step7a] classified: 25 regular, 3 irregular (threshold=0.82)
-[step7a] export | 25 item(s) -> /tmp/ai-build-cutlines-working_regular.svg
-[step7a] export | 3 item(s) -> /tmp/ai-build-cutlines-working_irregular.svg
+[step7a] classified: 17 regular, 11 irregular (threshold=0.82)
+[step7a] export | 17 item(s) -> /tmp/ai-build-cutlines-working_regular.svg
+[step7a] export | 11 item(s) -> /tmp/ai-build-cutlines-working_irregular.svg
 [step7a] exported: /tmp/ai-build-cutlines-working_regular.svg
 [step7a] exported: /tmp/ai-build-cutlines-working_irregular.svg
 [pipeline] === AI_BuildCutlines done ===
 Done.
 
-  Regular   (25 paths): /tmp/ai-build-cutlines-working_regular.svg
-  Irregular (3 paths): /tmp/ai-build-cutlines-working_irregular.svg
+  Regular   (17 paths): /tmp/ai-build-cutlines-working_regular.svg
+  Irregular (11 paths): /tmp/ai-build-cutlines-working_irregular.svg
 
 Review both SVGs now open in Illustrator.
 Move any misclassified paths between files, then File > Save each.
