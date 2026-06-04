@@ -47,10 +47,17 @@ function _runExportForNesting(doc) {
 
     log("[pipeline] === AI_BuildCutlines done ===");
 
+    if (!CONFIG.dryRun) {
+        if (result.regularPath)   { app.open(new File(result.regularPath)); }
+        if (result.irregularPath) { app.open(new File(result.irregularPath)); }
+    }
+
     scriptAlert("Done.\n\n"
         + "  Regular   (" + result.regular   + " paths): " + (result.regularPath   || "—") + "\n"
         + "  Irregular (" + result.irregular + " paths): " + (result.irregularPath || "—") + "\n\n"
-        + "Import each SVG into Deepnest:\n"
+        + "Review both SVGs now open in Illustrator.\n"
+        + "Move any misclassified paths between files, then File > Save each.\n\n"
+        + "Then import each SVG into Deepnest:\n"
         + "  Regular   → 90° increments, gap 1mm\n"
         + "  Irregular → free rotation, gap 1.5mm\n\n"
         + "Threshold used: " + CONFIG.deepnestRectThreshold
