@@ -52,7 +52,7 @@ function runCaptionWhite(doc) {
             var parsed = parseLayerName(name);
             if (!parsed) continue;
 
-            // ── Stamps: group SO + White Base_Cutline only, no caption ──────
+            // ── Stamps ([ST]): group SO + White Base_Cutline only, no caption ──
             if (parsed.styleCode === "ST") {
                 if (CONFIG.dryRun) {
                     log("[step3B] [DRY RUN] would group stamp | " + name);
@@ -60,7 +60,7 @@ function runCaptionWhite(doc) {
                     continue;
                 }
                 try {
-                    groupStamp(doc, elementsGroup, soLayer, name);
+                    groupNoCaption(doc, elementsGroup, soLayer, name);
                     log("[step3B] grouped stamp | " + name);
                     grouped++;
                 } catch (e) {
@@ -75,9 +75,20 @@ function runCaptionWhite(doc) {
             // Find matching T layer: a TEXT layer whose name equals the display name.
             var textLayer = findTextLayerByDisplayName(doc, parsed.displayName);
             if (!textLayer) {
-                log("[step3B] SKIP | \"" + name + "\" — no T layer named \""
-                    + parsed.displayName + "\" found. Run Step 3A first.");
-                skipped.push(name + " (no T layer)");
+                // No caption text placed — group without caption.
+                if (CONFIG.dryRun) {
+                    log("[step3B] [DRY RUN] would group (no caption) | " + name);
+                    grouped++;
+                    continue;
+                }
+                try {
+                    groupNoCaption(doc, elementsGroup, soLayer, name);
+                    log("[step3B] grouped (no caption) | " + name);
+                    grouped++;
+                } catch (e) {
+                    log("[step3B] ERROR | \"" + name + "\" line " + e.line + ": " + e.message);
+                    skipped.push(name + " (error: " + e.message + ")");
+                }
                 continue;
             }
 
@@ -125,7 +136,7 @@ function runCaptionWhite(doc) {
 // ─── STAMP PATH ───────────────────────────────────────────────────────────────
 // ST elements: SO + White Base_Cutline only (no caption layers).
 
-function groupStamp(doc, elementsGroup, soLayer, groupName) {
+function groupNoCaption(doc, elementsGroup, soLayer, groupName) {
     var wbcLayer = findAdjacentCutline(doc, soLayer);
     var layers   = wbcLayer ? [soLayer, wbcLayer] : [soLayer];
     if (!wbcLayer) {
