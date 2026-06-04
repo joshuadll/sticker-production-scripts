@@ -241,7 +241,10 @@ function deriveCutline(outline, plate) {
     var dupOutline = outline.duplicate();
     var dupPlate   = plate.duplicate();
 
-    app.selection = null;
+    // Use the deselectall menu command — assigning app.selection = null is
+    // unreliable in Illustrator and can deadlock on redraw once the document
+    // has accumulated items.
+    app.executeMenuCommand("deselectall");
     dupOutline.selected = true;
     dupPlate.selected   = true;
 

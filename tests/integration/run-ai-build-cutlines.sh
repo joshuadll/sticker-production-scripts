@@ -54,7 +54,7 @@ rm -f "$LOG" "$TEMP_SCRIPT"
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
     s|CONFIG\.logPath\s*=\s*_root[^;]+;|CONFIG.logPath = "/tmp/AI_BuildCutlines.log";|;
-    s|CONFIG\.stampTemplatePath\s*=\s*_root[^;]+;|CONFIG.stampTemplatePath = "__skip__";|;
+    s|CONFIG\.stampTemplatePath\s*=\s*_root[^;]+;|CONFIG.stampTemplatePath = "'"$REPO_ROOT"'/assets/Stamp Cutline Template.ai";|;
     s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
@@ -69,7 +69,9 @@ JSEOF
 echo "[$STEP] Opening template and running cutlines script..."
 osascript << EOF
 tell application "$APP"
-    do javascript file (POSIX file "$TEMP_SCRIPT")
+    with timeout of 600 seconds
+        do javascript file (POSIX file "$TEMP_SCRIPT")
+    end timeout
 end tell
 EOF
 

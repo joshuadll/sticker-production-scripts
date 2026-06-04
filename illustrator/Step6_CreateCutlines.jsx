@@ -277,7 +277,12 @@ function _placeStampTemplate(doc, layer, element, tracedPath,
 
     doc.activeLayer = layer;
     var tmpl = doc.placedItems.add();
+    // Suppress the embedded-color-profile-mismatch dialog the stamp template
+    // raises on placement — cutlines are pure geometry, the profile is irrelevant.
+    var prevLevel = app.userInteractionLevel;
+    app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
     tmpl.file = new File(CONFIG.stampTemplatePath);
+    app.userInteractionLevel = prevLevel;
 
     var ai = _psBoundsToAi(element.left, element.top, element.right, element.bottom,
                  data, pngLeft, pngTop, pngWidth, pngHeight);
