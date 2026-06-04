@@ -249,6 +249,16 @@ function exportElementPngs(doc) {
     }
     elementsGroup.visible = true;
 
+    // Snapshot element sub-group visibility — the isolation loop below hides
+    // siblings to export each element alone, and these must be restored after
+    // (the silhouette builder downstream merges the whole Elements group and
+    // depends on every element group being visible).
+    var subVis = [];
+    var sv;
+    for (sv = 0; sv < elementsGroup.layerSets.length; sv++) {
+        subVis[sv] = elementsGroup.layerSets[sv].visible;
+    }
+
     var count = 0;
     var j, k, grp, parsed, safeName, pngPath, dup;
 
@@ -294,7 +304,12 @@ function exportElementPngs(doc) {
         app.activeDocument = doc;
     }
 
-    // Restore visibilities.
+    // Restore element sub-group visibility (hidden during per-element isolation).
+    for (sv = 0; sv < elementsGroup.layerSets.length; sv++) {
+        elementsGroup.layerSets[sv].visible = subVis[sv];
+    }
+
+    // Restore top-level layer visibilities.
     for (i = 0; i < topLayers.length; i++) {
         topLayers[i].visible = topVis[i];
     }

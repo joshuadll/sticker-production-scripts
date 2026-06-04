@@ -85,7 +85,7 @@
 [pipeline] element PNGs: 24 file(s) → /private/tmp/psai-build-export-cutlines-fixture_elements
 [pipeline] element PNGs folder: /private/tmp/psai-build-export-cutlines-fixture_elements
 [pipeline] --- BridgeTalk handoff → Illustrator (Step 6) ---
-[step5] hid 2 caption sub-layer(s).
+[step5] hid 44 caption sub-layer(s).
 [step5] transient Silhouette built.
 [pipeline] exported silhouette PNG (transient layer removed): /private/tmp/psai-build-export-cutlines-fixture_silhouette.png
 [pipeline] wrote elements sidecar: /private/tmp/psai-build-export-cutlines-fixture_elements.txt (24 element(s))
