@@ -195,24 +195,30 @@ function setStrokeStyle(path, weightPt, colorObj) {
     path.filled     = false;
 }
 
-// Applies stroke style to a PathItem/CompoundPathItem, or recurses into a
-// GroupItem (Pathfinder results are sometimes wrapped in a group). Used so the
-// derived cutline gets a stroke regardless of how the boolean op nests it.
+// Applies stroke style (and clears fill) to a PathItem/CompoundPathItem, or
+// recurses into a GroupItem (Pathfinder/expandStyle results are wrapped in groups,
+// sometimes nested several levels deep). Walks pageItems — the typed collections
+// (pathItems/compoundPathItems/groupItems) on a GroupItem are inconsistently
+// recursive across AI versions and silently miss deeper nestings, which left some
+// fused cutlines filled black. pageItems lists every direct child of any type, so
+// recursing it reaches every leaf path.
 function strokeRecursive(item, weightPt, colorObj) {
-    if (item.typename === "PathItem" || item.typename === "CompoundPathItem") {
+    if (item.typename === "PathItem") {
         setStrokeStyle(item, weightPt, colorObj);
         return;
     }
+    if (item.typename === "CompoundPathItem") {
+        // CompoundPathItem.filled / .strokeColor do NOT reliably propagate to the
+        // shape — Illustrator styles a compound through its sub-paths. Setting them
+        // on the compound left the fused cutline black-filled. Style each sub-path.
+        for (var c = 0; c < item.pathItems.length; c++) {
+            setStrokeStyle(item.pathItems[c], weightPt, colorObj);
+        }
+        return;
+    }
     if (item.typename === "GroupItem") {
-        var i;
-        for (i = 0; i < item.pathItems.length; i++) {
-            setStrokeStyle(item.pathItems[i], weightPt, colorObj);
-        }
-        for (i = 0; i < item.compoundPathItems.length; i++) {
-            setStrokeStyle(item.compoundPathItems[i], weightPt, colorObj);
-        }
-        for (i = 0; i < item.groupItems.length; i++) {
-            strokeRecursive(item.groupItems[i], weightPt, colorObj);
+        for (var i = 0; i < item.pageItems.length; i++) {
+            strokeRecursive(item.pageItems[i], weightPt, colorObj);
         }
     }
 }
