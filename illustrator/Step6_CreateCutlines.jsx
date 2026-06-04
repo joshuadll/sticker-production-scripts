@@ -72,14 +72,17 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     log("[step6] scaled to " + Math.round(pngWidth) + "pt wide, centred on artboard.");
 
     // ── 4. Image Trace ────────────────────────────────────────────────────────
-    // Use Illustrator's native trace API (ActionDescriptor is Photoshop-only).
-    var tracing = placed.trace();
-    tracing.preset = "Silhouettes";
-    // Setting preset may clear the selection; re-select before expanding.
-    doc.selection = [tracing];
-    app.executeMenuCommand("expandArt1");
+    // Native Illustrator trace API (ActionDescriptor/executeAction is Photoshop-only).
+    // placed.trace() returns a PluginItem whose .tracing is a TracingObject.
+    // Tracing is asynchronous — redraw() forces it before we read/expand it.
+    var pluginItem = placed.trace();
+    pluginItem.tracing.tracingOptions.loadFromPreset("Silhouettes");
+    app.redraw();
+    // expandTracing() converts the tracing to a GroupItem, replacing the PluginItem.
+    var tracedGroup = pluginItem.tracing.expandTracing();
 
-    // Ungroup — expand leaves a GroupItem; one ungroup gives PathItems.
+    // Ungroup — expandTracing leaves a GroupItem; one ungroup gives PathItems.
+    doc.selection = [tracedGroup];
     app.executeMenuCommand("ungroup");
 
     // ── 5. Collect traced PathItems ───────────────────────────────────────────

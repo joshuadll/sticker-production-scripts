@@ -48,6 +48,9 @@ function isCaption(pathItem) {
 function log(msg) {
     $.writeln(msg);
     var f = new File(CONFIG.logPath);
+    f.encoding = "UTF-8";       // accented element names (Devín, Šúľance) write as
+                                // valid UTF-8, not invalid Mac-Roman bytes
+    f.lineFeed = "Unix";        // \n terminators so grep/diff treat the log as text
     f.open("a");
     f.writeln(msg);
     f.close();
@@ -243,8 +246,13 @@ function deriveCutline(outline, plate) {
     dupPlate.selected   = true;
 
     // Non-destructive Pathfinder "Add", then expand to a concrete path.
+    // Suppress the advisory "Pathfinder effects should be applied to groups"
+    // dialog — it's only a warning; Add works fine on the two loose paths.
+    var prevLevel = app.userInteractionLevel;
+    app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
     app.executeMenuCommand("Live Pathfinder Add");
     app.executeMenuCommand("expandStyle");
+    app.userInteractionLevel = prevLevel;
 
     return app.selection[0];
 }
