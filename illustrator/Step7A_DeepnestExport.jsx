@@ -14,8 +14,7 @@
 //   {docName}_regular.svg
 //   {docName}_irregular.svg
 //
-// Each export duplicates the document, deletes the paths that don't belong,
-// exports SVG, then closes the duplicate without saving.
+// Each export hides paths that don't belong, exports SVG, then restores visibility.
 //
 // Returns: { regular, irregular, regularPath, irregularPath }
 
@@ -111,44 +110,52 @@ function _collectPaths(layer) {
     return result;
 }
 
-// Duplicates the document, removes all paths whose names are NOT in keepNames,
-// exports as SVG, then closes the duplicate without saving.
+// Hides all paths whose names are NOT in keepNames (and hides non-Cutlines layers),
+// exports as SVG, then restores visibility. Illustrator has no doc.duplicate().
 function _exportSvgGroup(doc, keepNames, outputPath) {
-    var tmp = doc.duplicate();
+    var cutlinesLayer = findLayer(doc, CONFIG.cutlinesLayerName);
+    if (!cutlinesLayer) {
+        log("[step7a] WARN | Cutlines layer missing — skipping export of " + outputPath);
+        return;
+    }
+
+    var i;
+
+    // Hide every layer except Cutlines.
+    var layerVisible = [];
+    for (i = 0; i < doc.layers.length; i++) {
+        layerVisible.push(doc.layers[i].visible);
+        doc.layers[i].visible = (doc.layers[i].name === cutlinesLayer.name);
+    }
+
+    // Hide paths not in keepNames.
+    var paths      = _collectPaths(cutlinesLayer);
+    var pathHidden = [];
+    for (i = 0; i < paths.length; i++) {
+        pathHidden.push(paths[i].hidden);
+        paths[i].hidden = !keepNames[paths[i].name];
+    }
 
     try {
-        var tmpLayer = findLayer(tmp, CONFIG.cutlinesLayerName);
-        if (!tmpLayer) {
-            log("[step7a] WARN | Cutlines layer missing in duplicate — skipping export.");
-            tmp.close(SaveOptions.DONOTSAVECHANGES);
-            return;
-        }
-
-        // Remove paths NOT in keepNames. Collect first, then remove.
-        var paths   = _collectPaths(tmpLayer);
-        var toRemove = [];
-        var i;
-        for (i = 0; i < paths.length; i++) {
-            if (!keepNames[paths[i].name]) {
-                toRemove.push(paths[i]);
-            }
-        }
-        for (i = 0; i < toRemove.length; i++) {
-            toRemove[i].remove();
-        }
-
         var svgOpts = new ExportOptionsSVG();
         svgOpts.embedRasterImages    = false;
         svgOpts.preserveEditability  = false;
         svgOpts.includeFileInfo      = false;
         svgOpts.includeUnusedStyles  = false;
-
-        tmp.exportFile(new File(outputPath), ExportType.SVG, svgOpts);
+        doc.exportFile(new File(outputPath), ExportType.SVG, svgOpts);
     } catch (e) {
         log("[step7a] ERROR | export failed for " + outputPath + ": " + e.message);
     }
 
-    tmp.close(SaveOptions.DONOTSAVECHANGES);
+    // Restore path visibility.
+    for (i = 0; i < paths.length; i++) {
+        paths[i].hidden = pathHidden[i];
+    }
+
+    // Restore layer visibility.
+    for (i = 0; i < doc.layers.length; i++) {
+        doc.layers[i].visible = layerVisible[i];
+    }
 }
 
 // Formats a float to 3 decimal places (ES3-safe).

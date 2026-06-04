@@ -67,15 +67,13 @@ function findLayer(doc, name) {
     return null;
 }
 
-// Builds the working document from scratch — replaces the dependency on
-// assets/Production_File_Template.ai. Reproduces the template's spec exactly
-// (values read from the committed template, June 2026):
+// Builds the working document the AI pipeline runs on. The values below are the
+// print-production spec — they must match the press/cutting setup, so don't change
+// them without confirming against a real production file:
 //   - A4 sheet (210 x 297 mm), CMYK, mm ruler units
 //   - Color Block : full-sheet green rect, fill CMYK(55,0,100,0), locked, bottom
 //                   (the green background for Step 10's green preview JPEG)
-//   - Grid        : vector 1-inch reference grid, locked (artist manual-check aid;
-//                   the template used a raster image — a vector grid is the
-//                   resolution-independent equivalent, no asset needed)
+//   - Grid        : vector 1-inch reference grid, locked (artist manual-check aid)
 //   - Stickers    : empty (Step 7B places nested artwork here)
 // Cutlines / Halfcut layers are created later by their own steps, above Stickers.
 // Returns the new document.

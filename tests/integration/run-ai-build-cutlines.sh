@@ -53,7 +53,8 @@ rm -f "$LOG" "$TEMP_SCRIPT"
 
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
-    s|stampTemplatePath:\s*""|stampTemplatePath: "__skip__"|;
+    s|CONFIG\.logPath\s*=\s*_root[^;]+;|CONFIG.logPath = "/tmp/AI_BuildCutlines.log";|;
+    s|CONFIG\.stampTemplatePath\s*=\s*_root[^;]+;|CONFIG.stampTemplatePath = "__skip__";|;
     s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
