@@ -85,22 +85,46 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     doc.selection = [tracedGroup];
     app.executeMenuCommand("ungroup");
 
-    // ── 5. Collect traced PathItems ───────────────────────────────────────────
+    // ── 5. Collect traced PathItems (dropping the whole-sheet background) ──────
     // Stroke is applied per-path below, only where the path ends up visible.
-    var tracedPaths = [];
+    // Snapshot the selection refs first — removing items re-indexes the live
+    // doc.selection collection mid-loop (see CLAUDE.md live-collection note).
+    var selSnapshot = [];
     var si;
-    for (si = 0; si < doc.selection.length; si++) {
-        var sel = doc.selection[si];
-        if (sel.typename === "PathItem" || sel.typename === "CompoundPathItem") {
-            tracedPaths.push(sel);
+    for (si = 0; si < doc.selection.length; si++) { selSnapshot.push(doc.selection[si]); }
+
+    // Stage A junk filter: drop the whole-sheet trace background. Image Trace
+    // emits one path that is the frame rectangle plus every element's outline
+    // (dozens of sub-paths) — its bbox spans most of the sheet. No real element
+    // is that big, so a path that large is junk. Left in, it gets matched by
+    // centroid to whatever element contains the sheet centre and becomes a ghost
+    // cutline group (the "all elements leak into one SVG" bug).
+    var fullSheetArea = pngWidth * pngHeight;
+    var bgFloor       = CONFIG.traceBackgroundAreaFrac * fullSheetArea;
+    var tracedPaths      = [];
+    var droppedBackground = 0;
+    for (si = 0; si < selSnapshot.length; si++) {
+        var sel = selSnapshot[si];
+        if (sel.typename !== "PathItem" && sel.typename !== "CompoundPathItem") { continue; }
+        var sb    = sel.geometricBounds;
+        var sArea = Math.abs(sb[2] - sb[0]) * Math.abs(sb[1] - sb[3]);
+        if (sArea >= bgFloor) {
+            log("[step6] DROP | whole-sheet trace background (bbox " + Math.round(sArea)
+                + "pt^2 >= " + Math.round(bgFloor) + ")");
+            sel.remove();
+            droppedBackground++;
+            continue;
         }
+        tracedPaths.push(sel);
     }
-    log("[step6] Image Trace complete. " + tracedPaths.length + " path(s) collected.");
+    log("[step6] Image Trace complete. " + tracedPaths.length + " path(s) collected"
+        + (droppedBackground ? " (" + droppedBackground + " background dropped)" : "") + ".");
 
     // ── 6. Match and name paths ───────────────────────────────────────────────
-    var named          = 0;
-    var stampsReplaced = 0;
-    var unmatched      = 0;
+    var named           = 0;
+    var stampsReplaced  = 0;
+    var unmatched       = 0;
+    var droppedFragment = 0;
     var pi;
 
     for (pi = 0; pi < tracedPaths.length; pi++) {
@@ -114,6 +138,24 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             log("[step6] UNMATCHED path " + (pi + 1) + " centroid ("
                 + Math.round(center.x) + "," + Math.round(center.y) + ")");
             unmatched++;
+            continue;
+        }
+
+        // Stage B junk filter: drop a trace fragment — a path far smaller than the
+        // element it matched (e.g. a stray blob whose centroid happens to land in a
+        // real element's box). Left in, it becomes a duplicate ghost group sharing
+        // the element's name. Compared to the element's own expected AI bounds, so
+        // it stays correct across SKUs without an absolute size constant.
+        var elAi   = _psBoundsToAi(matched.left, matched.top, matched.right, matched.bottom,
+                         elementsData, pngLeft, pngTop, pngWidth, pngHeight);
+        var elArea = Math.abs(elAi[2] - elAi[0]) * Math.abs(elAi[1] - elAi[3]);
+        var pb     = path.geometricBounds;
+        var pArea  = Math.abs(pb[2] - pb[0]) * Math.abs(pb[1] - pb[3]);
+        if (elArea > 0 && pArea < CONFIG.traceMinElementAreaFrac * elArea) {
+            log("[step6] DROP | trace fragment near " + matched.displayName
+                + " (" + Math.round((pArea / elArea) * 100) + "% of element box)");
+            path.remove();
+            droppedFragment++;
             continue;
         }
 
@@ -146,9 +188,11 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
         }
     }
 
+    var droppedJunk = droppedBackground + droppedFragment;
     log("[step6] done | named=" + named + " stamps=" + stampsReplaced
-        + " unmatched=" + unmatched);
-    return { named: named, stampsReplaced: stampsReplaced, unmatched: unmatched };
+        + " unmatched=" + unmatched + " dropped=" + droppedJunk);
+    return { named: named, stampsReplaced: stampsReplaced, unmatched: unmatched,
+             dropped: droppedJunk };
 }
 
 

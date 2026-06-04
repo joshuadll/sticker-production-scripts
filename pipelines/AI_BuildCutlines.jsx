@@ -17,6 +17,13 @@ var CONFIG = {
     cutlinesLayerName:   "Cutlines",
     stickersLayerName:   "Stickers",
 
+    // Trace-junk filters. Image Trace on the whole sheet can emit spurious paths
+    // beyond the real elements: a whole-sheet background compound (frame + every
+    // outline) and tiny stray fragments. Drop them before they get named/grouped,
+    // else they become ghost cutline groups (see Step 6 _collectTracedPaths).
+    traceBackgroundAreaFrac: 0.5,   // path bbox >= this x full-sheet bbox -> background, drop
+    traceMinElementAreaFrac: 0.15,  // matched path bbox < this x element bbox -> fragment, drop
+
     // ── Step 7A: Deepnest Export ─────────────────────────────────────────────
     // Extent ratio threshold: paths >= this are "regular" (90° rotation in Deepnest).
     // Tune on first real SKU run — every path's ratio is logged.
@@ -50,8 +57,8 @@ function _runExportForNesting(doc) {
     if (!CONFIG.dryRun) {
         var _prevUI = app.userInteractionLevel;
         app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
-        if (result.regularPath)   { app.open(new File(result.regularPath)); }
-        if (result.irregularPath) { app.open(new File(result.irregularPath)); }
+        if (result.regularPath)   { _reopenFresh(result.regularPath); }
+        if (result.irregularPath) { _reopenFresh(result.irregularPath); }
         app.userInteractionLevel = _prevUI;
     }
 
@@ -66,6 +73,24 @@ function _runExportForNesting(doc) {
         + "Threshold used: " + CONFIG.deepnestRectThreshold
         + "  (see log for per-path ratios to calibrate)\n\n"
         + "Log: " + CONFIG.logPath);
+}
+
+// Opens an exported SVG, first closing any already-open document with the same
+// path. Without this, a re-run finds the file already open from the previous run
+// and app.open() just re-activates the STALE in-memory tab instead of reloading
+// the regenerated file from disk — the artist sees old geometry.
+function _reopenFresh(svgPath) {
+    var target = new File(svgPath);
+    var i;
+    for (i = app.documents.length - 1; i >= 0; i--) {
+        var d = app.documents[i];
+        try {
+            if (d.fullName && d.fullName.fsName === target.fsName) {
+                d.close(SaveOptions.DONOTSAVECHANGES);
+            }
+        } catch (e) { /* untitled/no fullName — ignore */ }
+    }
+    app.open(target);
 }
 
 // ─── ENTRY POINT: BridgeTalk from PSAI_BuildAndExportCutlines.jsx ───────────────────────

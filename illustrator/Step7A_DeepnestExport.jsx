@@ -14,7 +14,8 @@
 //   {docName}_regular.svg
 //   {docName}_irregular.svg
 //
-// Each export hides items that don't belong, exports SVG, then restores visibility.
+// Each export duplicates only the wanted cutlines into a throwaway temp document
+// and exports that (see _exportSvgGroup for why hide-then-export can't work).
 //
 // Returns: { regular, irregular, regularPath, irregularPath }
 
@@ -94,13 +95,26 @@ function runDeepnestExport(doc) {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
+// Returns the fused cutline sub-item in a cutline GroupItem: the child whose
+// name equals the group name (the documented invariant — see CLAUDE.md cutline
+// structure). The group also contains hidden outline + plate sub-paths (named
+// "<name> outline" / "<name> plate"); matching on the exact name skips those.
+// Returns null if the group has no name-matching child (a malformed group).
+function _namedCutlineInGroup(group) {
+    var j;
+    for (j = 0; j < group.pageItems.length; j++) {
+        if (group.pageItems[j].name === group.name) { return group.pageItems[j]; }
+    }
+    return null;
+}
+
 // Returns one entry per top-level item in the Cutlines layer:
 //   { name, item, area (for extent ratio), bounds [l,t,r,b] }
 // Uses layer.pageItems to stay top-level only — layer.pathItems is recursive
 // and would pick up hidden sub-paths inside GroupItems.
 function _collectCutlineEntries(layer) {
     var entries = [];
-    var i, j, item, sub, bounds;
+    var i, item, sub, bounds;
 
     for (i = 0; i < layer.pageItems.length; i++) {
         item = layer.pageItems[i];
@@ -108,16 +122,17 @@ function _collectCutlineEntries(layer) {
         if (item.typename === "GroupItem") {
             // Skip unnamed groups — expandStyle artifacts leaked by deriveCutline.
             if (!item.name || item.name.length === 0) { continue; }
-            // Caption element group: find the cutline child (named = group.name).
-            // Use pageItems on the group — GroupItem has no .pathItems collection.
-            sub = null;
-            for (j = 0; j < item.pageItems.length; j++) {
-                if (item.pageItems[j].name === item.name) { sub = item.pageItems[j]; break; }
+            // Caption element group: classify on the fused cutline (child named ==
+            // group name), so we read the final contour's area, not the hidden
+            // outline/plate sub-paths.
+            sub = _namedCutlineInGroup(item);
+            if (!sub) {
+                log("[step7a] SKIP | group has no fused cutline — " + item.name);
+                continue;
             }
-            bounds = sub ? sub.geometricBounds : item.geometricBounds;
+            bounds = sub.geometricBounds;
             entries.push({ name: item.name, item: item,
-                           area: sub ? _pathArea(sub) : _bboxArea(bounds) * 0.7,
-                           bounds: bounds });
+                           area: _pathArea(sub), bounds: bounds });
 
         } else if (item.typename === "PathItem" || item.typename === "CompoundPathItem") {
             // Skip unnamed paths — these are dupOutline leftovers leaked by deriveCutline.
@@ -190,10 +205,19 @@ function _exportSvgGroup(doc, keepNames, outputPath) {
     var copied = 0;
     for (i = 0; i < cutlinesLayer.pageItems.length; i++) {
         var src = cutlinesLayer.pageItems[i];
-        if (keepNames[src.name]) {
+        if (!keepNames[src.name]) { continue; }
+
+        if (src.typename === "GroupItem") {
+            // Copy ONLY the fused cutline (child named == group name) — NOT the
+            // whole group. Duplicating the group drags in the hidden outline/plate
+            // sub-paths (Illustrator re-shows display:none on SVG reopen).
+            var cutline = _namedCutlineInGroup(src);
+            if (!cutline) { continue; }   // malformed group, no fused cutline
+            cutline.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
+        } else {
             src.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
-            copied++;
         }
+        copied++;
     }
 
     var exportOk = false;
