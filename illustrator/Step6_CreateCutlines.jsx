@@ -72,17 +72,14 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     log("[step6] scaled to " + Math.round(pngWidth) + "pt wide, centred on artboard.");
 
     // ── 4. Image Trace ────────────────────────────────────────────────────────
-    // ActionDescriptor approach: sets preset atomically and suppresses the
-    // "Tracing may proceed slowly" performance warning via DialogModes.NO.
-    doc.selection = [placed];
-    var traceDesc = new ActionDescriptor();
-    traceDesc.putString(stringIDToTypeID("preset"), "Silhouettes");
-    executeAction(stringIDToTypeID("imageTrace"), traceDesc, DialogModes.NO);
-
-    // Expand the trace result to live paths.
+    // Use Illustrator's native trace API (ActionDescriptor is Photoshop-only).
+    var tracing = placed.trace();
+    tracing.preset = "Silhouettes";
+    // Setting preset may clear the selection; re-select before expanding.
+    doc.selection = [tracing];
     app.executeMenuCommand("expandArt1");
 
-    // Ungroup — trace result is a GroupItem; one ungroup gives PathItems.
+    // Ungroup — expand leaves a GroupItem; one ungroup gives PathItems.
     app.executeMenuCommand("ungroup");
 
     // ── 5. Collect traced PathItems ───────────────────────────────────────────
