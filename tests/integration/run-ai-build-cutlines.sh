@@ -3,11 +3,10 @@
 # Runs AI_BuildCutlines.jsx against a pre-exported silhouette PNG + elements sidecar.
 # Checks that the Cutlines layer was created and paths were named.
 #
-# FIXTURES REQUIRED:
-#   tests/integration/fixtures/step6-template.ai
-#     A copy of Production_File_Template.ai (the blank AI template).
-#     Obtain from the Team Drive and save here.
+# The working document is built from scratch by buildWorkingDocument() (aiUtils.jsx)
+# — no template file needed.
 #
+# FIXTURES REQUIRED:
 #   tests/integration/fixtures/step6-silhouette.png
 #     A flat black PNG of a silhouette layer from a real Resize Area PSD.
 #     Export by running PSAI_BuildAndExportCutlines.jsx on a captioned fixture PSD
@@ -25,12 +24,11 @@
 set -euo pipefail
 
 STEP="ai-build-cutlines"
-APP="Adobe Illustrator 2026"
+APP="Adobe Illustrator"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_BuildCutlines.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
-TEMPLATE_FIXTURE="$FIXTURE_DIR/step6-template.ai"
 PNG_FIXTURE="$FIXTURE_DIR/step6-silhouette.png"
 ELEMENTS_FIXTURE="$FIXTURE_DIR/step6-elements.txt"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ai-build-cutlines-expected.txt"
@@ -40,7 +38,7 @@ LOG="/tmp/AI_BuildCutlines.log"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
-for FIXTURE in "$TEMPLATE_FIXTURE" "$PNG_FIXTURE" "$ELEMENTS_FIXTURE"; do
+for FIXTURE in "$PNG_FIXTURE" "$ELEMENTS_FIXTURE"; do
     if [ ! -f "$FIXTURE" ]; then
         echo "SKIP [$STEP]: fixture not found: $FIXTURE"
         echo "  See script header for fixture creation instructions."
@@ -56,12 +54,13 @@ rm -f "$LOG" "$TEMP_SCRIPT"
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
     s|stampTemplatePath:\s*""|stampTemplatePath: "__skip__"|;
-    s|#include "\.\./|#include "$REPO_ROOT/|g;
+    s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
 # Append the entry-point call so #include resolves correctly when run as a file.
+# buildDocAndImport builds the working document from scratch (no template file).
 cat >> "$TEMP_SCRIPT" << JSEOF
-openTemplateAndImport("$TEMPLATE_FIXTURE","$PNG_FIXTURE","$ELEMENTS_FIXTURE");
+buildDocAndImport("$PNG_FIXTURE","$ELEMENTS_FIXTURE");
 JSEOF
 
 # ── Run script via osascript ─────────────────────────────────────────────────

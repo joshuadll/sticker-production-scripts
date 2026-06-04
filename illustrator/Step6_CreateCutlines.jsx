@@ -39,10 +39,8 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
         cutlinesLayer = doc.layers.add();
         cutlinesLayer.name  = CONFIG.cutlinesLayerName;
         cutlinesLayer.color = UIColors.MAGENTA; // matches manual workflow; cosmetic only
-        var stickersLayer = findLayer(doc, CONFIG.stickersLayerName);
-        if (stickersLayer) {
-            cutlinesLayer.move(stickersLayer, ElementPlacement.PLACEBEFORE);
-        }
+        // Stickers always exists (buildWorkingDocument creates it); place above it.
+        cutlinesLayer.move(findLayer(doc, CONFIG.stickersLayerName), ElementPlacement.PLACEBEFORE);
         log("[step6] created Cutlines layer (Magenta) above Stickers.");
     }
 

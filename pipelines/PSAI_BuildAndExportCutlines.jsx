@@ -47,7 +47,6 @@ var _root = $.fileName
     : Folder.desktop.fsName;
 
 CONFIG.logPath        = _root + "/pipelines/PSAI_BuildAndExportCutlines.log";
-CONFIG.aiTemplatePath = _root + "/assets/Production_File_Template.ai";
 CONFIG.aiPipelinePath = _root + "/pipelines/AI_BuildCutlines.jsx";
 
 // ─── SILHOUETTE PNG EXPORT ────────────────────────────────────────────────────
@@ -329,10 +328,9 @@ function handOffToIllustrator(doc) {
     var bt = new BridgeTalk();
     bt.target = "illustrator";
     bt.body = '$.evalFile(new File("' + esc(CONFIG.aiPipelinePath) + '"));'
-        + 'openTemplateAndImport("'
-        + esc(CONFIG.aiTemplatePath) + '","'
-        + esc(silhPngPath)           + '","'
-        + esc(elementsPath)          + '");';
+        + 'buildDocAndImport("'
+        + esc(silhPngPath)  + '","'
+        + esc(elementsPath) + '");';
     bt.onError = function(e) {
         log("[pipeline] BridgeTalk error: " + e.body);
     };

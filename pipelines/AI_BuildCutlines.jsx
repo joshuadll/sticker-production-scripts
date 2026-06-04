@@ -60,42 +60,19 @@ function _runExportForNesting(doc) {
 
 // ─── ENTRY POINT: BridgeTalk from PSAI_BuildAndExportCutlines.jsx ───────────────────────
 
-// Set by openTemplateAndImport so main() knows not to double-fire Step 7A.
+// Set by buildDocAndImport so main() knows not to double-fire Step 7A.
 var _ranViaHandoff = false;
 
-function openTemplateAndImport(templatePath, silhPngPath, elementsFilePath) {
+// Builds the working document from scratch (no template file) and runs Step 6.
+function buildDocAndImport(silhPngPath, elementsFilePath) {
     _ranViaHandoff = true;
 
     log("[ai-pipeline] === AI_BuildCutlines start ===");
-    log("[ai-pipeline] template:       " + templatePath);
     log("[ai-pipeline] silhouette PNG: " + silhPngPath);
     log("[ai-pipeline] elements file:  " + elementsFilePath);
 
-    if (!templatePath) {
-        log("[ai-pipeline] ERROR | templatePath is empty.");
-        scriptAlert("AI_BuildCutlines: CONFIG.aiTemplatePath is not set in PSAI_BuildAndExportCutlines.jsx.\n"
-            + "Set it to the full path of Production_File_Template.ai and re-run.");
-        return;
-    }
-
-    var templateFile = new File(templatePath);
-    if (!templateFile.exists) {
-        log("[ai-pipeline] ERROR | template not found: " + templatePath);
-        scriptAlert("AI_BuildCutlines: template file not found:\n" + templatePath
-            + "\nLog: " + CONFIG.logPath);
-        return;
-    }
-
-    var doc;
-    try {
-        doc = app.open(templateFile);
-    } catch (e) {
-        log("[ai-pipeline] ERROR | could not open template: " + e.message);
-        scriptAlert("AI_BuildCutlines: failed to open template.\n" + e.message
-            + "\nLog: " + CONFIG.logPath);
-        return;
-    }
-    log("[ai-pipeline] template opened: " + doc.name);
+    var doc = buildWorkingDocument();
+    log("[ai-pipeline] working document built: " + doc.name);
 
     var result;
     try {

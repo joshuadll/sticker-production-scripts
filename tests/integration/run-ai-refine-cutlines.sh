@@ -18,7 +18,7 @@
 set -euo pipefail
 
 STEP="ai-refine-cutlines"
-APP="Adobe Illustrator 2026"
+APP="Adobe Illustrator"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_RefineCutlines.jsx"

@@ -137,7 +137,7 @@ function _s10ExportJpegs(doc, clipData, outFolder, stkCode) {
     // Show all original layers; suppress Color Block for white-background pass.
     _s10ShowAll(snap);
     var colorBlockLayer = _s10LayerCI(doc, CONFIG.colorBlockLayerName);
-    if (colorBlockLayer) colorBlockLayer.visible = false;
+    colorBlockLayer.visible = false;
 
     var opts          = new ExportOptionsJPEG();
     opts.qualitySetting = CONFIG.jpegQuality;
@@ -147,11 +147,8 @@ function _s10ExportJpegs(doc, clipData, outFolder, stkCode) {
                    ExportType.JPEG, opts);
     log("[step10] JPEG white saved.");
 
-    if (colorBlockLayer) {
-        colorBlockLayer.visible = true;
-    } else {
-        log("[step10] WARN | Color Block layer not found: " + CONFIG.colorBlockLayerName);
-    }
+    // Restore Color Block for the green-background pass.
+    colorBlockLayer.visible = true;
 
     doc.exportFile(new File(outFolder + "/" + stkCode + "_preview_green.jpg"),
                    ExportType.JPEG, opts);

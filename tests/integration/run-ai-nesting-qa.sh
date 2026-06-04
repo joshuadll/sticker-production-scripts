@@ -17,7 +17,7 @@
 set -euo pipefail
 
 STEP="ai-nesting-qa"
-APP="Adobe Illustrator 2026"
+APP="Adobe Illustrator"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_NestingQA.jsx"
