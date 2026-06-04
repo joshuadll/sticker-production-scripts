@@ -7,70 +7,92 @@
 [step6] Image Trace complete. 27 path(s) collected (1 background dropped).
 [step6] DROP | trace fragment near Kroje (0% of element box)
 [step6] named | Bratislava(text)
+[step6] caption capsule | Fujara (spine 41pts, r=5pt)
 [step6] named | Fujara
 [step6] named | National Flower
 [step6] named | Slovakia Map
+[step6] caption capsule | Šúľance s Makom (spine 41pts, r=5pt)
 [step6] named | Šúľance s Makom
 [step6] named | UFO Observation Deck, Bridge SNP
+[step6] caption capsule | National Animal - Tatra chamois (spine 2pts, r=5pt)
 [step6] named | National Animal - Tatra chamois
+[step6] caption capsule | Tram (spine 41pts, r=5pt)
 [step6] named | Tram
+[step6] caption capsule | Kroje (spine 41pts, r=5pt)
 [step6] named | Kroje
+[step6] caption capsule | Kraslice (spine 2pts, r=5pt)
 [step6] named | Kraslice
+[step6] caption capsule | Bryndzové halušky (spine 41pts, r=6pt)
 [step6] named | Bryndzové halušky
+[step6] caption capsule | Pirohy (spine 41pts, r=5pt)
 [step6] named | Pirohy
+[step6] caption capsule | Čumil Statue (spine 2pts, r=6pt)
 [step6] named | Čumil Statue
+[step6] caption capsule | Carpathian Wooden Churches (spine 2pts, r=9pt)
 [step6] named | Carpathian Wooden Churches
+[step6] caption capsule | Michael's Gate (spine 2pts, r=6pt)
 [step6] named | Michael's Gate
+[step6] caption capsule | Orava Castle (spine 2pts, r=5pt)
 [step6] named | Orava Castle
+[step6] caption capsule | St Elizabeth's Cathedral (Dóm Svätej Alzbety) (spine 41pts, r=9pt)
 [step6] named | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
+[step6] caption capsule | Old Town Hall (Bratislava) (spine 2pts, r=6pt)
 [step6] named | Old Town Hall (Bratislava)
+[step6] caption capsule | The Blue Church - Church of St. Elizabeth (spine 2pts, r=9pt)
 [step6] named | The Blue Church - Church of St. Elizabeth
+[step6] caption capsule | Bojnice Castle (spine 2pts, r=6pt)
 [step6] named | Bojnice Castle
+[step6] caption capsule | Spiš Castle (spine 2pts, r=6pt)
 [step6] named | Spiš Castle
+[step6] caption capsule | Slovak Paradise National Park (spine 2pts, r=9pt)
 [step6] named | Slovak Paradise National Park
+[step6] caption capsule | St. Martin's Cathedral (spine 2pts, r=5pt)
 [step6] named | St. Martin's Cathedral
+[step6] caption capsule | Devín Castle (spine 2pts, r=5pt)
 [step6] named | Devín Castle
+[step6] caption capsule | Štrbské Pleso (spine 2pts, r=6pt)
 [step6] named | Štrbské Pleso
+[step6] caption capsule | Bratislava Castle (spine 2pts, r=5pt)
 [step6] named | Bratislava Castle
 [step6] done | named=26 unmatched=0 dropped=2
 [pipeline] --- Step 7A: Deepnest export ---
 [pipeline] threshold: 0.82
 [step7a] regular   | ratio=0.922 | Bratislava Castle
-[step7a] regular   | ratio=0.867 | Štrbské Pleso
+[step7a] regular   | ratio=0.868 | Štrbské Pleso
 [step7a] regular   | ratio=0.89 | Devín Castle
-[step7a] regular   | ratio=0.907 | St. Martin's Cathedral
+[step7a] regular   | ratio=0.906 | St. Martin's Cathedral
 [step7a] regular   | ratio=0.902 | Slovak Paradise National Park
 [step7a] regular   | ratio=0.881 | Spiš Castle
-[step7a] regular   | ratio=0.898 | Bojnice Castle
-[step7a] regular   | ratio=0.88 | The Blue Church - Church of St. Elizabeth
-[step7a] regular   | ratio=0.852 | Old Town Hall (Bratislava)
-[step7a] regular   | ratio=0.848 | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
-[step7a] regular   | ratio=0.886 | Orava Castle
-[step7a] regular   | ratio=0.878 | Michael's Gate
-[step7a] regular   | ratio=0.826 | Carpathian Wooden Churches
-[step7a] regular   | ratio=0.935 | Čumil Statue
-[step7a] irregular | ratio=0.753 | Pirohy
-[step7a] irregular | ratio=0.8 | Bryndzové halušky
+[step7a] regular   | ratio=0.897 | Bojnice Castle
+[step7a] regular   | ratio=0.879 | The Blue Church - Church of St. Elizabeth
+[step7a] regular   | ratio=0.851 | Old Town Hall (Bratislava)
+[step7a] regular   | ratio=0.838 | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
+[step7a] regular   | ratio=0.885 | Orava Castle
+[step7a] regular   | ratio=0.877 | Michael's Gate
+[step7a] regular   | ratio=0.827 | Carpathian Wooden Churches
+[step7a] regular   | ratio=0.934 | Čumil Statue
+[step7a] irregular | ratio=0.748 | Pirohy
+[step7a] irregular | ratio=0.73 | Bryndzové halušky
 [step7a] irregular | ratio=0.722 | Kraslice
-[step7a] irregular | ratio=0.703 | Kroje
-[step7a] irregular | ratio=0.611 | Tram
-[step7a] irregular | ratio=0.405 | National Animal - Tatra chamois
-[step7a] regular   | ratio=0.82 | Šúľance s Makom
-[step7a] irregular | ratio=0.687 | Fujara
+[step7a] irregular | ratio=0.7 | Kroje
+[step7a] irregular | ratio=0.608 | Tram
+[step7a] irregular | ratio=0.406 | National Animal - Tatra chamois
+[step7a] irregular | ratio=0.758 | Šúľance s Makom
+[step7a] irregular | ratio=0.68 | Fujara
 [step7a] regular   | ratio=0.838 | Bratislava(text)
 [step7a] irregular | ratio=0.724 | National Flower
 [step7a] irregular | ratio=0.645 | Slovakia Map
 [step7a] regular   | ratio=0.931 | UFO Observation Deck, Bridge SNP
-[step7a] classified: 17 regular, 9 irregular (threshold=0.82)
-[step7a] export | 17 item(s) -> /tmp/ai-build-cutlines-working_regular.svg
-[step7a] export | 9 item(s) -> /tmp/ai-build-cutlines-working_irregular.svg
+[step7a] classified: 16 regular, 10 irregular (threshold=0.82)
+[step7a] export | 16 item(s) -> /tmp/ai-build-cutlines-working_regular.svg
+[step7a] export | 10 item(s) -> /tmp/ai-build-cutlines-working_irregular.svg
 [step7a] exported: /tmp/ai-build-cutlines-working_regular.svg
 [step7a] exported: /tmp/ai-build-cutlines-working_irregular.svg
 [pipeline] === AI_BuildCutlines done ===
 Done.
 
-  Regular   (17 paths): /tmp/ai-build-cutlines-working_regular.svg
-  Irregular (9 paths): /tmp/ai-build-cutlines-working_irregular.svg
+  Regular   (16 paths): /tmp/ai-build-cutlines-working_regular.svg
+  Irregular (10 paths): /tmp/ai-build-cutlines-working_irregular.svg
 
 Review both SVGs now open in Illustrator.
 Move any misclassified paths between files, then File > Save each.

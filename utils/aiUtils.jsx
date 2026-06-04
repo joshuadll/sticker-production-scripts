@@ -238,6 +238,77 @@ function buildPlate(layer, aiBounds) {
     return p;
 }
 
+// Builds a caption-plate capsule PathItem that FOLLOWS a fitted spine (curved or
+// tilted captions), instead of an axis-aligned pill. spinePts is an array of
+// {x,y} in AI points (y-up); radius in points. This is the AI-side twin of
+// Step 3B's _capsulePolygon (Photoshop) — same offset-spine-plus-end-caps math —
+// so the cutline's caption portion matches the real White pill. Returns a filled,
+// unstroked PathItem ready for deriveCutline's boolean union.
+function buildCapsuleFromSpine(layer, spinePts, radius) {
+    var poly = _capsulePolygon(spinePts, radius);
+    var p = layer.pathItems.add();
+    p.setEntirePath(poly);
+    p.closed  = true;   // setEntirePath can drop the closed flag
+    p.filled  = true;
+    p.stroked = false;
+    return p;
+}
+
+// Offsets a spine polyline by ±radius into a closed capsule polygon (rounded ends).
+// Returns an array of [x,y] for setEntirePath. Ported from Step3B_CaptionWhite.jsx.
+function _capsulePolygon(spine, r) {
+    var n = spine.length, i;
+    var top = [], bot = [];
+
+    for (i = 0; i < n; i++) {
+        // Local tangent from neighbours (forward/backward diff at the ends).
+        var p0 = spine[i > 0 ? i - 1 : i];
+        var p1 = spine[i < n - 1 ? i + 1 : i];
+        var tx = p1.x - p0.x, ty = p1.y - p0.y;
+        var len = Math.sqrt(tx * tx + ty * ty) || 1;
+        var nx = -ty / len, ny = tx / len;   // unit normal
+        top.push([spine[i].x + r * nx, spine[i].y + r * ny]);
+        bot.push([spine[i].x - r * nx, spine[i].y - r * ny]);
+    }
+
+    var endT   = _capUnit(spine[n - 1].x - spine[n - 2 >= 0 ? n - 2 : 0].x,
+                          spine[n - 1].y - spine[n - 2 >= 0 ? n - 2 : 0].y);
+    var startT = _capUnit(spine[0].x - spine[1 < n ? 1 : 0].x,
+                          spine[0].y - spine[1 < n ? 1 : 0].y);
+
+    var poly = [], k;
+    for (k = 0; k < top.length; k++) poly.push(top[k]);                // one edge
+    _appendCap(poly, spine[n - 1], r, top[n - 1], bot[n - 1], endT);   // end cap
+    for (k = bot.length - 1; k >= 0; k--) poly.push(bot[k]);           // other edge
+    _appendCap(poly, spine[0], r, bot[0], top[0], startT);             // start cap
+    return poly;
+}
+
+// Appends a semicircular arc of points around centre C (radius r), from fromPt to
+// toPt, sweeping through the outward direction `through`.
+function _appendCap(poly, C, r, fromPt, toPt, through) {
+    var steps = 10;
+    var a0 = Math.atan2(fromPt[1] - C.y, fromPt[0] - C.x);
+    var a1 = Math.atan2(toPt[1]   - C.y, toPt[0]   - C.x);
+    var sweep = a1 - a0;
+    while (sweep <= -Math.PI) sweep += 2 * Math.PI;
+    while (sweep > Math.PI)  sweep -= 2 * Math.PI;
+    var midAng = a0 + sweep / 2;
+    if (Math.cos(midAng) * through[0] + Math.sin(midAng) * through[1] < 0) {
+        sweep += (sweep > 0 ? -2 * Math.PI : 2 * Math.PI);
+    }
+    var s;
+    for (s = 1; s < steps; s++) {
+        var ang = a0 + sweep * (s / steps);
+        poly.push([C.x + r * Math.cos(ang), C.y + r * Math.sin(ang)]);
+    }
+}
+
+function _capUnit(x, y) {
+    var len = Math.sqrt(x * x + y * y) || 1;
+    return [x / len, y / len];
+}
+
 // Derives the fused cutline = boolean union of element_outline and plate.
 // Duplicates both inputs so the originals survive as separable components.
 // Returns the resulting item (PathItem, CompoundPathItem, or wrapping GroupItem).

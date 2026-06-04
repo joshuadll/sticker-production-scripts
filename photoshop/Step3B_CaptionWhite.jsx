@@ -15,6 +15,33 @@
 // Stamp elements ([ST]) are grouped with their White Base_Cutline only (no caption).
 //
 // Returns: { grouped, skipped[] }
+//
+// ── Caption-spine carry (Mechanism B) ─────────────────────────────────────────
+// The White pill is a capsule fitted to the text spine (curved/tilted captions
+// follow the art). Step 6 in Illustrator rebuilds the caption parametrically, so
+// to make the cutline FOLLOW that curve we hand the real spine+radius across the
+// PS→AI seam. createWhiteFromText computes them; we stash them here keyed by
+// display name (in PSD px, as offsets from the White pill's pre-snap bbox so the
+// later snapCaptionToBorder translation is irrelevant). PSAI's writeElementsFile
+// re-anchors them to the final White bounds and writes them to the sidecar.
+// WC-only consumer (GC keeps the parametric pill). PSAI always runs this step in
+// the same session as the sidecar write, so every WC caption always carries a
+// spine — Step 6 relies on that (it builds the WC capsule unconditionally).
+
+var WC_CAPTION_SPINES = {};   // displayName -> { off:[{dx,dy}...], radius:Number }
+
+// Records a caption's spine offsets (relative to the White pill's current bbox
+// top-left, in px) + capsule radius, keyed by display name. snapCaptionToBorder
+// only translates the pill, so bbox-relative offsets survive the move unchanged.
+function _stashCaptionSpine(displayName, whiteLayer, spine, radius) {
+    if (!displayName || !spine || spine.length < 2 || !radius) return;
+    var b = _layerBoundsPx(whiteLayer);   // [L,T,R,B] at the current (pre-snap) position
+    var off = [];
+    for (var i = 0; i < spine.length; i++) {
+        off.push({ dx: spine[i].x - b[0], dy: spine[i].y - b[1] });
+    }
+    WC_CAPTION_SPINES[displayName] = { off: off, radius: radius };
+}
 
 function runCaptionWhite(doc) {
     var origUnits = app.preferences.rulerUnits;
@@ -152,7 +179,16 @@ function groupNoCaption(doc, elementsGroup, soLayer, groupName) {
 
 function groupStandard(doc, elementsGroup, soLayer, textLayer, groupName) {
     var wbcLayer   = findAdjacentCutline(doc, soLayer);
-    var whiteLayer = createWhiteFromText(doc, textLayer);
+    var whiteInfo  = createWhiteFromText(doc, textLayer);
+    var whiteLayer = whiteInfo.layer;
+
+    // Carry the real capsule (spine + radius) to Illustrator so Step 6 can rebuild
+    // a caption cutline that follows the curve, not an axis-aligned bbox pill.
+    // Stash BEFORE snapCaptionToBorder: offsets are bbox-relative, so the upcoming
+    // translation doesn't matter (see Mechanism B header).
+    var parsedStd = parseLayerName(groupName);
+    _stashCaptionSpine(parsedStd ? parsedStd.displayName : groupName,
+        whiteLayer, whiteInfo.spine, whiteInfo.radius);
 
     // Re-seat text + pill so the pill overlaps the white border (falls back to the
     // SO when no border layer exists). Travels along pill-centre → art-centre.
@@ -261,6 +297,10 @@ function groupWithPlate(doc, elementsGroup, soLayer, textLayer, groupName) {
 //   whitePenPadPx       — px added to detected line-height → pen diameter
 //   whiteStraightSnapPx — if the fitted spine stays within this of flat, force a
 //                         perfectly straight pill (kills micro-wobble on straight text)
+// Returns { layer, spine:[{x,y}...], radius } — the spine + radius are the actual
+// capsule geometry (px), surfaced so the caller can carry them to Illustrator (see
+// Mechanism B header). spine is always the one that was filled (straight fallback,
+// quad fit, or multi-line override).
 function createWhiteFromText(doc, textLayer) {
     var spine = _sampleTextSpine(doc, textLayer); // { pts, heights, bounds }
 
@@ -270,10 +310,13 @@ function createWhiteFromText(doc, textLayer) {
     var bnds = spine ? spine.bounds : _layerBoundsPx(textLayer);
     var boxH = bnds[3] - bnds[1];
 
+    var usedSpine, usedRadius;
+
     // Degenerate sample (too few slices) → fall back to a bounding-box stadium.
     if (!spine || spine.pts.length < 3) {
-        var fbR = boxH / 2 + CONFIG.whitePenPadPx / 2;
-        _fillCapsule(doc, _straightSpine(bnds[0], bnds[2], (bnds[1] + bnds[3]) / 2), fbR);
+        usedRadius = boxH / 2 + CONFIG.whitePenPadPx / 2;
+        usedSpine  = _straightSpine(bnds[0], bnds[2], (bnds[1] + bnds[3]) / 2);
+        _fillCapsule(doc, usedSpine, usedRadius);
     } else {
         var fit = _quadFitSpine(spine.pts, bnds[0], bnds[2]); // { spine, straight }
 
@@ -297,13 +340,14 @@ function createWhiteFromText(doc, textLayer) {
             ? boxH
             : _percentile(spine.heights, CONFIG.whiteCurvedHeightPctile);
 
-        var radius = penH / 2 + CONFIG.whitePenPadPx / 2;
-        _fillCapsule(doc, fit.spine, radius);
+        usedRadius = penH / 2 + CONFIG.whitePenPadPx / 2;
+        usedSpine  = fit.spine;
+        _fillCapsule(doc, usedSpine, usedRadius);
     }
 
     doc.selection.deselect();
     whiteLayer.move(textLayer, ElementPlacement.PLACEAFTER);
-    return whiteLayer;
+    return { layer: whiteLayer, spine: usedSpine, radius: usedRadius };
 }
 
 // Returns the p-quantile (0..1) of a numeric array. Array need not be sorted.

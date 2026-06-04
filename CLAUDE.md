@@ -143,8 +143,14 @@ merges the Elements group to a flat ArtLayer and loads that layer's transparency
 PSAI_BuildAndExportCutlines exports (written before BridgeTalk handoff, sibling to PSD):
   {name}_silhouette.png   ← element-art-only flat black PNG (captions excluded; Step 6 adds them back)
   {name}_elements.txt     ← PSD dimensions + per element:
-                            displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom
+                            displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom[|capRadius|x1,y1;x2,y2;…]
                             (stamps write 0|0|0|0|0 for the cap fields)
+                            Spine suffix (WC captions only): capRadius + the fitted
+                            White-pill spine points (px). Step 6 rebuilds the real
+                            curved/tilted caption capsule from it, so the cutline follows
+                            the caption. GC/stamps have no suffix (11 fields) → GC uses the
+                            parametric pill. PSAI always runs Step 3B in-session, so every
+                            WC caption always carries a spine (Step 6 relies on this).
   {name}_elements/        ← per-element trimmed PNGs (one per element group, transparent background)
                             used by AI_ImportNesting / Step7B to populate the Stickers layer after Deepnest
 
@@ -166,11 +172,14 @@ Offset Path layer.
 Each non-stamp element is a GroupItem named `[Display Name]` in the Cutlines layer:
   [Display Name]          ← visible fused cutline path = Unite(element_outline, plate)
   [Display Name] outline  ← element-art-only trace (hidden; separable component)
-  [Display Name] plate    ← parametric caption pill (hidden; separable component)
+  [Display Name] plate    ← caption pill (hidden; separable component). WC: the real
+                            curved/tilted capsule rebuilt from the PS spine+radius (sidecar
+                            suffix) so the cutline follows the caption. GC: axis-aligned
+                            parametric pill (buildPlate).
 
 The cutline is still one closed contour per sticker (nesting requires this). The components
 are kept separable so caption normalization in Steps 8a/8b is a re-Unite, not path surgery.
-Stamp elements: a placed copy of Stamp Cutline Template.ai named `[Display Name]` (no group).
+Stamp elements (ST): traced silhouette path named `[Display Name]` (PathItem, no group). Stamp cutline design approach TBD — `assets/Stamp Cutline Template.ai` is committed but not currently placed by any script.
 
 GroupItem.note carries caption metadata (set by Step 6, survives the Deepnest gap):
   Format: "{styleCode}|{capLines}"  e.g. "GC|2"
@@ -271,7 +280,7 @@ try {
 
 Before sending, PSAI_BuildAndExportCutlines exports two sidecar files next to the PSD:
 - `{name}_silhouette.png` — element-art-only flat black PNG (captions excluded)
-- `{name}_elements.txt`   — PSD dimensions + `displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom` per element
+- `{name}_elements.txt`   — PSD dimensions + `displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom` per element, plus an optional `|capRadius|x1,y1;x2,y2;…` spine suffix for WC captions (real capsule geometry; see the layer-stack section)
 
 Then sends both sidecar paths to AI_BuildCutlines.jsx via BridgeTalk. No template
 file is passed — the AI side builds its own working document (see below).

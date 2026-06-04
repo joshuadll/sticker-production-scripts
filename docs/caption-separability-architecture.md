@@ -38,7 +38,7 @@ Each sticker is an Illustrator GroupItem with these named members:
 |---|---|---|---|
 | `art` | placed raster | colored illustration (final placement) | yes |
 | `element_outline` | PathItem | cut path of the illustration **without** caption | hidden/locked |
-| `plate` | PathItem | caption pill (GC) / white-base rect (WC), regenerable from `caption_meta` | hidden/locked |
+| `plate` | PathItem | caption pill. **WC:** the real curved/tilted capsule, rebuilt in AI from the PS spine+radius (sidecar suffix) so the cutline follows the caption. **GC:** axis-aligned parametric pill from `caption_meta` | hidden/locked |
 | `cutline` | PathItem | `Unite(element_outline, plate)` — **the only thing nesting packs** | yes |
 
 Implemented as a GroupItem in the Cutlines layer whose members are named
@@ -55,6 +55,7 @@ appended after the existing 6 fields **only when `separableCaptions` is on**:
 | `styleCode` | WC / GC / ST — selects plate treatment (existing field) |
 | `caption_lines` | line count → plate height 0.5 / 0.8 cm (GC) |
 | `capLeft\|capTop\|capRight\|capBottom` | caption region bounds (px) → plate position + size, transformed to AI like element bounds |
+| `capRadius\|x1,y1;x2,y2;…` (WC only) | the White pill's fitted spine + capsule radius (px) → Step 6 rebuilds the **real** curved/tilted capsule (`buildCapsuleFromSpine`) instead of an axis-aligned pill. Captured in Step 3B (`createWhiteFromText`), re-anchored to the final White bounds at sidecar-write. GC lines omit it and use the parametric pill. |
 
 Elements with no caption (e.g. stamps) append `0|0|0|0|0` and are skipped by the
 Unite path.
@@ -97,8 +98,10 @@ Today: place fused PNG → Image Trace → one path per element
 
 New, per element:
 1. Image Trace the element-only silhouette → `element_outline`.
-2. Build `plate` parametrically from `caption_meta` (height locked to spec,
-   width follows caption extent, positioned at `caption_anchor`).
+2. Build `plate`: **WC with a spine suffix** → `buildCapsuleFromSpine` rebuilds the
+   real curved/tilted capsule from the PS spine+radius (sidecar), so the caption
+   cutline follows the actual pill. **Otherwise** → parametric pill from
+   `caption_meta` (height locked to spec, width follows caption extent).
 3. `cutline = Unite(element_outline, plate)`.
 4. Assemble the per-element group (contract above); name by positional match as
    today. Nesting (Step 7A) still exports `cutline` only.

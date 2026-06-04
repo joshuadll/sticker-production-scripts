@@ -239,12 +239,42 @@ function _readElementsFile(filePath) {
                     right:  parseInt(parts[9],  10),
                     bottom: parseInt(parts[10], 10)
                 };
+                // WC captions append |{radius}|x1,y1;x2,y2;... (px) — the real fitted
+                // capsule. GC has no suffix (11 fields) and uses the parametric pill.
+                if (parts.length >= 13) {
+                    el.caption.radius = parseFloat(parts[11]);
+                    el.caption.spine  = _parseSpine(parts[12]);
+                }
             }
         }
         elements.push(el);
     }
 
     return { psdWidth: psdWidth, psdHeight: psdHeight, elements: elements };
+}
+
+// Parses a serialised spine "x1,y1;x2,y2;..." (px) into [{x,y}...], or null.
+function _parseSpine(s) {
+    if (!s) return null;
+    var pairs = s.split(";");
+    var pts = [], i;
+    for (i = 0; i < pairs.length; i++) {
+        var xy = pairs[i].split(",");
+        if (xy.length < 2) continue;
+        var x = parseFloat(xy[0]), y = parseFloat(xy[1]);
+        if (isNaN(x) || isNaN(y)) continue;
+        pts.push({ x: x, y: y });
+    }
+    return pts.length ? pts : null;
+}
+
+// Transforms a single PSD pixel point to AI document points (AI y increases
+// upward). Point twin of _psBoundsToAi.
+function _psPointToAi(px, py, data, pngLeft, pngTop, pngWidth, pngHeight) {
+    return {
+        x: pngLeft + (px / data.psdWidth)  * pngWidth,
+        y: pngTop  - (py / data.psdHeight) * pngHeight
+    };
 }
 
 // Transforms PSD pixel bounds (left, top, right, bottom) to AI document points
@@ -290,10 +320,26 @@ function _buildSeparableCutline(doc, layer, element, elementOutline,
     doc.activeLayer = layer;
     var cap = element.caption;
 
-    var aiBounds = _psBoundsToAi(cap.left, cap.top, cap.right, cap.bottom,
-                       data, pngLeft, pngTop, pngWidth, pngHeight);
-
-    var plate   = buildPlate(layer, aiBounds);
+    // WC captions carry the real fitted spine + radius (from PS) → rebuild the
+    // actual curved/tilted capsule so the cutline follows the caption. GC keeps the
+    // axis-aligned parametric pill (its plate is a straight rect + gouache template,
+    // not a text-spine capsule).
+    var plate;
+    if (element.styleCode === "WC") {
+        var aiSpine = [], j;
+        for (j = 0; j < cap.spine.length; j++) {
+            aiSpine.push(_psPointToAi(cap.spine[j].x, cap.spine[j].y,
+                data, pngLeft, pngTop, pngWidth, pngHeight));
+        }
+        var aiRadius = (cap.radius / data.psdWidth) * pngWidth;
+        plate = buildCapsuleFromSpine(layer, aiSpine, aiRadius);
+        log("[step6] caption capsule | " + element.displayName
+            + " (spine " + aiSpine.length + "pts, r=" + Math.round(aiRadius) + "pt)");
+    } else {
+        var aiBounds = _psBoundsToAi(cap.left, cap.top, cap.right, cap.bottom,
+                           data, pngLeft, pngTop, pngWidth, pngHeight);
+        plate = buildPlate(layer, aiBounds);
+    }
     var cutline = deriveCutline(elementOutline, plate);
 
     strokeRecursive(cutline, CONFIG.cutlineStrokePt, blackCmyk());

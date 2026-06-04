@@ -103,6 +103,7 @@ function captionInfo(grp) {
     var left = null, top = null, right = null, bottom = null;
     var lines = 1;
     var found = false;
+    var whiteLeft = null, whiteTop = null;   // White pill's own bounds (spine re-anchor)
 
     function absorb(layer) {
         var b = layer.bounds;
@@ -112,6 +113,7 @@ function captionInfo(grp) {
         if (right  === null || r  > right)  right  = r;
         if (bottom === null || bo > bottom) bottom = bo;
         found = true;
+        return [l, t, r, bo];
     }
 
     var a;
@@ -126,7 +128,8 @@ function captionInfo(grp) {
                 if (parts.length > lines) lines = parts.length;
             }
         } else if (al.name === "White") {
-            absorb(al);
+            var wb = absorb(al);
+            whiteLeft = wb[0]; whiteTop = wb[1];
         }
     }
 
@@ -143,8 +146,29 @@ function captionInfo(grp) {
         left:   Math.round(left),
         top:    Math.round(top),
         right:  Math.round(right),
-        bottom: Math.round(bottom)
+        bottom: Math.round(bottom),
+        whiteLeft: whiteLeft === null ? null : Math.round(whiteLeft),
+        whiteTop:  whiteTop  === null ? null : Math.round(whiteTop)
     };
+}
+
+// Builds the sidecar spine suffix for one caption, or "" if no spine was stashed
+// (non-WC, cold start, or no White pill found). Re-anchors the bbox-relative spine
+// offsets captured in Step 3B to the White pill's FINAL position, then serialises
+// as "|{radius}|x1,y1;x2,y2;..." (absolute px). Step 6 maps these PSD px to AI.
+function captionSpineSuffix(displayName, cap) {
+    if (typeof WC_CAPTION_SPINES === "undefined") return "";
+    var rec = WC_CAPTION_SPINES[displayName];
+    if (!rec || !rec.off || rec.off.length < 2) return "";
+    if (cap.whiteLeft === null || cap.whiteTop === null) return "";
+
+    var pts = [];
+    for (var i = 0; i < rec.off.length; i++) {
+        var px = Math.round(cap.whiteLeft + rec.off[i].dx);
+        var py = Math.round(cap.whiteTop  + rec.off[i].dy);
+        pts.push(px + "," + py);
+    }
+    return "|" + Math.round(rec.radius) + "|" + pts.join(";");
 }
 
 // ─── ELEMENTS SIDECAR ────────────────────────────────────────────────────────
@@ -188,11 +212,14 @@ function writeElementsFile(doc) {
 
         // Append caption metadata so Step 6 can build the plate parametrically.
         // Format: |capLines|capLeft|capTop|capRight|capBottom  (px; zeros if none).
+        // Optional spine suffix (WC only): |capRadius|x1,y1;x2,y2;... lets Step 6
+        // rebuild the real curved/tilted capsule instead of an axis-aligned pill.
         var cap = captionInfo(grp);
         if (cap) {
             line += "|" + cap.lines
                 + "|" + cap.left + "|" + cap.top
-                + "|" + cap.right + "|" + cap.bottom;
+                + "|" + cap.right + "|" + cap.bottom
+                + captionSpineSuffix(parsed.displayName, cap);
         } else {
             line += "|0|0|0|0|0";
         }
