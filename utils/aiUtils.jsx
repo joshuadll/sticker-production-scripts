@@ -238,54 +238,40 @@ function buildPlate(layer, aiBounds) {
 // If the junction doesn't match expectations, swap this body — callers only
 // depend on the return value. See docs/caption-separability-architecture.md.
 function deriveCutline(outline, plate) {
-    // Snapshot the container's existing top-level items so we can identify and
-    // remove anything the Pathfinder op leaves behind. expandStyle in some AI
-    // versions strands the duplicated operands as unnamed filled siblings — if
-    // left in place they pollute the Cutlines layer (visible black blobs in
-    // exports, ghost paths in nesting). See docs/caption-separability-architecture.md.
     var parent = outline.parent;
-    var before = [];
-    var i, j;
-    for (i = 0; i < parent.pageItems.length; i++) { before.push(parent.pageItems[i]); }
 
     var dupOutline = outline.duplicate();
     var dupPlate   = plate.duplicate();
 
-    // Use the deselectall menu command — assigning app.selection = null is
-    // unreliable in Illustrator and can deadlock on redraw once the document
-    // has accumulated items.
-    app.executeMenuCommand("deselectall");
-    dupOutline.selected = true;
-    dupPlate.selected   = true;
+    // Build the union group via the DOM so the operand set is deterministic
+    // regardless of the global selection (the "group" menu command no-ops here).
+    var unionGroup = parent.groupItems.add();
+    dupOutline.move(unionGroup, ElementPlacement.PLACEATEND);
+    dupPlate.move(unionGroup, ElementPlacement.PLACEATEND);
 
-    // Non-destructive Pathfinder "Add", then expand to a concrete path.
-    // Suppress the advisory "Pathfinder effects should be applied to groups"
-    // dialog — it's only a warning; Add works fine on the two loose paths.
+    // Clear the selection one item at a time via the DOM. The two other ways to
+    // clear are both ruled out on the heavy working doc: `app.selection = null`
+    // deadlocks on redraw once the doc accumulates items, and a cross-document
+    // temp doc crashes Illustrator (stale live-object reference). `deselectall`
+    // (menu) silently no-ops. Per-item `.selected = false` is the remaining
+    // lightweight, in-place, crash-free option.
+    var sel = app.selection;
+    var snap = [];
+    var k;
+    for (k = 0; k < sel.length; k++) { snap.push(sel[k]); }
+    for (k = 0; k < snap.length; k++) { try { snap[k].selected = false; } catch (e) {} }
+
+    unionGroup.selected = true;
+
+    // Live Pathfinder Add unites the selected group's children; expandStyle bakes
+    // the live effect into concrete geometry. (No scriptable DOM equivalent.)
     var prevLevel = app.userInteractionLevel;
     app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
     app.executeMenuCommand("Live Pathfinder Add");
     app.executeMenuCommand("expandStyle");
     app.userInteractionLevel = prevLevel;
 
-    var result = app.selection[0];
-
-    // Remove every NEW top-level item that isn't the union result — these are the
-    // stranded duplicate operands. Collect first, then remove (live collection).
-    var leftovers = [];
-    for (i = 0; i < parent.pageItems.length; i++) {
-        var it = parent.pageItems[i];
-        if (it === result) { continue; }
-        var wasBefore = false;
-        for (j = 0; j < before.length; j++) {
-            if (before[j] === it) { wasBefore = true; break; }
-        }
-        if (!wasBefore) { leftovers.push(it); }
-    }
-    for (i = 0; i < leftovers.length; i++) {
-        try { leftovers[i].remove(); } catch (e) {}
-    }
-
-    return result;
+    return app.selection[0];
 }
 
 // Assembles the per-element bundle as a GroupItem so the components ride along
