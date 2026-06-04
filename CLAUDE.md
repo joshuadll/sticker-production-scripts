@@ -105,6 +105,7 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   samplePathToPolygons, pointInPolygon, segmentsIntersect,
   polygonsOverlap, boundsWithin, minPolygonSetDistance,
   parseNote, getOrCreateHalfcutLayer, drawHalfcutLine,
+  buildWorkingDocument (builds A4/CMYK doc + Stickers/Grid/Color Block layers, no template),
   log, scriptAlert, findLayer, findPathInLayer
 
 ---
@@ -157,8 +158,9 @@ Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
 
 Step 8c does **pure-geometry QA** — no Offset Path layer is created. It measures
 inter-cutline distance directly (< 2mm → fail) and checks cut-line bounds against
-the **Margin** layer rect (else computed from working area). Violations are flagged
-red on the cut line. No script writes the Margin or Offset Path layers.
+a safe area computed from the artboard top-left + working-area + margins (CONFIG).
+Violations are flagged red on the cut line. No script reads or writes a Margin or
+Offset Path layer.
 
 ## Cutline structure (set by Step 6 script)
 Each non-stamp element is a GroupItem named `[Display Name]` in the Cutlines layer:
@@ -271,11 +273,11 @@ Before sending, PSAI_BuildAndExportCutlines exports two sidecar files next to th
 - `{name}_silhouette.png` — element-art-only flat black PNG (captions excluded)
 - `{name}_elements.txt`   — PSD dimensions + `displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom` per element
 
-Then sends all three paths to AI_BuildCutlines.jsx via BridgeTalk.
+Then sends both sidecar paths to AI_BuildCutlines.jsx via BridgeTalk. No template
+file is passed — the AI side builds its own working document (see below).
 
 ```javascript
 // In PSAI_BuildAndExportCutlines.jsx — paths are auto-resolved from _root ($.fileName):
-// CONFIG.aiTemplatePath = _root + "/assets/Production_File_Template.ai";
 // CONFIG.aiPipelinePath = _root + "/pipelines/AI_BuildCutlines.jsx";
 // CONFIG.bridgeTalkTimeout = 20;  // seconds
 
@@ -286,19 +288,25 @@ function handOffToIllustrator(doc) {
     var bt = new BridgeTalk();
     bt.target = "illustrator";
     bt.body = '$.evalFile(new File("' + esc(CONFIG.aiPipelinePath) + '"));'
-        + 'openTemplateAndImport("' + esc(CONFIG.aiTemplatePath) + '","'
-        + esc(silhPngPath) + '","' + esc(elementsPath) + '");';
+        + 'buildDocAndImport("' + esc(silhPngPath) + '","' + esc(elementsPath) + '");';
     bt.send(CONFIG.bridgeTalkTimeout);
 }
 
 // In AI_BuildCutlines.jsx — entry point called by BridgeTalk (runs Steps 6 + 7A):
-function openTemplateAndImport(templatePath, silhPngPath, elementsFilePath) {
-    var doc = app.open(new File(templatePath));
+function buildDocAndImport(silhPngPath, elementsFilePath) {
+    var doc = buildWorkingDocument();   // aiUtils — builds A4/CMYK doc + layers, no template
     var result = runCreateCutlines(doc, silhPngPath, elementsFilePath);
     // Halts here if result.unmatched > 0 — artist renames paths, then re-runs directly.
     // If unmatched == 0, continues automatically to runDeepnestExport(doc).
 }
 ```
+
+**The AI pipeline has no template-file dependency.** `buildWorkingDocument()` in
+aiUtils.jsx creates the working document from scratch — A4 (210×297mm) CMYK, with
+layers (top→bottom) Stickers (empty) > Grid (vector 1-inch lines, locked) >
+Color Block (full-sheet rect, fill CMYK(55,0,100,0), locked). Cutlines/Halfcut are
+added later by their steps, above Stickers. `assets/Production_File_Template.ai` is
+no longer used.
 
 ### Defensive guards — validate every assumption before acting
 
@@ -349,10 +357,13 @@ Load transparency:  putEnumerated("Chnl","Chnl","Trsp") form — the compound pu
 Live collection:    doc.layers re-indexes when layers are resized/added — always snapshot refs into an array before iterating if you modify layers in the loop
 
 ## Shared asset paths (committed to repo — no config needed)
-assets/Production_File_Template.ai
 assets/Stamp Cutline Template.ai
 assets/Peeling Tab Asset.ai
 All paths resolve via: _root + "/assets/FileName.ai" where _root = new File($.fileName).parent.parent.fsName
+
+Note: `assets/Production_File_Template.ai` is NOT used by the pipeline. The AI working
+document is built in code by `buildWorkingDocument()` (aiUtils.jsx); the template file
+remains in the repo only as a manual reference.
 
 ## Per-SKU source folder convention
 The source folder passed to PS_BuildElements may contain an optional file:
