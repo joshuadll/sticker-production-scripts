@@ -1,10 +1,10 @@
 // Step7A_DeepnestExport.jsx — Phase function only.
 // #included by AI_BuildCutlines.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
-// Classifies every PathItem and CompoundPathItem in the Cutlines layer as
-// "regular" or "irregular" using the extent ratio:
+// Classifies every top-level item in the Cutlines layer as "regular" or
+// "irregular" using the extent ratio:
 //
-//   extentRatio = Math.abs(path.area) / (boundsWidth * boundsHeight)
+//   extentRatio = pathArea / (boundsWidth * boundsHeight)
 //
 // Regular shapes (extentRatio >= CONFIG.deepnestRectThreshold) fill their
 // bounding box well and should be run in Deepnest with 90°-only rotation.
@@ -14,7 +14,7 @@
 //   {docName}_regular.svg
 //   {docName}_irregular.svg
 //
-// Each export hides paths that don't belong, exports SVG, then restores visibility.
+// Each export hides items that don't belong, exports SVG, then restores visibility.
 //
 // Returns: { regular, irregular, regularPath, irregularPath }
 
@@ -27,39 +27,36 @@ function runDeepnestExport(doc) {
         return null;
     }
 
-    // ── 2. Collect and classify paths ─────────────────────────────────────────
+    // ── 2. Collect and classify top-level items ───────────────────────────────
     var regularNames   = {};
     var irregularNames = {};
     var regularCount   = 0;
     var irregularCount = 0;
 
-    var allPaths = _collectPaths(cutlinesLayer);
+    var entries = _collectCutlineEntries(cutlinesLayer);
     var i;
-    for (i = 0; i < allPaths.length; i++) {
-        var path   = allPaths[i];
-        var bounds = path.geometricBounds; // [left, top, right, bottom]
-        var w      = Math.abs(bounds[2] - bounds[0]);
-        var h      = Math.abs(bounds[1] - bounds[3]);
-        var bboxArea = w * h;
+    for (i = 0; i < entries.length; i++) {
+        var entry    = entries[i];
+        var bounds   = entry.bounds;
+        var bboxArea = _bboxArea(bounds);
 
-        // Guard: skip zero-area bounding boxes (degenerate paths).
         if (bboxArea === 0) {
-            log("[step7a] SKIP | zero bbox — " + path.name);
+            log("[step7a] SKIP | zero bbox — " + entry.name);
             continue;
         }
 
-        var extentRatio = Math.abs(path.area) / bboxArea;
+        var extentRatio = entry.area / bboxArea;
         var isRegular   = extentRatio >= CONFIG.deepnestRectThreshold;
 
         log("[step7a] " + (isRegular ? "regular  " : "irregular")
             + " | ratio=" + _fmt(extentRatio)
-            + " | " + path.name);
+            + " | " + entry.name);
 
         if (isRegular) {
-            regularNames[path.name] = true;
+            regularNames[entry.name] = true;
             regularCount++;
         } else {
-            irregularNames[path.name] = true;
+            irregularNames[entry.name] = true;
             irregularCount++;
         }
     }
@@ -97,26 +94,84 @@ function runDeepnestExport(doc) {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-// Returns a flat array of all PathItems and CompoundPathItems in a layer.
-function _collectPaths(layer) {
-    var result = [];
-    var i;
-    for (i = 0; i < layer.pathItems.length; i++) {
-        result.push(layer.pathItems[i]);
+// Returns one entry per top-level item in the Cutlines layer:
+//   { name, item, area (for extent ratio), bounds [l,t,r,b] }
+// Uses layer.pageItems to stay top-level only — layer.pathItems is recursive
+// and would pick up hidden sub-paths inside GroupItems.
+function _collectCutlineEntries(layer) {
+    var entries = [];
+    var i, j, item, sub, bounds;
+
+    for (i = 0; i < layer.pageItems.length; i++) {
+        item = layer.pageItems[i];
+
+        if (item.typename === "GroupItem") {
+            // Skip unnamed groups — expandStyle artifacts leaked by deriveCutline.
+            if (!item.name || item.name.length === 0) { continue; }
+            // Caption element group: find the cutline child (named = group.name).
+            // Use pageItems on the group — GroupItem has no .pathItems collection.
+            sub = null;
+            for (j = 0; j < item.pageItems.length; j++) {
+                if (item.pageItems[j].name === item.name) { sub = item.pageItems[j]; break; }
+            }
+            bounds = sub ? sub.geometricBounds : item.geometricBounds;
+            entries.push({ name: item.name, item: item,
+                           area: sub ? _pathArea(sub) : _bboxArea(bounds) * 0.7,
+                           bounds: bounds });
+
+        } else if (item.typename === "PathItem" || item.typename === "CompoundPathItem") {
+            // Skip unnamed paths — these are dupOutline leftovers leaked by deriveCutline.
+            if (!item.name || item.name.replace(/\s/g, "") === "") { continue; }
+            // No-caption bare path (e.g. Slovakia Map, Bratislava(text)).
+            entries.push({ name: item.name, item: item,
+                           area: _pathArea(item), bounds: item.geometricBounds });
+
+        } else if (item.typename === "PlacedItem") {
+            // Stamp template — ovals have ~0.785 fill ratio; always classify regular.
+            bounds = item.geometricBounds;
+            entries.push({ name: item.name, item: item,
+                           area: 0.785 * _bboxArea(bounds), bounds: bounds });
+        }
     }
-    for (i = 0; i < layer.compoundPathItems.length; i++) {
-        result.push(layer.compoundPathItems[i]);
-    }
-    return result;
+    return entries;
 }
 
-// Hides all paths whose names are NOT in keepNames (and hides non-Cutlines layers),
-// exports as SVG, then restores visibility. Illustrator has no doc.duplicate().
+// Returns the absolute area of a path-like item.
+// CompoundPathItem has no .area — sum sub-path areas.
+// GroupItem (expandStyle sometimes wraps result in a group) — recurse via pageItems.
+function _pathArea(item) {
+    var k, total;
+    if (item.typename === "PathItem") {
+        return isNaN(item.area) ? 0 : Math.abs(item.area);
+    }
+    if (item.typename === "CompoundPathItem") {
+        total = 0;
+        for (k = 0; k < item.pathItems.length; k++) {
+            if (!isNaN(item.pathItems[k].area)) { total += Math.abs(item.pathItems[k].area); }
+        }
+        return total;
+    }
+    if (item.typename === "GroupItem") {
+        total = 0;
+        for (k = 0; k < item.pageItems.length; k++) {
+            total += _pathArea(item.pageItems[k]);
+        }
+        return total;
+    }
+    return 0;
+}
+
+function _bboxArea(bounds) {
+    return Math.abs(bounds[2] - bounds[0]) * Math.abs(bounds[1] - bounds[3]);
+}
+
+// Hides top-level items whose names are NOT in keepNames (and hides non-Cutlines
+// layers), exports as SVG, then restores visibility.
 function _exportSvgGroup(doc, keepNames, outputPath) {
     var cutlinesLayer = findLayer(doc, CONFIG.cutlinesLayerName);
     if (!cutlinesLayer) {
         log("[step7a] WARN | Cutlines layer missing — skipping export of " + outputPath);
-        return;
+        return false;
     }
 
     var i;
@@ -128,12 +183,12 @@ function _exportSvgGroup(doc, keepNames, outputPath) {
         doc.layers[i].visible = (doc.layers[i].name === cutlinesLayer.name);
     }
 
-    // Hide paths not in keepNames.
-    var paths      = _collectPaths(cutlinesLayer);
-    var pathHidden = [];
-    for (i = 0; i < paths.length; i++) {
-        pathHidden.push(paths[i].hidden);
-        paths[i].hidden = !keepNames[paths[i].name];
+    // Hide top-level items not in keepNames.
+    var entries    = _collectCutlineEntries(cutlinesLayer);
+    var itemHidden = [];
+    for (i = 0; i < entries.length; i++) {
+        itemHidden.push(entries[i].item.hidden);
+        entries[i].item.hidden = !keepNames[entries[i].item.name];
     }
 
     var exportOk = false;
@@ -148,17 +203,18 @@ function _exportSvgGroup(doc, keepNames, outputPath) {
     } catch (e) {
         log("[step7a] ERROR | export failed for " + outputPath + ": " + e.message);
     }
-    return exportOk;
 
-    // Restore path visibility.
-    for (i = 0; i < paths.length; i++) {
-        paths[i].hidden = pathHidden[i];
+    // Restore item visibility.
+    for (i = 0; i < entries.length; i++) {
+        entries[i].item.hidden = itemHidden[i];
     }
 
     // Restore layer visibility.
     for (i = 0; i < doc.layers.length; i++) {
         doc.layers[i].visible = layerVisible[i];
     }
+
+    return exportOk;
 }
 
 // Formats a float to 3 decimal places (ES3-safe).
