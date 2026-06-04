@@ -201,8 +201,16 @@ function writeElementsFile(doc) {
 
     var txtPath = doc.fullName.fsName.replace(/\.psd$/i, "_elements.txt");
     var f = new File(txtPath);
-    f.open("w");
-    f.write(lines.join("\n"));
+    f.encoding = "UTF-8";
+    if (!f.open("w")) {
+        log("[pipeline] ERROR | could not open elements sidecar for writing: " + txtPath);
+        return null;
+    }
+    if (!f.write(lines.join("\n"))) {
+        log("[pipeline] ERROR | write failed for elements sidecar: " + txtPath);
+        f.close();
+        return null;
+    }
     f.close();
 
     log("[pipeline] wrote elements sidecar: " + txtPath
