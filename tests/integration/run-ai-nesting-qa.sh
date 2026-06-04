@@ -43,7 +43,7 @@ rm -f "$LOG" "$TEMP_SCRIPT"
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
     s|showOverlay:\s*true|showOverlay: false|;
-    s|#include "\.\./|#include "$REPO_ROOT/|g;
+    s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
 # ── Run via osascript ────────────────────────────────────────────────────────
