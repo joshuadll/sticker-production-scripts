@@ -58,7 +58,6 @@ rm -f "$LOG" "$TEMP_SCRIPT" "$TEMP_AI" "$REGULAR_SVG" "$IRREGULAR_SVG"
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
     s|CONFIG\.logPath\s*=\s*_root[^;]+;|CONFIG.logPath = "/tmp/AI_BuildCutlines.log";|;
-    s|CONFIG\.stampTemplatePath\s*=\s*_root[^;]+;|CONFIG.stampTemplatePath = "'"$REPO_ROOT"'/assets/Stamp Cutline Template.ai";|;
     s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
     s|^main\(\);||;
 ' "$SCRIPT" > "$TEMP_SCRIPT"

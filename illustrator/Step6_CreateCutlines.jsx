@@ -121,9 +121,8 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
         + (droppedBackground ? " (" + droppedBackground + " background dropped)" : "") + ".");
 
     // ── 6. Match and name paths ───────────────────────────────────────────────
-    var named           = 0;
-    var stampsReplaced  = 0;
-    var unmatched       = 0;
+    var named     = 0;
+    var unmatched = 0;
     var droppedFragment = 0;
     var pi;
 
@@ -160,19 +159,10 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
         }
 
         if (matched.styleCode === "ST") {
-            if (CONFIG.stampTemplatePath) {
-                _placeStampTemplate(doc, cutlinesLayer, matched, path,
-                    pngLeft, pngTop, pngWidth, pngHeight, elementsData);
-                path.remove();
-                stampsReplaced++;
-                log("[step6] stamp replaced | " + matched.displayName);
-            } else {
-                setStrokeStyle(path, CONFIG.cutlineStrokePt, blackCmyk());
-                path.name = matched.displayName;
-                log("[step6] WARN | stamp path kept (no stampTemplatePath) | "
-                    + matched.displayName);
-                named++;
-            }
+            setStrokeStyle(path, CONFIG.cutlineStrokePt, blackCmyk());
+            path.name = matched.displayName;
+            log("[step6] named | " + path.name);
+            named++;
         } else if (matched.caption) {
             // element_outline (path) gets hidden inside _buildSeparableCutline;
             // strokeRecursive there handles the cutline stroke.
@@ -189,10 +179,9 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     }
 
     var droppedJunk = droppedBackground + droppedFragment;
-    log("[step6] done | named=" + named + " stamps=" + stampsReplaced
-        + " unmatched=" + unmatched + " dropped=" + droppedJunk);
-    return { named: named, stampsReplaced: stampsReplaced, unmatched: unmatched,
-             dropped: droppedJunk };
+    log("[step6] done | named=" + named + " unmatched=" + unmatched
+        + " dropped=" + droppedJunk);
+    return { named: named, unmatched: unmatched, dropped: droppedJunk };
 }
 
 
@@ -315,39 +304,3 @@ function _buildSeparableCutline(doc, layer, element, elementOutline,
     grp.note = element.styleCode + "|" + cap.lines;
 }
 
-// Places a copy of CONFIG.stampTemplatePath, scaled to fit the element's AI bounds.
-function _placeStampTemplate(doc, layer, element, tracedPath,
-        pngLeft, pngTop, pngWidth, pngHeight, data) {
-
-    doc.activeLayer = layer;
-    var tmpl = doc.placedItems.add();
-    // Suppress the embedded-color-profile-mismatch dialog the stamp template
-    // raises on placement — cutlines are pure geometry, the profile is irrelevant.
-    var prevLevel = app.userInteractionLevel;
-    app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
-    tmpl.file = new File(CONFIG.stampTemplatePath);
-    app.userInteractionLevel = prevLevel;
-
-    var ai = _psBoundsToAi(element.left, element.top, element.right, element.bottom,
-                 data, pngLeft, pngTop, pngWidth, pngHeight);
-    var aiLeft = ai[0], aiTop = ai[1], aiRight = ai[2], aiBottom = ai[3];
-
-    var targetW = aiRight - aiLeft;
-    var targetH = aiTop   - aiBottom;
-
-    // Uniform scale to fit within element bounds (shorter axis constrains).
-    var scaleW   = (targetW / tmpl.width)  * 100;
-    var scaleH   = (targetH / tmpl.height) * 100;
-    var scalePct = (scaleW < scaleH) ? scaleW : scaleH;
-    tmpl.resize(scalePct, scalePct);
-
-    // Centre at element centre.
-    var elCX  = (aiLeft + aiRight)  / 2;
-    var elCY  = (aiTop  + aiBottom) / 2;
-    tmpl.translate(
-        elCX - (tmpl.position[0] + tmpl.width  / 2),
-        elCY - (tmpl.position[1] - tmpl.height / 2)
-    );
-
-    tmpl.name = element.displayName;
-}

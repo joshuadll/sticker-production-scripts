@@ -34,8 +34,7 @@ var _root = $.fileName
     ? new File($.fileName).parent.parent.fsName
     : Folder.desktop.fsName;
 
-CONFIG.logPath           = _root + "/pipelines/AI_BuildCutlines.log";
-CONFIG.stampTemplatePath = _root + "/assets/Stamp Cutline Template.ai";
+CONFIG.logPath = _root + "/pipelines/AI_BuildCutlines.log";
 
 // ─── SHARED: Step 7A export ───────────────────────────────────────────────────
 
@@ -125,7 +124,6 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
     }
 
     log("[ai-pipeline] step 6 complete | named: " + result.named
-        + " | stamps: " + result.stampsReplaced
         + " | unmatched: " + result.unmatched);
 
     if (result.unmatched > 0) {

@@ -8,10 +8,10 @@
 [step6] DROP | trace fragment near Kroje (0% of element box)
 [step6] named | Bratislava(text)
 [step6] named | Fujara
-[step6] stamp replaced | National Flower
+[step6] named | National Flower
 [step6] named | Slovakia Map
 [step6] named | Šúľance s Makom
-[step6] stamp replaced | UFO Observation Deck, Bridge SNP
+[step6] named | UFO Observation Deck, Bridge SNP
 [step6] named | National Animal - Tatra chamois
 [step6] named | Tram
 [step6] named | Kroje
@@ -32,7 +32,7 @@
 [step6] named | Devín Castle
 [step6] named | Štrbské Pleso
 [step6] named | Bratislava Castle
-[step6] done | named=24 stamps=2 unmatched=0 dropped=2
+[step6] done | named=26 unmatched=0 dropped=2
 [pipeline] --- Step 7A: Deepnest export ---
 [pipeline] threshold: 0.82
 [step7a] regular   | ratio=0.922 | Bratislava Castle
@@ -55,22 +55,22 @@
 [step7a] irregular | ratio=0.703 | Kroje
 [step7a] irregular | ratio=0.611 | Tram
 [step7a] irregular | ratio=0.405 | National Animal - Tatra chamois
-[step7a] irregular | ratio=0.785 | UFO Observation Deck, Bridge SNP
 [step7a] regular   | ratio=0.82 | Šúľance s Makom
-[step7a] irregular | ratio=0.785 | National Flower
 [step7a] irregular | ratio=0.687 | Fujara
 [step7a] regular   | ratio=0.838 | Bratislava(text)
+[step7a] irregular | ratio=0.724 | National Flower
 [step7a] irregular | ratio=0.645 | Slovakia Map
-[step7a] classified: 16 regular, 10 irregular (threshold=0.82)
-[step7a] export | 16 item(s) -> /tmp/ai-build-cutlines-working_regular.svg
-[step7a] export | 10 item(s) -> /tmp/ai-build-cutlines-working_irregular.svg
+[step7a] regular   | ratio=0.931 | UFO Observation Deck, Bridge SNP
+[step7a] classified: 17 regular, 9 irregular (threshold=0.82)
+[step7a] export | 17 item(s) -> /tmp/ai-build-cutlines-working_regular.svg
+[step7a] export | 9 item(s) -> /tmp/ai-build-cutlines-working_irregular.svg
 [step7a] exported: /tmp/ai-build-cutlines-working_regular.svg
 [step7a] exported: /tmp/ai-build-cutlines-working_irregular.svg
 [pipeline] === AI_BuildCutlines done ===
 Done.
 
-  Regular   (16 paths): /tmp/ai-build-cutlines-working_regular.svg
-  Irregular (10 paths): /tmp/ai-build-cutlines-working_irregular.svg
+  Regular   (17 paths): /tmp/ai-build-cutlines-working_regular.svg
+  Irregular (9 paths): /tmp/ai-build-cutlines-working_irregular.svg
 
 Review both SVGs now open in Illustrator.
 Move any misclassified paths between files, then File > Save each.
