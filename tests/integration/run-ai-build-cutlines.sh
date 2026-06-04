@@ -1,10 +1,11 @@
 #!/bin/bash
-# Integration test for Step 6 (Create Cut Lines).
-# Runs AI_BuildCutlines.jsx against a pre-exported silhouette PNG + elements sidecar.
-# Checks that the Cutlines layer was created and paths were named.
+# Integration test for the AI half of the 2nd pipeline (PSAI_BuildAndExportCutlines):
+# Steps 6 (Create Cut Lines) + 7A (Deepnest SVG Export).
 #
-# The working document is built from scratch by buildWorkingDocument() (aiUtils.jsx)
-# — no template file needed.
+# Runs AI_BuildCutlines.jsx against a pre-exported silhouette PNG + elements sidecar.
+# The working document is built from scratch by buildWorkingDocument() (aiUtils.jsx),
+# saved to a temp .ai path so Step 7A can resolve a real output path, then the two
+# SVG files are verified on disk.
 #
 # FIXTURES REQUIRED:
 #   tests/integration/fixtures/step6-silhouette.png
@@ -18,7 +19,7 @@
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
-#   2. Verify the log looks correct (named paths, no unmatched)
+#   2. Verify the log looks correct (named paths, no unmatched, SVGs exported)
 #   3. Commit: cp "$LOG" tests/integration/expected/ai-build-cutlines-expected.txt
 
 set -euo pipefail
@@ -35,6 +36,9 @@ EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ai-build-cutlines-expected.txt
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/AI_BuildCutlines.log"
+TEMP_AI="/tmp/${STEP}-working.ai"
+REGULAR_SVG="/tmp/${STEP}-working_regular.svg"
+IRREGULAR_SVG="/tmp/${STEP}-working_irregular.svg"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
@@ -49,19 +53,31 @@ done
 # ── Prepare temp script ──────────────────────────────────────────────────────
 # Inject fixture paths and suppress alerts.
 
-rm -f "$LOG" "$TEMP_SCRIPT"
+rm -f "$LOG" "$TEMP_SCRIPT" "$TEMP_AI" "$REGULAR_SVG" "$IRREGULAR_SVG"
 
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
     s|CONFIG\.logPath\s*=\s*_root[^;]+;|CONFIG.logPath = "/tmp/AI_BuildCutlines.log";|;
     s|CONFIG\.stampTemplatePath\s*=\s*_root[^;]+;|CONFIG.stampTemplatePath = "'"$REPO_ROOT"'/assets/Stamp Cutline Template.ai";|;
     s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
+    s|^main\(\);||;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
-# Append the entry-point call so #include resolves correctly when run as a file.
-# buildDocAndImport builds the working document from scratch (no template file).
+# Append step-by-step entry so the document is saved to a known path before
+# Step 7A runs — otherwise doc.fullName resolves to an unusable Untitled path
+# and the SVG export fails silently.
 cat >> "$TEMP_SCRIPT" << JSEOF
-buildDocAndImport("$PNG_FIXTURE","$ELEMENTS_FIXTURE");
+// Close any documents left open from a previous run so main() has nothing to act on.
+while (app.documents.length > 0) {
+    app.documents[0].close(SaveOptions.DONOTSAVECHANGES);
+}
+var _doc = buildWorkingDocument();
+runCreateCutlines(_doc, "$PNG_FIXTURE", "$ELEMENTS_FIXTURE");
+var _prevLevel = app.userInteractionLevel;
+app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
+_doc.saveAs(new File("$TEMP_AI"), new IllustratorSaveOptions());
+app.userInteractionLevel = _prevLevel;
+runDeepnestExport(_doc);
 JSEOF
 
 # ── Run script via osascript ─────────────────────────────────────────────────
@@ -115,6 +131,20 @@ else
     UNMATCHED=$(grep "unmatched=" "$LOG" | tail -1)
     echo "WARN [$STEP]: unmatched paths found — $UNMATCHED"
     echo "  This may indicate a coordinate transform issue. Review the log."
+fi
+
+if [ -f "$REGULAR_SVG" ] && [ -s "$REGULAR_SVG" ]; then
+    echo "PASS [$STEP]: _regular.svg created and non-empty."
+else
+    echo "FAIL [$STEP]: _regular.svg missing or empty — Step 7A export failed."
+    FAIL=1
+fi
+
+if [ -f "$IRREGULAR_SVG" ] && [ -s "$IRREGULAR_SVG" ]; then
+    echo "PASS [$STEP]: _irregular.svg created and non-empty."
+else
+    echo "FAIL [$STEP]: _irregular.svg missing or empty — Step 7A export failed."
+    FAIL=1
 fi
 
 if [ "$FAIL" -ne 0 ]; then

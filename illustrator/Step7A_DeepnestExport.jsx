@@ -80,17 +80,17 @@ function runDeepnestExport(doc) {
     var irregularSvgPath = basePath + "_irregular.svg";
 
     // ── 4. Export each group ──────────────────────────────────────────────────
-    _exportSvgGroup(doc, regularNames,   regularSvgPath);
-    _exportSvgGroup(doc, irregularNames, irregularSvgPath);
+    var regularOk   = _exportSvgGroup(doc, regularNames,   regularSvgPath);
+    var irregularOk = _exportSvgGroup(doc, irregularNames, irregularSvgPath);
 
-    log("[step7a] exported: " + regularSvgPath);
-    log("[step7a] exported: " + irregularSvgPath);
+    if (regularOk)   { log("[step7a] exported: " + regularSvgPath); }
+    if (irregularOk) { log("[step7a] exported: " + irregularSvgPath); }
 
     return {
         regular:       regularCount,
         irregular:     irregularCount,
-        regularPath:   regularSvgPath,
-        irregularPath: irregularSvgPath
+        regularPath:   regularOk   ? regularSvgPath   : null,
+        irregularPath: irregularOk ? irregularSvgPath : null
     };
 }
 
@@ -136,6 +136,7 @@ function _exportSvgGroup(doc, keepNames, outputPath) {
         paths[i].hidden = !keepNames[paths[i].name];
     }
 
+    var exportOk = false;
     try {
         var svgOpts = new ExportOptionsSVG();
         svgOpts.embedRasterImages    = false;
@@ -143,9 +144,11 @@ function _exportSvgGroup(doc, keepNames, outputPath) {
         svgOpts.includeFileInfo      = false;
         svgOpts.includeUnusedStyles  = false;
         doc.exportFile(new File(outputPath), ExportType.SVG, svgOpts);
+        exportOk = true;
     } catch (e) {
         log("[step7a] ERROR | export failed for " + outputPath + ": " + e.message);
     }
+    return exportOk;
 
     // Restore path visibility.
     for (i = 0; i < paths.length; i++) {
