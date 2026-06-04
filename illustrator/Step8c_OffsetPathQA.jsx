@@ -12,7 +12,7 @@
 //   1. Spacing QA — minimum sampled distance between cut-line pairs < 2mm → fail.
 //      Uses minPolygonSetDistance(), tolerant of sticker-scale sample density.
 //   2. Margin QA — cut line bounding box exceeds safe area → fail.
-//      Safe area: from "Margin" layer rect if present, else computed from CONFIG.
+//      Safe area: computed from artboard top-left + CONFIG working area + margins.
 //
 // Violations are flagged red on the cut line itself. The pipeline halts on
 // flagged > 0 so the artist can fix and re-run (idempotent — no layer to rebuild).
@@ -168,26 +168,9 @@ function _bboxNear(g1, g2, threshPt) {
     return true;
 }
 
-// Resolves the safe-area rectangle as geometricBounds [left, top, right, bottom]:
-//   1. First path/compoundPath on the "Margin" layer (if the template has one);
-//   2. Else computed from the artboard top-left + CONFIG working-area + margins.
+// Resolves the safe-area rectangle as geometricBounds [left, top, right, bottom],
+// computed from the artboard top-left + CONFIG working-area + margins.
 function _resolveMarginRect(doc) {
-    var marginLayer = findLayer(doc, CONFIG.marginLayerName);
-    if (marginLayer) {
-        var rectItem = null;
-        if (marginLayer.pathItems.length > 0) {
-            rectItem = marginLayer.pathItems[0];
-        } else if (marginLayer.compoundPathItems.length > 0) {
-            rectItem = marginLayer.compoundPathItems[0];
-        }
-        if (rectItem) {
-            log("[step8c] margin | from \"" + CONFIG.marginLayerName + "\" layer.");
-            return rectItem.geometricBounds;
-        }
-        log("[step8c] WARN | \"" + CONFIG.marginLayerName
-            + "\" layer has no rectangle — using computed safe area.");
-    }
-
     var aRect  = doc.artboards[0].artboardRect;
     var left   = aRect[0] + mmToPoints(CONFIG.marginLeftMm);
     var top    = aRect[1] - mmToPoints(CONFIG.marginTopMm);

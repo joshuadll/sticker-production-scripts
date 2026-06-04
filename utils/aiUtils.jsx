@@ -67,6 +67,90 @@ function findLayer(doc, name) {
     return null;
 }
 
+// Builds the working document from scratch — replaces the dependency on
+// assets/Production_File_Template.ai. Reproduces the template's spec exactly
+// (values read from the committed template, June 2026):
+//   - A4 sheet (210 x 297 mm), CMYK, mm ruler units
+//   - Color Block : full-sheet green rect, fill CMYK(55,0,100,0), locked, bottom
+//                   (the green background for Step 10's green preview JPEG)
+//   - Grid        : vector 1-inch reference grid, locked (artist manual-check aid;
+//                   the template used a raster image — a vector grid is the
+//                   resolution-independent equivalent, no asset needed)
+//   - Stickers    : empty (Step 7B places nested artwork here)
+// Cutlines / Halfcut layers are created later by their own steps, above Stickers.
+// Returns the new document.
+function buildWorkingDocument() {
+    var SHEET_W_MM = 210;   // A4 — matches template artboard
+    var SHEET_H_MM = 297;
+    var GRID_MM    = 25.4;  // 1 inch
+
+    var doc = app.documents.add(
+        DocumentColorSpace.CMYK,
+        mmToPoints(SHEET_W_MM),
+        mmToPoints(SHEET_H_MM)
+    );
+    doc.rulerUnits = RulerUnits.Millimeters;
+
+    var ab     = doc.artboards[0].artboardRect; // [left, top, right, bottom] pt
+    var left   = ab[0], top = ab[1], right = ab[2], bottom = ab[3];
+
+    // Default doc ships with one empty layer — repurpose it as Color Block (bottom).
+    var colorBlock = doc.layers[0];
+    colorBlock.name = CONFIG.colorBlockLayerName ? CONFIG.colorBlockLayerName : "Color Block";
+    doc.activeLayer = colorBlock;
+    var green = doc.pathItems.rectangle(top, left, right - left, top - bottom);
+    green.stroked   = false;
+    green.filled    = true;
+    green.fillColor = _bwdGreen();
+    colorBlock.locked = true;
+
+    // Grid (above Color Block): vector 1-inch lines.
+    var grid = doc.layers.add();
+    grid.name = "Grid";
+    var gridColor = _bwdGridColor();
+    var step = mmToPoints(GRID_MM);
+    var x, y;
+    for (x = left; x <= right + 0.01; x += step) {
+        _bwdGridLine(grid, x, top, x, bottom, gridColor);
+    }
+    for (y = top; y >= bottom - 0.01; y -= step) {
+        _bwdGridLine(grid, left, y, right, y, gridColor);
+    }
+    grid.locked = true;
+
+    // Stickers (above Grid): empty; Step 7B fills it after nesting.
+    var stickers = doc.layers.add();
+    stickers.name = CONFIG.stickersLayerName ? CONFIG.stickersLayerName : "Sticker";
+
+    log("[aiutils] built working document | A4 CMYK | Stickers > Grid > Color Block");
+    return doc;
+}
+
+// CMYK(55,0,100,0) — the template's Color Block green (Step 10 green preview).
+function _bwdGreen() {
+    var c = new CMYKColor();
+    c.cyan = 55; c.magenta = 0; c.yellow = 100; c.black = 0;
+    return c;
+}
+
+// Light grey for the reference grid — subtle, non-printing visual aid.
+function _bwdGridColor() {
+    var c = new CMYKColor();
+    c.cyan = 0; c.magenta = 0; c.yellow = 0; c.black = 20;
+    return c;
+}
+
+// Draws one thin open grid line on the given layer.
+function _bwdGridLine(layer, x1, y1, x2, y2, color) {
+    var ln = layer.pathItems.add();
+    ln.setEntirePath([[x1, y1], [x2, y2]]);
+    ln.filled      = false;
+    ln.stroked     = true;
+    ln.strokeColor = color;
+    ln.strokeWidth = 0.3;
+    ln.closed      = false;
+}
+
 // Finds a path item by exact name within a layer.
 // Returns null if not found.
 function findPathInLayer(layer, name) {

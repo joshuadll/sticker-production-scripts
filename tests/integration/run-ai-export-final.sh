@@ -23,7 +23,7 @@
 set -euo pipefail
 
 STEP="ai-export-final"
-APP="Adobe Illustrator 2026"
+APP="Adobe Illustrator"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_ExportFinal.jsx"
@@ -48,7 +48,7 @@ fi
 
 rm -f "$LOG" "$TEMP_SCRIPT"
 
-perl -pe 's|suppressAlerts:\s*false|suppressAlerts: true|;    s|#include "\.\./|#include "$REPO_ROOT/|g;
+perl -pe 's|suppressAlerts:\s*false|suppressAlerts: true|;    s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
 # ── Run script via osascript ─────────────────────────────────────────────────

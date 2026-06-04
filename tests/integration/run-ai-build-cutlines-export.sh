@@ -17,7 +17,7 @@
 set -euo pipefail
 
 STEP="ai-build-cutlines-export"
-APP="Adobe Illustrator 2026"
+APP="Adobe Illustrator"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_BuildCutlines.jsx"
@@ -46,7 +46,7 @@ rm -f "$LOG" "$TEMP_SCRIPT" "$REGULAR_SVG" "$IRREGULAR_SVG"
 
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
-    s|#include "\.\./|#include "$REPO_ROOT/|g;
+    s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
 # ── Run script via osascript ─────────────────────────────────────────────────
