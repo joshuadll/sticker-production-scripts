@@ -2,66 +2,73 @@
 [pipeline] dryRun: false
 [pipeline] document: psai-build-export-cutlines-fixture.psd
 [pipeline] --- Step 3B: Caption white + grouping ---
-[step3B] snapped caption | dir=(-0.01,-1.00) t=12px
-[step3B] grouped | Dev�n Castle [WC-LM]
-[step3B] snapped caption | dir=(-0.00,-1.00) t=14px
+[step3B] snapped caption | dir=(-0.01,-1.00) t=-14px
+[step3B] grouped | Devín Castle [WC-LM]
+[step3B] snapped caption | dir=(0.00,-1.00) t=-30px
 [step3B] grouped | Slovak Paradise National Park [WC-LM]
-[step3B] snapped caption | dir=(0.00,-1.00) t=5px
-[step3B] snapped caption | dir=(0.00,-1.00) t=14px
+[step3B] snapped caption | dir=(0.00,-1.00) t=-20px
+[step3B] grouped | Spiš Castle [WC-LM]
+[step3B] snapped caption | dir=(0.00,-1.00) t=-11px
 [step3B] grouped | Bratislava Castle [WC-LM]
-[step3B] snapped caption | dir=(0.00,-1.00) t=19px
+[step3B] snapped caption | dir=(0.00,-1.00) t=-6px
+[step3B] grouped | Štrbské Pleso [WC-LM]
 [step3B] grouped stamp | National Flower [ST]
-[step3B] snapped caption | dir=(0.00,-1.00) t=6px
-[step3B] grouped | Slovakia Map [WC-MP]
-[step3B] snapped caption | dir=(0.00,-1.00) t=16px
+[step3B] SKIP | "Slovakia Map [WC-MP]" — no T layer named "Slovakia Map" found. Run Step 3A first.
+[step3B] snapped caption | dir=(0.00,-1.00) t=-9px
 [step3B] grouped | St. Martin's Cathedral [WC-LM]
 [step3B] grouped stamp | UFO Observation Deck, Bridge SNP [ST]
-[step3B] snapped caption | dir=(0.00,-1.00) t=12px
+[step3B] snapped caption | dir=(0.00,-1.00) t=-13px
 [step3B] grouped | Old Town Hall (Bratislava) [WC-LM]
-[step3B] snapped caption | dir=(0.00,-1.00) t=6px
+[step3B] snapped caption | dir=(0.00,-1.00) t=-19px
 [step3B] grouped | Bojnice Castle [WC-LM]
-[step3B] snapped caption | dir=(-0.00,-1.00) t=14px
+[step3B] snapped caption | dir=(-0.00,-1.00) t=-11px
 [step3B] grouped | Orava Castle [WC-LM]
-[step3B] snapped caption | dir=(-0.00,-1.00) t=13px
+[step3B] snapped caption | dir=(-0.00,-1.00) t=-12px
 [step3B] grouped | Michael's Gate [WC-LM]
-[step3B] snapped caption | dir=(-0.00,-1.00) t=12px
+[step3B] snapped caption | dir=(-0.00,-1.00) t=-14px
 [step3B] grouped | The Blue Church - Church of St. Elizabeth [WC-LM]
-[step3B] snapped caption | dir=(-0.01,-1.00) t=19px
-[step3B] snapped caption | dir=(0.02,-1.00) t=4px
-[step3B] grouped | Bratislava(text) [WC-IC]
-[step3B] snapped caption | dir=(0.00,-1.00) t=18px
-[step3B] snapped caption | dir=(-0.01,-1.00) t=6px
+[step3B] snapped caption | dir=(-0.01,-1.00) t=-6px
+[step3B] grouped | Čumil Statue [WC-IC]
+[step3B] SKIP | "Bratislava(text) [WC-IC]" — no T layer named "Bratislava(text)" found. Run Step 3A first.
+[step3B] snapped caption | dir=(0.09,-1.00) t=-110px
+[step3B] grouped | Šúľance s Makom [WC-FD]
+[step3B] snapped caption | dir=(0.08,-1.00) t=-36px
 [step3B] grouped | Pirohy [WC-FD]
-[step3B] snapped caption | dir=(-0.00,-1.00) t=7px
-[step3B] snapped caption | dir=(-0.00,-1.00) t=14px
+[step3B] snapped caption | dir=(0.02,-1.00) t=-141px
+[step3B] grouped | Bryndzové halušky [WC-FD]
+[step3B] snapped caption | dir=(-0.00,-1.00) t=-11px
 [step3B] grouped | Kraslice [WC-IC]
-[step3B] snapped caption | dir=(-0.00,-1.00) t=1px
+[step3B] snapped caption | dir=(-0.00,-1.00) t=-24px
 [step3B] grouped | Kroje [WC-IC]
-[step3B] snapped caption | dir=(0.00,-1.00) t=3px
+[step3B] snapped caption | dir=(0.00,-1.00) t=-22px
 [step3B] grouped | Fujara [WC-IC]
-[step3B] snapped caption | dir=(-0.00,-1.00) t=5px
+[step3B] snapped caption | dir=(-0.00,-1.00) t=-20px
 [step3B] grouped | Tram [WC-TR]
-[step3B] snapped caption | dir=(-0.00,-1.00) t=12px
+[step3B] snapped caption | dir=(-0.00,-1.00) t=-13px
 [step3B] grouped | National Animal - Tatra chamois [WC-IC]
-[step3B] snapped caption | dir=(-0.00,-1.00) t=4px
+[step3B] snapped caption | dir=(-0.00,-1.00) t=-64px
 [step3B] grouped | Carpathian Wooden Churches [WC-IC]
-[step3B] snapped caption | dir=(0.01,-1.00) t=1px
-[step3B] grouped | St Elizabeth's Cathedral (D�m Sv�tej Alzbety) [WC-LM]
-[pipeline] step 3B complete | 26 element(s) grouped.
+[step3B] snapped caption | dir=(0.00,-1.00) t=-21px
+[step3B] grouped | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM]
+[pipeline] step 3B complete | 24 element(s) grouped.
 [pipeline] --- Step 5: Finalize Elements group ---
+[step5] moved skipped element into Elements | Slovakia Map [WC-MP]
+[step5] moved skipped element into Elements | Bratislava(text) [WC-IC]
 [step5] Elements group finalized.
 [pipeline] step 5 complete | Elements finalized.
 [pipeline] saved: /private/tmp/psai-build-export-cutlines-fixture.psd
 [pipeline] --- Exporting per-element PNGs ---
-[pipeline] exported element PNG: St Elizabeth's Cathedral (D�m Sv�tej Alzbety)
+[pipeline] exported element PNG: St Elizabeth's Cathedral (Dóm Svätej Alzbety)
 [pipeline] exported element PNG: Carpathian Wooden Churches
 [pipeline] exported element PNG: National Animal - Tatra chamois
 [pipeline] exported element PNG: Tram
 [pipeline] exported element PNG: Fujara
 [pipeline] exported element PNG: Kroje
 [pipeline] exported element PNG: Kraslice
+[pipeline] exported element PNG: Bryndzové halušky
 [pipeline] exported element PNG: Pirohy
-[pipeline] exported element PNG: Bratislava(text)
+[pipeline] exported element PNG: Šúľance s Makom
+[pipeline] exported element PNG: Čumil Statue
 [pipeline] exported element PNG: The Blue Church - Church of St. Elizabeth
 [pipeline] exported element PNG: Michael's Gate
 [pipeline] exported element PNG: Orava Castle
@@ -69,17 +76,20 @@
 [pipeline] exported element PNG: Old Town Hall (Bratislava)
 [pipeline] exported element PNG: UFO Observation Deck, Bridge SNP
 [pipeline] exported element PNG: St. Martin's Cathedral
-[pipeline] exported element PNG: Slovakia Map
 [pipeline] exported element PNG: National Flower
+[pipeline] exported element PNG: Štrbské Pleso
 [pipeline] exported element PNG: Bratislava Castle
+[pipeline] exported element PNG: Spiš Castle
 [pipeline] exported element PNG: Slovak Paradise National Park
-[pipeline] exported element PNG: Dev�n Castle
+[pipeline] exported element PNG: Devín Castle
+[pipeline] element PNGs: 24 file(s) → /private/tmp/psai-build-export-cutlines-fixture_elements
 [pipeline] element PNGs folder: /private/tmp/psai-build-export-cutlines-fixture_elements
+[pipeline] --- BridgeTalk handoff → Illustrator (Step 6) ---
 [step5] hid 2 caption sub-layer(s).
 [step5] transient Silhouette built.
 [pipeline] exported silhouette PNG (transient layer removed): /private/tmp/psai-build-export-cutlines-fixture_silhouette.png
-[pipeline] wrote elements sidecar: /private/tmp/psai-build-export-cutlines-fixture_elements.txt (26 element(s))
-[pipeline] WARN: aiPipelinePath not set � sidecars written, skipping BridgeTalk handoff.
+[pipeline] wrote elements sidecar: /private/tmp/psai-build-export-cutlines-fixture_elements.txt (24 element(s))
+[pipeline] WARN: aiPipelinePath not set — sidecars written, skipping BridgeTalk handoff.
 Sidecars exported (silhouette PNG + elements sidecar).
 BridgeTalk skipped: CONFIG.aiPipelinePath is empty.
 Set CONFIG.aiPipelinePath to AI_BuildCutlines.jsx and re-run to auto-hand off.
@@ -87,13 +97,17 @@ Log: /tmp/PSAI_BuildAndExportCutlines.log
 [pipeline] === PSAI_BuildAndExportCutlines done ===
 Done.
 
-  Grouped:     26 element(s).
+  Grouped:     24 element(s).
   Art PNGs:    /private/tmp/psai-build-export-cutlines-fixture_elements
 
 Illustrator is opening the production template and will run cut lines automatically.
-Wait for it to finish � it will alert you when SVGs are ready for Deepnest.
+Wait for it to finish — it will alert you when SVGs are ready for Deepnest.
 
 After Deepnest: run AI_ImportNesting.jsx, selecting the Deepnest SVG(s)
 and the '_elements' folder shown above.
 
 Log: /tmp/PSAI_BuildAndExportCutlines.log
+
+Grouping skipped (2):
+  - Slovakia Map [WC-MP] (no T layer)
+  - Bratislava(text) [WC-IC] (no T layer)

@@ -71,8 +71,10 @@ function scalePercent(currentPx, targetPx) {
 function log(msg) {
     $.writeln(msg);
     var f = new File(CONFIG.logPath);
+    f.encoding = "UTF-8";   // accented element names (Devín, Šúľance) write as valid
+                            // UTF-8, not invalid Mac-Roman bytes that break grep
+    f.lineFeed = "Unix";    // ensure \n line endings so grep/diff work correctly
     f.open("a");
-    f.lineFeed = "Unix"; // ensure \n line endings so grep/diff work correctly
     f.writeln(msg);
     f.close();
 }
