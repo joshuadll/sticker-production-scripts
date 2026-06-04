@@ -77,7 +77,7 @@ var _prevLevel = app.userInteractionLevel;
 app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
 _doc.saveAs(new File("$TEMP_AI"), new IllustratorSaveOptions());
 app.userInteractionLevel = _prevLevel;
-runDeepnestExport(_doc);
+_runExportForNesting(_doc);
 JSEOF
 
 # ── Run script via osascript ─────────────────────────────────────────────────

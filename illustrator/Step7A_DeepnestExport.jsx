@@ -183,12 +183,16 @@ function _exportSvgGroup(doc, keepNames, outputPath) {
         doc.layers[i].visible = (doc.layers[i].name === cutlinesLayer.name);
     }
 
-    // Hide top-level items not in keepNames.
-    var entries    = _collectCutlineEntries(cutlinesLayer);
+    // Snapshot all top-level items (including unnamed artifacts) and hide any
+    // not in keepNames. Unnamed items have empty name so keepNames[""] is undefined -> hidden.
+    var allItems   = [];
     var itemHidden = [];
-    for (i = 0; i < entries.length; i++) {
-        itemHidden.push(entries[i].item.hidden);
-        entries[i].item.hidden = !keepNames[entries[i].item.name];
+    for (i = 0; i < cutlinesLayer.pageItems.length; i++) {
+        allItems.push(cutlinesLayer.pageItems[i]);
+    }
+    for (i = 0; i < allItems.length; i++) {
+        itemHidden.push(allItems[i].hidden);
+        allItems[i].hidden = !keepNames[allItems[i].name];
     }
 
     var exportOk = false;
@@ -205,8 +209,8 @@ function _exportSvgGroup(doc, keepNames, outputPath) {
     }
 
     // Restore item visibility.
-    for (i = 0; i < entries.length; i++) {
-        entries[i].item.hidden = itemHidden[i];
+    for (i = 0; i < allItems.length; i++) {
+        allItems[i].hidden = itemHidden[i];
     }
 
     // Restore layer visibility.

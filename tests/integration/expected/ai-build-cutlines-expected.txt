@@ -33,6 +33,8 @@
 [step6] named | Bratislava Castle
 [step6] named | Čumil Statue
 [step6] done | named=26 stamps=2 unmatched=0
+[pipeline] --- Step 7A: Deepnest export ---
+[pipeline] threshold: 0.82
 [step7a] regular   | ratio=0.95 | Čumil Statue
 [step7a] regular   | ratio=0.963 | Bratislava Castle
 [step7a] regular   | ratio=0.95 | Štrbské Pleso
@@ -64,3 +66,19 @@
 [step7a] classified: 25 regular, 3 irregular (threshold=0.82)
 [step7a] exported: /tmp/ai-build-cutlines-working_regular.svg
 [step7a] exported: /tmp/ai-build-cutlines-working_irregular.svg
+[pipeline] === AI_BuildCutlines done ===
+Done.
+
+  Regular   (25 paths): /tmp/ai-build-cutlines-working_regular.svg
+  Irregular (3 paths): /tmp/ai-build-cutlines-working_irregular.svg
+
+Review both SVGs now open in Illustrator.
+Move any misclassified paths between files, then File > Save each.
+
+Then import each SVG into Deepnest:
+  Regular   → 90° increments, gap 1mm
+  Irregular → free rotation, gap 1.5mm
+
+Threshold used: 0.82  (see log for per-path ratios to calibrate)
+
+Log: /tmp/AI_BuildCutlines.log

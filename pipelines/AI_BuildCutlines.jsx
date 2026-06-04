@@ -48,8 +48,11 @@ function _runExportForNesting(doc) {
     log("[pipeline] === AI_BuildCutlines done ===");
 
     if (!CONFIG.dryRun) {
+        var _prevUI = app.userInteractionLevel;
+        app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
         if (result.regularPath)   { app.open(new File(result.regularPath)); }
         if (result.irregularPath) { app.open(new File(result.irregularPath)); }
+        app.userInteractionLevel = _prevUI;
     }
 
     scriptAlert("Done.\n\n"
