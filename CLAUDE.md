@@ -15,7 +15,8 @@ Always wrap main() in try/catch that alerts error with line number.
 sticker-production-scripts/
 ├── utils/
 │   ├── psUtils.jsx          ← shared Photoshop helpers (#included by PS pipelines)
-│   └── aiUtils.jsx          ← shared Illustrator helpers (#included by AI pipelines)
+│   ├── aiUtils.jsx          ← shared Illustrator helpers (#included by AI pipelines)
+│   └── json2.jsx            ← JSON.stringify/parse polyfill (ExtendScript has no native JSON); #included by PSAI + AI_BuildCutlines for the _elements.json sidecar
 ├── photoshop/
 │   ├── Step1_CombineElements.jsx
 │   ├── Step2A_AutoResize.jsx
@@ -366,9 +367,15 @@ test runner in tests/integration/ alongside it.
 Photoshop integration test fixtures:
   tests/integration/fixtures/source-psds/              ← source PSDs for combine tests (≥1 required)
   PS_BuildElements creates its own template document — no pre-opened PSD needed.
-  Derivative fixtures (for psai-build-export-cutlines-3b / psai-build-export-cutlines-silhouette) are saved outputs of earlier pipeline runs:
-    tests/integration/fixtures/resize-area-template-captioned.psd  ← saved after PS_BuildElements
-    tests/integration/fixtures/resize-area-template-grouped.psd    ← saved after PSAI_BuildAndExportCutlines step 3B
+  tests/integration/fixtures/elements-captioned-ungrouped.psd  ← output of PS_BuildElements
+    (SO + T layers, ungrouped); input for run-psai-build-export-cutlines.sh
+
+run-psai-build-export-cutlines.sh is a COMBINED two-phase end-to-end runner: Phase 1 drives
+Photoshop (PSAI → real {name}_silhouette.png + {name}_elements.json sidecars in /tmp); Phase 2
+drives Illustrator through the real buildDocAndImport handoff (Steps 6+7A) and asserts cutlines
+(unmatched=0) + both SVGs on disk. Up-front clean slate: closes all docs in BOTH apps + clears
+stale /tmp artifacts at the START (not on exit), leaving outputs open for inspection. Requires
+both Adobe apps. The standalone AI-only test (run-ai-build-cutlines.sh) was removed 2026-06-05.
 
 Test runners are named after the pipeline they test (e.g. run-ps-build-elements.sh, run-ai-refine-cutlines.sh).
 They patch CONFIG via perl injection (sourceFolderPath + suppressAlerts + absolute #include paths)
