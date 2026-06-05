@@ -13,8 +13,9 @@
 #       the same function BridgeTalk invokes — then verifies cutlines + both SVGs on disk.
 #       NOTE: this deliberately does NOT hand-roll the doc save. buildDocAndImport must
 #       save the working doc itself; if it regresses to an unsaved "Untitled" doc, Step 7A
-#       writes to filesystem root and SVG export fails — and THIS test catches it (the
-#       fixture-based run-ai-build-cutlines.sh masks it by injecting its own saveAs).
+#       writes to filesystem root and SVG export fails — and THIS test catches it. (The
+#       former fixture-based AI-only test masked this by injecting its own saveAs; it was
+#       removed in favour of this end-to-end runner, which drives the real handoff entry.)
 #
 # The only production path not exercised is the BridgeTalk transport itself (arg passing
 # from PS to AI); everything downstream of buildDocAndImport is the real code on real input.
