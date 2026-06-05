@@ -126,6 +126,23 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
     log("[ai-pipeline] step 6 complete | named: " + result.named
         + " | unmatched: " + result.unmatched);
 
+    // Save the working document next to the incoming sidecars. buildWorkingDocument()
+    // returns an unsaved "Untitled" doc; without a real fullName, Step 7A resolves its
+    // SVG output path to "/Untitled-1_regular.svg" (filesystem root) and the export is
+    // cancelled. Saving as {name}.ai beside {name}_elements.txt lets Step 7A export
+    // {name}_regular.svg / {name}_irregular.svg next to the PSD, where AI_ImportNesting
+    // expects them. Done before the unmatched halt so the re-run path also has a saved doc.
+    if (!CONFIG.dryRun) {
+        var elemFile      = new File(elementsFilePath);
+        var baseName      = elemFile.name.replace(/_elements\.txt$/i, "").replace(/\.txt$/i, "");
+        var workingAiPath = elemFile.parent.fsName + "/" + baseName + ".ai";
+        var _prevSaveUI   = app.userInteractionLevel;
+        app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
+        doc.saveAs(new File(workingAiPath), new IllustratorSaveOptions());
+        app.userInteractionLevel = _prevSaveUI;
+        log("[ai-pipeline] working document saved: " + workingAiPath);
+    }
+
     if (result.unmatched > 0) {
         log("[ai-pipeline] HALT | " + result.unmatched
             + " unmatched path(s) — rename before export.");
