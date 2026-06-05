@@ -60,18 +60,6 @@ WORKING_AI="/tmp/${STEP}-fixture.ai"
 REGULAR_SVG="/tmp/${STEP}-fixture_regular.svg"
 IRREGULAR_SVG="/tmp/${STEP}-fixture_irregular.svg"
 
-cleanup() {
-    # Close the fixture doc in Photoshop (by path) so a re-run's app.open() reloads
-    # fresh from disk instead of re-activating a stale, already-processed in-memory doc.
-    # Targeted by path — never touches the user's other open Photoshop documents.
-    osascript -e 'tell application "'"$APP_PS"'" to do javascript "var _t=new File(\"'"$TEMP_FIXTURE"'\");for(var _i=app.documents.length-1;_i>=0;_i--){try{if(app.documents[_i].fullName&&app.documents[_i].fullName.fsName===_t.fsName){app.documents[_i].close(SaveOptions.DONOTSAVECHANGES);}}catch(_e){}}"' >/dev/null 2>&1 || true
-    # Close any leftover doc in Illustrator so re-runs start clean.
-    osascript -e 'tell application "Adobe Illustrator" to do javascript "while (app.documents.length > 0) { app.documents[0].close(SaveOptions.DONOTSAVECHANGES); }"' >/dev/null 2>&1 || true
-    rm -f "$TEMP_SCRIPT_PS" "$TEMP_SCRIPT_AI" "$TEMP_FIXTURE" \
-          "$SILH" "$ELEM" "$WORKING_AI" "$REGULAR_SVG" "$IRREGULAR_SVG"
-}
-trap cleanup EXIT
-
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
 if [ ! -f "$TEMPLATE_FIXTURE" ]; then
@@ -80,6 +68,24 @@ if [ ! -f "$TEMPLATE_FIXTURE" ]; then
     echo "  then saving the resulting document as: $TEMPLATE_FIXTURE"
     exit 0
 fi
+
+# ── Clean slate UP FRONT (not on exit) ───────────────────────────────────────
+# Establish a deterministic starting state instead of tearing down afterwards. This
+# is more robust: a crashed previous run can't leave us dirty, the run's outputs are
+# LEFT open/on disk for inspection (demo-friendly; the NEXT run clears them), and a
+# failure leaves its evidence in place for debugging. Both apps are cleaned the same
+# way, so there's no PS/AI asymmetry.
+#
+# CAVEAT: this closes ALL open documents in both apps with DONOTSAVECHANGES — any
+# UNSAVED work you have open in Photoshop or Illustrator will be discarded. Intended
+# for a dedicated test/dev machine. (Use targeted-by-path closes instead if that's a
+# concern — see git history for the previous fixture-only PS close.)
+echo "[$STEP] clean slate: closing open docs in both apps + clearing stale /tmp artifacts..."
+osascript -e 'tell application "'"$APP_PS"'" to do javascript "while (app.documents.length > 0) { app.documents[0].close(SaveOptions.DONOTSAVECHANGES); }"' >/dev/null 2>&1 || true
+osascript -e 'tell application "'"$APP_AI"'" to do javascript "while (app.documents.length > 0) { app.documents[0].close(SaveOptions.DONOTSAVECHANGES); }"' >/dev/null 2>&1 || true
+rm -f "$TEMP_SCRIPT_PS" "$TEMP_SCRIPT_AI" "$TEMP_FIXTURE" \
+      "$SILH" "$ELEM" "$WORKING_AI" "$REGULAR_SVG" "$IRREGULAR_SVG" \
+      "$LOG_PS" "$LOG_AI"
 
 # Copy fixture so doc.save() in the pipeline doesn't corrupt the original.
 cp "$TEMPLATE_FIXTURE" "$TEMP_FIXTURE"
