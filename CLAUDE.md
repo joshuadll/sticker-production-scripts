@@ -99,7 +99,7 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   convertToSmartObject, resizeLayerToTarget, loadLayerTransparency
 - aiUtils.jsx: NAME_REGEX, parseLayerName, mmToPoints, boundsCenter, isCaption,
   blackCmyk, whiteCmyk, redCmyk, setStrokeStyle, strokeRecursive,
-  buildPlate, deriveCutline, assembleElementGroup,
+  buildPlate, buildCapsuleFromSpine, deriveCutline, assembleElementGroup,
   findGroupMember, reuniteCutline, rebuildPlateToHeight,
   rdpSimplify, simplifyPathItem,
   samplePathToPolygons, pointInPolygon, segmentsIntersect,
@@ -134,23 +134,30 @@ layers Step 3B skipped).
 
 Silhouette implementation note: before loading transparency, createSilhouetteLayer hides
 caption sub-layers (TEXT, "White" pill, "Caption plate") so the silhouette covers element
-art only. This is intentional — Step 6 rebuilds the caption parametrically and unites it with
-the traced element outline, producing a fused cutline (art + caption) identical in shape to
-the old single-pass trace. Deepnest still receives the full sticker outline. To avoid the
+art only. This is intentional — Step 6 rebuilds the caption and unites it with the traced
+element outline into a fused cutline (art + caption). WC: the real curved/tilted capsule,
+rebuilt from the White-pill spine+radius carried in the sidecar (buildCapsuleFromSpine), so
+the cutline follows the actual caption. GC: an axis-aligned parametric pill (buildPlate).
+Deepnest still receives the full sticker outline. To avoid the
 PS 2026 full-canvas-selection bug when loading a LayerSet's transparency, it duplicates +
 merges the Elements group to a flat ArtLayer and loads that layer's transparency.
 
 PSAI_BuildAndExportCutlines exports (written before BridgeTalk handoff, sibling to PSD):
   {name}_silhouette.png   ← element-art-only flat black PNG (captions excluded; Step 6 adds them back)
-  {name}_elements.txt     ← PSD dimensions + per element:
-                            displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom[|capRadius|x1,y1;x2,y2;…]
-                            (stamps write 0|0|0|0|0 for the cap fields)
-                            Spine suffix (WC captions only): capRadius + the fitted
-                            White-pill spine points (px). Step 6 rebuilds the real
-                            curved/tilted caption capsule from it, so the cutline follows
-                            the caption. GC/stamps have no suffix (11 fields) → GC uses the
-                            parametric pill. PSAI always runs Step 3B in-session, so every
-                            WC caption always carries a spine (Step 6 relies on this).
+  {name}_elements.json    ← JSON sidecar (json2.jsx polyfill; ExtendScript has no native
+                            JSON). Shape:
+                              { psdWidth, psdHeight, elements: [
+                                  { displayName, styleCode, left, top, right, bottom,
+                                    caption: null | { lines, left, top, right, bottom,
+                                                      radius?, spine?: [{x,y}, …] } } ] }
+                            caption is null for stamps/uncaptioned. radius + spine are
+                            present only for WC captions: the fitted White-pill capsule
+                            (px). Step 6 rebuilds the real curved/tilted caption capsule
+                            from them, so the cutline follows the caption; GC/stamps omit
+                            radius+spine → GC uses the parametric pill. PSAI always runs
+                            Step 3B in-session, so every WC caption carries a spine (Step 6
+                            relies on this). JSON (vs the old pipe-delimited text) prevents
+                            delimiter collisions with caption display names.
   {name}_elements/        ← per-element trimmed PNGs (one per element group, transparent background)
                             used by AI_ImportNesting / Step7B to populate the Stickers layer after Deepnest
 
@@ -280,7 +287,7 @@ try {
 
 Before sending, PSAI_BuildAndExportCutlines exports two sidecar files next to the PSD:
 - `{name}_silhouette.png` — element-art-only flat black PNG (captions excluded)
-- `{name}_elements.txt`   — PSD dimensions + `displayName|styleCode|left|top|right|bottom|capLines|capLeft|capTop|capRight|capBottom` per element, plus an optional `|capRadius|x1,y1;x2,y2;…` spine suffix for WC captions (real capsule geometry; see the layer-stack section)
+- `{name}_elements.json`  — JSON: `{ psdWidth, psdHeight, elements: [{ displayName, styleCode, left, top, right, bottom, caption }] }`, where `caption` is `null` or `{ lines, left, top, right, bottom, radius?, spine? }` (WC captions carry `radius`+`spine` = real capsule geometry; see the layer-stack section). Uses the json2.jsx polyfill.
 
 Then sends both sidecar paths to AI_BuildCutlines.jsx via BridgeTalk. No template
 file is passed — the AI side builds its own working document (see below).
@@ -292,22 +299,34 @@ file is passed — the AI side builds its own working document (see below).
 
 function handOffToIllustrator(doc) {
     var silhPngPath  = exportSilhouettePng(doc);   // → {name}_silhouette.png
-    var elementsPath = writeElementsFile(doc);     // → {name}_elements.txt
+    var elementsPath = writeElementsFile(doc);     // → {name}_elements.json
     function esc(p) { return p.replace(/\\/g, "/").replace(/"/g, '\\"'); }
+    var aiStatus = null;
     var bt = new BridgeTalk();
     bt.target = "illustrator";
-    bt.body = '$.evalFile(new File("' + esc(CONFIG.aiPipelinePath) + '"));'
+    // Set the handoff flag first so AI_BuildCutlines' bottom dispatch does NOT auto-run
+    // its direct-run main(); end the body with buildDocAndImport(...) so its returned
+    // JSON status string is this message's result.
+    bt.body = '$.global.__aiBuildCutlinesHandoff = true;'
+        + '$.evalFile(new File("' + esc(CONFIG.aiPipelinePath) + '"));'
         + 'buildDocAndImport("' + esc(silhPngPath) + '","' + esc(elementsPath) + '");';
+    bt.onResult = function(m) { aiStatus = m.body; };   // JSON status from the AI half
     bt.send(CONFIG.bridgeTalkTimeout);
+    return aiStatus ? JSON.parse(aiStatus) : null;      // main() reports the real outcome
 }
 
-// In AI_BuildCutlines.jsx — entry point called by BridgeTalk (runs Steps 6 + 7A):
+// In AI_BuildCutlines.jsx — entry point called by BridgeTalk (runs Steps 6 + 7A).
+// Returns a JSON status string (parsed by PSAI's onResult) so the PS-side completion
+// alert reflects the real Illustrator outcome instead of always saying "Done".
 function buildDocAndImport(silhPngPath, elementsFilePath) {
     var doc = buildWorkingDocument();   // aiUtils — builds A4/CMYK doc + layers, no template
     var result = runCreateCutlines(doc, silhPngPath, elementsFilePath);
-    // Halts here if result.unmatched > 0 — artist renames paths, then re-runs directly.
-    // If unmatched == 0, continues automatically to runDeepnestExport(doc).
+    // Saves the working doc next to the sidecar (so Step 7A's doc.fullName resolves),
+    // then: halts if result.unmatched > 0 (artist renames paths, re-runs directly);
+    // else continues automatically to runDeepnestExport(doc). Returns _status(...) JSON.
 }
+// Dispatch (bottom of file): one-shot read-and-clear of $.global.__aiBuildCutlinesHandoff
+// decides whether to auto-run main() (direct double-click re-run) or stay quiet (handoff).
 ```
 
 **The AI pipeline has no template-file dependency.** `buildWorkingDocument()` in

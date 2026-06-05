@@ -1,4 +1,5 @@
 #target illustrator
+#include "../utils/json2.jsx"
 #include "../utils/aiUtils.jsx"
 #include "../illustrator/Step6_CreateCutlines.jsx"
 #include "../illustrator/Step7A_DeepnestExport.jsx"
@@ -48,8 +49,10 @@ function _runExportForNesting(doc) {
         scriptAlert("Step 7A failed — Cutlines layer not found.\n"
             + "Make sure Step 6 has been run on this document.\n"
             + "Log: " + CONFIG.logPath);
-        return;
+        return { ok: false, phase: "step7a", error: "Cutlines layer not found" };
     }
+
+    var svgsOk = !!(result.regularPath && result.irregularPath);
 
     log("[pipeline] === AI_BuildCutlines done ===");
 
@@ -72,6 +75,16 @@ function _runExportForNesting(doc) {
         + "Threshold used: " + CONFIG.deepnestRectThreshold
         + "  (see log for per-path ratios to calibrate)\n\n"
         + "Log: " + CONFIG.logPath);
+
+    return {
+        ok:           svgsOk,
+        phase:        "step7a",
+        regular:      result.regular,
+        irregular:    result.irregular,
+        regularPath:  result.regularPath  || null,
+        irregularPath: result.irregularPath || null,
+        error:        svgsOk ? null : "SVG export failed (see log)"
+    };
 }
 
 // Opens an exported SVG, first closing any already-open document with the same
@@ -94,13 +107,15 @@ function _reopenFresh(svgPath) {
 
 // ─── ENTRY POINT: BridgeTalk from PSAI_BuildAndExportCutlines.jsx ───────────────────────
 
-// Set by buildDocAndImport so main() knows not to double-fire Step 7A.
-var _ranViaHandoff = false;
+// Serialises a status object to a JSON string for return across the BridgeTalk
+// boundary. PSAI's bt.onResult parses this so its completion alert reflects the
+// real outcome of the Illustrator half (instead of always saying "Done").
+function _status(obj) { return JSON.stringify(obj); }
 
-// Builds the working document from scratch (no template file) and runs Step 6.
+// Builds the working document from scratch (no template file), runs Step 6, saves,
+// and (when fully matched) runs Step 7A. Returns a JSON status string describing the
+// outcome — see _status. Also alerts in Illustrator for the artist looking at that app.
 function buildDocAndImport(silhPngPath, elementsFilePath) {
-    _ranViaHandoff = true;
-
     log("[ai-pipeline] === AI_BuildCutlines start ===");
     log("[ai-pipeline] silhouette PNG: " + silhPngPath);
     log("[ai-pipeline] elements file:  " + elementsFilePath);
@@ -115,12 +130,12 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
         log("[ai-pipeline] ERROR | step 6 line " + e.line + ": " + e.message);
         scriptAlert("ERROR in Step 6 (Create Cutlines).\nLine " + e.line + ": " + e.message
             + "\nLog: " + CONFIG.logPath);
-        return;
+        return _status({ ok: false, phase: "step6", error: "line " + e.line + ": " + e.message });
     }
 
     if (!result) {
         log("[ai-pipeline] Step 6 returned null — aborted.");
-        return;
+        return _status({ ok: false, phase: "step6", error: "Step 6 returned null" });
     }
 
     log("[ai-pipeline] step 6 complete | named: " + result.named
@@ -129,12 +144,12 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
     // Save the working document next to the incoming sidecars. buildWorkingDocument()
     // returns an unsaved "Untitled" doc; without a real fullName, Step 7A resolves its
     // SVG output path to "/Untitled-1_regular.svg" (filesystem root) and the export is
-    // cancelled. Saving as {name}.ai beside {name}_elements.txt lets Step 7A export
+    // cancelled. Saving as {name}.ai beside {name}_elements.json lets Step 7A export
     // {name}_regular.svg / {name}_irregular.svg next to the PSD, where AI_ImportNesting
     // expects them. Done before the unmatched halt so the re-run path also has a saved doc.
     if (!CONFIG.dryRun) {
         var elemFile      = new File(elementsFilePath);
-        var baseName      = elemFile.name.replace(/_elements\.txt$/i, "").replace(/\.txt$/i, "");
+        var baseName      = elemFile.name.replace(/_elements\.json$/i, "").replace(/\.json$/i, "");
         var workingAiPath = elemFile.parent.fsName + "/" + baseName + ".ai";
         var _prevSaveUI   = app.userInteractionLevel;
         app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
@@ -152,17 +167,19 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
             + "When done, re-run this script directly (File → Scripts → Browse → AI_BuildCutlines.jsx)"
             + " to export SVGs for Deepnest.\n\n"
             + "Log: " + CONFIG.logPath);
-        return;
+        return _status({ ok: false, phase: "step6", named: result.named,
+                         unmatched: result.unmatched, error: result.unmatched + " unmatched path(s)" });
     }
 
-    _runExportForNesting(doc);
+    var exportResult = _runExportForNesting(doc);
+    exportResult.named = result.named;
+    exportResult.unmatched = result.unmatched;
+    return _status(exportResult);
 }
 
 // ─── MAIN: direct run after fixing unmatched paths ───────────────────────────
 
 function main() {
-    if (_ranViaHandoff) { return; }
-
     try {
         if (app.documents.length === 0) {
             scriptAlert("No document open.\nOpen the working .ai file first.");
@@ -184,4 +201,12 @@ function main() {
     }
 }
 
-main();
+// Dispatch. When invoked through the BridgeTalk handoff (or the integration test),
+// the caller sets $.global.__aiBuildCutlinesHandoff = true BEFORE evaluating this
+// file, then calls buildDocAndImport() itself — so main() (the direct re-run path)
+// must NOT auto-fire. Read-and-clear makes it a one-shot signal: $.global persists
+// for the whole Illustrator session, so without clearing it a later direct
+// double-click re-run would be wrongly suppressed.
+var _viaHandoff = $.global.__aiBuildCutlinesHandoff;
+$.global.__aiBuildCutlinesHandoff = false;
+if (!_viaHandoff) { main(); }

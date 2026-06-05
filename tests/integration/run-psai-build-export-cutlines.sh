@@ -55,7 +55,7 @@ LOG_AI="/tmp/AI_BuildCutlines.log"
 
 # Sidecars PSAI writes next to TEMP_FIXTURE, and the AI-side outputs derived from them.
 SILH="/tmp/${STEP}-fixture_silhouette.png"
-ELEM="/tmp/${STEP}-fixture_elements.txt"
+ELEM="/tmp/${STEP}-fixture_elements.json"
 WORKING_AI="/tmp/${STEP}-fixture.ai"
 REGULAR_SVG="/tmp/${STEP}-fixture_regular.svg"
 IRREGULAR_SVG="/tmp/${STEP}-fixture_irregular.svg"
@@ -147,11 +147,13 @@ fi
 
 rm -f "$LOG_AI" "$TEMP_SCRIPT_AI" "$WORKING_AI" "$REGULAR_SVG" "$IRREGULAR_SVG"
 
+# Inject the handoff flag (as production's bt.body does) so AI_BuildCutlines' bottom
+# dispatch does NOT auto-run its direct-run main(); we call buildDocAndImport ourselves.
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
     s|CONFIG\.logPath\s*=\s*_root[^;]+;|CONFIG.logPath = "'"$LOG_AI"'";|;
     s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
-    s|^main\(\);||;
+    s|^(#target illustrator.*)|$1\n\$.global.__aiBuildCutlinesHandoff = true;|;
 ' "$SCRIPT_AI" > "$TEMP_SCRIPT_AI"
 
 cat >> "$TEMP_SCRIPT_AI" << JSEOF

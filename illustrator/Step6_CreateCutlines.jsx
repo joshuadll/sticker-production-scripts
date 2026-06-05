@@ -187,85 +187,34 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-// Parses the elements sidecar text file produced by PSAI_BuildAndExportCutlines.
-// Format:
-//   width:{psdWidthPx}
-//   height:{psdHeightPx}
-//   {displayName}|{styleCode}|{left_px}|{top_px}|{right_px}|{bottom_px}
-//
-// Returns { psdWidth, psdHeight, elements: [{displayName, styleCode, left, top, right, bottom}] }
-// or null on parse failure.
+// Parses the JSON elements sidecar produced by PSAI_BuildAndExportCutlines.
+// Shape (see writeElementsFile):
+//   { psdWidth, psdHeight, elements: [
+//       { displayName, styleCode, left, top, right, bottom,
+//         caption: null | { lines, left, top, right, bottom,
+//                           radius?, spine?: [{x,y}, ...] } } ] }
+// Returns that object directly, or null on read/parse failure. Requires JSON
+// (json2.jsx, #included by AI_BuildCutlines). WC captions carry radius+spine (the
+// real fitted capsule); GC/stamps have caption.radius/spine absent (parametric pill).
 function _readElementsFile(filePath) {
     var f = new File(filePath);
     if (!f.exists) return null;
 
+    f.encoding = "UTF-8";
     f.open("r");
-    var lines = [];
-    while (!f.eof) {
-        var ln = f.readln();
-        if (ln !== "") lines.push(ln);
-    }
+    var text = f.read();
     f.close();
+    if (!text) return null;
 
-    if (lines.length < 3) return null;
-
-    var psdWidth  = parseInt(lines[0].split(":")[1], 10);
-    var psdHeight = parseInt(lines[1].split(":")[1], 10);
-    if (!psdWidth || !psdHeight) return null;
-
-    var elements = [];
-    var i;
-    for (i = 2; i < lines.length; i++) {
-        var parts = lines[i].split("|");
-        if (parts.length < 6) continue;
-        var el = {
-            displayName: parts[0],
-            styleCode:   parts[1],
-            left:        parseInt(parts[2], 10),
-            top:         parseInt(parts[3], 10),
-            right:       parseInt(parts[4], 10),
-            bottom:      parseInt(parts[5], 10),
-            caption:     null
-        };
-        // Extended (separable) format appends: capLines|capL|capT|capR|capB.
-        if (parts.length >= 11) {
-            var capLines = parseInt(parts[6], 10);
-            var capL = parseInt(parts[7], 10);
-            if (capLines > 0 && (capL || parseInt(parts[9], 10))) {
-                el.caption = {
-                    lines:  capLines,
-                    left:   capL,
-                    top:    parseInt(parts[8],  10),
-                    right:  parseInt(parts[9],  10),
-                    bottom: parseInt(parts[10], 10)
-                };
-                // WC captions append |{radius}|x1,y1;x2,y2;... (px) — the real fitted
-                // capsule. GC has no suffix (11 fields) and uses the parametric pill.
-                if (parts.length >= 13) {
-                    el.caption.radius = parseFloat(parts[11]);
-                    el.caption.spine  = _parseSpine(parts[12]);
-                }
-            }
-        }
-        elements.push(el);
+    var data;
+    try {
+        data = JSON.parse(text);
+    } catch (e) {
+        log("[step6] ERROR | elements sidecar is not valid JSON: " + e.message);
+        return null;
     }
-
-    return { psdWidth: psdWidth, psdHeight: psdHeight, elements: elements };
-}
-
-// Parses a serialised spine "x1,y1;x2,y2;..." (px) into [{x,y}...], or null.
-function _parseSpine(s) {
-    if (!s) return null;
-    var pairs = s.split(";");
-    var pts = [], i;
-    for (i = 0; i < pairs.length; i++) {
-        var xy = pairs[i].split(",");
-        if (xy.length < 2) continue;
-        var x = parseFloat(xy[0]), y = parseFloat(xy[1]);
-        if (isNaN(x) || isNaN(y)) continue;
-        pts.push({ x: x, y: y });
-    }
-    return pts.length ? pts : null;
+    if (!data || !data.psdWidth || !data.psdHeight || !data.elements) return null;
+    return data;
 }
 
 // Transforms a single PSD pixel point to AI document points (AI y increases

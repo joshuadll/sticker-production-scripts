@@ -1,4 +1,5 @@
 #target photoshop
+#include "../utils/json2.jsx"
 #include "../utils/psUtils.jsx"
 #include "../photoshop/Step3B_CaptionWhite.jsx"
 #include "../photoshop/Step5_Silhouette.jsx"
@@ -156,29 +157,36 @@ function captionInfo(grp) {
 // (non-WC, cold start, or no White pill found). Re-anchors the bbox-relative spine
 // offsets captured in Step 3B to the White pill's FINAL position, then serialises
 // as "|{radius}|x1,y1;x2,y2;..." (absolute px). Step 6 maps these PSD px to AI.
-function captionSpineSuffix(displayName, cap) {
-    if (typeof WC_CAPTION_SPINES === "undefined") return "";
+// Returns the WC caption's real fitted capsule as { radius, points: [{x,y}, ...] }
+// (px, re-anchored to the White pill's current position), or null when there's no
+// spine record or the White pill bounds are unknown (GC/stamps → parametric pill).
+function captionSpine(displayName, cap) {
+    if (typeof WC_CAPTION_SPINES === "undefined") return null;
     var rec = WC_CAPTION_SPINES[displayName];
-    if (!rec || !rec.off || rec.off.length < 2) return "";
-    if (cap.whiteLeft === null || cap.whiteTop === null) return "";
+    if (!rec || !rec.off || rec.off.length < 2) return null;
+    if (cap.whiteLeft === null || cap.whiteTop === null) return null;
 
     var pts = [];
     for (var i = 0; i < rec.off.length; i++) {
-        var px = Math.round(cap.whiteLeft + rec.off[i].dx);
-        var py = Math.round(cap.whiteTop  + rec.off[i].dy);
-        pts.push(px + "," + py);
+        pts.push({
+            x: Math.round(cap.whiteLeft + rec.off[i].dx),
+            y: Math.round(cap.whiteTop  + rec.off[i].dy)
+        });
     }
-    return "|" + Math.round(rec.radius) + "|" + pts.join(";");
+    return { radius: Math.round(rec.radius), points: pts };
 }
 
 // ─── ELEMENTS SIDECAR ────────────────────────────────────────────────────────
 
-// Writes a text sidecar next to the PSD with PSD dimensions and element bounds.
-// Used by AI_BuildCutlines.jsx for positional path naming after Image Trace.
-// Format:
-//   width:{px}
-//   height:{px}
-//   {displayName}|{styleCode}|{left_px}|{top_px}|{right_px}|{bottom_px}
+// Writes a JSON sidecar ({name}_elements.json) next to the PSD with PSD dimensions
+// and per-element bounds + caption metadata. Read by AI_BuildCutlines/Step 6 for
+// positional path naming and plate rebuild after Image Trace. Shape:
+//   { psdWidth, psdHeight, elements: [
+//       { displayName, styleCode, left, top, right, bottom,
+//         caption: null | { lines, left, top, right, bottom,
+//                           radius?, spine?: [{x,y}, ...] } } ] }
+// caption is null for stamps/uncaptioned; radius+spine present only for WC captions
+// (the real fitted capsule). JSON avoids delimiter collisions with caption text.
 //
 // Returns the sidecar file path, or null on failure.
 function writeElementsFile(doc) {
@@ -194,7 +202,7 @@ function writeElementsFile(doc) {
     var psdW = Math.round(doc.width.as("px"));
     var psdH = Math.round(doc.height.as("px"));
 
-    var lines = ["width:" + psdW, "height:" + psdH];
+    var data = { psdWidth: psdW, psdHeight: psdH, elements: [] };
     var i;
     for (i = 0; i < elementsGroup.layerSets.length; i++) {
         var grp    = elementsGroup.layerSets[i];
@@ -202,50 +210,57 @@ function writeElementsFile(doc) {
         if (!parsed) continue;
 
         var b = grp.bounds; // [left, top, right, bottom] UnitValues
-        var line =
-            parsed.displayName + "|"
-            + parsed.styleCode + "|"
-            + Math.round(b[0].as("px")) + "|"
-            + Math.round(b[1].as("px")) + "|"
-            + Math.round(b[2].as("px")) + "|"
-            + Math.round(b[3].as("px"));
+        var el = {
+            displayName: parsed.displayName,
+            styleCode:   parsed.styleCode,
+            left:   Math.round(b[0].as("px")),
+            top:    Math.round(b[1].as("px")),
+            right:  Math.round(b[2].as("px")),
+            bottom: Math.round(b[3].as("px")),
+            caption: null
+        };
 
-        // Append caption metadata so Step 6 can build the plate parametrically.
-        // Format: |capLines|capLeft|capTop|capRight|capBottom  (px; zeros if none).
-        // Optional spine suffix (WC only): |capRadius|x1,y1;x2,y2;... lets Step 6
-        // rebuild the real curved/tilted capsule instead of an axis-aligned pill.
+        // Caption metadata lets Step 6 build the plate. WC captions additionally
+        // carry the real fitted capsule (radius + spine points, px) so Step 6
+        // rebuilds the curved/tilted caption instead of an axis-aligned pill.
         var cap = captionInfo(grp);
         if (cap) {
-            line += "|" + cap.lines
-                + "|" + cap.left + "|" + cap.top
-                + "|" + cap.right + "|" + cap.bottom
-                + captionSpineSuffix(parsed.displayName, cap);
-        } else {
-            line += "|0|0|0|0|0";
+            el.caption = {
+                lines:  cap.lines,
+                left:   cap.left,
+                top:    cap.top,
+                right:  cap.right,
+                bottom: cap.bottom
+            };
+            var spine = captionSpine(parsed.displayName, cap);
+            if (spine) {
+                el.caption.radius = spine.radius;
+                el.caption.spine  = spine.points;
+            }
         }
 
-        lines.push(line);
+        data.elements.push(el);
     }
 
     app.preferences.rulerUnits = prevUnits;
 
-    var txtPath = doc.fullName.fsName.replace(/\.psd$/i, "_elements.txt");
-    var f = new File(txtPath);
+    var jsonPath = doc.fullName.fsName.replace(/\.psd$/i, "_elements.json");
+    var f = new File(jsonPath);
     f.encoding = "UTF-8";
     if (!f.open("w")) {
-        log("[pipeline] ERROR | could not open elements sidecar for writing: " + txtPath);
+        log("[pipeline] ERROR | could not open elements sidecar for writing: " + jsonPath);
         return null;
     }
-    if (!f.write(lines.join("\n"))) {
-        log("[pipeline] ERROR | write failed for elements sidecar: " + txtPath);
+    if (!f.write(JSON.stringify(data))) {
+        log("[pipeline] ERROR | write failed for elements sidecar: " + jsonPath);
         f.close();
         return null;
     }
     f.close();
 
-    log("[pipeline] wrote elements sidecar: " + txtPath
-        + " (" + (lines.length - 2) + " element(s))");
-    return txtPath;
+    log("[pipeline] wrote elements sidecar: " + jsonPath
+        + " (" + data.elements.length + " element(s))");
+    return jsonPath;
 }
 
 // ─── PER-ELEMENT PNG EXPORT ───────────────────────────────────────────────────
@@ -378,17 +393,32 @@ function handOffToIllustrator(doc) {
 
     function esc(p) { return p.replace(/\\/g, "/").replace(/"/g, '\\"'); }
 
+    var aiStatus = null;   // JSON status string returned by the Illustrator half
+
     var bt = new BridgeTalk();
     bt.target = "illustrator";
-    bt.body = '$.evalFile(new File("' + esc(CONFIG.aiPipelinePath) + '"));'
+    // Set the handoff flag first so AI_BuildCutlines' bottom dispatch does NOT auto-run
+    // its direct-run main(); end the body with buildDocAndImport(...) so its returned
+    // JSON status string becomes this message's result (captured in onResult below).
+    bt.body = '$.global.__aiBuildCutlinesHandoff = true;'
+        + '$.evalFile(new File("' + esc(CONFIG.aiPipelinePath) + '"));'
         + 'buildDocAndImport("'
         + esc(silhPngPath)  + '","'
         + esc(elementsPath) + '");';
+    bt.onResult = function(resultMsg) {
+        aiStatus = resultMsg.body;
+        log("[pipeline] BridgeTalk result: " + aiStatus);
+    };
     bt.onError = function(e) {
         log("[pipeline] BridgeTalk error: " + e.body);
     };
     bt.send(CONFIG.bridgeTalkTimeout);
     log("[pipeline] BridgeTalk: handed off to Illustrator | silh: " + silhPngPath);
+
+    // Parse the Illustrator-half status so main()'s completion alert reflects the real
+    // outcome. null when the AI side didn't respond within bridgeTalkTimeout.
+    if (!aiStatus) return null;
+    try { return JSON.parse(aiStatus); } catch (e) { return null; }
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
@@ -467,8 +497,9 @@ function main() {
 
     // ── BridgeTalk → Illustrator ───────────────────────────────────
     log("[pipeline] --- BridgeTalk handoff → Illustrator (Step 6) ---");
+    var aiStatus = null;
     if (!CONFIG.dryRun) {
-        handOffToIllustrator(doc);
+        aiStatus = handOffToIllustrator(doc);
     } else {
         log("[pipeline] [DRY RUN] would export silhouette PNG + elements sidecar"
             + " and hand off to Illustrator: " + doc.fullName.fsName);
@@ -477,11 +508,27 @@ function main() {
     // ── Completion summary ─────────────────────────────────────────
     log("[pipeline] === PSAI_BuildAndExportCutlines done ===");
 
+    // Report the Illustrator half's real outcome (from the BridgeTalk result) instead
+    // of optimistically saying "Done." aiStatus is null on dry-run or no/late response.
+    var cutlineLine;
+    if (aiStatus && aiStatus.ok) {
+        cutlineLine = "Cut lines + SVGs done in Illustrator ("
+            + aiStatus.regular + " regular, " + aiStatus.irregular + " irregular).\n"
+            + "Both SVGs are open in Illustrator, ready for Deepnest.\n\n";
+    } else if (aiStatus) {
+        cutlineLine = "WARNING: the Illustrator half did NOT finish cleanly"
+            + (aiStatus.phase ? " (" + aiStatus.phase + ")" : "") + ":\n  "
+            + (aiStatus.error || "unknown error") + "\n"
+            + "Check Illustrator and the log before continuing.\n\n";
+    } else {
+        cutlineLine = "Illustrator is running cut lines automatically.\n"
+            + "Wait for it to finish — it will alert you when SVGs are ready for Deepnest.\n\n";
+    }
+
     var msg = "Done.\n\n"
         + "  Grouped:     " + captionWhiteResult.grouped + " element(s).\n"
         + "  Art PNGs:    " + (elemArtFolder ? elemArtFolder : "skipped") + "\n\n"
-        + "Illustrator is opening the production template and will run cut lines automatically.\n"
-        + "Wait for it to finish — it will alert you when SVGs are ready for Deepnest.\n\n"
+        + cutlineLine
         + "After Deepnest: run AI_ImportNesting.jsx, selecting the Deepnest SVG(s)\n"
         + "and the '_elements' folder shown above.\n\n"
         + "Log: " + CONFIG.logPath;

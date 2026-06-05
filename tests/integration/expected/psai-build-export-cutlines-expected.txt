@@ -88,7 +88,7 @@
 [step5] hid 44 caption sub-layer(s).
 [step5] transient Silhouette built.
 [pipeline] exported silhouette PNG (transient layer removed): /private/tmp/psai-build-export-cutlines-fixture_silhouette.png
-[pipeline] wrote elements sidecar: /private/tmp/psai-build-export-cutlines-fixture_elements.txt (26 element(s))
+[pipeline] wrote elements sidecar: /private/tmp/psai-build-export-cutlines-fixture_elements.json (26 element(s))
 [pipeline] WARN: aiPipelinePath not set — sidecars written, skipping BridgeTalk handoff.
 Sidecars exported (silhouette PNG + elements sidecar).
 BridgeTalk skipped: CONFIG.aiPipelinePath is empty.
@@ -100,7 +100,7 @@ Done.
   Grouped:     26 element(s).
   Art PNGs:    /private/tmp/psai-build-export-cutlines-fixture_elements
 
-Illustrator is opening the production template and will run cut lines automatically.
+Illustrator is running cut lines automatically.
 Wait for it to finish — it will alert you when SVGs are ready for Deepnest.
 
 After Deepnest: run AI_ImportNesting.jsx, selecting the Deepnest SVG(s)
