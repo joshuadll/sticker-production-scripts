@@ -54,6 +54,7 @@ CONFIG.logPath = ($.fileName
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 function main() {
+    if ($.global.__noteworthieSetup) return;
 
     if (app.documents.length === 0) {
         scriptAlert("No document open.\nPlease open the production .ai file first.");

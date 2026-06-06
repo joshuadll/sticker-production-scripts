@@ -118,6 +118,7 @@ function saveWorkingDoc(doc, folder) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 function main() {
+    if ($.global.__noteworthieSetup) return;
 
     // ── Get or create template document ───────────────────────────
     var doc;
