@@ -172,14 +172,16 @@ function _findNestedSvgs(doc) {
     catch (e) { return out; }
     if (!base) return out;
 
-    var cand = [base + "_regular_nested.svg",
-                base + "_irregular_nested.svg",
-                base + "_nested.svg"];
-    var i, f;
-    for (i = 0; i < cand.length; i++) {
-        f = new File(cand[i]);
-        if (f.exists) out.push(f);
-    }
+    // Check the split-run names first. Only fall through to the single-run
+    // _nested.svg if NEITHER split file is present — avoids accumulating a
+    // stale _nested.svg alongside its replacements (all three would be imported).
+    var regular   = new File(base + "_regular_nested.svg");
+    var irregular = new File(base + "_irregular_nested.svg");
+    var single    = new File(base + "_nested.svg");
+    if (regular.exists)   out.push(regular);
+    if (irregular.exists) out.push(irregular);
+    if (out.length === 0 && single.exists) out.push(single);
+    var i;
     if (out.length > 0) return out;
 
     // Fallback: enumerate for any *_nested.svg (works where getFiles is allowed).
@@ -217,6 +219,7 @@ function _selectSvgFiles(doc) {
     }
 
     // Manual fallback (multi-select via shift-click).
+    if (CONFIG.suppressAlerts) return null; // headless: no dialog, treat as cancelled
     var files = File.openDialog(
         "Select Deepnest output SVG(s) — files ending in _nested.svg",
         "SVG:*.svg",
@@ -253,6 +256,7 @@ function _selectArtFolder(doc) {
             return guess;
         }
     }
+    if (CONFIG.suppressAlerts) return null; // headless: no dialog, treat as cancelled
     return Folder.selectDialog(
         "Select the element art folder — the '{SKU}_elements' folder next to your PSD"
     );

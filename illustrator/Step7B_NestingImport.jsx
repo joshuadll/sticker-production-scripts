@@ -248,7 +248,13 @@ function _nestCollectParts(node) {
 
     for (i = 0; i < node.groupItems.length; i++) {
         g = node.groupItems[i];
-        if (g.pathItems.length > 0 || g.compoundPathItems.length > 0) {
+        // Treat a group as a leaf part only when it has direct geometry AND no
+        // sub-groups. A group with BOTH direct paths AND sub-groups is ambiguous
+        // (e.g. a Deepnest outer-sheet <g> that also carries a boundary rect);
+        // recurse through it instead of pushing it as one oversized part — which
+        // would inflate the area and break matching for the whole file.
+        if ((g.pathItems.length > 0 || g.compoundPathItems.length > 0)
+                && g.groupItems.length === 0) {
             parts.push(g);
         } else if (g.groupItems.length > 0) {
             sub = _nestCollectParts(g);
@@ -471,35 +477,40 @@ function _nestPlaceArtwork(doc, stickersLayer, displayName, artFolder,
 
     doc.activeLayer = stickersLayer;
 
-    var placed = doc.placedItems.add();
-    placed.file = pngFile;
-    placed.name = displayName;
+    try {
+        var placed = doc.placedItems.add();
+        placed.file = pngFile;
+        placed.name = displayName;
 
-    // Scale to the cutline's longest edge. Use the caller-supplied pre-rotation
-    // longest edge: the cutline has already been rotated by _nestApplyTransform,
-    // so its current bbox is distorted at oblique angles. The PNG is measured
-    // unrotated, then rotated below — so both must use the unrotated extent.
-    var cLongest = cutlineLongest;
-    var pLongest = placed.width > placed.height ? placed.width : placed.height;
+        // Scale to the cutline's longest edge. Use the caller-supplied pre-rotation
+        // longest edge: the cutline has already been rotated by _nestApplyTransform,
+        // so its current bbox is distorted at oblique angles. The PNG is measured
+        // unrotated, then rotated below — so both must use the unrotated extent.
+        var pLongest = placed.width > placed.height ? placed.width : placed.height;
+        if (pLongest > 0 && cutlineLongest > 0) {
+            var scalePercent = (cutlineLongest / pLongest) * 100;
+            placed.resize(scalePercent, scalePercent);
+        }
 
-    if (pLongest > 0 && cLongest > 0) {
-        placed.resize((cLongest / pLongest) * 100,
-                      (cLongest / pLongest) * 100);
+        // Centre at cutline centre (post-transform — art follows the moved cutline).
+        var cc = boundsCenter(cutlineItem.geometricBounds);
+        placed.translate(
+            cc.x - (placed.position[0] + placed.width  / 2),
+            cc.y - (placed.position[1] - placed.height / 2)
+        );
+
+        // Rotate to match the Deepnest rotation (around the artwork's own centre).
+        if (Math.abs(rotation) > 0.5) {
+            placed.rotate(rotation, true, false, false, false, Transformation.CENTER);
+        }
+
+        log("[step-nest] placed art | " + displayName
+            + "  rot=" + Math.round(rotation) + "°");
+        return true;
+
+    } catch (e) {
+        log("[step-nest] WARN | art placement failed for: " + displayName
+            + " — line " + e.line + ": " + e.message);
+        return false;
     }
-
-    // Centre at cutline centre (post-transform — art follows the moved cutline).
-    var cc = boundsCenter(cutlineItem.geometricBounds);
-    placed.translate(
-        cc.x - (placed.position[0] + placed.width  / 2),
-        cc.y - (placed.position[1] - placed.height / 2)
-    );
-
-    // Rotate to match the Deepnest rotation (around the artwork's own centre).
-    if (Math.abs(rotation) > 0.5) {
-        placed.rotate(rotation, true, false, false, false, Transformation.CENTER);
-    }
-
-    log("[step-nest] placed art | " + displayName
-        + "  rot=" + Math.round(rotation) + "°");
-    return true;
 }
