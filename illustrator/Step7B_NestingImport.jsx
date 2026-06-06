@@ -63,12 +63,13 @@ function runNestingImport(doc, svgFiles, artFolder) {
 
         if (cutlineItem && !usedCutlines[svgItem.name]) {
             rotation = _nestComputeRotation(svgItem, cutlineItem);
+            var preLongest = _nestLongestEdge(cutlineItem); // before rotation distorts bbox
             _nestApplyTransform(svgItem, cutlineItem, rotation);
             usedCutlines[svgItem.name] = true;
 
             if (stickersLayer && artFolder) {
                 if (_nestPlaceArtwork(doc, stickersLayer, svgItem.name,
-                                      artFolder, cutlineItem, rotation)) {
+                                      artFolder, cutlineItem, rotation, preLongest)) {
                     artPlaced++;
                 }
             }
@@ -85,6 +86,7 @@ function runNestingImport(doc, svgFiles, artFolder) {
         cutlineItem = _nestAreaMatch(svgItem, cutlineMap, usedCutlines);
         if (cutlineItem) {
             rotation = _nestComputeRotation(svgItem, cutlineItem);
+            var preLongestA = _nestLongestEdge(cutlineItem); // before rotation distorts bbox
             _nestApplyTransform(svgItem, cutlineItem, rotation);
             usedCutlines[cutlineItem.name] = true;
 
@@ -93,7 +95,7 @@ function runNestingImport(doc, svgFiles, artFolder) {
 
             if (stickersLayer && artFolder) {
                 if (_nestPlaceArtwork(doc, stickersLayer, cutlineItem.name,
-                                      artFolder, cutlineItem, rotation)) {
+                                      artFolder, cutlineItem, rotation, preLongestA)) {
                     artPlaced++;
                 }
             }
@@ -120,16 +122,18 @@ function runNestingImport(doc, svgFiles, artFolder) {
 // Applies the full Deepnest transform (rotation then translation) to a cutline
 // item. Logs the applied values.
 function _nestApplyTransform(svgItem, cutlineItem, rotation) {
-    var oldCenter = boundsCenter(cutlineItem.geometricBounds);
     var newCenter = svgItem.center;
 
     if (!CONFIG.dryRun) {
-        // Rotate around the item's own centre first (centre stays fixed).
+        // Rotate around the item's own centre first.
         if (Math.abs(rotation) > 0.5) {
             cutlineItem.rotate(rotation, true, false, false, false,
                                Transformation.CENTER);
         }
-        // Then translate old centre → new centre.
+        // Re-read the bounding-box centre AFTER rotating: for an asymmetric shape
+        // the axis-aligned bbox centre shifts under rotation, so the pre-rotation
+        // centre would land the item off by that shift. Then translate to target.
+        var oldCenter = boundsCenter(cutlineItem.geometricBounds);
         cutlineItem.translate(newCenter.x - oldCenter.x,
                               newCenter.y - oldCenter.y);
     }
@@ -354,6 +358,14 @@ function _nestAreaMatch(svgItem, cutlineMap, usedCutlines) {
     return null;
 }
 
+// Longest edge of an item's current (axis-aligned) bounding box.
+function _nestLongestEdge(item) {
+    var gb = item.geometricBounds;
+    var w  = Math.abs(gb[2] - gb[0]);
+    var h  = Math.abs(gb[1] - gb[3]);
+    return w > h ? w : h;
+}
+
 function _nestGetArea(item) {
     if (item.typename === "PathItem") return Math.abs(item.area);
     if (item.typename === "GroupItem") {
@@ -372,7 +384,7 @@ function _nestGetArea(item) {
 // Places {displayName}.png in the Stickers layer, scaled to the cutlineItem's
 // longest edge, centred at its bounding-box centre, and rotated to match.
 function _nestPlaceArtwork(doc, stickersLayer, displayName, artFolder,
-                           cutlineItem, rotation) {
+                           cutlineItem, rotation, cutlineLongest) {
     var safeName = displayName.replace(/[\/\\:*?"<>|]/g, "_");
     var pngFile  = new File(artFolder.fsName + "/" + safeName + ".png");
 
@@ -392,11 +404,11 @@ function _nestPlaceArtwork(doc, stickersLayer, displayName, artFolder,
     placed.file = pngFile;
     placed.name = displayName;
 
-    // Scale to cutline's longest edge.
-    var cgb      = cutlineItem.geometricBounds;
-    var cw       = Math.abs(cgb[2] - cgb[0]);
-    var ch       = Math.abs(cgb[1] - cgb[3]);
-    var cLongest = cw > ch ? cw : ch;
+    // Scale to the cutline's longest edge. Use the caller-supplied pre-rotation
+    // longest edge: the cutline has already been rotated by _nestApplyTransform,
+    // so its current bbox is distorted at oblique angles. The PNG is measured
+    // unrotated, then rotated below — so both must use the unrotated extent.
+    var cLongest = cutlineLongest;
     var pLongest = placed.width > placed.height ? placed.width : placed.height;
 
     if (pLongest > 0 && cLongest > 0) {
@@ -404,8 +416,8 @@ function _nestPlaceArtwork(doc, stickersLayer, displayName, artFolder,
                       (cLongest / pLongest) * 100);
     }
 
-    // Centre at cutline centre.
-    var cc = boundsCenter(cgb);
+    // Centre at cutline centre (post-transform — art follows the moved cutline).
+    var cc = boundsCenter(cutlineItem.geometricBounds);
     placed.translate(
         cc.x - (placed.position[0] + placed.width  / 2),
         cc.y - (placed.position[1] - placed.height / 2)
