@@ -157,8 +157,8 @@ function _confirm(msg) {
 }
 
 // Deepnest output convention: saved next to the working file named
-// "{base}_regular_nested.svg" / "{base}_irregular_nested.svg" (or "{base}_nested.svg"
-// for a single file). Returns matching File[] (may be empty).
+// "{base}_regular_nested.svg" and "{base}_irregular_nested.svg".
+// Returns matching File[] (may be empty if neither is found yet).
 //
 // Primary lookup STATS the convention names directly rather than enumerating the
 // folder: Folder.getFiles() returns nothing on some macOS folders (e.g. /tmp) where
@@ -172,15 +172,10 @@ function _findNestedSvgs(doc) {
     catch (e) { return out; }
     if (!base) return out;
 
-    // Check the split-run names first. Only fall through to the single-run
-    // _nested.svg if NEITHER split file is present — avoids accumulating a
-    // stale _nested.svg alongside its replacements (all three would be imported).
     var regular   = new File(base + "_regular_nested.svg");
     var irregular = new File(base + "_irregular_nested.svg");
-    var single    = new File(base + "_nested.svg");
     if (regular.exists)   out.push(regular);
     if (irregular.exists) out.push(irregular);
-    if (out.length === 0 && single.exists) out.push(single);
     var i;
     if (out.length > 0) return out;
 
