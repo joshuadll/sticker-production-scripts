@@ -34,19 +34,26 @@ CONFIG.logPath = _root + "/pipelines/AI_ImportNesting.log";
 function main() {
     try {
 
-        // ── Validate document ──────────────────────────────────────────────
-        if (app.documents.length === 0) {
-            scriptAlert("No document open.\nOpen the working .ai file first.");
-            return;
-        }
-        var doc = app.activeDocument;
-
         log("[pipeline] === AI_ImportNesting start ===");
         log("[pipeline] dryRun: " + CONFIG.dryRun);
+
+        // ── Resolve the working document ────────────────────────────────────
+        // Pipeline 2 ends by re-opening the exported SVGs, so the ACTIVE document
+        // is usually an SVG — not the working .ai. Don't blindly trust
+        // activeDocument: find the open doc that carries a Cutlines layer (Step 6's
+        // output). SVGs have no such layer, so this also gives a clear error
+        // instead of the misleading "run Step 6" message when an SVG is in front.
+        var resolved = _resolveWorkingDoc();
+        if (!resolved.doc) {
+            log("[pipeline] cannot resolve working doc | " + resolved.error);
+            scriptAlert(resolved.error + "\n\nLog: " + CONFIG.logPath);
+            return;
+        }
+        var doc = resolved.doc;
         log("[pipeline] document: " + doc.name);
 
         // ── Select Deepnest SVG file(s) ────────────────────────────────────
-        var svgFiles = _selectSvgFiles();
+        var svgFiles = _selectSvgFiles(doc);
         if (!svgFiles || svgFiles.length === 0) {
             log("[pipeline] cancelled — no SVG file(s) selected.");
             return;
@@ -57,7 +64,7 @@ function main() {
         }
 
         // ── Select element art folder ──────────────────────────────────────
-        var artFolder = _selectArtFolder();
+        var artFolder = _selectArtFolder(doc);
         if (!artFolder) {
             log("[pipeline] cancelled — no art folder selected.");
             return;
@@ -104,19 +111,148 @@ function main() {
 
 // ─── DIALOGS ──────────────────────────────────────────────────────────────────
 
-function _selectSvgFiles() {
-    // Illustrator's File.openDialog supports multi-select (shift-click) on most platforms.
+// Resolves the working document. Returns { doc: Document|null, error: String|null }.
+// The working file is identified by having a Cutlines layer (Step 6's output);
+// SVGs opened by Pipeline 2 do not, so this avoids operating on the wrong doc.
+function _resolveWorkingDoc() {
+    if (app.documents.length === 0) {
+        return { doc: null, error: "No document open.\nOpen your working .ai file first." };
+    }
+
+    // Prefer the active document when it is itself the working file.
+    var active = app.activeDocument;
+    if (active && findLayer(active, CONFIG.cutlinesLayerName)) {
+        return { doc: active, error: null };
+    }
+
+    // Otherwise look for the single open doc that has a Cutlines layer.
+    var candidates = [];
+    var i;
+    for (i = 0; i < app.documents.length; i++) {
+        if (findLayer(app.documents[i], CONFIG.cutlinesLayerName)) {
+            candidates.push(app.documents[i]);
+        }
+    }
+
+    if (candidates.length === 1) {
+        app.activeDocument = candidates[0];
+        log("[pipeline] active doc was not the working file; switched to: "
+            + candidates[0].name);
+        return { doc: candidates[0], error: null };
+    }
+    if (candidates.length > 1) {
+        return { doc: null, error: "Multiple open documents have a Cutlines layer.\n"
+            + "Click the working .ai you want to nest, then run this script again." };
+    }
+
+    return { doc: null, error: "The front document has no Cutlines layer — it looks like an "
+        + "SVG, not your working .ai.\n\nBring the working .ai (the file Step 6 created the cut "
+        + "lines in) to the front, then run this script again." };
+}
+
+// Confirm dialog that auto-accepts under suppressAlerts (headless test runs).
+function _confirm(msg) {
+    if (CONFIG.suppressAlerts) return true;
+    return confirm(msg);
+}
+
+// Deepnest output convention: saved next to the working file named
+// "{base}_regular_nested.svg" / "{base}_irregular_nested.svg" (or "{base}_nested.svg"
+// for a single file). Returns matching File[] (may be empty).
+//
+// Primary lookup STATS the convention names directly rather than enumerating the
+// folder: Folder.getFiles() returns nothing on some macOS folders (e.g. /tmp) where
+// directory listing is blocked by TCC, even though File.exists and app.open work.
+// A getFiles() pass is kept as a fallback for non-standard names where listing is
+// permitted.
+function _findNestedSvgs(doc) {
+    var out = [];
+    var base, parent;
+    try { base = doc.fullName.fsName.replace(/\.ai$/i, ""); parent = doc.fullName.parent; }
+    catch (e) { return out; }
+    if (!base) return out;
+
+    var cand = [base + "_regular_nested.svg",
+                base + "_irregular_nested.svg",
+                base + "_nested.svg"];
+    var i, f;
+    for (i = 0; i < cand.length; i++) {
+        f = new File(cand[i]);
+        if (f.exists) out.push(f);
+    }
+    if (out.length > 0) return out;
+
+    // Fallback: enumerate for any *_nested.svg (works where getFiles is allowed).
+    if (parent) {
+        var all = parent.getFiles("*.svg");
+        if (all) {
+            for (i = 0; i < all.length; i++) {
+                if (all[i] instanceof File && (/_nested\.svg$/i).test(all[i].name)) {
+                    out.push(all[i]);
+                }
+            }
+        }
+    }
+    return out;
+}
+
+function _findElementsFolder(doc) {
+    var base;
+    try { base = doc.fullName.fsName.replace(/\.ai$/i, ""); } catch (e) { return null; }
+    if (!base) return null;
+    return new Folder(base + "_elements");
+}
+
+function _selectSvgFiles(doc) {
+    // Happy path: auto-discover {…}_nested.svg next to the working file.
+    var found = _findNestedSvgs(doc);
+    if (found.length > 0) {
+        var names = [];
+        var n;
+        for (n = 0; n < found.length; n++) names.push(found[n].name);
+        if (_confirm("Found " + found.length + " Deepnest SVG(s) next to your file:\n  "
+                + names.join("\n  ") + "\n\nImport these?   (No = pick manually)")) {
+            return found;
+        }
+    }
+
+    // Manual fallback (multi-select via shift-click).
     var files = File.openDialog(
-        "Select Deepnest output SVG(s) — shift-click to select both regular and irregular",
+        "Select Deepnest output SVG(s) — files ending in _nested.svg",
         "SVG:*.svg",
         true
     );
     if (!files) return null;
-    if (files instanceof File) return [files];
+    if (files instanceof File) files = [files];
+
+    // Guard: the pre-Deepnest Step 7A exports ({name}_regular.svg / _irregular.svg)
+    // sit right next to the PSD and are easy to pick by mistake — importing them
+    // would lay elements out UN-nested. Warn on anything not ending in _nested.svg.
+    var suspect = [];
+    var j;
+    for (j = 0; j < files.length; j++) {
+        if (!(/_nested\.svg$/i).test(files[j].name)) suspect.push(files[j].name);
+    }
+    if (suspect.length > 0) {
+        if (!_confirm("These don't look like Deepnest output (expected names ending in "
+                + "\"_nested.svg\"):\n  " + suspect.join("\n  ")
+                + "\n\nThe pre-Deepnest cut-line SVGs place elements UN-nested.\n\n"
+                + "Use the selected file(s) anyway?")) {
+            return null;
+        }
+    }
     return files;
 }
 
-function _selectArtFolder() {
+function _selectArtFolder(doc) {
+    // Happy path: the per-element PNGs live in "{base}_elements" next to the file.
+    var guess = _findElementsFolder(doc);
+    if (guess && guess.exists) {
+        if (_confirm("Use element art folder:\n  " + guess.fsName
+                + "\n\nImport art from here?   (No = pick manually)")) {
+            return guess;
+        }
+    }
     return Folder.selectDialog(
         "Select the element art folder — the '{SKU}_elements' folder next to your PSD"
     );

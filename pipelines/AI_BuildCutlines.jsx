@@ -64,6 +64,9 @@ function _runExportForNesting(doc) {
         app.userInteractionLevel = _prevUI;
     }
 
+    var baseHint = "{name}";
+    try { if (doc.fullName) baseHint = doc.fullName.name.replace(/\.ai$/i, ""); } catch (eName) {}
+
     scriptAlert("Done.\n\n"
         + "  Regular   (" + result.regular   + " paths): " + (result.regularPath   || "—") + "\n"
         + "  Irregular (" + result.irregular + " paths): " + (result.irregularPath || "—") + "\n\n"
@@ -72,6 +75,10 @@ function _runExportForNesting(doc) {
         + "Then import each SVG into Deepnest:\n"
         + "  Regular   → 90° increments, gap 1mm\n"
         + "  Irregular → free rotation, gap 1.5mm\n\n"
+        + "NEXT — after nesting:\n"
+        + "  1. Save each Deepnest result next to this file, named ending in\n"
+        + "     \"_nested.svg\"  (e.g. " + baseHint + "_regular_nested.svg).\n"
+        + "  2. Bring the working .ai to the front and run AI_ImportNesting.jsx.\n\n"
         + "Threshold used: " + CONFIG.deepnestRectThreshold
         + "  (see log for per-path ratios to calibrate)\n\n"
         + "Log: " + CONFIG.logPath);

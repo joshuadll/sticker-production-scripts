@@ -1,22 +1,28 @@
 // Step7B_NestingImport.jsx — Phase function only.
 // #included by AI_ImportNesting.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
-// Opens each Deepnest output SVG, reads the nested path positions and rotations,
-// then fully repositions each cutline GroupItem in the working file — applying
-// both the rotation and the translation so the item matches the Deepnest layout.
+// Opens each Deepnest output SVG, reads each nested part's position + rotation,
+// then fully repositions the matching cutline GroupItem in the working file —
+// applying both rotation and translation so it lands on the Deepnest layout.
 // Also places per-element artwork PNGs in the Stickers layer at the same
 // position and rotation.
 //
-// Rotation is computed by comparing the direction from each path's centroid to
-// its first anchor point in the Deepnest SVG vs the original working file. Both
-// are in Illustrator coordinate space (Illustrator flips SVG's y-axis on open),
-// so the comparison is direct. The GroupItem is rotated around its own centre
-// first, then translated — so the hidden outline and plate sub-paths move with it.
+// Deepnest output structure (verified against real output, 2026-06-06):
+//   Each nested part is wrapped in <g transform="translate(...) rotate(...)">,
+//   possibly inside an outer sheet <g>. Illustrator BAKES the transform into the
+//   path coordinates on open, and the wrapped paths are NOT at the layer's top
+//   level (layer.pathItems == 0). The export→Deepnest round-trip also STRIPS
+//   ids from group-wrapped cutlines (only originally-ungrouped paths keep a name),
+//   so name-based matching is not viable — matching is purely by area.
 //
-// Matching strategy:
-//   Pass 1 — name: SVG path id === GroupItem name (works when Deepnest preserves
-//             the id attribute, which is the normal case).
-//   Pass 2 — area: compares path areas within CONFIG.areaMatchTolerance ratio.
+// Matching: each SVG part is paired to a cutline by closest path area within
+// CONFIG.areaMatchTolerance (rotation + translation preserve area, so a true pair
+// has near-identical area). Assignment is global-greedy: all candidate pairs are
+// sorted by area ratio and assigned best-first, each part/cutline used once.
+//
+// Rotation: compared via centroid→largest-anchor direction on the baked geometry
+// of the matched pair (Illustrator inverts SVG's y-axis on open, so the angle
+// difference is directly usable with rotate()).
 //
 // Returns: { matched, unmatched, artPlaced }
 
@@ -34,6 +40,23 @@ function runNestingImport(doc, svgFiles, artFolder) {
         log("[step-nest] WARN | Stickers layer not found — artwork will not be placed.");
     }
 
+    // Re-run safety: cutline transforms are idempotent on their own — each match
+    // re-targets the cutline to the part's ABSOLUTE centre and re-measures rotation
+    // from the current state, so positions converge instead of compounding. Placed
+    // artwork is the exception: _nestPlaceArtwork adds a fresh PlacedItem every run,
+    // so clear any art from a previous run first to avoid duplicate stacks.
+    if (stickersLayer && !CONFIG.dryRun) {
+        var cleared = 0;
+        var pi;
+        for (pi = stickersLayer.placedItems.length - 1; pi >= 0; pi--) {
+            stickersLayer.placedItems[pi].remove();
+            cleared++;
+        }
+        if (cleared > 0) {
+            log("[step-nest] cleared " + cleared + " previously placed art item(s) (re-run).");
+        }
+    }
+
     // ── 2. Build cutline map {displayName: pageItem} ──────────────────────────────
     var cutlineMap = _nestBuildCutlineMap(cutlinesLayer);
     var totalCutlines = 0;
@@ -41,72 +64,53 @@ function runNestingImport(doc, svgFiles, artFolder) {
     for (k in cutlineMap) { totalCutlines++; }
     log("[step-nest] found " + totalCutlines + " cutline(s) in working file.");
 
-    // ── 3. Collect nested item data from Deepnest SVG(s) ─────────────────────────
-    var nestedItems = _nestCollectFromSvgs(doc, svgFiles);
-    log("[step-nest] found " + nestedItems.length + " path(s) across SVG file(s).");
+    // ── 3. Collect nested parts from Deepnest SVG(s) ─────────────────────────────
+    var parts = _nestCollectFromSvgs(doc, svgFiles);
+    log("[step-nest] found " + parts.length + " nested part(s) across SVG file(s).");
 
-    if (nestedItems.length === 0) {
-        log("[step-nest] WARN | no named paths found in SVG file(s).");
+    if (parts.length === 0) {
+        log("[step-nest] WARN | no parts found in SVG file(s).");
         return { matched: 0, unmatched: 0, artPlaced: 0 };
     }
 
-    // ── 4. Pass 1 — name-based matching ──────────────────────────────────────────
-    var matched      = 0;
-    var unmatched    = 0;
-    var artPlaced    = 0;
-    var usedCutlines = {};
-    var i, svgItem, cutlineItem, rotation;
+    // ── 4. Area-based assignment (global greedy by closest area ratio) ────────────
+    var assignments = _nestAssignByArea(parts, cutlineMap);
 
-    for (i = 0; i < nestedItems.length; i++) {
-        svgItem     = nestedItems[i];
-        cutlineItem = cutlineMap[svgItem.name];
+    var matched   = 0;
+    var artPlaced = 0;
+    var assignedPart = {};
+    var a, svgItem, cutlineItem, rotation, preLongest;
 
-        if (cutlineItem && !usedCutlines[svgItem.name]) {
-            rotation = _nestComputeRotation(svgItem, cutlineItem);
-            var preLongest = _nestLongestEdge(cutlineItem); // before rotation distorts bbox
-            _nestApplyTransform(svgItem, cutlineItem, rotation);
-            usedCutlines[svgItem.name] = true;
+    for (a = 0; a < assignments.length; a++) {
+        svgItem     = assignments[a].part;
+        cutlineItem = assignments[a].cutlineItem;
+        assignedPart[assignments[a].partIndex] = true;
 
-            if (stickersLayer && artFolder) {
-                if (_nestPlaceArtwork(doc, stickersLayer, svgItem.name,
-                                      artFolder, cutlineItem, rotation, preLongest)) {
-                    artPlaced++;
-                }
+        rotation   = _nestComputeRotation(svgItem, cutlineItem);
+        preLongest = _nestLongestEdge(cutlineItem); // before rotation distorts the bbox
+        _nestApplyTransform(svgItem, cutlineItem, rotation);
+
+        log("[step-nest] matched (area) | " + cutlineItem.name
+            + "  ratio=" + (Math.round(assignments[a].ratio * 1000) / 1000));
+
+        if (stickersLayer && artFolder) {
+            if (_nestPlaceArtwork(doc, stickersLayer, cutlineItem.name,
+                                  artFolder, cutlineItem, rotation, preLongest)) {
+                artPlaced++;
             }
-
-            matched++;
         }
+
+        matched++;
     }
 
-    // ── 5. Pass 2 — area-based fallback for unrecognised names ───────────────────
-    for (i = 0; i < nestedItems.length; i++) {
-        svgItem = nestedItems[i];
-        if (usedCutlines[svgItem.name]) continue;
-
-        cutlineItem = _nestAreaMatch(svgItem, cutlineMap, usedCutlines);
-        if (cutlineItem) {
-            rotation = _nestComputeRotation(svgItem, cutlineItem);
-            var preLongestA = _nestLongestEdge(cutlineItem); // before rotation distorts bbox
-            _nestApplyTransform(svgItem, cutlineItem, rotation);
-            usedCutlines[cutlineItem.name] = true;
-
-            log("[step-nest] matched (area) | " + cutlineItem.name
-                + " ← SVG \"" + svgItem.name + "\"");
-
-            if (stickersLayer && artFolder) {
-                if (_nestPlaceArtwork(doc, stickersLayer, cutlineItem.name,
-                                      artFolder, cutlineItem, rotation, preLongestA)) {
-                    artPlaced++;
-                }
-            }
-
-            matched++;
-        } else {
-            log("[step-nest] WARN unmatched | SVG path: \"" + svgItem.name + "\""
-                + " at (" + Math.round(svgItem.center.x) + ", "
-                + Math.round(svgItem.center.y) + ")");
-            unmatched++;
-        }
+    // ── 5. Report unmatched parts ────────────────────────────────────────────────
+    var unmatched = 0;
+    for (a = 0; a < parts.length; a++) {
+        if (assignedPart[a]) continue;
+        unmatched++;
+        log("[step-nest] WARN unmatched part | area=" + Math.round(parts[a].area)
+            + " at (" + Math.round(parts[a].center.x) + ", "
+            + Math.round(parts[a].center.y) + ")");
     }
 
     log("[step-nest] result | matched: " + matched
@@ -178,8 +182,8 @@ function _nestBuildCutlineMap(cutlinesLayer) {
     return map;
 }
 
-// Opens each SVG in Illustrator, reads named paths with position/rotation/area,
-// restores the working doc as active. Returns [{name, center, bounds, area, rotation, anchor0}].
+// Opens each SVG, collects nested-part records, restores the working doc as active.
+// Returns [{ name, center, bounds, area, anchor0 }] — one per nested part.
 function _nestCollectFromSvgs(workingDoc, svgFiles) {
     var result = [];
     var i, svgFile, svgDoc, items, j;
@@ -201,7 +205,7 @@ function _nestCollectFromSvgs(workingDoc, svgFiles) {
             app.activeDocument = workingDoc;
 
             for (j = 0; j < items.length; j++) { result.push(items[j]); }
-            log("[step-nest] read " + items.length + " path(s) from " + svgFile.name);
+            log("[step-nest] read " + items.length + " part(s) from " + svgFile.name);
 
         } catch (e) {
             log("[step-nest] ERROR | SVG " + svgFile.name + ": " + e.message);
@@ -215,80 +219,205 @@ function _nestCollectFromSvgs(workingDoc, svgFiles) {
     return result;
 }
 
-// Reads named paths from the first layer of an SVG doc.
-// Captures anchor0 (first anchor point) for rotation computation.
+// Builds part records from every layer of an SVG doc. Deepnest nests each part in
+// a transform-group, so we collect part-groups recursively rather than reading
+// only the layer's top-level paths.
 function _nestCollectFromDoc(svgDoc) {
     var result = [];
-    if (!svgDoc.layers.length) return result;
-    var layer = svgDoc.layers[0];
-    var i, item, gb, pt, a0;
+    var i, s, parts = [];
+    for (i = 0; i < svgDoc.layers.length; i++) {
+        var sub = _nestCollectParts(svgDoc.layers[i]);
+        for (s = 0; s < sub.length; s++) parts.push(sub[s]);
+    }
+    for (i = 0; i < parts.length; i++) {
+        var rec = _nestPartRecord(parts[i]);
+        if (rec.area > 0) result.push(rec);
+    }
+    return result;
+}
 
-    for (i = 0; i < layer.pathItems.length; i++) {
-        item = layer.pathItems[i];
-        if (!item.name || item.name === "") continue;
-        gb = item.geometricBounds;
-        a0 = null;
-        if (item.pathPoints && item.pathPoints.length > 0) {
-            pt = item.pathPoints[0].anchor; // [x, y]
-            a0 = { x: pt[0], y: pt[1] };
+// Recursively collects "part" page-items from a container (layer or group):
+//   - a group that directly holds path/compound geometry is a part (the Deepnest
+//     part wrapper) and is NOT descended into further;
+//   - a group holding only other groups is a wrapper (outer sheet / translate(0 0))
+//     and is recursed through;
+//   - any path/compound directly under the container is its own part.
+function _nestCollectParts(node) {
+    var parts = [];
+    var i, g, sub, s;
+
+    for (i = 0; i < node.groupItems.length; i++) {
+        g = node.groupItems[i];
+        if (g.pathItems.length > 0 || g.compoundPathItems.length > 0) {
+            parts.push(g);
+        } else if (g.groupItems.length > 0) {
+            sub = _nestCollectParts(g);
+            for (s = 0; s < sub.length; s++) parts.push(sub[s]);
         }
-        result.push({
-            name:    item.name,
-            center:  boundsCenter(gb),
-            bounds:  gb,
-            area:    Math.abs(item.area),
-            anchor0: a0
-        });
+    }
+    for (i = 0; i < node.pathItems.length; i++) {
+        if (node.pathItems[i].parent === node) parts.push(node.pathItems[i]);
+    }
+    for (i = 0; i < node.compoundPathItems.length; i++) {
+        if (node.compoundPathItems[i].parent === node) parts.push(node.compoundPathItems[i]);
+    }
+    return parts;
+}
+
+// Builds a { name, center, bounds, area, anchor0 } record for one nested part.
+// area = summed true path area (rotation-invariant); anchor0 = first anchor of the
+// part's largest sub-path (for rotation recovery).
+function _nestPartRecord(part) {
+    var gb   = part.geometricBounds;
+    var area = _nestSumPathArea(part);
+
+    var a0 = null;
+    var largest = _nestLargestPath(part);
+    if (largest && largest.pathPoints && largest.pathPoints.length > 0) {
+        var pt = largest.pathPoints[0].anchor; // [x, y]
+        a0 = { x: pt[0], y: pt[1] };
     }
 
-    for (i = 0; i < layer.compoundPathItems.length; i++) {
-        item = layer.compoundPathItems[i];
-        if (!item.name || item.name === "") continue;
-        gb = item.geometricBounds;
-        a0 = null;
-        if (item.pathItems.length > 0
-                && item.pathItems[0].pathPoints
-                && item.pathItems[0].pathPoints.length > 0) {
-            pt = item.pathItems[0].pathPoints[0].anchor;
-            a0 = { x: pt[0], y: pt[1] };
+    return {
+        name:    part.name || "",
+        center:  boundsCenter(gb),
+        bounds:  gb,
+        area:    area,
+        anchor0: a0
+    };
+}
+
+// Sum of |area| over every PathItem contained in an item (recurses groups +
+// compounds). For a cutline GROUP, call this on the visible fused member only —
+// see _nestCutlineArea — never on the whole group (it also holds the hidden
+// outline + plate, which would double-count).
+function _nestSumPathArea(item) {
+    var a = 0, i;
+    if (item.typename === "PathItem") return Math.abs(item.area);
+    if (item.typename === "CompoundPathItem") {
+        for (i = 0; i < item.pathItems.length; i++) a += Math.abs(item.pathItems[i].area);
+        return a;
+    }
+    if (item.typename === "GroupItem") {
+        for (i = 0; i < item.pathItems.length; i++) a += Math.abs(item.pathItems[i].area);
+        for (i = 0; i < item.compoundPathItems.length; i++) a += _nestSumPathArea(item.compoundPathItems[i]);
+        for (i = 0; i < item.groupItems.length; i++) a += _nestSumPathArea(item.groupItems[i]);
+        return a;
+    }
+    return 0;
+}
+
+// Returns the largest-area PathItem within an item (recurses groups + compounds).
+function _nestLargestPath(item) {
+    var best = null, bestA = -1, i, c, ar;
+    if (item.typename === "PathItem") return item;
+    if (item.typename === "CompoundPathItem") {
+        for (i = 0; i < item.pathItems.length; i++) {
+            ar = Math.abs(item.pathItems[i].area);
+            if (ar > bestA) { bestA = ar; best = item.pathItems[i]; }
         }
-        var w = Math.abs(gb[2] - gb[0]);
-        var h = Math.abs(gb[1] - gb[3]);
-        result.push({
-            name:    item.name,
-            center:  boundsCenter(gb),
-            bounds:  gb,
-            area:    w * h,
-            anchor0: a0
-        });
+        return best;
+    }
+    if (item.typename === "GroupItem") {
+        for (i = 0; i < item.pathItems.length; i++) {
+            ar = Math.abs(item.pathItems[i].area);
+            if (ar > bestA) { bestA = ar; best = item.pathItems[i]; }
+        }
+        for (i = 0; i < item.compoundPathItems.length; i++) {
+            c = _nestLargestPath(item.compoundPathItems[i]);
+            if (c) { ar = Math.abs(c.area); if (ar > bestA) { bestA = ar; best = c; } }
+        }
+        for (i = 0; i < item.groupItems.length; i++) {
+            c = _nestLargestPath(item.groupItems[i]);
+            if (c) { ar = Math.abs(c.area); if (ar > bestA) { bestA = ar; best = c; } }
+        }
+        return best;
+    }
+    return null;
+}
+
+// The visible fused cutline page-item inside a cutline map entry.
+// GroupItem → the child named group.name (the Unite result). Path/Compound → itself.
+function _nestCutlineVisible(item) {
+    if (item.typename === "PathItem" || item.typename === "CompoundPathItem") return item;
+    if (item.typename === "GroupItem") return findGroupMember(item, "");
+    return null;
+}
+
+// True path area of a cutline map entry (visible fused member only).
+function _nestCutlineArea(item) {
+    var vis = _nestCutlineVisible(item);
+    if (vis) return _nestSumPathArea(vis);
+    var gb = item.geometricBounds; // fallback: bbox
+    return Math.abs(gb[2] - gb[0]) * Math.abs(gb[1] - gb[3]);
+}
+
+// Global-greedy area assignment. Builds every (part, cutline) pair within
+// CONFIG.areaMatchTolerance, sorts by area ratio ascending, and assigns best-first
+// with each part and each cutline used at most once.
+// Returns [{ part, cutlineItem, ratio, partIndex }].
+function _nestAssignByArea(parts, cutlineMap) {
+    var cutNames = [];
+    var name, c, p, q;
+    for (name in cutlineMap) cutNames.push(name);
+
+    var cutArea = {};
+    for (c = 0; c < cutNames.length; c++) {
+        cutArea[cutNames[c]] = _nestCutlineArea(cutlineMap[cutNames[c]]);
     }
 
+    var pairs = [];
+    for (p = 0; p < parts.length; p++) {
+        var pa = parts[p].area;
+        if (pa <= 0) continue;
+        for (q = 0; q < cutNames.length; q++) {
+            var ca = cutArea[cutNames[q]];
+            if (ca <= 0) continue;
+            var ratio = pa > ca ? pa / ca : ca / pa;
+            if (ratio <= CONFIG.areaMatchTolerance) {
+                pairs.push({ p: p, name: cutNames[q], ratio: ratio });
+            }
+        }
+    }
+
+    pairs.sort(function (x, y) { return x.ratio - y.ratio; });
+
+    var usedPart = {}, usedCut = {}, result = [];
+    for (var k = 0; k < pairs.length; k++) {
+        var pr = pairs[k];
+        if (usedPart[pr.p] || usedCut[pr.name]) continue;
+        usedPart[pr.p]   = true;
+        usedCut[pr.name] = true;
+        result.push({
+            part:        parts[pr.p],
+            cutlineItem: cutlineMap[pr.name],
+            ratio:       pr.ratio,
+            partIndex:   pr.p
+        });
+    }
     return result;
 }
 
 // Computes the rotation angle (degrees, Illustrator convention: + = CCW) that
-// Deepnest applied to svgItem relative to cutlineItem.
+// Deepnest applied to the part relative to the matched cutline.
 //
-// Method: compare the direction from each item's centroid to its first anchor.
-// Both items are in Illustrator document coordinates (Illustrator inverts SVG's
-// y-axis on open), so the angle difference is directly usable with rotate().
-//
-// Falls back to a bounding-box aspect-ratio check for PlacedItems (stamps) which
-// have no pathPoints. Returns 0 if the rotation cannot be determined.
+// Method: compare the direction from each item's centroid to its largest sub-path's
+// first anchor. Both are in Illustrator document coordinates, so the difference is
+// directly usable with rotate(). Falls back to a bounding-box swap check (90° flip)
+// when no anchor is available. Returns 0 if it cannot be determined.
 function _nestComputeRotation(svgItem, cutlineItem) {
     var svgAnchor = svgItem.anchor0;
 
-    // PathItem/GroupItem path: use anchor direction comparison.
-    var clPath = _nestGetVisiblePath(cutlineItem);
-    if (clPath && clPath.pathPoints && clPath.pathPoints.length > 0) {
-        if (!svgAnchor) return 0;
+    var vis    = _nestCutlineVisible(cutlineItem);
+    var clPath = vis ? _nestLargestPath(vis) : null;
 
+    if (clPath && clPath.pathPoints && clPath.pathPoints.length > 0 && svgAnchor) {
         var svgCenter = svgItem.center;
         var clCenter  = boundsCenter(cutlineItem.geometricBounds);
 
         var clPt  = clPath.pathPoints[0].anchor;
-        var clVec = { x: clPt[0]        - clCenter.x,  y: clPt[1]        - clCenter.y  };
-        var svVec = { x: svgAnchor.x    - svgCenter.x, y: svgAnchor.y    - svgCenter.y };
+        var clVec = { x: clPt[0]     - clCenter.x,  y: clPt[1]     - clCenter.y  };
+        var svVec = { x: svgAnchor.x - svgCenter.x, y: svgAnchor.y - svgCenter.y };
 
         var clLen = Math.sqrt(clVec.x * clVec.x + clVec.y * clVec.y);
         var svLen = Math.sqrt(svVec.x * svVec.x + svVec.y * svVec.y);
@@ -298,14 +427,13 @@ function _nestComputeRotation(svgItem, cutlineItem) {
         var svAngle = Math.atan2(svVec.y, svVec.x) * 180 / Math.PI;
 
         var rot = svAngle - clAngle;
-        // Normalise to [-180, 180].
         while (rot >  180) rot -= 360;
         while (rot < -180) rot += 360;
         return rot;
     }
 
-    // PlacedItem fallback (stamps): detect 90° flip from bounding-box swap.
-    var cgb  = cutlineItem.geometricBounds;
+    // Fallback: detect a 90° flip from a bounding-box width/height swap.
+    var cgb   = cutlineItem.geometricBounds;
     var origW = Math.abs(cgb[2] - cgb[0]);
     var origH = Math.abs(cgb[1] - cgb[3]);
     var newW  = Math.abs(svgItem.bounds[2] - svgItem.bounds[0]);
@@ -316,69 +444,12 @@ function _nestComputeRotation(svgItem, cutlineItem) {
     return 0;
 }
 
-// Returns the visible cutline PathItem inside a cutline item.
-// GroupItem → looks up the child named group.name (the fused cutline).
-// PathItem → returns itself. CompoundPathItem → returns first sub-path.
-function _nestGetVisiblePath(item) {
-    if (item.typename === "PathItem") return item;
-    if (item.typename === "GroupItem") {
-        var child = findGroupMember(item, "");
-        if (child && child.typename === "PathItem") return child;
-        if (child && child.typename === "CompoundPathItem"
-                && child.pathItems.length > 0) {
-            return child.pathItems[0];
-        }
-    }
-    if (item.typename === "CompoundPathItem") {
-        if (item.pathItems.length > 0) return item.pathItems[0];
-    }
-    return null;
-}
-
-// Finds the best unmatched cutline by area ratio.
-function _nestAreaMatch(svgItem, cutlineMap, usedCutlines) {
-    var targetArea = svgItem.area;
-    if (targetArea <= 0) return null;
-
-    var bestName  = null;
-    var bestRatio = Infinity;
-    var name, clArea, ratio;
-
-    for (name in cutlineMap) {
-        if (usedCutlines[name]) continue;
-        clArea = _nestGetArea(cutlineMap[name]);
-        if (clArea <= 0) continue;
-        ratio = targetArea > clArea ? targetArea / clArea : clArea / targetArea;
-        if (ratio < bestRatio) { bestRatio = ratio; bestName = name; }
-    }
-
-    if (bestName && bestRatio <= CONFIG.areaMatchTolerance) {
-        return cutlineMap[bestName];
-    }
-    return null;
-}
-
 // Longest edge of an item's current (axis-aligned) bounding box.
 function _nestLongestEdge(item) {
     var gb = item.geometricBounds;
     var w  = Math.abs(gb[2] - gb[0]);
     var h  = Math.abs(gb[1] - gb[3]);
     return w > h ? w : h;
-}
-
-function _nestGetArea(item) {
-    if (item.typename === "PathItem") return Math.abs(item.area);
-    if (item.typename === "GroupItem") {
-        var child = findGroupMember(item, "");
-        if (child && child.typename === "PathItem") return Math.abs(child.area);
-        var gb = item.geometricBounds;
-        return Math.abs(gb[2] - gb[0]) * Math.abs(gb[1] - gb[3]);
-    }
-    if (item.typename === "CompoundPathItem") {
-        var gb2 = item.geometricBounds;
-        return Math.abs(gb2[2] - gb2[0]) * Math.abs(gb2[1] - gb2[3]);
-    }
-    return 0;
 }
 
 // Places {displayName}.png in the Stickers layer, scaled to the cutlineItem's

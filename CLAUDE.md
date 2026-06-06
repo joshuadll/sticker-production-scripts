@@ -49,8 +49,17 @@ sticker-production-scripts/
 │   ├── AI_ImportNesting.jsx        ← run after Deepnest: reads nested SVG(s), applies full Deepnest transform
 │   │                                   (rotation + translation) to each cutline GroupItem, places artwork PNGs
 │   │                                   in Stickers layer at matching position/rotation
-│   │                                   Match: name-based (primary) → area-based fallback
-│   │                                   Rotation: anchor-direction comparison (PathItems); bbox-flip heuristic (stamps)
+│   │                                   Deepnest nests each part in <g transform="translate() rotate()"> (Illustrator
+│   │                                     bakes the transform on open) and STRIPS path ids (only originally-ungrouped
+│   │                                     paths keep a name) → Step7B collects parts recursively (not layer.pathItems,
+│   │                                     which is 0) and matches AREA-ONLY (global-greedy by closest area ratio;
+│   │                                     translate+rotate preserve area so true pairs ≈1.0). No name matching.
+│   │                                   Rotation: centroid→largest-anchor direction on baked geometry; bbox-swap fallback.
+│   │                                   Working doc resolved by its Cutlines layer (NOT activeDocument — Pipeline 2
+│   │                                     leaves an SVG in front); auto-discovers {base}_{regular,irregular}_nested.svg
+│   │                                     + {base}_elements/ by STATting the convention names (Folder.getFiles can't
+│   │                                     enumerate some macOS dirs); manual dialog fallback. Re-run safe: cutline
+│   │                                     transforms target absolute SVG positions (converge); placed art cleared on entry.
 │   │                                                   (stop: artist reviews layout for any unmatched elements)
 │   ├── AI_RefineCutlines.jsx       ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
 │   ├── AI_ExportFinal.jsx          ← Steps 8c → 9A → 10 (Asset Export) → 11 (Final File)
