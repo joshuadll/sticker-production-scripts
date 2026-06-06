@@ -121,6 +121,38 @@ else
     else
         echo "WARN [$STEP]: art placed=0 — check the {base}_elements PNG names match cutline display names."
     fi
+
+    # Rotation correctness: each placed cutline is the SAME polygon as its SVG part,
+    # so its bounding box must match (logged as VERIFY ... ROTATION WRONG on mismatch).
+    # This is the objective guard against the rotation-recovery regression.
+    WRONG=$(grep -c "ROTATION WRONG" "$LOG" || true)
+    if [ "${WRONG:-0}" -eq 0 ]; then
+        echo "PASS [$STEP]: all rotations verified (cutline bbox matches SVG part)."
+    else
+        echo "FAIL [$STEP]: $WRONG element(s) placed at the wrong rotation:"
+        grep "ROTATION WRONG" "$LOG"
+        FAIL=1
+    fi
+
+    # Art-layer correctness: artwork must land on the Stickers layer, not Cutlines.
+    if grep -q "ART ON WRONG LAYER" "$LOG"; then
+        echo "FAIL [$STEP]: artwork landed on the wrong layer:"
+        grep "art-layer-check" "$LOG"
+        FAIL=1
+    else
+        echo "PASS [$STEP]: artwork on Stickers layer."
+    fi
+
+    # Group-rotation correctness: the regular cluster's −90° rotation must transpose
+    # its bbox (W↔H). A failure means elements spun in place instead of orbiting the
+    # pivot, so the group never actually rotated to its top-left landscape band.
+    if grep -q "GROUP ROTATION DID NOT TRANSPOSE" "$LOG"; then
+        echo "FAIL [$STEP]: regular group did not rotate as a cluster:"
+        grep "group-rot-check" "$LOG"
+        FAIL=1
+    else
+        echo "PASS [$STEP]: regular group rotated −90° (bbox transposed)."
+    fi
 fi
 
 if [ "$FAIL" -ne 0 ]; then

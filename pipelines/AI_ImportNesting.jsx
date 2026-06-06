@@ -32,6 +32,7 @@ CONFIG.logPath = _root + "/pipelines/AI_ImportNesting.log";
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 function main() {
+    if ($.global.__noteworthieSetup) return;
     try {
 
         log("[pipeline] === AI_ImportNesting start ===");
@@ -88,6 +89,8 @@ function main() {
         var msg = "Done.\n\n"
             + "  Placed:     " + result.matched   + " element(s) at nested positions\n"
             + "  Unmatched:  " + result.unmatched  + " element(s) — see log\n"
+            + "  Layout:     regular rotated -90° at artboard top-left;\n"
+            + "              irregular auto-rotated below with 2 mm gap\n"
             + "  Art placed: " + result.artPlaced  + " PNG(s) in Stickers layer\n\n";
 
         if (result.unmatched > 0) {
@@ -97,7 +100,7 @@ function main() {
                 + "element display names, or position those cutlines manually.\n\n";
         }
 
-        msg += "Review the layout, then run AI_RefineCutlines to continue.\n\n"
+        msg += "Review the cutline layout, then run AI_RefineCutlines to continue.\n\n"
             + "Log: " + CONFIG.logPath;
 
         scriptAlert(msg);
