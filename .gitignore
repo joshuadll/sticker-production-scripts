@@ -6,8 +6,17 @@
 # Exception: shared template assets committed to the repo
 !assets/*.ai
 
+# Large local-only integration-test fixtures (the .ai is already ignored above).
+# Deepnest-output SVGs + per-element PNG folders — regenerate via the upstream
+# pipelines; see tests/integration/run-ai-import-nesting.sh header.
+tests/integration/fixtures/*.svg
+tests/integration/fixtures/*_elements/
+
 # Dependencies
 node_modules/
 
 # macOS
 .DS_Store
+
+# Illustrator scratch/lock files (written next to an open doc)
+~ai-*.tmp

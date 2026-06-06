@@ -98,7 +98,8 @@ if [ -z "$RESULT_LINE" ]; then
     echo "FAIL [$STEP]: no result line in log."
     FAIL=1
 else
-    MATCHED=$(echo "$RESULT_LINE"   | grep -oE "matched: [0-9]+"   | grep -oE "[0-9]+")
+    # Leading space on " matched" avoids also matching the "matched: 0" inside "unmatched: 0".
+    MATCHED=$(echo "$RESULT_LINE"   | grep -oE " matched: [0-9]+"  | grep -oE "[0-9]+")
     UNMATCHED=$(echo "$RESULT_LINE" | grep -oE "unmatched: [0-9]+" | grep -oE "[0-9]+")
     ART=$(echo "$RESULT_LINE"       | grep -oE "art placed: [0-9]+"| grep -oE "[0-9]+")
     echo "[$STEP] matched=$MATCHED unmatched=$UNMATCHED art=$ART"
