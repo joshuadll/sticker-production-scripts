@@ -509,6 +509,8 @@ function _nestPlaceArtwork(doc, stickersLayer, displayName, artFolder,
         return true;
 
     } catch (e) {
+        // Rare Illustrator API failure (e.g. locked layer, memory hiccup);
+        // log and skip this element rather than aborting the whole loop.
         log("[step-nest] WARN | art placement failed for: " + displayName
             + " — line " + e.line + ": " + e.message);
         return false;
