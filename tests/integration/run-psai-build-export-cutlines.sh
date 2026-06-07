@@ -221,19 +221,6 @@ if [ "$FAIL" -ne 0 ]; then
     exit 1
 fi
 
-# ── Publish Pipeline 3 fixtures ───────────────────────────────────────────────
-# The working .ai, pre-nesting SVGs (used as _nested stubs so Pipeline 3 runs
-# without a real Deepnest pass), elements folder, and sidecar JSON are copied
-# into the fixtures dir so run-ai-import-nesting.sh has fresh, consistent inputs.
-P3="$(cd "$(dirname "$0")" && pwd)/fixtures/import-nesting"
-cp "$WORKING_AI"       "${P3}.ai"
-cp "$REGULAR_SVG"      "${P3}_regular_nested.svg"
-cp "$IRREGULAR_SVG"    "${P3}_irregular_nested.svg"
-cp "$ELEM"             "${P3}_elements.json"
-rm -rf "${P3}_elements"
-cp -r  "/tmp/${STEP}-fixture_elements" "${P3}_elements"
-echo "[$STEP] published Pipeline 3 fixtures: import-nesting.ai + SVGs + elements"
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # PHASE 1 golden diff (PS log) — regression detection on the Photoshop side
 # ═══════════════════════════════════════════════════════════════════════════════

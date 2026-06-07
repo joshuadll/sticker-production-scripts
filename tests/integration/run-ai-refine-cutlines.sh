@@ -107,11 +107,6 @@ if [ "$FAIL" -ne 0 ]; then
     exit 1
 fi
 
-# ── Publish Pipeline 5 fixture ────────────────────────────────────────────────
-PIPELINE5_FIXTURE="$FIXTURE_DIR/step8c-cutlines.ai"
-osascript -e "tell application \"$APP\" to do javascript \"var f=new File('$PIPELINE5_FIXTURE'); app.activeDocument.saveAs(f, new IllustratorSaveOptions());\""
-echo "[$STEP] published Pipeline 5 fixture: step8c-cutlines.ai"
-
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {

@@ -97,13 +97,10 @@ if [ ! -f "$LOG" ]; then
     exit 1
 fi
 
-# ── Verify saved PSD and publish as Pipeline 2 fixture ───────────────────────
+# ── Verify saved PSD ─────────────────────────────────────────────────────────
 EXPECTED_PSD="$FIXTURE_DIR/$(basename "$SOURCE_FIXTURE").psd"
-PIPELINE2_FIXTURE="$FIXTURE_DIR/elements-captioned-ungrouped.psd"
 if [ -f "$EXPECTED_PSD" ]; then
     echo "[$STEP] saved PSD found: $EXPECTED_PSD"
-    cp "$EXPECTED_PSD" "$PIPELINE2_FIXTURE"
-    echo "[$STEP] copied to Pipeline 2 fixture: $PIPELINE2_FIXTURE"
 else
     echo "WARN [$STEP]: expected saved PSD not found: $EXPECTED_PSD"
 fi
