@@ -211,7 +211,7 @@ Minimum spacing between elements: 2mm (checked by Step 8c via direct distance me
 QA stroke colour: #ff0000
 Working area: 19 × 26.7 cm (A4 minus margins)
 Grid: 1 square = 1 inch = 2.5 cm
-Caption font: Kalam Regular, 16pt, tracking -20
+Caption font: Kalam Regular, 8pt, tracking -20
 
 Half-cut functional requirement: the caption plate acts as a peeling tab — the artist grabs
 the caption and peels the element off the backing as a separate flake sticker. The half-cut
