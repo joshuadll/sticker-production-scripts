@@ -225,7 +225,7 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
             var cgb2 = cutlineItem.geometricBounds;
             var dW   = Math.abs(Math.abs(cgb2[2] - cgb2[0]) - Math.abs(svgItem.bounds[2] - svgItem.bounds[0]));
             var dH   = Math.abs(Math.abs(cgb2[1] - cgb2[3]) - Math.abs(svgItem.bounds[1] - svgItem.bounds[3]));
-            var bad  = (dW > 2 || dH > 2);
+            var bad  = (dW > 5 || dH > 5);
             log("[step-nest] VERIFY | " + cutlineItem.name
                 + " rot=" + Math.round(rotation)
                 + " bboxΔ=(" + Math.round(dW) + "," + Math.round(dH) + ")"

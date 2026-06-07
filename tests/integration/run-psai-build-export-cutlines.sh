@@ -22,10 +22,9 @@
 #
 # FIXTURES REQUIRED:
 #   tests/integration/fixtures/elements-captioned-ungrouped.psd
-#     A Production Template PSD with all elements placed, resized, and caption
-#     text layers added (SO + T layers at the top level, not yet grouped).
-#     Create this by running PS_BuildElements.jsx on fixture source PSDs,
-#     then saving the resulting document to that path.
+#     Output of the Pipeline 1 integration test (run-ps-build-elements.sh).
+#     Contains all elements placed, resized, white-edged, and caption text layers
+#     added — the exact state PSAI_BuildAndExportCutlines expects as input.
 #
 # REQUIRES: both Adobe Photoshop 2026 and Adobe Illustrator installed.
 #
@@ -64,8 +63,7 @@ IRREGULAR_SVG="/tmp/${STEP}-fixture_irregular.svg"
 
 if [ ! -f "$TEMPLATE_FIXTURE" ]; then
     echo "SKIP [$STEP]: fixture not found: $TEMPLATE_FIXTURE"
-    echo "  Create by running PS_BuildElements.jsx on fixture source PSDs,"
-    echo "  then saving the resulting document as: $TEMPLATE_FIXTURE"
+    echo "  Run run-ps-build-elements.sh first to produce this fixture."
     exit 0
 fi
 
@@ -222,6 +220,19 @@ if [ "$FAIL" -ne 0 ]; then
     echo "  AI log contents:"; cat "$LOG_AI"
     exit 1
 fi
+
+# ── Publish Pipeline 3 fixtures ───────────────────────────────────────────────
+# The working .ai, pre-nesting SVGs (used as _nested stubs so Pipeline 3 runs
+# without a real Deepnest pass), elements folder, and sidecar JSON are copied
+# into the fixtures dir so run-ai-import-nesting.sh has fresh, consistent inputs.
+P3="$(cd "$(dirname "$0")" && pwd)/fixtures/import-nesting"
+cp "$WORKING_AI"       "${P3}.ai"
+cp "$REGULAR_SVG"      "${P3}_regular_nested.svg"
+cp "$IRREGULAR_SVG"    "${P3}_irregular_nested.svg"
+cp "$ELEM"             "${P3}_elements.json"
+rm -rf "${P3}_elements"
+cp -r  "/tmp/${STEP}-fixture_elements" "${P3}_elements"
+echo "[$STEP] published Pipeline 3 fixtures: import-nesting.ai + SVGs + elements"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PHASE 1 golden diff (PS log) — regression detection on the Photoshop side

@@ -53,6 +53,17 @@ fi
 
 rm -f "$LOG" "$TEMP_SCRIPT"
 
+# ── Close all open documents in Photoshop ────────────────────────────────────
+# Any open PSD (from a prior run or unrelated work) could be picked up as the
+# "valid template" and carry stale layers into the test.  Close everything
+# without saving so PS_BuildElements always creates a fresh template doc.
+rm -f "$FIXTURE_DIR/source-psds.psd"
+osascript << 'ENDCLOSE'
+tell application "Adobe Photoshop 2026"
+    close every document saving no
+end tell
+ENDCLOSE
+
 perl -pe '
     s|sourceFolderPath:\s*""|sourceFolderPath: "'"$SOURCE_FIXTURE"'"|;
     s|suppressAlerts:\s*false|suppressAlerts: true|;
@@ -86,10 +97,13 @@ if [ ! -f "$LOG" ]; then
     exit 1
 fi
 
-# ── Verify saved PSD ─────────────────────────────────────────────────────────
+# ── Verify saved PSD and publish as Pipeline 2 fixture ───────────────────────
 EXPECTED_PSD="$FIXTURE_DIR/$(basename "$SOURCE_FIXTURE").psd"
+PIPELINE2_FIXTURE="$FIXTURE_DIR/elements-captioned-ungrouped.psd"
 if [ -f "$EXPECTED_PSD" ]; then
     echo "[$STEP] saved PSD found: $EXPECTED_PSD"
+    cp "$EXPECTED_PSD" "$PIPELINE2_FIXTURE"
+    echo "[$STEP] copied to Pipeline 2 fixture: $PIPELINE2_FIXTURE"
 else
     echo "WARN [$STEP]: expected saved PSD not found: $EXPECTED_PSD"
 fi
