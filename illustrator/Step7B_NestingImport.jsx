@@ -35,13 +35,13 @@
 //
 // Returns: { matched, unmatched, artPlaced }
 //
-// elementsData (optional): the parsed {name}_elements.json sidecar (only psdWidth is
-// used here). Artwork is sized by the ABSOLUTE PSD→AI factor — mmToPoints(workingAreaWidthMm)
-// / psdWidth — the same scale Step 6 used to place the silhouette. The cutline and the art
-// are twins from the same PSD at the same pixel scale, so the art's true size is a single
-// known constant (factor), applied uniformly: a 72-dpi element PNG is element_px points
-// wide, so resizing by factor×100 lands it at element_px×factor with no per-element math.
-// If the sidecar is absent, placement falls back to the legacy height-fit.
+// elementsData (required; AI_ImportNesting halts if the sidecar is missing): the parsed
+// {name}_elements.json sidecar (only psdWidth is used here). Artwork is sized by the
+// ABSOLUTE PSD→AI factor — mmToPoints(workingAreaWidthMm) / psdWidth — the same scale
+// Step 6 used to place the silhouette. The cutline and the art are twins from the same PSD
+// at the same pixel scale, so the art's true size is a single known constant (factor),
+// applied uniformly: a 72-dpi element PNG is element_px points wide, so resizing by
+// factor×100 lands it at element_px×factor with no per-element math.
 
 function runNestingImport(doc, svgFiles, artFolder, elementsData) {
 
@@ -52,15 +52,12 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         return null;
     }
 
-    // The one number art sizing needs (0 → height-fit fallback).
+    // The one number art sizing needs. The pipeline guarantees a valid sidecar (it
+    // halts otherwise), so this is always > 0.
     var artFactor = _nestArtFactor(elementsData);
-    if (artFactor > 0) {
-        log("[step-nest] art sizing: ABSOLUTE factor=" + artFactor.toFixed(5)
-            + " pt/px (psdWidth=" + elementsData.psdWidth
-            + ", workingAreaWidthMm=" + CONFIG.workingAreaWidthMm + ")");
-    } else {
-        log("[step-nest] art sizing: HEIGHT-FIT fallback (no usable sidecar).");
-    }
+    log("[step-nest] art sizing: factor=" + artFactor.toFixed(5)
+        + " pt/px (psdWidth=" + elementsData.psdWidth
+        + ", workingAreaWidthMm=" + CONFIG.workingAreaWidthMm + ")");
 
     var stickersLayer = _nestFindStickersLayer(doc);
     if (!stickersLayer) {
@@ -816,7 +813,6 @@ function _nestRefineRotation(clPath, coarseRot, targetBounds) {
 // Sizing: the art and cutline are twins from the same PSD at the same pixel scale, so the
 // art needs no fitting — Deepnest only rotates/translates. resize by artFactor×100 lands
 // the 72-dpi PNG at its true AI size (element_px × factor); uniform scale keeps its aspect.
-// artFactor == 0 (no sidecar) → legacy height-fit to the cutline.
 // Returns the placed PageItem, or null if the PNG is missing / placement failed.
 function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFactor) {
     var displayName = cutlineItem.name;
@@ -847,21 +843,11 @@ function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFac
             placed.move(stickersLayer, ElementPlacement.PLACEATBEGINNING);
         }
 
-        // Size the art, then centre it on the cutline group (cutline is upright here).
+        // Size to true AI size = element_px × factor; for a 72-dpi PNG that's just
+        // resize by factor×100 (placed.width == element_px, so the px term cancels).
+        // Then centre on the cutline group (cutline is upright here).
         var cgb = cutlineItem.geometricBounds;
-
-        if (artFactor > 0 && placed.width > 0) {
-            // ABSOLUTE: true AI size = element_px × factor; for a 72-dpi PNG that is just
-            // resize by factor×100 (placed.width == element_px, so the px term cancels).
-            placed.resize(artFactor * 100, artFactor * 100);
-        } else {
-            // FALLBACK: legacy height-fit to the cutline (no sidecar).
-            var cH = Math.abs(cgb[1] - cgb[3]);
-            if (placed.height > 0 && cH > 0) {
-                placed.resize(cH / placed.height * 100, cH / placed.height * 100);
-            }
-            log("[step-nest] art-size | " + displayName + " mode=heightfit-fallback");
-        }
+        placed.resize(artFactor * 100, artFactor * 100);
 
         var cc = boundsCenter(cgb);
         placed.translate(cc.x - (placed.position[0] + placed.width  / 2),

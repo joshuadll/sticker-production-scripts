@@ -80,18 +80,23 @@ function main() {
         }
         log("[pipeline] art folder: " + artFolder.fsName);
 
-        // ── Read elements sidecar (for absolute art sizing) ────────────────
-        // The {base}_elements.json sidecar (psdWidth + per-element pixel bounds)
-        // lets Step 7B size artwork by the known PSD→AI factor rather than fitting
-        // it to the traced cutline. Absent → Step 7B falls back to height-fit.
+        // ── Read elements sidecar (required — for absolute art sizing) ─────
+        // The {base}_elements.json sidecar (psdWidth) gives the PSD→AI scale used to
+        // size artwork. Pipeline 2 writes it next to the working file alongside the
+        // element art folder, so if the art folder resolved above, this is present too.
+        // Treat it as required: without it we can't size art correctly, and silently
+        // guessing (the old height-fit) is the very bug this pipeline fixed.
         var elementsData = _readElementsSidecar(doc);
-        if (elementsData) {
-            log("[pipeline] elements sidecar: " + elementsData.elements.length
-                + " element(s), psdWidth=" + elementsData.psdWidth);
-        } else {
-            log("[pipeline] WARN | no elements sidecar found — art will fall back to "
-                + "height-fit sizing.");
+        if (!elementsData) {
+            log("[pipeline] no elements sidecar found next to the working file.");
+            scriptAlert("Couldn't find the elements sidecar ({name}_elements.json) next to your\n"
+                + "working file — it's needed to size the artwork. It's written by Pipeline 2\n"
+                + "beside the element art folder; make sure both sit next to the .ai.\n\n"
+                + "Log: " + CONFIG.logPath);
+            return;
         }
+        log("[pipeline] elements sidecar: " + elementsData.elements.length
+            + " element(s), psdWidth=" + elementsData.psdWidth);
 
         // ── Run import ─────────────────────────────────────────────────────
         log("[pipeline] --- importing Deepnest layout ---");

@@ -154,18 +154,6 @@ else
         echo "PASS [$STEP]: regular group rotated −90° (bbox transposed)."
     fi
 
-    # Art-sizing mode: every placed element must use the ABSOLUTE (sidecar factor)
-    # sizing, not the legacy height-fit fallback. A fallback means the sidecar was
-    # missing/unparseable or an element name was absent from it.
-    FALLBACK=$(grep -c "art-size | .* mode=heightfit-fallback" "$LOG" || true)
-    if [ "${FALLBACK:-0}" -eq 0 ]; then
-        echo "PASS [$STEP]: all art sized by absolute factor (no height-fit fallback)."
-    else
-        echo "FAIL [$STEP]: $FALLBACK element(s) fell back to height-fit (sidecar issue):"
-        grep "mode=heightfit-fallback" "$LOG"
-        FAIL=1
-    fi
-
     # Art-fit (the actual bug under test): art and cutline are the SAME element, so
     # their bounding boxes must agree closely once art is at its true size. Under the
     # old height-fit, height matched but width could be far off; the absolute factor
