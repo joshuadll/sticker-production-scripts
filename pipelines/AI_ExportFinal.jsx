@@ -31,6 +31,7 @@ var CONFIG = {
     halfcutExtendMm:     0.5,   // half-cut extends past each end of the edge
 
     // ── Step 10: Asset Export ─────────────────────────────────────────────────
+    stickersLayerName:     "Sticker",      // exact (built in code by buildWorkingDocument)
     colorBlockLayerName:   "Color Block",  // case-insensitive search
     jpegQuality:           8,              // 0-100
     // ⚠️  pngExportScale: pending artist confirmation — assumed 150 DPI for now.

@@ -59,7 +59,7 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         + " pt/px (psdWidth=" + elementsData.psdWidth
         + ", workingAreaWidthMm=" + CONFIG.workingAreaWidthMm + ")");
 
-    var stickersLayer = _nestFindStickersLayer(doc);
+    var stickersLayer = findLayer(doc, CONFIG.stickersLayerName);
     if (!stickersLayer) {
         log("[step-nest] WARN | Stickers layer not found — artwork will not be placed.");
     }
@@ -446,15 +446,6 @@ function _nestArtFactor(elementsData) {
     if (!elementsData || !elementsData.psdWidth || !CONFIG.workingAreaWidthMm) return 0;
     var factor = mmToPoints(CONFIG.workingAreaWidthMm) / elementsData.psdWidth;
     return factor > 0 ? factor : 0;
-}
-
-function _nestFindStickersLayer(doc) {
-    var i, n;
-    for (i = 0; i < doc.layers.length; i++) {
-        n = doc.layers[i].name.toLowerCase();
-        if (n === "sticker" || n === "stickers") return doc.layers[i];
-    }
-    return null;
 }
 
 // Builds {displayName: pageItem} from direct children of the Cutlines layer.

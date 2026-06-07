@@ -26,8 +26,8 @@ function runAssetExport(doc) {
         throw new Error("Document must be saved before running Step 10.");
     }
 
-    var stickersLayer = _s10LayerCI(doc, "stickers") || _s10LayerCI(doc, "sticker");
-    if (!stickersLayer) throw new Error("Sticker/Stickers layer not found.");
+    var stickersLayer = findLayer(doc, CONFIG.stickersLayerName);
+    if (!stickersLayer) throw new Error("Sticker layer not found: " + CONFIG.stickersLayerName);
 
     var cutlinesLayer = findLayer(doc, CONFIG.cutlinesLayerName);
     if (!cutlinesLayer) {

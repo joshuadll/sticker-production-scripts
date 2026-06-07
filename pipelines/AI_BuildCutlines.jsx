@@ -16,7 +16,7 @@ var CONFIG = {
     workingAreaHeightMm: 267,
     cutlineStrokePt:     0.25,
     cutlinesLayerName:   "Cutlines",
-    stickersLayerName:   "Stickers",
+    stickersLayerName:   "Sticker",
 
     // Trace-junk filters. Image Trace on the whole sheet can emit spurious paths
     // beyond the real elements: a whole-sheet background compound (frame + every

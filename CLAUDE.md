@@ -174,7 +174,7 @@ PSAI_BuildAndExportCutlines exports (written before BridgeTalk handoff, sibling 
 ## Illustrator layer names (exact strings except where noted)
 Exceptions (case-insensitive search, consistent standard):
 - **Halfcut layer**: Steps 9A/9B search case-insensitively via `getOrCreateHalfcutLayer()` in aiUtils (seen as "Half cut", "Halfcut", "halfcut lines"); creates as "Halfcut" if absent. Step 11 standardises to `"Halfcut/Peeling Tab"` when saving the final file.
-- **Stickers layer**: Standard is `"Sticker"` (singular). Scripts search case-insensitively with a plural fallback so existing files with "Stickers" don't break.
+- **Stickers layer**: `"Sticker"` (singular) everywhere. Built in code by `buildWorkingDocument` and found by exact `findLayer(doc, CONFIG.stickersLayerName)` — all pipeline CONFIGs use the same name, so no case-insensitive/plural fallback (the doc is always code-built, never from a template, so there's no naming variety to tolerate).
 - **Asset layer**: NOT created by the automated pipeline. Step 10 builds temporary clip groups per-export and discards them — the working file stays clean. (The manual workflow created a persistent Asset layer; the script does not.)
 Working file stack: Margin > Offset Path > Halfcut > Cutlines > Stickers > Grid > Color Block
 Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
