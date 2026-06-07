@@ -326,7 +326,9 @@ function exportElementPngs(doc) {
             continue;
         }
 
-        // Duplicate, trim to transparent bounds, export, close.
+        // Duplicate, trim to transparent bounds, export. (main() ran doc.revealAll()
+        // before Step 3B, so all caption pixels are on-canvas — trim captures the full
+        // element with no off-canvas clipping to undo here.)
         dup = null;
         try {
             dup = doc.duplicate();
@@ -336,7 +338,21 @@ function exportElementPngs(doc) {
             pngOpts.PNG8         = false;
             pngOpts.transparency = true;
             pngOpts.interlaced   = false;
-            dup.exportDocument(new File(pngPath), ExportType.SAVEFORWEB, pngOpts);
+            // Export to an ASCII temp name, then rename to the exact "{displayName}.png".
+            // Two PS 2026 Save-For-Web quirks force this dance (saveAs(PNG) is not an
+            // option — it errors on this layered CMYK duplicate):
+            //   1. SFW silently NO-OPs over an existing file (no exception — still logs OK),
+            //      so a re-run of a SKU would keep STALE art. → remove the target first.
+            //   2. SFW SANITISES the output filename (spaces → hyphens, etc.), which breaks
+            //      the exact-name convention AI_ImportNesting matches cutlines against. The
+            //      sanitiser only touches spaces/punctuation, so a space-free temp name is
+            //      written verbatim; we then rename it to the real (spaced/unicode) name.
+            var tmpFile = new File(folderPath + "/__export_tmp.png");
+            if (tmpFile.exists) tmpFile.remove();
+            dup.exportDocument(tmpFile, ExportType.SAVEFORWEB, pngOpts);
+            var outFile = new File(pngPath);
+            if (outFile.exists) outFile.remove();
+            tmpFile.rename(safeName + ".png");
             count++;
             log("[pipeline] exported element PNG: " + safeName);
         } catch (e) {
@@ -446,6 +462,23 @@ function main() {
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
+    // ── Reveal off-canvas content BEFORE Step 3B ───────────────────
+    // The working canvas (A2, set in PS_BuildElements) anchors the PSD→AI SCALE via its
+    // WIDTH, but its fixed HEIGHT clips captions on the bottom row. That clip causes two
+    // distinct failures downstream: (a) the exported element art is cropped, and (b) the
+    // Step 3B white-pill / caption-spine fit is skewed against the canvas edge, so Step 6
+    // rebuilds a plate that no longer matches the text and the cut line crosses the
+    // caption. Expanding the canvas to contain ALL content here — before Step 3B fits the
+    // pill — fixes both at the root. A bottom/right reveal leaves the top-left origin (and
+    // therefore every layer's coordinates) unchanged, and width is the only scale-bearing
+    // dimension, so calibration is preserved. isValidTemplate already ran above.
+    if (!CONFIG.dryRun) {
+        var _preW = Math.round(doc.width.as("px")), _preH = Math.round(doc.height.as("px"));
+        doc.revealAll();
+        log("[pipeline] revealAll | canvas " + _preW + "x" + _preH + " -> "
+            + Math.round(doc.width.as("px")) + "x" + Math.round(doc.height.as("px")));
+    }
+
     // ── Step 3B: Caption white base + grouping ─────────────────────
     log("[pipeline] --- Step 3B: Caption white + grouping ---");
     var snapshotA = doc.activeHistoryState;
@@ -482,6 +515,21 @@ function main() {
         return;
     }
     log("[pipeline] step 5 complete | Elements finalized.");
+
+    // ── Reveal again AFTER Step 3B built the pills ─────────────────
+    // The pre-Step-3B revealAll above sized the canvas to the caption TEXT (so the pill
+    // fit isn't skewed against the edge). But Step 3B then grows each caption downward by
+    // the white pill (~whitePenPadPx below the text), which can spill past that canvas
+    // again. Reveal once more here so every pill is on-canvas before export — otherwise
+    // the per-element trim would clip the pill bottom (cropped art). Together the two
+    // reveals fix BOTH the spine fit (before) and the art completeness (after) with plain
+    // document-wide calls — no per-element canvas math at export time.
+    if (!CONFIG.dryRun) {
+        var _pre2W = Math.round(doc.width.as("px")), _pre2H = Math.round(doc.height.as("px"));
+        doc.revealAll();
+        log("[pipeline] revealAll (post-Step-3B) | canvas " + _pre2W + "x" + _pre2H + " -> "
+            + Math.round(doc.width.as("px")) + "x" + Math.round(doc.height.as("px")));
+    }
 
     // ── Save PSD ───────────────────────────────────────────────────
     if (!CONFIG.dryRun) {

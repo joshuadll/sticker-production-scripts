@@ -1,8 +1,9 @@
 [pipeline] === PSAI_BuildAndExportCutlines start ===
 [pipeline] dryRun: false
 [pipeline] document: psai-build-export-cutlines-fixture.psd
+[pipeline] revealAll | canvas 4961x7016 -> 4961x7041
 [pipeline] --- Step 3B: Caption white + grouping ---
-[step3B] snapped caption | axis=y sign=-1 maxGap=-10 move=7px
+[step3B] snapped caption | axis=y sign=-1 maxGap=-9 move=6px
 [step3B] grouped | Devín Castle [WC-LM]
 [step3B] snapped caption | axis=y sign=-1 maxGap=-21 move=18px
 [step3B] grouped | Slovak Paradise National Park [WC-LM]
@@ -54,6 +55,7 @@
 [pipeline] --- Step 5: Finalize Elements group ---
 [step5] Elements group finalized.
 [pipeline] step 5 complete | Elements finalized.
+[pipeline] revealAll (post-Step-3B) | canvas 4961x7041 -> 4961x7058
 [pipeline] saved: /private/tmp/psai-build-export-cutlines-fixture.psd
 [pipeline] --- Exporting per-element PNGs ---
 [pipeline] exported element PNG: St Elizabeth's Cathedral (Dóm Svätej Alzbety)

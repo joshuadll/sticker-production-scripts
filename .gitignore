@@ -11,6 +11,7 @@
 # pipelines; see tests/integration/run-ai-import-nesting.sh header.
 tests/integration/fixtures/*.svg
 tests/integration/fixtures/*_elements/
+tests/integration/fixtures/*_elements.json
 
 # Dependencies
 node_modules/

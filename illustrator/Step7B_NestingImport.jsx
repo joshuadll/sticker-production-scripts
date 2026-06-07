@@ -34,14 +34,32 @@
 //   If names don't match, the first file is treated as regular, the second as irregular.
 //
 // Returns: { matched, unmatched, artPlaced }
+//
+// elementsData (optional): the parsed {name}_elements.json sidecar (only psdWidth is
+// used here). Artwork is sized by the ABSOLUTE PSD→AI factor — mmToPoints(workingAreaWidthMm)
+// / psdWidth — the same scale Step 6 used to place the silhouette. The cutline and the art
+// are twins from the same PSD at the same pixel scale, so the art's true size is a single
+// known constant (factor), applied uniformly: a 72-dpi element PNG is element_px points
+// wide, so resizing by factor×100 lands it at element_px×factor with no per-element math.
+// If the sidecar is absent, placement falls back to the legacy height-fit.
 
-function runNestingImport(doc, svgFiles, artFolder) {
+function runNestingImport(doc, svgFiles, artFolder, elementsData) {
 
     // ── 1. Find layers ────────────────────────────────────────────────────────────
     var cutlinesLayer = findLayer(doc, CONFIG.cutlinesLayerName);
     if (!cutlinesLayer) {
         log("[step-nest] ERROR | Cutlines layer not found.");
         return null;
+    }
+
+    // The one number art sizing needs (0 → height-fit fallback).
+    var artFactor = _nestArtFactor(elementsData);
+    if (artFactor > 0) {
+        log("[step-nest] art sizing: ABSOLUTE factor=" + artFactor.toFixed(5)
+            + " pt/px (psdWidth=" + elementsData.psdWidth
+            + ", workingAreaWidthMm=" + CONFIG.workingAreaWidthMm + ")");
+    } else {
+        log("[step-nest] art sizing: HEIGHT-FIT fallback (no usable sidecar).");
     }
 
     var stickersLayer = _nestFindStickersLayer(doc);
@@ -98,7 +116,7 @@ function runNestingImport(doc, svgFiles, artFolder) {
     // ── 4. Process regular SVG ────────────────────────────────────────────────────
     if (regularSvg) {
         log("[step-nest] --- processing regular SVG: " + regularSvg.name + " ---");
-        var regResult = _nestProcessSingleSvg(doc, regularSvg, cutlineMap, stickersLayer, artFolder);
+        var regResult = _nestProcessSingleSvg(doc, regularSvg, cutlineMap, stickersLayer, artFolder, artFactor);
         totalMatched   += regResult.matched;
         totalUnmatched += regResult.unmatched;
         totalArtPlaced += regResult.artPlaced;
@@ -116,7 +134,7 @@ function runNestingImport(doc, svgFiles, artFolder) {
     // ── 5. Process irregular SVG ──────────────────────────────────────────────────
     if (irregularSvg) {
         log("[step-nest] --- processing irregular SVG: " + irregularSvg.name + " ---");
-        var irrResult = _nestProcessSingleSvg(doc, irregularSvg, cutlineMap, stickersLayer, artFolder);
+        var irrResult = _nestProcessSingleSvg(doc, irregularSvg, cutlineMap, stickersLayer, artFolder, artFactor);
         totalMatched   += irrResult.matched;
         totalUnmatched += irrResult.unmatched;
         totalArtPlaced += irrResult.artPlaced;
@@ -167,7 +185,7 @@ function runNestingImport(doc, svgFiles, artFolder) {
 // still-upright cutline, then moves each {cut, art} pair to its nest pose as a rigid
 // unit. Removes matched entries from cutlineMap so subsequent SVGs can't double-assign.
 // Returns { matched, unmatched, pairs, artPlaced }.
-function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolder) {
+function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolder, artFactor) {
     var parts = _nestCollectFromSvgs(doc, [svgFile]);
     log("[step-nest] found " + parts.length + " nested part(s) in " + svgFile.name);
 
@@ -194,7 +212,7 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
         // then moved to the nest pose together by _nestApplyPairTransform.
         artItem = null;
         if (stickersLayer && artFolder) {
-            artItem = _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem);
+            artItem = _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFactor);
             if (artItem) artPlaced++;
         }
 
@@ -423,6 +441,15 @@ function _nestBestRotation(items, abRect, targetTop) {
 
 
 // ── Private helpers ────────────────────────────────────────────────────────────
+
+// AI points per PSD pixel = mmToPoints(workingAreaWidthMm) / psdWidth — the SAME scale
+// Step 6 applied when it placed the silhouette at the working-area width. Returns 0 when
+// the sidecar is missing/unusable (caller falls back to height-fit).
+function _nestArtFactor(elementsData) {
+    if (!elementsData || !elementsData.psdWidth || !CONFIG.workingAreaWidthMm) return 0;
+    var factor = mmToPoints(CONFIG.workingAreaWidthMm) / elementsData.psdWidth;
+    return factor > 0 ? factor : 0;
+}
 
 function _nestFindStickersLayer(doc) {
     var i, n;
@@ -781,22 +808,17 @@ function _nestRefineRotation(clPath, coarseRot, targetBounds) {
     return bestRot;
 }
 
-// Places {displayName}.png on its cutline WHILE THE CUTLINE IS STILL UPRIGHT, scaled by
-// HEIGHT to the cutline and centred — so the art-to-cutline alignment is set with no
-// rotation. The caller then moves the {cut, art} pair to the nest pose as a rigid unit,
-// so the art never needs an independent rotation (where the raster Y-flip caused drift).
+// Places {displayName}.png on its cutline WHILE THE CUTLINE IS STILL UPRIGHT — scaled by
+// the absolute PSD→AI factor and centred — so the art-to-cutline alignment is set with no
+// rotation. The caller then moves the {cut, art} pair to the nest pose as a rigid unit, so
+// the art never needs an independent rotation (where the raster Y-flip caused drift).
 //
-// Sizing = whole-HEIGHT match (NOT element-by-JSON, which was tried and reverted):
-//   The art PNG and the cutline are built differently (rendered raster vs Image-Trace
-//   silhouette + rebuilt plate) and differ a few % in the caption region. Whole-height
-//   match is the best uniform fit. Scaling the art's ELEMENT to the cutline's traced
-//   `outline` (via the _elements.json split) was tried — it over-scaled the element ~6%
-//   on ~half the SKU because the PNG element aspect ≠ the traced-outline aspect (the
-//   Image Trace smooths + insets), so the art overflowed its cut line. The residual
-//   caption-region gap on a couple of long-caption elements is only fixable upstream
-//   (align Step 6's plate to the rendered pill). See the step7b memory note.
+// Sizing: the art and cutline are twins from the same PSD at the same pixel scale, so the
+// art needs no fitting — Deepnest only rotates/translates. resize by artFactor×100 lands
+// the 72-dpi PNG at its true AI size (element_px × factor); uniform scale keeps its aspect.
+// artFactor == 0 (no sidecar) → legacy height-fit to the cutline.
 // Returns the placed PageItem, or null if the PNG is missing / placement failed.
-function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem) {
+function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFactor) {
     var displayName = cutlineItem.name;
     var safeName    = displayName.replace(/[\/\\:*?"<>|]/g, "_");
     var pngFile     = new File(artFolder.fsName + "/" + safeName + ".png");
@@ -825,15 +847,37 @@ function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem) {
             placed.move(stickersLayer, ElementPlacement.PLACEATBEGINNING);
         }
 
-        // Scale by HEIGHT to the cutline (upright here), centred on the cutline group.
+        // Size the art, then centre it on the cutline group (cutline is upright here).
         var cgb = cutlineItem.geometricBounds;
-        var cH  = Math.abs(cgb[1] - cgb[3]);
-        if (placed.height > 0 && cH > 0) {
-            placed.resize(cH / placed.height * 100, cH / placed.height * 100);
+
+        if (artFactor > 0 && placed.width > 0) {
+            // ABSOLUTE: true AI size = element_px × factor; for a 72-dpi PNG that is just
+            // resize by factor×100 (placed.width == element_px, so the px term cancels).
+            placed.resize(artFactor * 100, artFactor * 100);
+        } else {
+            // FALLBACK: legacy height-fit to the cutline (no sidecar).
+            var cH = Math.abs(cgb[1] - cgb[3]);
+            if (placed.height > 0 && cH > 0) {
+                placed.resize(cH / placed.height * 100, cH / placed.height * 100);
+            }
+            log("[step-nest] art-size | " + displayName + " mode=heightfit-fallback");
         }
+
         var cc = boundsCenter(cgb);
         placed.translate(cc.x - (placed.position[0] + placed.width  / 2),
                          cc.y - (placed.position[1] - placed.height / 2));
+
+        // Objective fit check (upright, before the nest transform): the art and the
+        // cutline are the same element, so their bounding boxes should closely agree.
+        // Under the old height-fit, height matched but width could be far off; the
+        // absolute factor makes both agree (residual = trace inset + plate vs render).
+        var agb = placed.geometricBounds;
+        var aW = Math.abs(agb[2] - agb[0]), aH = Math.abs(agb[1] - agb[3]);
+        var cW = Math.abs(cgb[2] - cgb[0]), cHb = Math.abs(cgb[1] - cgb[3]);
+        log("[step-nest] ART-FIT | " + displayName
+            + " art=" + Math.round(aW) + "x" + Math.round(aH)
+            + " cut=" + Math.round(cW) + "x" + Math.round(cHb)
+            + " dW=" + Math.round(aW - cW) + " dH=" + Math.round(aH - cHb));
 
         return placed;
 

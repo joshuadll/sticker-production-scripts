@@ -1,5 +1,6 @@
 #target illustrator
 #include "../utils/aiUtils.jsx"
+#include "../utils/json2.jsx"
 #include "../illustrator/Step7B_NestingImport.jsx"
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -15,6 +16,13 @@ var CONFIG = {
     // ── Layer names ──────────────────────────────────────────────────────────
     cutlinesLayerName: "Cutlines",
     stickersLayerName: "Sticker",
+
+    // ── Art sizing ───────────────────────────────────────────────────────────
+    // Working-area width in mm. Used to reconstruct the PSD→AI scale factor
+    // (mmToPoints(workingAreaWidthMm) / psdWidth) so placed artwork lands at the
+    // element's true size instead of being fitted to the traced cutline height.
+    // MUST match AI_BuildCutlines.jsx (Step 6 scales the silhouette to this width).
+    workingAreaWidthMm: 190,
 
     // ── Area-based fallback matching ─────────────────────────────────────────
     // Max area ratio for accepting a match when names don't agree.
@@ -72,9 +80,22 @@ function main() {
         }
         log("[pipeline] art folder: " + artFolder.fsName);
 
+        // ── Read elements sidecar (for absolute art sizing) ────────────────
+        // The {base}_elements.json sidecar (psdWidth + per-element pixel bounds)
+        // lets Step 7B size artwork by the known PSD→AI factor rather than fitting
+        // it to the traced cutline. Absent → Step 7B falls back to height-fit.
+        var elementsData = _readElementsSidecar(doc);
+        if (elementsData) {
+            log("[pipeline] elements sidecar: " + elementsData.elements.length
+                + " element(s), psdWidth=" + elementsData.psdWidth);
+        } else {
+            log("[pipeline] WARN | no elements sidecar found — art will fall back to "
+                + "height-fit sizing.");
+        }
+
         // ── Run import ─────────────────────────────────────────────────────
         log("[pipeline] --- importing Deepnest layout ---");
-        var result = runNestingImport(doc, svgFiles, artFolder);
+        var result = runNestingImport(doc, svgFiles, artFolder, elementsData);
 
         if (!result) {
             scriptAlert("Import failed — Cutlines layer not found.\n"
@@ -201,6 +222,32 @@ function _findElementsFolder(doc) {
     try { base = doc.fullName.fsName.replace(/\.ai$/i, ""); } catch (e) { return null; }
     if (!base) return null;
     return new Folder(base + "_elements");
+}
+
+// Reads the {base}_elements.json sidecar next to the working file, or null if it is
+// absent/unreadable/invalid. Same convention + parse as Step 6's _readElementsFile.
+function _readElementsSidecar(doc) {
+    var base;
+    try { base = doc.fullName.fsName.replace(/\.ai$/i, ""); } catch (e) { return null; }
+    if (!base) return null;
+
+    var f = new File(base + "_elements.json");
+    if (!f.exists) return null;
+
+    f.encoding = "UTF-8";
+    if (!f.open("r")) return null;
+    var text = f.read();
+    f.close();
+    if (!text) return null;
+
+    var data;
+    try { data = JSON.parse(text); }
+    catch (e) {
+        log("[pipeline] WARN | elements sidecar is not valid JSON: " + e.message);
+        return null;
+    }
+    if (!data || !data.psdWidth || !data.elements) return null;
+    return data;
 }
 
 function _selectSvgFiles(doc) {
