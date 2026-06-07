@@ -136,7 +136,7 @@ function _s10ExportJpegs(doc, clipData, outFolder, stkCode) {
 
     // Show all original layers; suppress Color Block for white-background pass.
     _s10ShowAll(snap);
-    var colorBlockLayer = _s10LayerCI(doc, CONFIG.colorBlockLayerName);
+    var colorBlockLayer = findLayer(doc, CONFIG.colorBlockLayerName);
     colorBlockLayer.visible = false;
 
     var opts          = new ExportOptionsJPEG();
@@ -331,13 +331,4 @@ function _s10RestoreLayers(snap) {
     for (i = 0; i < snap.length; i++) {
         try { snap[i].layer.visible = snap[i].wasVisible; } catch (e) { /* layer gone */ }
     }
-}
-
-// Case-insensitive layer lookup.
-function _s10LayerCI(doc, name) {
-    var n = name.toLowerCase(), i;
-    for (i = 0; i < doc.layers.length; i++) {
-        if (doc.layers[i].name.toLowerCase() === n) return doc.layers[i];
-    }
-    return null;
 }

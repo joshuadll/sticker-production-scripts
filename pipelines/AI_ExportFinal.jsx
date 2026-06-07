@@ -32,7 +32,7 @@ var CONFIG = {
 
     // ── Step 10: Asset Export ─────────────────────────────────────────────────
     stickersLayerName:     "Sticker",      // exact (built in code by buildWorkingDocument)
-    colorBlockLayerName:   "Color Block",  // case-insensitive search
+    colorBlockLayerName:   "Color Block",  // exact (built in code by buildWorkingDocument)
     jpegQuality:           8,              // 0-100
     // ⚠️  pngExportScale: pending artist confirmation — assumed 150 DPI for now.
     pngExportScale:        150,            // DPI
