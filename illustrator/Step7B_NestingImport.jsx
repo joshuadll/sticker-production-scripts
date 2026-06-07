@@ -37,7 +37,7 @@
 //
 // elementsData (required; AI_ImportNesting halts if the sidecar is missing): the parsed
 // {name}_elements.json sidecar (only psdWidth is used here). Artwork is sized by the
-// ABSOLUTE PSD→AI factor — mmToPoints(workingAreaWidthMm) / psdWidth — the same scale
+// ABSOLUTE PSD→AI factor — 72 / sourceDPI pt per px — the same scale
 // Step 6 used to place the silhouette. The cutline and the art are twins from the same PSD
 // at the same pixel scale, so the art's true size is a single known constant (factor),
 // applied uniformly: a 72-dpi element PNG is element_px points wide, so resizing by
@@ -57,7 +57,7 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     var artFactor = _nestArtFactor(elementsData);
     log("[step-nest] art sizing: factor=" + artFactor.toFixed(5)
         + " pt/px (psdWidth=" + elementsData.psdWidth
-        + ", workingAreaWidthMm=" + CONFIG.workingAreaWidthMm + ")");
+        + ", sourceDPI=" + CONFIG.sourceDPI + ")");
 
     var stickersLayer = findLayer(doc, CONFIG.stickersLayerName);
     if (!stickersLayer) {
@@ -439,12 +439,13 @@ function _nestBestRotation(items, abRect, targetTop) {
 
 // ── Private helpers ────────────────────────────────────────────────────────────
 
-// AI points per PSD pixel = mmToPoints(workingAreaWidthMm) / psdWidth — the SAME scale
-// Step 6 applied when it placed the silhouette at the working-area width. Returns 0 when
-// the sidecar is missing/unusable (caller falls back to height-fit).
+// AI points per PSD pixel = 72 / sourceDPI — the SAME scale Step 6 applied when it
+// placed the silhouette at the source DPI. (Placing pixels at their source DPI makes
+// art and cutlines twins at true physical size.) Returns 0 when the sidecar is
+// missing/unusable (caller falls back to height-fit).
 function _nestArtFactor(elementsData) {
-    if (!elementsData || !elementsData.psdWidth || !CONFIG.workingAreaWidthMm) return 0;
-    var factor = mmToPoints(CONFIG.workingAreaWidthMm) / elementsData.psdWidth;
+    if (!elementsData || !elementsData.psdWidth || !CONFIG.sourceDPI) return 0;
+    var factor = 72.0 / CONFIG.sourceDPI;
     return factor > 0 ? factor : 0;
 }
 

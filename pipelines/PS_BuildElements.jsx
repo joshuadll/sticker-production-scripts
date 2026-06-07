@@ -60,7 +60,8 @@ var CONFIG = {
     // Defaults to captionFont until confirmed.
     captionFontPlate:        "Kalam-Regular",
 
-    captionSizePt:    16,   // pt — doubled from 8pt actual (double-A4 template)
+    captionSizePt:    8,    // pt — real caption size; Step 6 places the silhouette at
+                            // source DPI so 8pt renders at a true 8pt on the printed sticker.
     captionTracking:  -20,  // thousandths of an em
     captionGap:        5,   // px: text top below white border bottom (WBC bounds[3]) — this is only
                             //     the REVIEW position the artist sees after Step 3A. Final placement is

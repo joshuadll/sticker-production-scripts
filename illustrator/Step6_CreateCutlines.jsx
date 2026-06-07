@@ -50,9 +50,13 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     placed.file = pngFile;
     log("[step6] placed silhouette PNG.");
 
-    // Scale to fit working area width (proportional).
-    var workingWidthPt = mmToPoints(CONFIG.workingAreaWidthMm);
-    var scalePct = (workingWidthPt / placed.width) * 100;
+    // Place at the source DPI so PSD pixels map to true physical size:
+    // final width (pt) = psdWidth_px * 72 / sourceDPI. THIS is the governing print
+    // scale (not workingAreaWidthMm); Step 7B sizes artwork by the same factor so the
+    // art and cutlines stay twins. A 72-dpi silhouette places at psdWidth pt, so this
+    // resolves to a flat 72/sourceDPI scale, but is written to tolerate other embeds.
+    var targetWidthPt = elementsData.psdWidth * (72.0 / CONFIG.sourceDPI);
+    var scalePct = (targetWidthPt / placed.width) * 100;
     placed.resize(scalePct, scalePct);
 
     // Centre on artboard.

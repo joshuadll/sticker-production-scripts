@@ -12,6 +12,10 @@ var CONFIG = {
     logPath:        "", // resolved below
 
     // ── Step 6: Create Cutlines ──────────────────────────────────────────────
+    // Source PSD resolution. Step 6 places the silhouette at this DPI so PSD pixels
+    // map 1:1 to real-world size (pt/px = 72/sourceDPI). THIS is the governing print
+    // scale — not workingAreaWidthMm, which is now only a QA safe-area bound.
+    sourceDPI:           300,
     workingAreaWidthMm:  190,
     workingAreaHeightMm: 267,
     cutlineStrokePt:     0.25,

@@ -18,11 +18,11 @@ var CONFIG = {
     stickersLayerName: "Sticker",
 
     // ── Art sizing ───────────────────────────────────────────────────────────
-    // Working-area width in mm. Used to reconstruct the PSD→AI scale factor
-    // (mmToPoints(workingAreaWidthMm) / psdWidth) so placed artwork lands at the
-    // element's true size instead of being fitted to the traced cutline height.
-    // MUST match AI_BuildCutlines.jsx (Step 6 scales the silhouette to this width).
-    workingAreaWidthMm: 190,
+    // Source PSD resolution. Placed artwork is sized by the PSD→AI factor
+    // (pt/px = 72/sourceDPI) so it lands at the element's true physical size
+    // instead of being fitted to the traced cutline height. MUST match
+    // AI_BuildCutlines.jsx (Step 6 places the silhouette at the same DPI).
+    sourceDPI: 300,
 
     // ── Area-based fallback matching ─────────────────────────────────────────
     // Max area ratio for accepting a match when names don't agree.
