@@ -183,5 +183,10 @@ if [ "$FAIL" -ne 0 ]; then
     exit 1
 fi
 
+# ── Publish Pipeline 4 fixture ────────────────────────────────────────────────
+PIPELINE4_FIXTURE="$FIXTURE_DIR/step8-cutlines.ai"
+osascript -e "tell application \"$APP\" to do javascript \"var f=new File('$PIPELINE4_FIXTURE'); app.activeDocument.saveAs(f, new IllustratorSaveOptions());\""
+echo "[$STEP] published Pipeline 4 fixture: step8-cutlines.ai"
+
 echo "PASS [$STEP]"
 exit 0

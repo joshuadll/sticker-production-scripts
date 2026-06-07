@@ -1,19 +1,14 @@
 #!/bin/bash
-# Integration test for Step 8c (Offset Path QA).
-# Runs AI_ExportFinal.jsx against a saved post-pencil .ai and checks that 1mm
-# offset paths were built and the QA flagged a deliberately-too-close pair.
+# Integration test for AI_ExportFinal (Steps 8c → 9A → 10 → 11).
+# Runs against the output of run-ai-refine-cutlines.sh.
 #
 # FIXTURE REQUIRED:
 #   tests/integration/fixtures/step8c-cutlines.ai
-#     A production .ai after the manual pencil pass (Cutlines layer populated with
-#     named cut lines). To exercise the spacing flag, include at least one pair of
-#     elements closer than 2mm. Create it by running run-step8.sh's output, then in
-#     Illustrator nudging two elements together and File > Save As → this path.
+#     Output of run-ai-refine-cutlines.sh (cutlines simplified + normalised).
+#     Run that test first; it publishes this fixture automatically.
 #
-# WHY THIS STOPS AFTER 8c:
-#   AI_ExportFinal halts after Step 8c when flagged > 0 (artist must fix, then
-#   re-run). A fixture with a too-close pair therefore keeps Steps 9/10 — which
-#   need the shared Peeling Tab asset — out of the test path.
+# A temp copy is used so Step 11's saveAs (_final.ai) and Step 10's
+# JPEG/PNG exports land in /tmp rather than the fixtures directory.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
@@ -32,32 +27,38 @@ AI_FIXTURE="$FIXTURE_DIR/step8c-cutlines.ai"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ai-export-final-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
+TEMP_FIXTURE="/tmp/${STEP}-fixture.ai"
 LOG="/tmp/AI_ExportFinal.log"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
 if [ ! -f "$AI_FIXTURE" ]; then
     echo "SKIP [$STEP]: fixture not found: $AI_FIXTURE"
-    echo "  See script header for fixture creation instructions."
+    echo "  Run run-ai-refine-cutlines.sh first to produce this fixture."
     exit 0
 fi
 
+# ── Clean slate ───────────────────────────────────────────────────────────────
+rm -f "$LOG" "$TEMP_SCRIPT" "$TEMP_FIXTURE" /tmp/${STEP}-fixture_final.ai
+osascript -e "tell application \"$APP\" to do javascript \"while(app.documents.length>0){app.documents[0].close(SaveOptions.DONOTSAVECHANGES);}\"" >/dev/null 2>&1 || true
+
+cp "$AI_FIXTURE" "$TEMP_FIXTURE"
+
 # ── Prepare temp script ──────────────────────────────────────────────────────
-# Suppress alerts for headless run. main() operates on app.activeDocument, so we
-# open the fixture first (below) then eval the patched pipeline.
 
-rm -f "$LOG" "$TEMP_SCRIPT"
-
-perl -pe 's|suppressAlerts:\s*false|suppressAlerts: true|;    s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
+perl -pe 's|suppressAlerts:\s*false|suppressAlerts: true|;
+          s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
 # ── Run script via osascript ─────────────────────────────────────────────────
 
-echo "[$STEP] Opening fixture and running AfterPencil pipeline..."
+echo "[$STEP] Opening fixture copy and running AI_ExportFinal..."
 osascript << EOF
 tell application "$APP"
-    open POSIX file "$AI_FIXTURE"
-    do javascript file (POSIX file "$TEMP_SCRIPT")
+    with timeout of 600 seconds
+        open POSIX file "$TEMP_FIXTURE"
+        do javascript file (POSIX file "$TEMP_SCRIPT")
+    end timeout
 end tell
 EOF
 

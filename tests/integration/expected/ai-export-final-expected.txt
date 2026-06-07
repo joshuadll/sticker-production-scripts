@@ -1,0 +1,40 @@
+[pipeline] === AI_ExportFinal start ===
+[pipeline] dryRun: false
+[pipeline] document: ai-export-final-fixture.ai
+[pipeline] --- Step 8c: Offset Path QA ---
+[step8c] collected 26 cut line(s).
+[step8c] FLAG | spacing 1mm (< 2mm) | Orava Castle <-> National Animal - Tatra chamois
+[step8c] margin | computed 190x267mm safe area.
+[step8c] FLAG | cut line exceeds margin | Bratislava Castle
+[step8c] FLAG | cut line exceeds margin | Štrbské Pleso
+[step8c] FLAG | cut line exceeds margin | Devín Castle
+[step8c] FLAG | cut line exceeds margin | St. Martin's Cathedral
+[step8c] FLAG | cut line exceeds margin | Slovak Paradise National Park
+[step8c] FLAG | cut line exceeds margin | Spiš Castle
+[step8c] FLAG | cut line exceeds margin | Bojnice Castle
+[step8c] FLAG | cut line exceeds margin | The Blue Church - Church of St. Elizabeth
+[step8c] FLAG | cut line exceeds margin | Old Town Hall (Bratislava)
+[step8c] FLAG | cut line exceeds margin | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
+[step8c] FLAG | cut line exceeds margin | Orava Castle
+[step8c] FLAG | cut line exceeds margin | Michael's Gate
+[step8c] FLAG | cut line exceeds margin | Carpathian Wooden Churches
+[step8c] FLAG | cut line exceeds margin | Čumil Statue
+[step8c] FLAG | cut line exceeds margin | Pirohy
+[step8c] FLAG | cut line exceeds margin | Bryndzové halušky
+[step8c] FLAG | cut line exceeds margin | Kraslice
+[step8c] FLAG | cut line exceeds margin | Kroje
+[step8c] FLAG | cut line exceeds margin | Tram
+[step8c] FLAG | cut line exceeds margin | National Animal - Tatra chamois
+[step8c] FLAG | cut line exceeds margin | Šúľance s Makom
+[step8c] FLAG | cut line exceeds margin | Slovakia Map
+[step8c] FLAG | cut line exceeds margin | Fujara
+[step8c] FLAG | cut line exceeds margin | Bratislava(text)
+[step8c] FLAG | cut line exceeds margin | National Flower
+[step8c] FLAG | cut line exceeds margin | UFO Observation Deck, Bridge SNP
+[step8c] done | checked=26 flagged=26 (spacing: 1 pair(s); margin: 26)
+[pipeline] step 8c complete | 26 path(s) checked, 26 flagged.
+Step 8c: 26 path(s) flagged for review.
+Flagged paths are highlighted in red.
+Fix them before continuing, then re-run this script.
+
+Log: /private/tmp/AI_ExportFinal.log

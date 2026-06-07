@@ -1,14 +1,10 @@
 #!/bin/bash
-# Integration test for Step 8 (Simplify + Caption Normalisation).
-# Runs AI_RefineCutlines.jsx against a saved Step-6 output .ai and checks that
-# cutlines were simplified and GC plates normalised.
+# Integration test for AI_RefineCutlines (Steps 8a Simplify + 8b Caption Normalise).
 #
 # FIXTURE REQUIRED:
 #   tests/integration/fixtures/step8-cutlines.ai
-#     A production .ai right after Step 6 (the Cutlines layer populated with
-#     named cutline groups). Create it by running run-step6.sh, then in
-#     Illustrator: File > Save As → this path. Include at least one GC caption
-#     element so Step 8b has something to normalise.
+#     Output of run-ai-import-nesting.sh (cutlines at nested positions, artwork
+#     placed). Run that test first; it publishes this fixture automatically.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
@@ -33,26 +29,29 @@ LOG="/tmp/AI_RefineCutlines.log"
 
 if [ ! -f "$AI_FIXTURE" ]; then
     echo "SKIP [$STEP]: fixture not found: $AI_FIXTURE"
-    echo "  See script header for fixture creation instructions."
+    echo "  Run run-ai-import-nesting.sh first to produce this fixture."
     exit 0
 fi
 
-# ── Prepare temp script ──────────────────────────────────────────────────────
-# Suppress alerts for headless run. main() operates on app.activeDocument, so we
-# open the fixture first (below) then eval the patched pipeline.
-
+# ── Clean slate ───────────────────────────────────────────────────────────────
 rm -f "$LOG" "$TEMP_SCRIPT"
+osascript -e "tell application \"$APP\" to do javascript \"while(app.documents.length>0){app.documents[0].close(SaveOptions.DONOTSAVECHANGES);}\"" >/dev/null 2>&1 || true
 
-perl -pe 's|suppressAlerts:\s*false|suppressAlerts: true|;    s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
+# ── Prepare temp script ──────────────────────────────────────────────────────
+
+perl -pe 's|suppressAlerts:\s*false|suppressAlerts: true|;
+          s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
 # ── Run script via osascript ─────────────────────────────────────────────────
 
-echo "[$STEP] Opening fixture and running AfterDeepnest pipeline..."
+echo "[$STEP] Opening fixture and running AI_RefineCutlines..."
 osascript << EOF
 tell application "$APP"
-    open POSIX file "$AI_FIXTURE"
-    do javascript file (POSIX file "$TEMP_SCRIPT")
+    with timeout of 300 seconds
+        open POSIX file "$AI_FIXTURE"
+        do javascript file (POSIX file "$TEMP_SCRIPT")
+    end timeout
 end tell
 EOF
 
@@ -107,6 +106,11 @@ if [ "$FAIL" -ne 0 ]; then
     cat "$LOG"
     exit 1
 fi
+
+# ── Publish Pipeline 5 fixture ────────────────────────────────────────────────
+PIPELINE5_FIXTURE="$FIXTURE_DIR/step8c-cutlines.ai"
+osascript -e "tell application \"$APP\" to do javascript \"var f=new File('$PIPELINE5_FIXTURE'); app.activeDocument.saveAs(f, new IllustratorSaveOptions());\""
+echo "[$STEP] published Pipeline 5 fixture: step8c-cutlines.ai"
 
 # ── Diff against golden file ─────────────────────────────────────────────────
 
