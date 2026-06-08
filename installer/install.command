@@ -30,35 +30,44 @@ if ! bash "$UPDATE_SCRIPT"; then
 fi
 echo ""
 
-# ── 2. Install the Noteworthie launcher into PS and AI Scripts menus ───────────
-# The launcher (File > Scripts > Noteworthie) opens a dialog of pipeline buttons.
-# It must live inside the app bundle, which is root-owned — requires sudo.
-echo "Installing the Noteworthie launcher into Photoshop and Illustrator..."
+# ── 2. Install one Scripts-menu entry per pipeline ────────────────────────────
+# Each pipeline becomes its own "Noteworthie N - ..." item under File > Scripts.
+# Each item is a thin wrapper that runs the real pipeline from the auto-updating
+# scripts folder (so the menu entries stay tiny and never need re-installing when
+# the pipeline code changes). The Scripts folder is inside the app bundle, which
+# is root-owned — requires sudo.
+echo "Installing the Noteworthie scripts into Photoshop and Illustrator..."
 echo "(You may be prompted for your Mac password — this is normal.)"
 echo ""
 
-# install_launcher <app-label> <scripts-dir> <source-jsx> [stale-name ...]
-# Copies the launcher in as Noteworthie.jsx, then deletes any stale launcher
-# names from earlier installer versions. Copy-before-remove so a failed copy
-# never leaves the app with no launcher at all.
-install_launcher() {
-    local label="$1"; local scripts_dir="$2"; local src="$3"; shift 3
-    sudo mkdir -p "$scripts_dir"
-    sudo cp "$INSTALL_DIR/installer/$src" "$scripts_dir/Noteworthie.jsx"
-    sudo chmod 755 "$scripts_dir/Noteworthie.jsx"
-    local stale
-    for stale in "$@"; do
-        sudo rm -f "$scripts_dir/$stale"
-    done
-    echo "  $label launcher installed."
+# install_entry <scripts-dir> <#target app> <menu name> <pipeline filename>
+install_entry() {
+    local scripts_dir="$1"; local target="$2"; local menu_name="$3"; local pipeline="$4"
+    sudo tee "$scripts_dir/$menu_name.jsx" >/dev/null <<WRAP
+#target $target
+(function () {
+    var f = new File((new File("~")).fsName + "/Library/Application Support/Noteworthie/scripts/pipelines/$pipeline");
+    if (!f.exists) {
+        alert("Noteworthie script not found:\n" + f.fsName + "\n\nRe-run the Noteworthie installer.");
+        return;
+    }
+    \$.evalFile(f);
+})();
+WRAP
+    sudo chmod 755 "$scripts_dir/$menu_name.jsx"
 }
 
 PS_APP=$(find /Applications -maxdepth 1 -name "Adobe Photoshop*" -type d 2>/dev/null | sort -r | head -1)
 AI_APP=$(find /Applications -maxdepth 1 -name "Adobe Illustrator*" -type d 2>/dev/null | sort -r | head -1)
 
 if [ -n "$PS_APP" ]; then
-    install_launcher "Photoshop" "$PS_APP/Presets/Scripts" "noteworthie-panel-ps.jsx" \
-        "NoteworthieSetupPS.jsx" "Noteworthie Setup PS.jsx"
+    PS_SCRIPTS="$PS_APP/Presets/Scripts"
+    sudo mkdir -p "$PS_SCRIPTS"
+    # Clear any prior Noteworthie entries (old launcher, setup scripts, renamed steps)
+    sudo find "$PS_SCRIPTS" -maxdepth 1 -name "Noteworthie*.jsx" -delete 2>/dev/null
+    install_entry "$PS_SCRIPTS" "photoshop" "Noteworthie 1 - Build Elements"          "PS_BuildElements.jsx"
+    install_entry "$PS_SCRIPTS" "photoshop" "Noteworthie 2 - Build & Export Cutlines" "PSAI_BuildAndExportCutlines.jsx"
+    echo "  Photoshop scripts installed (2 entries)."
 else
     echo "  Photoshop not found — skipping."
 fi
@@ -68,8 +77,13 @@ if [ -n "$AI_APP" ]; then
     if [ -z "$AI_SCRIPTS" ]; then
         AI_SCRIPTS="$AI_APP/Presets/Scripts"
     fi
-    install_launcher "Illustrator" "$AI_SCRIPTS" "noteworthie-panel-ai.jsx" \
-        "NoteworthieSetupAI.jsx" "Noteworthie Setup AI.jsx"
+    sudo mkdir -p "$AI_SCRIPTS"
+    sudo find "$AI_SCRIPTS" -maxdepth 1 -name "Noteworthie*.jsx" -delete 2>/dev/null
+    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 3 - Import Nesting"  "AI_ImportNesting.jsx"
+    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 4 - Refine Cutlines" "AI_RefineCutlines.jsx"
+    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 5 - Export Final"    "AI_ExportFinal.jsx"
+    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 6 - Nesting QA"      "AI_NestingQA.jsx"
+    echo "  Illustrator scripts installed (4 entries)."
 else
     echo "  Illustrator not found — skipping."
 fi
@@ -124,8 +138,14 @@ echo ""
 echo "  2. Reopen Photoshop and Illustrator."
 echo ""
 echo "  3. To run a pipeline, in Photoshop or Illustrator:"
-echo "       File > Scripts > Noteworthie"
-echo "     then click the pipeline you want to run."
+echo "       File > Scripts > Noteworthie N - <name>"
+echo "     Each pipeline is its own entry, in order:"
+echo "       Photoshop:    1 - Build Elements"
+echo "                     2 - Build & Export Cutlines"
+echo "       Illustrator:  3 - Import Nesting"
+echo "                     4 - Refine Cutlines"
+echo "                     5 - Export Final"
+echo "                     6 - Nesting QA"
 echo ""
 echo "The pipeline scripts update automatically on every"
 echo "login, so you only ever do this setup once."
