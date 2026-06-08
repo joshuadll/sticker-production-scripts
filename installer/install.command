@@ -21,7 +21,13 @@ cp "$SCRIPT_DIR/update.sh" "$UPDATE_SCRIPT"
 chmod +x "$UPDATE_SCRIPT"
 
 echo "Downloading latest scripts..."
-bash "$UPDATE_SCRIPT"
+if ! bash "$UPDATE_SCRIPT"; then
+    echo ""
+    echo "Download failed — could not fetch the latest scripts."
+    echo "Check your internet connection and run this installer again."
+    read -r -p "Press Enter to close..." _
+    exit 1
+fi
 echo ""
 
 # ── 2. Install the Noteworthie launcher into PS and AI Scripts menus ───────────
@@ -31,17 +37,28 @@ echo "Installing the Noteworthie launcher into Photoshop and Illustrator..."
 echo "(You may be prompted for your Mac password — this is normal.)"
 echo ""
 
+# install_launcher <app-label> <scripts-dir> <source-jsx> [stale-name ...]
+# Copies the launcher in as Noteworthie.jsx, then deletes any stale launcher
+# names from earlier installer versions. Copy-before-remove so a failed copy
+# never leaves the app with no launcher at all.
+install_launcher() {
+    local label="$1"; local scripts_dir="$2"; local src="$3"; shift 3
+    sudo mkdir -p "$scripts_dir"
+    sudo cp "$INSTALL_DIR/installer/$src" "$scripts_dir/Noteworthie.jsx"
+    sudo chmod 755 "$scripts_dir/Noteworthie.jsx"
+    local stale
+    for stale in "$@"; do
+        sudo rm -f "$scripts_dir/$stale"
+    done
+    echo "  $label launcher installed."
+}
+
 PS_APP=$(find /Applications -maxdepth 1 -name "Adobe Photoshop*" -type d 2>/dev/null | sort -r | head -1)
 AI_APP=$(find /Applications -maxdepth 1 -name "Adobe Illustrator*" -type d 2>/dev/null | sort -r | head -1)
 
 if [ -n "$PS_APP" ]; then
-    PS_SCRIPTS="$PS_APP/Presets/Scripts"
-    sudo mkdir -p "$PS_SCRIPTS"
-    # Remove the old action-setup script name from earlier installer versions
-    sudo rm -f "$PS_SCRIPTS/NoteworthieSetupPS.jsx" "$PS_SCRIPTS/Noteworthie Setup PS.jsx"
-    sudo cp "$INSTALL_DIR/installer/noteworthie-panel-ps.jsx" "$PS_SCRIPTS/Noteworthie.jsx"
-    sudo chmod 755 "$PS_SCRIPTS/Noteworthie.jsx"
-    echo "  Photoshop launcher installed."
+    install_launcher "Photoshop" "$PS_APP/Presets/Scripts" "noteworthie-panel-ps.jsx" \
+        "NoteworthieSetupPS.jsx" "Noteworthie Setup PS.jsx"
 else
     echo "  Photoshop not found — skipping."
 fi
@@ -51,12 +68,8 @@ if [ -n "$AI_APP" ]; then
     if [ -z "$AI_SCRIPTS" ]; then
         AI_SCRIPTS="$AI_APP/Presets/Scripts"
     fi
-    sudo mkdir -p "$AI_SCRIPTS"
-    # Remove the old action-setup script name from earlier installer versions
-    sudo rm -f "$AI_SCRIPTS/NoteworthieSetupAI.jsx" "$AI_SCRIPTS/Noteworthie Setup AI.jsx"
-    sudo cp "$INSTALL_DIR/installer/noteworthie-panel-ai.jsx" "$AI_SCRIPTS/Noteworthie.jsx"
-    sudo chmod 755 "$AI_SCRIPTS/Noteworthie.jsx"
-    echo "  Illustrator launcher installed."
+    install_launcher "Illustrator" "$AI_SCRIPTS" "noteworthie-panel-ai.jsx" \
+        "NoteworthieSetupAI.jsx" "Noteworthie Setup AI.jsx"
 else
     echo "  Illustrator not found — skipping."
 fi
@@ -116,6 +129,10 @@ echo "     then click the pipeline you want to run."
 echo ""
 echo "The pipeline scripts update automatically on every"
 echo "login, so you only ever do this setup once."
+echo ""
+echo "NOTE: if 'Noteworthie' ever disappears from the"
+echo "Scripts menu after Photoshop or Illustrator updates"
+echo "itself, just run this installer again."
 echo "============================================"
 echo ""
 read -r -p "Press Enter to close..." _
