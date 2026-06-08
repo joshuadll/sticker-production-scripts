@@ -25,29 +25,33 @@ bash "$UPDATE_SCRIPT"
 echo ""
 
 # ── 2. Install action setup scripts into PS and AI Scripts menus ──────────────
-# Finds the user-level Adobe support folder for each app (no admin required).
-# Scripts placed here appear under File > Scripts in each app.
+# Scripts must go into the app bundle — requires admin password (sudo).
+echo "Installing setup shortcuts into Photoshop and Illustrator..."
+echo "(You may be prompted for your Mac password — this is normal.)"
+echo ""
 
-PS_SUPPORT=$(find "$HOME/Library/Application Support/Adobe" -maxdepth 1 -name "Adobe Photoshop*" -type d 2>/dev/null | sort -r | head -1)
-AI_SUPPORT=$(find "$HOME/Library/Application Support/Adobe" -maxdepth 1 -name "Adobe Illustrator*" -type d 2>/dev/null | sort -r | head -1)
+PS_APP=$(find /Applications -maxdepth 1 -name "Adobe Photoshop*" -type d 2>/dev/null | sort -r | head -1)
+AI_APP=$(find /Applications -maxdepth 1 -name "Adobe Illustrator*" -type d 2>/dev/null | sort -r | head -1)
 
-if [ -n "$PS_SUPPORT" ]; then
-    mkdir -p "$PS_SUPPORT/Presets/Scripts"
-    cp "$INSTALL_DIR/installer/generate-ps-actions.jsx" "$PS_SUPPORT/Presets/Scripts/Noteworthie Setup PS.jsx"
+if [ -n "$PS_APP" ]; then
+    PS_DEST="$PS_APP/Presets/Scripts/NoteworthieSetupPS.jsx"
+    sudo mkdir -p "$PS_APP/Presets/Scripts"
+    sudo cp "$INSTALL_DIR/installer/generate-ps-actions.jsx" "$PS_DEST"
+    sudo chmod 755 "$PS_DEST"
     echo "  Photoshop setup shortcut installed."
 else
     echo "  Photoshop not found — skipping."
 fi
 
-if [ -n "$AI_SUPPORT" ]; then
-    # AI uses en_US subfolder if present, otherwise fall back to Presets/Scripts
-    if [ -d "$AI_SUPPORT/en_US" ]; then
-        mkdir -p "$AI_SUPPORT/en_US/Scripts"
-        cp "$INSTALL_DIR/installer/generate-ai-actions.jsx" "$AI_SUPPORT/en_US/Scripts/Noteworthie Setup AI.jsx"
-    else
-        mkdir -p "$AI_SUPPORT/Presets/Scripts"
-        cp "$INSTALL_DIR/installer/generate-ai-actions.jsx" "$AI_SUPPORT/Presets/Scripts/Noteworthie Setup AI.jsx"
+if [ -n "$AI_APP" ]; then
+    AI_SCRIPTS=$(find "$AI_APP" -maxdepth 4 -path "*/en_US/Scripts" -type d 2>/dev/null | head -1)
+    if [ -z "$AI_SCRIPTS" ]; then
+        AI_SCRIPTS="$AI_APP/Presets/Scripts"
     fi
+    AI_DEST="$AI_SCRIPTS/NoteworthieSetupAI.jsx"
+    sudo mkdir -p "$AI_SCRIPTS"
+    sudo cp "$INSTALL_DIR/installer/generate-ai-actions.jsx" "$AI_DEST"
+    sudo chmod 755 "$AI_DEST"
     echo "  Illustrator setup shortcut installed."
 else
     echo "  Illustrator not found — skipping."
@@ -86,13 +90,18 @@ echo "============================================"
 echo ""
 echo "ONE-TIME SETUP (do this now, only once):"
 echo ""
-echo "  1. Restart Photoshop and Illustrator."
+echo "  1. FULLY QUIT Photoshop and Illustrator if they"
+echo "     are open. Press Cmd+Q in each app — closing"
+echo "     the window is NOT enough, the app keeps running"
+echo "     in the background and won't see the new scripts."
 echo ""
-echo "  2. In Photoshop:"
-echo "       File > Scripts > Noteworthie Setup PS"
+echo "  2. Reopen Photoshop and Illustrator."
+echo ""
+echo "  3. In Photoshop:"
+echo "       File > Scripts > NoteworthieSetupPS"
 echo ""
 echo "     In Illustrator:"
-echo "       File > Scripts > Noteworthie Setup AI"
+echo "       File > Scripts > NoteworthieSetupAI"
 echo ""
 echo "This adds the Noteworthie panel to the Actions"
 echo "panel in each app. Scripts update automatically"
