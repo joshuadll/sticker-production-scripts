@@ -40,7 +40,6 @@ CONFIG.logPath = _root + "/pipelines/AI_ImportNesting.log";
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 function main() {
-    if ($.global.__noteworthieSetup) return;
     try {
 
         log("[pipeline] === AI_ImportNesting start ===");

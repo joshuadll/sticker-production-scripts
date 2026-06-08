@@ -24,9 +24,10 @@ echo "Downloading latest scripts..."
 bash "$UPDATE_SCRIPT"
 echo ""
 
-# ── 2. Install action setup scripts into PS and AI Scripts menus ──────────────
-# Scripts must go into the app bundle — requires admin password (sudo).
-echo "Installing setup shortcuts into Photoshop and Illustrator..."
+# ── 2. Install the Noteworthie launcher into PS and AI Scripts menus ───────────
+# The launcher (File > Scripts > Noteworthie) opens a dialog of pipeline buttons.
+# It must live inside the app bundle, which is root-owned — requires sudo.
+echo "Installing the Noteworthie launcher into Photoshop and Illustrator..."
 echo "(You may be prompted for your Mac password — this is normal.)"
 echo ""
 
@@ -34,11 +35,13 @@ PS_APP=$(find /Applications -maxdepth 1 -name "Adobe Photoshop*" -type d 2>/dev/
 AI_APP=$(find /Applications -maxdepth 1 -name "Adobe Illustrator*" -type d 2>/dev/null | sort -r | head -1)
 
 if [ -n "$PS_APP" ]; then
-    PS_DEST="$PS_APP/Presets/Scripts/NoteworthieSetupPS.jsx"
-    sudo mkdir -p "$PS_APP/Presets/Scripts"
-    sudo cp "$INSTALL_DIR/installer/generate-ps-actions.jsx" "$PS_DEST"
-    sudo chmod 755 "$PS_DEST"
-    echo "  Photoshop setup shortcut installed."
+    PS_SCRIPTS="$PS_APP/Presets/Scripts"
+    sudo mkdir -p "$PS_SCRIPTS"
+    # Remove the old action-setup script name from earlier installer versions
+    sudo rm -f "$PS_SCRIPTS/NoteworthieSetupPS.jsx" "$PS_SCRIPTS/Noteworthie Setup PS.jsx"
+    sudo cp "$INSTALL_DIR/installer/noteworthie-panel-ps.jsx" "$PS_SCRIPTS/Noteworthie.jsx"
+    sudo chmod 755 "$PS_SCRIPTS/Noteworthie.jsx"
+    echo "  Photoshop launcher installed."
 else
     echo "  Photoshop not found — skipping."
 fi
@@ -48,11 +51,12 @@ if [ -n "$AI_APP" ]; then
     if [ -z "$AI_SCRIPTS" ]; then
         AI_SCRIPTS="$AI_APP/Presets/Scripts"
     fi
-    AI_DEST="$AI_SCRIPTS/NoteworthieSetupAI.jsx"
     sudo mkdir -p "$AI_SCRIPTS"
-    sudo cp "$INSTALL_DIR/installer/generate-ai-actions.jsx" "$AI_DEST"
-    sudo chmod 755 "$AI_DEST"
-    echo "  Illustrator setup shortcut installed."
+    # Remove the old action-setup script name from earlier installer versions
+    sudo rm -f "$AI_SCRIPTS/NoteworthieSetupAI.jsx" "$AI_SCRIPTS/Noteworthie Setup AI.jsx"
+    sudo cp "$INSTALL_DIR/installer/noteworthie-panel-ai.jsx" "$AI_SCRIPTS/Noteworthie.jsx"
+    sudo chmod 755 "$AI_SCRIPTS/Noteworthie.jsx"
+    echo "  Illustrator launcher installed."
 else
     echo "  Illustrator not found — skipping."
 fi
@@ -91,21 +95,27 @@ echo ""
 echo "ONE-TIME SETUP (do this now, only once):"
 echo ""
 echo "  1. FULLY QUIT Photoshop and Illustrator if they"
-echo "     are open. Press Cmd+Q in each app — closing"
-echo "     the window is NOT enough, the app keeps running"
-echo "     in the background and won't see the new scripts."
+echo "     are open. Closing the window (clicking the red"
+echo "     dot) is NOT enough — the app keeps running in"
+echo "     the background and won't see the new scripts."
+echo ""
+echo "     To fully quit:"
+echo "       a. Click the app so it is in front."
+echo "       b. Press Command (cmd) + Q together,"
+echo "          OR use the menu bar at the very top:"
+echo "          'Photoshop' > 'Quit Photoshop'"
+echo "          'Illustrator' > 'Quit Illustrator'."
+echo "       c. Tip: a still-running app shows a dot under"
+echo "          its Dock icon. No dot = fully quit."
 echo ""
 echo "  2. Reopen Photoshop and Illustrator."
 echo ""
-echo "  3. In Photoshop:"
-echo "       File > Scripts > NoteworthieSetupPS"
+echo "  3. To run a pipeline, in Photoshop or Illustrator:"
+echo "       File > Scripts > Noteworthie"
+echo "     then click the pipeline you want to run."
 echo ""
-echo "     In Illustrator:"
-echo "       File > Scripts > NoteworthieSetupAI"
-echo ""
-echo "This adds the Noteworthie panel to the Actions"
-echo "panel in each app. Scripts update automatically"
-echo "on every login after that."
+echo "The pipeline scripts update automatically on every"
+echo "login, so you only ever do this setup once."
 echo "============================================"
 echo ""
 read -r -p "Press Enter to close..." _

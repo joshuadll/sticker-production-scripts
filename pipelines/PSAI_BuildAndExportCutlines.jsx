@@ -442,8 +442,6 @@ function handOffToIllustrator(doc) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 function main() {
-    if ($.global.__noteworthieSetup) return;
-
     // ── Validate document ──────────────────────────────────────────
     if (app.documents.length === 0) {
         scriptAlert("No document open.\nPlease open the Resize Area PSD first.");
