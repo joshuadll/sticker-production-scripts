@@ -26,9 +26,9 @@
 // _nestComputeRotation / _nestRefineRotation.
 //
 // Group layout (after per-element placement):
-//   Regular SVG  → group-rotated -90°, snapped to artboard top-left corner.
+//   Regular SVG  → group-rotated -90°, snapped to the MARGIN top-left corner.
 //   Irregular SVG → rotated to the angle (0–350°, step 10°) that minimises the
-//                   bounding-box area outside the artboard, then placed directly
+//                   bounding-box area outside the MARGIN, then placed directly
 //                   below the regular group with a 2 mm gap.
 //   SVG identity is inferred from the filename (_regular_nested / _irregular_nested).
 //   If names don't match, the first file is treated as regular, the second as irregular.
@@ -97,11 +97,13 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         if (svgFiles.length >= 2) irregularSvg = svgFiles[1];
     }
 
-    var artboard = doc.artboards[0];
-    var abRect   = artboard.artboardRect; // [left, top, right, bottom] — top > bottom in AI coords
+    // Nesting is laid out within the MARGIN (printable safe area), not the full
+    // artboard: stickers may touch the margin line but must not cross it. marginR
+    // is the same inner rectangle the margin band and Steps 8c/QA use.
+    var marginR  = marginRect(doc);
 
     var totalMatched = 0, totalUnmatched = 0, totalArtPlaced = 0;
-    var regularBottomY = abRect[1]; // fallback: artboard top (used when no regular group)
+    var regularBottomY = marginR[1]; // fallback: margin top (used when no regular group)
 
     // Each element is processed as a rigid {cut, art} PAIR: the artwork is placed on
     // the still-upright cutline (exact: centre + scale, no rotation) and then every
@@ -119,12 +121,12 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         totalArtPlaced += regResult.artPlaced;
 
         if (regResult.pairs.length > 0 && !CONFIG.dryRun) {
-            // Rotate the regular cluster -90° and snap its top-left to the artboard corner.
-            var regBounds  = _nestPlaceGroup(regResult.pairs, -90, abRect[0], abRect[1], true);
+            // Rotate the regular cluster -90° and snap its top-left to the margin corner.
+            var regBounds  = _nestPlaceGroup(regResult.pairs, -90, marginR[0], marginR[1], true);
             regularBottomY = regBounds[3];
             log("[step-nest] regular group placed | bottom y=" + Math.round(regularBottomY));
         } else if (regResult.pairs.length > 0) {
-            log("[step-nest] [DRY RUN] would rotate regular -90° and snap to artboard top-left.");
+            log("[step-nest] [DRY RUN] would rotate regular -90° and snap to margin top-left.");
         }
     }
 
@@ -141,16 +143,16 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
             // placed. If a regular SVG WAS supplied but produced no group (0 matched, or a
             // failed open), the irregular group lands at the top, overlapping the upright
             // regular cutlines — warn so it isn't mistaken for a layout bug.
-            if (regularSvg && regularBottomY === abRect[1]) {
+            if (regularSvg && regularBottomY === marginR[1]) {
                 log("[step-nest] WARN | regular SVG present but no regular group placed "
-                    + "(0 matched / open failed?) — irregular goes to the artboard top.");
+                    + "(0 matched / open failed?) — irregular goes to the margin top.");
             }
             var targetTop = regularBottomY - mmToPoints(2);
 
-            // Best rotation (0–350°, step 10°) that minimises area outside the artboard,
-            // then snap the cluster's left to the artboard left and its top to targetTop.
-            var bestAngle = _nestBestRotation(_nestCutsOf(irrResult.pairs), abRect, targetTop);
-            _nestPlaceGroup(irrResult.pairs, bestAngle, abRect[0], targetTop, false);
+            // Best rotation (0–350°, step 10°) that minimises area outside the margin,
+            // then snap the cluster's left to the margin left and its top to targetTop.
+            var bestAngle = _nestBestRotation(_nestCutsOf(irrResult.pairs), marginR, targetTop);
+            _nestPlaceGroup(irrResult.pairs, bestAngle, marginR[0], targetTop, false);
 
             log("[step-nest] irregular group placed | rotation=" + bestAngle
                 + "° | top y=" + Math.round(targetTop));
@@ -391,18 +393,18 @@ function _nestRotatedBboxBounds(bounds, cx, cy, angleDeg) {
     return [minX, maxY, maxX, minY]; // [left, top, right, bottom]
 }
 
-// Area of a bounding box that falls outside the artboard when the box is
-// left-aligned to abRect[0] and top-aligned to targetTop.
+// Area of a bounding box that falls outside the bound rect (margin/safe area) when
+// the box is left-aligned to boundRect[0] and top-aligned to targetTop.
 // Measures right-side and bottom-side overflow; subtracts the corner double-count.
-function _nestOutsideArtboardArea(rotBounds, abRect, targetTop) {
+function _nestOutsideArtboardArea(rotBounds, boundRect, targetTop) {
     var W = rotBounds[2] - rotBounds[0];
     var H = rotBounds[1] - rotBounds[3];
-    var abWidth      = abRect[2] - abRect[0];
-    // Space from targetTop down to artboard bottom. Clamp at 0: if the regular group
-    // already fills the sheet vertically, targetTop can fall below the artboard bottom
-    // and a negative availHeight would make bottomOverflow blow up identically for every
+    var abWidth      = boundRect[2] - boundRect[0];
+    // Space from targetTop down to the bound bottom. Clamp at 0: if the regular group
+    // already fills the area vertically, targetTop can fall below the bottom and a
+    // negative availHeight would make bottomOverflow blow up identically for every
     // angle (garbage minimum). Clamped, the search degrades predictably to 0°.
-    var availHeight  = Math.max(0, targetTop - abRect[3]);
+    var availHeight  = Math.max(0, targetTop - boundRect[3]);
 
     var rightOverflow  = Math.max(0, W - abWidth);
     var bottomOverflow = Math.max(0, H - availHeight);
@@ -412,9 +414,9 @@ function _nestOutsideArtboardArea(rotBounds, abRect, targetTop) {
 }
 
 // Finds the rotation angle (0–350°, step 10°) for the given items that minimises
-// the area outside the artboard when the group is left-aligned and top-aligned to
-// targetTop. Uses only bounding-box math — no Illustrator objects are moved.
-function _nestBestRotation(items, abRect, targetTop) {
+// the area outside the bound rect (margin/safe area) when the group is left-aligned
+// and top-aligned to targetTop. Uses only bounding-box math — no objects are moved.
+function _nestBestRotation(items, boundRect, targetTop) {
     var bounds = _nestCombinedBounds(items);
     var cx = (bounds[0] + bounds[2]) / 2;
     var cy = (bounds[1] + bounds[3]) / 2;
@@ -424,7 +426,7 @@ function _nestBestRotation(items, abRect, targetTop) {
 
     for (angle = 0; angle < 360; angle += 10) {
         rotBounds = _nestRotatedBboxBounds(bounds, cx, cy, angle);
-        outside   = _nestOutsideArtboardArea(rotBounds, abRect, targetTop);
+        outside   = _nestOutsideArtboardArea(rotBounds, boundRect, targetTop);
         if (outside < bestOutside) {
             bestOutside = outside;
             bestAngle   = angle;

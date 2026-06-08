@@ -21,9 +21,12 @@ Illustrator API calls.
 | **Spacing** | Minimum sampled distance between every cut-line pair | < 2mm → both cut lines flagged red |
 | **Margin** | `boundsWithin(cutlineBounds, safeAreaRect)` | Any edge outside the safe area → flagged red |
 
-The safe area is read from a `"Margin"` layer rectangle if the template has one;
-otherwise computed as a 190 × 267 mm rectangle (A4 minus 10mm top/left/right margins)
-from the artboard top-left.
+The safe area comes from `marginRect(doc)` (aiUtils): a 190 × 267 mm rectangle (A4
+minus 10mm top/left/right + 20mm bottom) computed from the artboard top-left. This
+is the documented working area and the single boundary shared by the drawn Margin
+band (`buildWorkingDocument`), the nesting placement (Step 7B), and the Nesting QA
+score (StepQA). It is computed to spec, not read from the drawn layer — so an
+artist's hand-drawn margin that has drifted from spec does not move the QA boundary.
 
 ## Algorithm (`aiUtils.jsx`)
 

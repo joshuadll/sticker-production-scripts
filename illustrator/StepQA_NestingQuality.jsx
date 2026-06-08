@@ -59,6 +59,53 @@ function runNestingQA(doc) {
     var gapCells = Math.ceil(CONFIG.gapMm / CONFIG.cellSizeMm);
     _qa_dilate(grid, gridW, gridH, gapCells);
 
+    // ── 4b. Margin mask — score only the printable safe area ──────────────────
+    // Cells outside the margin are marked occupied so the gutter never counts as a
+    // free pocket, and the NQI denominator is the in-margin cell count. Keeps the
+    // score about packing efficiency inside the printable region, not sheet bleed.
+    var mR        = marginRect(doc); // [l, t, r, b] points (AI y-up)
+    var mLeftMm   = (mR[0] - artLeft) / PT;
+    var mRightMm  = (mR[2] - artLeft) / PT;
+    var mTopMm    = (artTop - mR[1]) / PT;
+    var mBottomMm = (artTop - mR[3]) / PT;
+
+    // Denominators default to the whole sheet; the margin mask narrows them to the
+    // printable area only when the margin rect is sane. A degenerate margin (zero/
+    // inverted working area, or one that lands entirely off the grid) would make the
+    // in-margin count 0 → NQI/utilization NaN, so fall back to full-sheet scoring.
+    var denomCells   = totalCells;
+    var denomAreaMm2 = sheetW * sheetH;
+
+    var marginValid = (mRightMm > mLeftMm) && (mBottomMm > mTopMm)
+        && (mRightMm > 0) && (mLeftMm < sheetW)
+        && (mBottomMm > 0) && (mTopMm < sheetH);
+
+    if (marginValid) {
+        var inMarginCells = 0;
+        var mr_row, mr_col, mr_cx, mr_cy, mr_idx;
+        for (mr_row = 0; mr_row < gridH; mr_row++) {
+            mr_cy = (mr_row + 0.5) * CONFIG.cellSizeMm;
+            for (mr_col = 0; mr_col < gridW; mr_col++) {
+                mr_cx  = (mr_col + 0.5) * CONFIG.cellSizeMm;
+                mr_idx = mr_row * gridW + mr_col;
+                if (mr_cx < mLeftMm || mr_cx > mRightMm
+                    || mr_cy < mTopMm || mr_cy > mBottomMm) {
+                    grid[mr_idx] = 1; // outside margin → never a pocket
+                } else {
+                    inMarginCells++;
+                }
+            }
+        }
+        if (inMarginCells > 0) {
+            denomCells   = inMarginCells;
+            denomAreaMm2 = (mRightMm - mLeftMm) * (mBottomMm - mTopMm);
+        }
+        log("[stepQA] margin: " + _qa_fmt(mRightMm - mLeftMm) + " x "
+            + _qa_fmt(mBottomMm - mTopMm) + " mm | inMarginCells=" + inMarginCells);
+    } else {
+        log("[stepQA] WARN | degenerate margin rect — scoring against full sheet.");
+    }
+
     // ── 5. Connected-component pocket detection ────────────────────────────────
     var pockets = _qa_findPockets(grid, gridW, gridH, CONFIG.cellSizeMm);
 
@@ -74,14 +121,15 @@ function runNestingQA(doc) {
     }
 
     // ── 6. NQI ─────────────────────────────────────────────────────────────────
-    var nqi          = Math.round(100 * (1 - recoverableCells / totalCells));
+    // Denominator is the printable safe area (or the full sheet if the margin was
+    // degenerate): NQI and utilization both measure packing within that region.
+    var nqi          = Math.round(100 * (1 - recoverableCells / denomCells));
     var pass         = nqi >= CONFIG.passingNqi;
-    var sheetAreaMm2 = sheetW * sheetH;
-    var utilization  = Math.round(1000 * totalAreaMm2 / sheetAreaMm2) / 10;
+    var utilization  = Math.round(1000 * totalAreaMm2 / denomAreaMm2) / 10;
 
     log("[stepQA] NQI=" + nqi + " | pass=" + pass
         + " | utilization=" + utilization + "%"
-        + " | recoverableCells=" + recoverableCells + "/" + totalCells);
+        + " | recoverableCells=" + recoverableCells + "/" + denomCells);
 
     // ── 7. Visual overlay ─────────────────────────────────────────────────────
     if (CONFIG.showOverlay && !CONFIG.dryRun) {
@@ -99,15 +147,29 @@ function runNestingQA(doc) {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-// Returns flat array of all PathItems and CompoundPathItems in a layer.
-function _qa_collectPaths(layer) {
+// Returns flat array of all PathItems and CompoundPathItems in a layer,
+// recursing through GroupItems of any depth.
+//
+// Cutlines arrive in two shapes and this must handle both:
+//   • loose PathItems (stamps), and pipeline triads grouped as
+//     [Display Name] fused + outline (hidden) + plate (hidden) — Step 6 output;
+//   • single closed paths wrapped in unnamed GroupItems — real artist deliverables.
+// Walking pageItems recursively collects the leaf paths by TYPE, so grouping,
+// naming, and the hidden outline/plate sub-paths are all irrelevant: occupancy
+// is a union, and hidden components are geometric subsets of the fused contour.
+function _qa_collectPaths(container) {
     var result = [];
-    var i;
-    for (i = 0; i < layer.pathItems.length; i++) {
-        result.push(layer.pathItems[i]);
-    }
-    for (i = 0; i < layer.compoundPathItems.length; i++) {
-        result.push(layer.compoundPathItems[i]);
+    var items  = container.pageItems;
+    var i, t;
+    for (i = 0; i < items.length; i++) {
+        t = items[i].typename;
+        if (t === "PathItem" || t === "CompoundPathItem") {
+            result.push(items[i]);
+        } else if (t === "GroupItem") {
+            var inner = _qa_collectPaths(items[i]);
+            var j;
+            for (j = 0; j < inner.length; j++) result.push(inner[j]);
+        }
     }
     return result;
 }

@@ -115,7 +115,8 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   samplePathToPolygons, pointInPolygon, segmentsIntersect,
   polygonsOverlap, boundsWithin, minPolygonSetDistance,
   parseNote, getOrCreateHalfcutLayer, drawHalfcutLine,
-  buildWorkingDocument (builds A4/CMYK doc + Stickers/Grid/Color Block layers, no template),
+  buildWorkingDocument (builds A4/CMYK doc + Margin/Stickers/Grid/Color Block layers, no template),
+  marginRect (shared safe-area rect: documented 190×267mm working area),
   log, scriptAlert, findLayer, findPathInLayer
 
 ---
@@ -181,9 +182,16 @@ Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
 
 Step 8c does **pure-geometry QA** — no Offset Path layer is created. It measures
 inter-cutline distance directly (< 2mm → fail) and checks cut-line bounds against
-a safe area computed from the artboard top-left + working-area + margins (CONFIG).
-Violations are flagged red on the cut line. No script reads or writes a Margin or
-Offset Path layer.
+the safe area returned by `marginRect(doc)` (aiUtils) — the documented 190×267mm
+working area (A4 minus 10mm top/left/right + 20mm bottom). Violations are flagged
+red on the cut line. No script reads or writes an Offset Path layer.
+
+The **Margin** band layer IS created — by `buildWorkingDocument()` (aiUtils): a
+30%-black even-odd compound path (outer = artboard, inner = safe area), locked, on
+top. The inner rectangle is the single boundary shared by `marginRect()`: nesting
+placement (Step 7B aligns the regular/irregular clusters to the margin top-left, not
+the artboard), Step 8c margin QA, and the Nesting QA score (StepQA masks everything
+outside the margin and scores NQI/utilization against the printable area only).
 
 ## Cutline structure (set by Step 6 script)
 Each non-stamp element is a GroupItem named `[Display Name]` in the Cutlines layer:
@@ -341,7 +349,8 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
 
 **The AI pipeline has no template-file dependency.** `buildWorkingDocument()` in
 aiUtils.jsx creates the working document from scratch — A4 (210×297mm) CMYK, with
-layers (top→bottom) Stickers (empty) > Grid (vector 1-inch lines, locked) >
+layers (top→bottom) Margin (30%-black even-odd band, outer=artboard + inner=safe
+area, locked) > Stickers (empty) > Grid (vector 1-inch lines, locked) >
 Color Block (full-sheet rect, fill CMYK(55,0,100,0), locked). Cutlines/Halfcut are
 added later by their steps, above Stickers. `assets/Production_File_Template.ai` is
 no longer used.

@@ -16,8 +16,9 @@ var CONFIG = {
     // map 1:1 to real-world size (pt/px = 72/sourceDPI). THIS is the governing print
     // scale — not workingAreaWidthMm, which is now only a QA safe-area bound.
     sourceDPI:           300,
-    workingAreaWidthMm:  190,
-    workingAreaHeightMm: 267,
+    // Margin spec — single source of truth in aiUtils.MARGIN_SPEC (avoids drift).
+    workingAreaWidthMm:  MARGIN_SPEC.workingAreaWidthMm,
+    workingAreaHeightMm: MARGIN_SPEC.workingAreaHeightMm,
     cutlineStrokePt:     0.25,
     cutlinesLayerName:   "Cutlines",
     stickersLayerName:   "Sticker",

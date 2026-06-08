@@ -123,8 +123,80 @@ function buildWorkingDocument() {
     var stickers = doc.layers.add();
     stickers.name = CONFIG.stickersLayerName ? CONFIG.stickersLayerName : "Sticker";
 
-    log("[aiutils] built working document | A4 CMYK | Stickers > Grid > Color Block");
+    // Margin band (top): the printable-area guide. Cutlines must stay inside it
+    // (touching allowed); nesting and QA both reference its inner rectangle.
+    _bwdMarginBand(doc);
+
+    log("[aiutils] built working document | A4 CMYK | Margin > Stickers > Grid > Color Block");
     return doc;
+}
+
+// Canonical printable-area spec — the SINGLE source of truth for the margin.
+// Documented working area: 190 x 267 mm = A4 minus 10mm top/left/right + 20mm bottom.
+// Pipelines reference these (e.g. workingAreaWidthMm: MARGIN_SPEC.workingAreaWidthMm)
+// instead of repeating literals, so the value cannot drift between pipeline and QA.
+var MARGIN_SPEC = {
+    marginLeftMm:       10,
+    marginTopMm:        10,
+    workingAreaWidthMm: 190,
+    workingAreaHeightMm: 267
+};
+
+// Inner safe-area rectangle as geometricBounds [left, top, right, bottom] (AI y-up).
+// Reads CONFIG when a pipeline supplies the values, else falls back to MARGIN_SPEC —
+// so nesting, the drawn margin band, and Steps 8c/QA all resolve the same boundary.
+function marginRect(doc) {
+    var ab = doc.artboards[0].artboardRect;
+    var lM = (CONFIG && CONFIG.marginLeftMm        != null) ? CONFIG.marginLeftMm       : MARGIN_SPEC.marginLeftMm;
+    var tM = (CONFIG && CONFIG.marginTopMm         != null) ? CONFIG.marginTopMm        : MARGIN_SPEC.marginTopMm;
+    var wW = (CONFIG && CONFIG.workingAreaWidthMm   != null) ? CONFIG.workingAreaWidthMm  : MARGIN_SPEC.workingAreaWidthMm;
+    var wH = (CONFIG && CONFIG.workingAreaHeightMm  != null) ? CONFIG.workingAreaHeightMm : MARGIN_SPEC.workingAreaHeightMm;
+    var left   = ab[0] + mmToPoints(lM);
+    var top    = ab[1] - mmToPoints(tM);
+    var right  = left  + mmToPoints(wW);
+    var bottom = top   - mmToPoints(wH);
+    return [left, top, right, bottom];
+}
+
+// Builds the "Margin" layer's band: a compound path of two rectangles (outer =
+// artboard, inner = safe area), filled 30% black with the even-odd rule so the
+// border band shows and the printable interior is a transparent hole. Locked,
+// brought to front — matches the band style artists are used to seeing.
+function _bwdMarginBand(doc) {
+    var ab = doc.artboards[0].artboardRect;   // [l, t, r, b]
+    var mr = marginRect(doc);                  // inner safe area [l, t, r, b]
+
+    var margin = doc.layers.add();
+    margin.name = (CONFIG && CONFIG.marginLayerName) ? CONFIG.marginLayerName : "Margin";
+    doc.activeLayer = margin;
+
+    var outer = margin.pathItems.rectangle(ab[1], ab[0], ab[2] - ab[0], ab[1] - ab[3]);
+    var inner = margin.pathItems.rectangle(mr[1], mr[0], mr[2] - mr[0], mr[1] - mr[3]);
+
+    // Style the rects BEFORE compounding — setting fill on the compound does not
+    // propagate to its sub-paths (they keep the default 0-ink fill), so the band
+    // would render invisible. Set black fill + no stroke on each rect first.
+    var rects = [outer, inner], ri;
+    for (ri = 0; ri < rects.length; ri++) {
+        rects[ri].filled     = true;
+        rects[ri].fillColor  = blackCmyk();
+        rects[ri].stroked    = false;
+    }
+
+    // "Make Compound Path" on the two rects — the inner becomes a hole.
+    app.selection = null;
+    outer.selected = true;
+    inner.selected = true;
+    app.executeMenuCommand("compoundPath");
+    app.selection = null;
+
+    var cp = margin.compoundPathItems[0];
+    cp.evenodd = true;   // inner rect reads as a hole
+    cp.opacity = 30;     // 30% black band — container opacity (applies to the whole compound)
+
+    margin.zOrder(ZOrderMethod.BRINGTOFRONT);
+    margin.locked = true;
+    return margin;
 }
 
 // CMYK(55,0,100,0) — the template's Color Block green (Step 10 green preview).

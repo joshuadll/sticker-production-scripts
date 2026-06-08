@@ -19,10 +19,11 @@ var CONFIG = {
     qaSpacingSampleSteps: 12,
     flagStrokePt:         1.0,
 
-    workingAreaWidthMm:  190,
-    workingAreaHeightMm: 267,
-    marginTopMm:         10,
-    marginLeftMm:        10,
+    // Margin spec — single source of truth in aiUtils.MARGIN_SPEC (avoids drift).
+    workingAreaWidthMm:  MARGIN_SPEC.workingAreaWidthMm,
+    workingAreaHeightMm: MARGIN_SPEC.workingAreaHeightMm,
+    marginTopMm:         MARGIN_SPEC.marginTopMm,
+    marginLeftMm:        MARGIN_SPEC.marginLeftMm,
 
     // ── Step 9A: Half-cut ─────────────────────────────────────────────────────
     // Layer names — case-insensitive search; created as halfcutLayerName if absent.

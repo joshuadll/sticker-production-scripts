@@ -168,17 +168,14 @@ function _bboxNear(g1, g2, threshPt) {
     return true;
 }
 
-// Resolves the safe-area rectangle as geometricBounds [left, top, right, bottom],
-// computed from the artboard top-left + CONFIG working-area + margins.
+// Resolves the safe-area rectangle as geometricBounds [left, top, right, bottom].
+// Delegates to aiUtils.marginRect so QA, the drawn margin band (buildWorkingDocument),
+// and the nesting placement (Step 7B) all share one boundary.
 function _resolveMarginRect(doc) {
-    var aRect  = doc.artboards[0].artboardRect;
-    var left   = aRect[0] + mmToPoints(CONFIG.marginLeftMm);
-    var top    = aRect[1] - mmToPoints(CONFIG.marginTopMm);
-    var right  = left + mmToPoints(CONFIG.workingAreaWidthMm);
-    var bottom = top  - mmToPoints(CONFIG.workingAreaHeightMm);
-    log("[step8c] margin | computed "
+    var r = marginRect(doc);
+    log("[step8c] margin | "
         + CONFIG.workingAreaWidthMm + "x" + CONFIG.workingAreaHeightMm + "mm safe area.");
-    return [left, top, right, bottom];
+    return r;
 }
 
 // Formats a distance in points as mm to one decimal place for the log.
