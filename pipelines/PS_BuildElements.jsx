@@ -106,7 +106,7 @@ function createTemplateDoc() {
 }
 
 function saveWorkingDoc(doc, folder) {
-    var savePath = folder.parent.fsName + "/" + folder.name + ".psd";
+    var savePath = folder.fsName + "/" + folder.name + ".psd";
     var saveFile = new File(savePath);
     var opts = new PhotoshopSaveOptions();
     opts.layers = true;
