@@ -576,10 +576,20 @@ function main() {
             + "Wait for it to finish — it will alert you when SVGs are ready for Deepnest.\n\n";
     }
 
+    // Surface an Illustrator-side trace-tuning no-op (from the AI status) in the PS alert.
+    var tuneWarn = "";
+    if (aiStatus && aiStatus.traceTuning && aiStatus.traceTuning.requested > 0
+            && aiStatus.traceTuning.failed && aiStatus.traceTuning.failed.length > 0) {
+        tuneWarn = "WARNING — trace tuning: only " + aiStatus.traceTuning.applied + "/"
+            + aiStatus.traceTuning.requested + " knob(s) took effect — cutlines may be looser"
+            + " than intended (not honored: " + aiStatus.traceTuning.failed.join(", ") + "). See log.\n\n";
+    }
+
     var msg = "Done.\n\n"
         + "  Grouped:     " + captionWhiteResult.grouped + " element(s).\n"
         + "  Art PNGs:    " + (elemArtFolder ? elemArtFolder : "skipped") + "\n\n"
         + cutlineLine
+        + tuneWarn
         + "After Deepnest: run AI_ImportNesting.jsx, selecting the Deepnest SVG(s)\n"
         + "and the '_elements' folder shown above.\n\n"
         + "Log: " + CONFIG.logPath;

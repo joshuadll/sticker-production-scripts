@@ -80,7 +80,12 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     // placed.trace() returns a PluginItem whose .tracing is a TracingObject.
     // Tracing is asynchronous — redraw() forces it before we read/expand it.
     var pluginItem = placed.trace();
-    pluginItem.tracing.tracingOptions.loadFromPreset("Silhouettes");
+    var traceOpts  = pluginItem.tracing.tracingOptions;
+    traceOpts.loadFromPreset("Silhouettes");
+    // Tighten beyond the preset so the cutline follows the real edge instead of the
+    // preset's smoothed/denoised approximation (see CONFIG.tracePathFidelity et al.).
+    // Capture the apply/fail summary so the run status can warn on a silent no-op.
+    var traceTuning = _tuneTraceOptions(traceOpts);
     app.redraw();
     // expandTracing() converts the tracing to a GroupItem, replacing the PluginItem.
     var tracedGroup = pluginItem.tracing.expandTracing();
@@ -185,11 +190,76 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     var droppedJunk = droppedBackground + droppedFragment;
     log("[step6] done | named=" + named + " unmatched=" + unmatched
         + " dropped=" + droppedJunk);
-    return { named: named, unmatched: unmatched, dropped: droppedJunk };
+    return { named: named, unmatched: unmatched, dropped: droppedJunk,
+             traceTuning: traceTuning };
 }
 
 
 // ── Private helpers ───────────────────────────────────────────────────────────
+
+// Applies the CONFIG trace-tuning overrides on top of the loaded "Silhouettes"
+// preset so the traced contour hugs the silhouette edge (the preset is built to
+// simplify, which rounds concave detail and sits the line loose). Each knob is set
+// only when its CONFIG value is non-null; null means "keep the preset's value".
+// Returns { requested, applied, failed: [names] } and logs a single status line.
+// The summary is threaded into the run's result/status (see AI_BuildCutlines.jsx)
+// so a silent no-op — e.g. a future Illustrator that renames a trace property —
+// surfaces at the run level instead of only as a buried log line plus quietly-loose
+// cutlines that every test still passes. See AI_BuildCutlines.jsx CONFIG
+// (tracePathFidelity / traceCornerFidelity / traceNoiseFidelity / traceThreshold).
+function _tuneTraceOptions(topts) {
+    var knobs = [
+        ["pathFidelity",   CONFIG.tracePathFidelity],
+        ["cornerFidelity", CONFIG.traceCornerFidelity],
+        ["noiseFidelity",  CONFIG.traceNoiseFidelity],
+        ["threshold",      CONFIG.traceThreshold]
+    ];
+    var requested = 0, applied = 0, failed = [], i;
+    for (i = 0; i < knobs.length; i++) {
+        var r = _setTraceOpt(topts, knobs[i][0], knobs[i][1]);
+        if (r === "skip") { continue; }
+        requested++;
+        if (r === "ok") { applied++; } else { failed.push(knobs[i][0]); }
+    }
+    if (requested > 0 && applied === 0) {
+        log("[step6] trace tuning | WARN applied 0/" + requested
+            + " — no overrides took effect (" + failed.join(", ")
+            + "); cutlines will use the raw preset (loose). Check trace property"
+            + " names for this Illustrator version.");
+    } else if (failed.length > 0) {
+        log("[step6] trace tuning | WARN applied " + applied + "/" + requested
+            + " — not honored: " + failed.join(", "));
+    } else {
+        log("[step6] trace tuning | applied " + applied + "/" + requested);
+    }
+    return { requested: requested, applied: applied, failed: failed };
+}
+
+// Sets one tracing option and reports whether it ACTUALLY took effect, so a silent
+// no-op is detectable rather than buried. Returns "skip" (CONFIG null → keep
+// preset), "ok" (the property existed and read back the requested value), or "fail"
+// (threw, or the value didn't stick — an absent/renamed property the build silently
+// ignores, or a clamp). "ok" requires `was` to be defined (a real preset property,
+// not a junk expando) AND the read-back to equal the request. Logs the outcome.
+function _setTraceOpt(topts, name, value) {
+    if (value === null || value === undefined) { return "skip"; }
+    try {
+        var was = topts[name];
+        topts[name] = value;
+        var now = topts[name];
+        if (was !== undefined && now == value) {   // == tolerates int/float read-back
+            log("[step6] trace opt | " + name + ": " + was + " -> " + now);
+            return "ok";
+        }
+        log("[step6] trace opt | " + name + " did NOT take effect: requested "
+            + value + ", read back " + now + " (was " + was + ")");
+        return "fail";
+    } catch (e) {
+        log("[step6] trace opt | " + name + " not supported — keeping preset ("
+            + e.message + ")");
+        return "fail";
+    }
+}
 
 // Parses the JSON elements sidecar produced by PSAI_BuildAndExportCutlines.
 // Shape (see writeElementsFile):

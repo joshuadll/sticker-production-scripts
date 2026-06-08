@@ -194,6 +194,18 @@ else
     FAIL=1
 fi
 
+# Trace tuning must actually take effect. A silent no-op — e.g. a future Illustrator
+# that renames a trace property — would fall back to the loose "Silhouettes" preset
+# while every other assertion here still passes; this guards that regression.
+if grep -q "\[step6\] trace tuning | applied" "$LOG_AI" \
+   && ! grep -q "\[step6\] trace tuning | WARN" "$LOG_AI"; then
+    echo "  PASS: trace tuning applied (no silent no-op)."
+else
+    echo "FAIL [$STEP]: trace tuning did not fully apply — cutlines would use the raw preset."
+    grep -E "\[step6\] trace tuning|\[step6\] trace opt" "$LOG_AI" || true
+    FAIL=1
+fi
+
 # The handoff must save the working doc itself (regression guard for the Untitled bug).
 if grep -q "working document saved:" "$LOG_AI"; then
     echo "  PASS: buildDocAndImport saved the working document."

@@ -22,6 +22,26 @@ var CONFIG = {
     cutlinesLayerName:   "Cutlines",
     stickersLayerName:   "Sticker",
 
+    // Image Trace tuning — overrides applied on top of the "Silhouettes" preset so the
+    // cutline HUGS the silhouette edge. The preset is built to *simplify* (clean solid
+    // shapes), which rounds concave detail and sits the line loose; these push it back
+    // toward faithful edge-following. Modern Image Trace scale is 0-100:
+    //   tracePathFidelity   higher = path follows the pixel edge more tightly
+    //   traceCornerFidelity higher = sharper corners kept (less rounding of points)
+    //   traceNoiseFidelity  the "Noise" control in px — LOWER keeps small features
+    //                       (the notches between petals etc.); the preset runs higher
+    //   traceThreshold      0-255 B&W cutoff = where the edge falls (tune to pull the
+    //                       line in/out); null = keep the preset's value
+    // Set any value to null to keep the preset default for that knob. The run logs each
+    // as "[step6] trace opt | name: <preset> -> <applied>" so you can see what took
+    // effect and tune from there. ⚠️ If concavities are still rounded after this,
+    // traceNoiseFidelity is the prime suspect — lower it; if lowering makes it WORSE,
+    // your build inverts the property (treats it as a fidelity %) so raise it instead.
+    tracePathFidelity:   90,    // 0-100, higher = tighter hug
+    traceCornerFidelity: 80,    // 0-100, higher = sharper corners
+    traceNoiseFidelity:  5,     // px, lower = keep small detail (preset is higher)
+    traceThreshold:      null,  // 0-255, or null to keep preset (tune for edge placement)
+
     // Trace-junk filters. Image Trace on the whole sheet can emit spurious paths
     // beyond the real elements: a whole-sheet background compound (frame + every
     // outline) and tiny stray fragments. Drop them before they get named/grouped,
@@ -43,7 +63,7 @@ CONFIG.logPath = _root + "/pipelines/AI_BuildCutlines.log";
 
 // ─── SHARED: Step 7A export ───────────────────────────────────────────────────
 
-function _runExportForNesting(doc) {
+function _runExportForNesting(doc, traceTuning) {
     log("[pipeline] --- Step 7A: Deepnest export ---");
     log("[pipeline] threshold: " + CONFIG.deepnestRectThreshold);
 
@@ -71,7 +91,16 @@ function _runExportForNesting(doc) {
     var baseHint = "{name}";
     try { if (doc.fullName) baseHint = doc.fullName.name.replace(/\.ai$/i, ""); } catch (eName) {}
 
-    scriptAlert("Done.\n\n"
+    // Surface a silent trace-tuning no-op at the alert level (not just the log): if
+    // some knobs didn't take effect the cutlines fell back to the loose preset.
+    var tuneWarn = "";
+    if (traceTuning && traceTuning.requested > 0 && traceTuning.failed && traceTuning.failed.length > 0) {
+        tuneWarn = "WARNING — trace tuning: only " + traceTuning.applied + "/" + traceTuning.requested
+            + " knob(s) took effect (not honored: " + traceTuning.failed.join(", ") + ").\n"
+            + "Cutlines may be looser than intended — see log.\n\n";
+    }
+
+    scriptAlert("Done.\n\n" + tuneWarn
         + "  Regular   (" + result.regular   + " paths): " + (result.regularPath   || "—") + "\n"
         + "  Irregular (" + result.irregular + " paths): " + (result.irregularPath || "—") + "\n\n"
         + "Review both SVGs now open in Illustrator.\n"
@@ -179,12 +208,14 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
             + " to export SVGs for Deepnest.\n\n"
             + "Log: " + CONFIG.logPath);
         return _status({ ok: false, phase: "step6", named: result.named,
-                         unmatched: result.unmatched, error: result.unmatched + " unmatched path(s)" });
+                         unmatched: result.unmatched, traceTuning: result.traceTuning,
+                         error: result.unmatched + " unmatched path(s)" });
     }
 
-    var exportResult = _runExportForNesting(doc);
+    var exportResult = _runExportForNesting(doc, result.traceTuning);
     exportResult.named = result.named;
     exportResult.unmatched = result.unmatched;
+    exportResult.traceTuning = result.traceTuning;   // so PSAI's completion alert can warn on a no-op
     return _status(exportResult);
 }
 
