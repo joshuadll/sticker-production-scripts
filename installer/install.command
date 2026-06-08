@@ -20,15 +20,14 @@ mkdir -p "$LAUNCH_AGENTS_DIR"
 cp "$SCRIPT_DIR/update.sh" "$UPDATE_SCRIPT"
 chmod +x "$UPDATE_SCRIPT"
 
-echo "Downloading latest scripts..."
 if ! bash "$UPDATE_SCRIPT"; then
     echo ""
-    echo "Download failed — could not fetch the latest scripts."
-    echo "Check your internet connection and run this installer again."
+    echo "Download failed — check your internet connection and run this installer again."
     read -r -p "Press Enter to close..." _
     exit 1
 fi
-echo ""
+echo "  ↓ Downloaded latest scripts"
+echo "  (enter your Mac password if prompted)"
 
 # ── 2. Install one Scripts-menu entry per pipeline ────────────────────────────
 # Each pipeline becomes its own "Noteworthie N - ..." item under File > Scripts.
@@ -36,9 +35,6 @@ echo ""
 # scripts folder (so the menu entries stay tiny and never need re-installing when
 # the pipeline code changes). The Scripts folder is inside the app bundle, which
 # is root-owned — requires sudo.
-echo "Installing the Noteworthie scripts into Photoshop and Illustrator..."
-echo "(You may be prompted for your Mac password — this is normal.)"
-echo ""
 
 # install_entry <scripts-dir> <#target app> <menu name> <pipeline filename>
 install_entry() {
@@ -67,9 +63,9 @@ if [ -n "$PS_APP" ]; then
     sudo find "$PS_SCRIPTS" -maxdepth 1 -name "Noteworthie*.jsx" -delete 2>/dev/null
     install_entry "$PS_SCRIPTS" "photoshop" "Noteworthie 1 - Build Elements"          "PS_BuildElements.jsx"
     install_entry "$PS_SCRIPTS" "photoshop" "Noteworthie 2 - Build & Export Cutlines" "PSAI_BuildAndExportCutlines.jsx"
-    echo "  Photoshop scripts installed (2 entries)."
+    echo "  ✓ Photoshop   — 2 scripts"
 else
-    echo "  Photoshop not found — skipping."
+    echo "  ✗ Photoshop not found — skipped"
 fi
 
 if [ -n "$AI_APP" ]; then
@@ -83,9 +79,9 @@ if [ -n "$AI_APP" ]; then
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 4 - Refine Cutlines" "AI_RefineCutlines.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 5 - Export Final"    "AI_ExportFinal.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 6 - Nesting QA"      "AI_NestingQA.jsx"
-    echo "  Illustrator scripts installed (4 entries)."
+    echo "  ✓ Illustrator — 4 scripts"
 else
-    echo "  Illustrator not found — skipping."
+    echo "  ✗ Illustrator not found — skipped"
 fi
 
 echo ""
@@ -115,44 +111,15 @@ launchctl unload "$PLIST_PATH" 2>/dev/null || true
 launchctl load "$PLIST_PATH"
 
 # ── Done ───────────────────────────────────────────────────────────────────────
-echo "============================================"
-echo "  Installation complete!"
-echo "============================================"
 echo ""
-echo "ONE-TIME SETUP (do this now, only once):"
+echo "✅ Installed."
 echo ""
-echo "  1. FULLY QUIT Photoshop and Illustrator if they"
-echo "     are open. Closing the window (clicking the red"
-echo "     dot) is NOT enough — the app keeps running in"
-echo "     the background and won't see the new scripts."
+echo "DO THIS ONCE:"
+echo "  1. Fully QUIT Photoshop & Illustrator — press Cmd+Q"
+echo "     (closing the window isn't enough), then reopen."
+echo "  2. Run a step from File > Scripts (the \"Noteworthie 1-6\" items)."
 echo ""
-echo "     To fully quit:"
-echo "       a. Click the app so it is in front."
-echo "       b. Press Command (cmd) + Q together,"
-echo "          OR use the menu bar at the very top:"
-echo "          'Photoshop' > 'Quit Photoshop'"
-echo "          'Illustrator' > 'Quit Illustrator'."
-echo "       c. Tip: a still-running app shows a dot under"
-echo "          its Dock icon. No dot = fully quit."
-echo ""
-echo "  2. Reopen Photoshop and Illustrator."
-echo ""
-echo "  3. To run a pipeline, in Photoshop or Illustrator:"
-echo "       File > Scripts > Noteworthie N - <name>"
-echo "     Each pipeline is its own entry, in order:"
-echo "       Photoshop:    1 - Build Elements"
-echo "                     2 - Build & Export Cutlines"
-echo "       Illustrator:  3 - Import Nesting"
-echo "                     4 - Refine Cutlines"
-echo "                     5 - Export Final"
-echo "                     6 - Nesting QA"
-echo ""
-echo "The pipeline scripts update automatically on every"
-echo "login, so you only ever do this setup once."
-echo ""
-echo "NOTE: if 'Noteworthie' ever disappears from the"
-echo "Scripts menu after Photoshop or Illustrator updates"
-echo "itself, just run this installer again."
-echo "============================================"
+echo "Pipelines auto-update on login. If the menu items ever vanish"
+echo "after an Adobe update, run this installer again."
 echo ""
 read -r -p "Press Enter to close..." _
