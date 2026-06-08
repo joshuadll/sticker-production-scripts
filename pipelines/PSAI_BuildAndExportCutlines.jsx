@@ -23,7 +23,9 @@ var CONFIG = {
     whiteEdgeLayerName: "White Base_Cutline",
 
     whiteSliceStepPx:       12,  // px: slice width for sampling the text centreline (smaller = finer spine)
-    whitePenPadPx:          40,  // px: added to text height → pen diameter (margin above+below text, split top/bottom)
+    whitePenPadPx:          20,  // px: added to text height → pen diameter (margin above+below text, split top/bottom)
+                                 //     halved 40→20 to track captionSizePt 16→8 (deterministic true-scale placement);
+                                 //     keeps the pill ~1.5x the printed 8pt text (~4.2mm). Confirm on a real render.
     whiteStraightSnapPx:    6,   // px: if the fitted spine stays within this of flat, force a perfectly straight pill
     whiteCurvedHeightPctile: 0.9,// quantile of per-slice heights used as curved-text line-height (accents included)
     captionBorderOverlapPx: 3,   // px: the White pill is re-seated so its real ink overlaps the element's
