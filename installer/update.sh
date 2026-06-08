@@ -3,7 +3,7 @@ set -e
 
 SUPPORT_DIR="$HOME/Library/Application Support/Noteworthie"
 INSTALL_DIR="$SUPPORT_DIR/scripts"
-REPO_ZIP="https://github.com/joshuadelallana/sticker-production-scripts/archive/refs/heads/main.zip"
+REPO_ZIP="https://github.com/joshuadll/sticker-production-scripts/archive/refs/heads/main.zip"
 TMP_DIR=$(mktemp -d)
 
 trap 'rm -rf "$TMP_DIR"' EXIT
