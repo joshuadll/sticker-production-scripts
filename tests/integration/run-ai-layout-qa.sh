@@ -5,12 +5,10 @@
 #   • Spacing+Margin — [step8c] collected / done
 #   • Nesting Quality — [stepQA] NQI= / paths: / grid:
 #
-# FIXTURE REQUIRED:
-#   tests/integration/fixtures/stepQA-working.ai
+# FIXTURE REQUIRED (local-only — *.ai is gitignored, so it never leaves your Mac):
+#   tests/integration/fixtures/quality-check.ai
 #     A working .ai file that has been through Steps 6 + Deepnest import —
 #     must have a "Cutlines" layer with nested PathItems/CompoundPathItems.
-#     A good source: save any post-Deepnest .ai file here before running.
-#     (Same fixture the old run-ai-nesting-qa.sh used — no new fixture needed.)
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
@@ -24,7 +22,7 @@ APP="Adobe Illustrator"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_LayoutQA.jsx"
-FIXTURE_AI="$REPO_ROOT/tests/integration/fixtures/stepQA-working.ai"
+FIXTURE_AI="$REPO_ROOT/tests/integration/fixtures/quality-check.ai"
 EXPECTED="$REPO_ROOT/tests/integration/expected/ai-layout-qa-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
