@@ -40,7 +40,7 @@ var CONFIG = {
     // (Step 8c) AND NQI pocket fills (StepQA). The artist toggles this one layer to
     // show/hide everything; cut lines themselves are never recoloured. Step 11
     // strips it by name, so it never reaches the print file.
-    qaLayerName:       "Layout QA",
+    qaLayerName:       QA_LAYER_NAME,  // shared constant in aiUtils; Step 11 strips it
 
     // ── Phase 1: Spacing + Margin QA ─────────────────────────────────────────
     spacingThresholdMm:   2,

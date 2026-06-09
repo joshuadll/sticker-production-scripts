@@ -19,7 +19,7 @@ var CONFIG = {
     // clears on the re-run.
     cutlinesLayerName:    "Cutlines",
     marginLayerName:      "Margin",
-    qaLayerName:          "Layout QA",  // shared QA overlay (flags); stripped by Step 11
+    qaLayerName:          QA_LAYER_NAME,  // shared constant in aiUtils; stripped by Step 11
 
     spacingThresholdMm:   2,
     qaSpacingSampleSteps: 12,

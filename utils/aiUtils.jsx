@@ -142,6 +142,12 @@ var MARGIN_SPEC = {
     workingAreaHeightMm: 267
 };
 
+// Single source of truth for the shared QA overlay layer name. Pipelines set
+// CONFIG.qaLayerName from this, and Step 11 strips QA_LAYER_NAME.toLowerCase() —
+// so the reserved name cannot drift between where it's created and where it's
+// stripped (a drift would leak the overlay into the final print file).
+var QA_LAYER_NAME = "Layout QA";
+
 // Inner safe-area rectangle as geometricBounds [left, top, right, bottom] (AI y-up).
 // Reads CONFIG when a pipeline supplies the values, else falls back to MARGIN_SPEC —
 // so nesting, the drawn margin band, and Steps 8c/QA all resolve the same boundary.
@@ -286,32 +292,32 @@ function setStrokeStyle(path, weightPt, colorObj) {
     path.filled     = false;
 }
 
-// Applies stroke style (and clears fill) to a PathItem/CompoundPathItem, or
-// recurses into a GroupItem (Pathfinder/expandStyle results are wrapped in groups,
-// sometimes nested several levels deep). Walks pageItems — the typed collections
-// (pathItems/compoundPathItems/groupItems) on a GroupItem are inconsistently
-// recursive across AI versions and silently miss deeper nestings, which left some
-// fused cutlines filled black. pageItems lists every direct child of any type, so
-// recursing it reaches every leaf path.
-function strokeRecursive(item, weightPt, colorObj) {
+// Calls fn(pathItem) on every leaf PathItem reachable from item, handling the three
+// container shapes uniformly: a PathItem is the leaf; a CompoundPathItem is styled
+// through its sub-paths (its own .filled/.strokeColor do NOT reliably propagate —
+// setting them left fused cutlines black-filled); a GroupItem is recursed via
+// pageItems (the typed collections pathItems/compoundPathItems/groupItems are
+// inconsistently recursive across AI versions and silently miss deeper nestings,
+// while pageItems lists every direct child of any type). Both strokeRecursive and
+// _qaFillRecursive share this walker so a traversal fix lands in one place.
+function applyToPathTree(item, fn) {
     if (item.typename === "PathItem") {
-        setStrokeStyle(item, weightPt, colorObj);
+        fn(item);
         return;
     }
     if (item.typename === "CompoundPathItem") {
-        // CompoundPathItem.filled / .strokeColor do NOT reliably propagate to the
-        // shape — Illustrator styles a compound through its sub-paths. Setting them
-        // on the compound left the fused cutline black-filled. Style each sub-path.
-        for (var c = 0; c < item.pathItems.length; c++) {
-            setStrokeStyle(item.pathItems[c], weightPt, colorObj);
-        }
+        for (var c = 0; c < item.pathItems.length; c++) fn(item.pathItems[c]);
         return;
     }
     if (item.typename === "GroupItem") {
-        for (var i = 0; i < item.pageItems.length; i++) {
-            strokeRecursive(item.pageItems[i], weightPt, colorObj);
-        }
+        for (var i = 0; i < item.pageItems.length; i++) applyToPathTree(item.pageItems[i], fn);
     }
+}
+
+// Applies stroke style (and clears fill) to every leaf path of item (PathItem,
+// CompoundPathItem sub-paths, or any depth of GroupItem).
+function strokeRecursive(item, weightPt, colorObj) {
+    applyToPathTree(item, function (p) { setStrokeStyle(p, weightPt, colorObj); });
 }
 
 // ─── CAPTION PLATE HELPERS ───────────────────────────────────────────────────
@@ -842,23 +848,9 @@ function boundsWithin(inner, outer, tolPt) {
            inner[3] >= outer[3] - t;     // bottom
 }
 
-// Minimum distance (points) from point p to segment a–b (all {x, y}).
-function _ptSegDist(p, a, b) {
-    var dx = b.x - a.x, dy = b.y - a.y;
-    var len2 = dx * dx + dy * dy;
-    if (len2 === 0) {
-        var ex = p.x - a.x, ey = p.y - a.y;
-        return Math.sqrt(ex * ex + ey * ey);
-    }
-    var tv = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
-    if (tv < 0) tv = 0; else if (tv > 1) tv = 1;
-    var qx = a.x + tv * dx, qy = a.y + tv * dy;
-    var fx = p.x - qx, fy = p.y - qy;
-    return Math.sqrt(fx * fx + fy * fy);
-}
-
-// Like _ptSegDist, but also returns the closest point ON segment ab to p.
-// Returns { dist, qx, qy } — qx/qy is the witness point on the segment. Used by
+// Minimum distance (points) from point p to segment a–b, AND the closest point ON
+// segment ab to p. Returns { dist, qx, qy } — qx/qy is the witness point on the
+// segment. (All {x, y}.) Used by
 // minPolygonSetDistanceEx so QA can draw a connector across the actual gap.
 function _ptSegClosest(p, a, b) {
     var dx = b.x - a.x, dy = b.y - a.y;
@@ -988,21 +980,6 @@ function qaDrawSegment(layer, x1, y1, x2, y2, colorObj, widthPt, opacity) {
     return seg;
 }
 
-// Duplicates a cutline path onto the QA layer and strokes it the flag colour — an
-// echo of the offending sticker outline (the familiar "which sticker is bad" cue)
-// that lives on the toggleable layer instead of mutating the real cutline. Same-
-// document duplicate (not cross-doc .move, which crashes). Returns the duplicate,
-// or null if the item can't be echoed (e.g. a PlacedItem stamp).
-function qaEchoCutline(layer, item, colorObj, widthPt) {
-    var tn = item.typename;
-    if (tn !== "PathItem" && tn !== "CompoundPathItem" && tn !== "GroupItem") {
-        return null;
-    }
-    var dup = item.duplicate(layer, ElementPlacement.PLACEATEND);
-    strokeRecursive(dup, widthPt, colorObj);
-    return dup;
-}
-
 // Duplicates a cutline outline onto the QA layer and FILLS it (no stroke) with a
 // translucent colour — the element "halo" that glows over the whole sticker so a
 // flagged element is spottable at full-sheet zoom regardless of how small the
@@ -1019,26 +996,12 @@ function qaHaloElement(layer, item, colorObj, opacity) {
     return dup;
 }
 
-// Fills a PathItem/CompoundPathItem (or recurses a GroupItem), clearing stroke —
-// the fill half of strokeRecursive, used by qaHaloElement.
+// Fills every leaf path of item (clearing stroke) — the fill counterpart of
+// strokeRecursive, used by qaHaloElement. Shares the applyToPathTree walker.
 function _qaFillRecursive(item, colorObj) {
-    if (item.typename === "PathItem") {
-        item.filled = true; item.fillColor = colorObj; item.stroked = false;
-        return;
-    }
-    if (item.typename === "CompoundPathItem") {
-        for (var c = 0; c < item.pathItems.length; c++) {
-            item.pathItems[c].filled = true;
-            item.pathItems[c].fillColor = colorObj;
-            item.pathItems[c].stroked = false;
-        }
-        return;
-    }
-    if (item.typename === "GroupItem") {
-        for (var i = 0; i < item.pageItems.length; i++) {
-            _qaFillRecursive(item.pageItems[i], colorObj);
-        }
-    }
+    applyToPathTree(item, function (p) {
+        p.filled = true; p.fillColor = colorObj; p.stroked = false;
+    });
 }
 
 // Draws a filled triangular arrow (badge) centred at (cx,cy), pointing along the

@@ -41,10 +41,11 @@ function runFinalFile(doc) {
     }
 
     // Remove non-production layers. Iterate backwards — safe when items are removed.
-    // "layout qa" (and legacy "nqi pockets") = the QA overlay — flags + pocket fills;
-    // strip by name so a stray QA layer the artist forgot to hide never reaches print.
+    // The QA overlay (flags + pocket fills) is stripped by its shared name
+    // (QA_LAYER_NAME, lowercased to match _s11InList); "nqi pockets" is the legacy
+    // name. Strip by name so a stray QA layer the artist forgot to hide never prints.
     var REMOVE = ["margin", "offset path", "grid", "color block",
-                  "layout qa", "nqi pockets"];
+                  QA_LAYER_NAME.toLowerCase(), "nqi pockets"];
     var i;
     for (i = fd.layers.length - 1; i >= 0; i--) {
         if (_s11InList(fd.layers[i].name.toLowerCase(), REMOVE)) {
