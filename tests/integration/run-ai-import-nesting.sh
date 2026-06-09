@@ -31,6 +31,16 @@ AI_FIXTURE="$FIXTURE_DIR/import-nesting.ai"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/AI_ImportNesting.log"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ai-import-nesting-expected.txt"
+
+# Golden normaliser: drop the machine-specific / volatile lines (absolute fixture
+# paths + start/done banners). Everything kept is deterministic given the fixed
+# fixtures (parts read, per-element ART-FIT/VERIFY, group rotation, contour-fit,
+# result) — the fixtures are stable committed inputs and the test never saves the
+# .ai, so each run starts from the same upright-cutline state.
+strip_variable_lines() {
+    grep -Ev "^(\[pipeline\] === AI_ImportNesting (start|done) ===|\[pipeline\] (document|SVG|art folder):|Log: )"
+}
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
@@ -175,6 +185,27 @@ else
         echo "FAIL [$STEP]: art/cutline mismatch exceeds ${ARTFIT_TOL}pt (worst ${WORST}pt)."
         FAIL=1
     fi
+fi
+
+# ── Golden diff ──────────────────────────────────────────────────────────────
+# Regression guard on the full deterministic log (placement, rotations, art-fit,
+# contour-fit). Stale only when the fixtures are deliberately re-nested — then
+# refresh the golden, exactly like the P2 PSD workflow.
+if [ ! -f "$EXPECTED" ]; then
+    strip_variable_lines < "$LOG" > "$EXPECTED"
+    echo "NOTE [$STEP]: no golden file yet — wrote one from this run:"
+    echo "    $EXPECTED"
+    echo "  Review it, then commit it as the golden file."
+elif diff -u <(strip_variable_lines < "$EXPECTED") <(strip_variable_lines < "$LOG"); then
+    echo "PASS [$STEP]: log matches golden."
+else
+    echo "FAIL [$STEP]: log differs from golden (diff above)."
+    echo "  If the change is intentional (e.g. fixtures re-nested):"
+    echo "    strip_variable_lines() { grep -Ev \"^(\\[pipeline\\] === AI_ImportNesting (start|done) ===|\\[pipeline\\] (document|SVG|art folder):|Log: )\"; }  # see runner"
+    echo "    bash $0   # regenerates from the live run, or:"
+    echo "    cp \"$EXPECTED.new\" \"$EXPECTED\"  # if produced"
+    strip_variable_lines < "$LOG" > "$EXPECTED.new"
+    FAIL=1
 fi
 
 if [ "$FAIL" -ne 0 ]; then

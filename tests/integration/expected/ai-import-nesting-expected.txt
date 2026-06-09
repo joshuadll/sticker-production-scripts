@@ -1,0 +1,80 @@
+[pipeline] dryRun: false
+[pipeline] elements sidecar: 26 element(s), psdWidth=4961
+[pipeline] --- importing Deepnest layout ---
+[step-nest] art sizing: factor=0.24000 pt/px (psdWidth=4961, sourceDPI=300)
+[step-nest] found 26 cutline(s) in working file.
+[step-nest] --- processing regular SVG: import-nesting_regular_nested.svg ---
+[step-nest] read 15 part(s) from import-nesting_regular_nested.svg
+[step-nest] found 15 nested part(s) in import-nesting_regular_nested.svg
+[step-nest] ART-FIT | St. Martin's Cathedral art=175x154 cut=175x153 dW=0 dH=0
+[step-nest] VERIFY | St. Martin's Cathedral rot=-90 bboxΔ=(1,0)  ok
+[step-nest] ART-FIT | Štrbské Pleso art=175x155 cut=175x155 dW=0 dH=0
+[step-nest] VERIFY | Štrbské Pleso rot=97 bboxΔ=(0,1)  ok
+[step-nest] ART-FIT | Slovak Paradise National Park art=175x140 cut=175x139 dW=0 dH=0
+[step-nest] VERIFY | Slovak Paradise National Park rot=-89 bboxΔ=(0,1)  ok
+[step-nest] ART-FIT | Orava Castle art=175x129 cut=175x129 dW=1 dH=0
+[step-nest] VERIFY | Orava Castle rot=181 bboxΔ=(0,1)  ok
+[step-nest] ART-FIT | Devín Castle art=175x149 cut=175x148 dW=1 dH=1
+[step-nest] VERIFY | Devín Castle rot=2 bboxΔ=(2,0)  ok
+[step-nest] ART-FIT | UFO Observation Deck, Bridge SNP art=118x91 cut=117x91 dW=0 dH=0
+[step-nest] VERIFY | UFO Observation Deck, Bridge SNP rot=183 bboxΔ=(1,0)  ok
+[step-nest] ART-FIT | Old Town Hall (Bratislava) art=175x136 cut=175x135 dW=0 dH=1
+[step-nest] VERIFY | Old Town Hall (Bratislava) rot=179 bboxΔ=(1,1)  ok
+[step-nest] ART-FIT | Bratislava(text) art=139x28 cut=139x28 dW=0 dH=0
+[step-nest] VERIFY | Bratislava(text) rot=92 bboxΔ=(2,0)  ok
+[step-nest] ART-FIT | Michael's Gate art=124x183 cut=124x183 dW=0 dH=0
+[step-nest] VERIFY | Michael's Gate rot=4 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Bratislava Castle art=175x152 cut=175x151 dW=0 dH=1
+[step-nest] VERIFY | Bratislava Castle rot=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | The Blue Church - Church of St. Elizabeth art=175x137 cut=175x136 dW=0 dH=1
+[step-nest] VERIFY | The Blue Church - Church of St. Elizabeth rot=-90 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Spiš Castle art=175x140 cut=175x140 dW=0 dH=0
+[step-nest] VERIFY | Spiš Castle rot=181 bboxΔ=(1,1)  ok
+[step-nest] ART-FIT | Carpathian Wooden Churches art=139x138 cut=139x138 dW=0 dH=0
+[step-nest] VERIFY | Carpathian Wooden Churches rot=-90 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | St Elizabeth's Cathedral (Dóm Svätej Alzbety) art=175x138 cut=175x138 dW=0 dH=0
+[step-nest] VERIFY | St Elizabeth's Cathedral (Dóm Svätej Alzbety) rot=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Bojnice Castle art=175x139 cut=175x138 dW=0 dH=1
+[step-nest] VERIFY | Bojnice Castle rot=-90 bboxΔ=(0,0)  ok
+[step-nest] group-rotated 15 pair(s) by -90°
+[step-nest] group-rot-check | pre 742x548 -> post 548x742  ok
+[step-nest] regular group placed | bottom y=71
+[step-nest] --- processing irregular SVG: import-nesting_irregular_nested.svg ---
+[step-nest] read 10 part(s) from import-nesting_irregular_nested.svg
+[step-nest] found 10 nested part(s) in import-nesting_irregular_nested.svg
+[step-nest] ART-FIT | Tram art=146x112 cut=146x112 dW=0 dH=0
+[step-nest] VERIFY | Tram rot=177 bboxΔ=(1,2)  ok
+[step-nest] ART-FIT | Kroje art=102x146 cut=101x146 dW=0 dH=0
+[step-nest] VERIFY | Kroje rot=-34 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Slovakia Map art=146x79 cut=147x79 dW=0 dH=0
+[step-nest] VERIFY | Slovakia Map rot=155 bboxΔ=(1,3)  ok
+[step-nest] ART-FIT | National Flower art=118x85 cut=117x84 dW=0 dH=0
+[step-nest] VERIFY | National Flower rot=-76 bboxΔ=(1,0)  ok
+[step-nest] ART-FIT | Kraslice art=139x111 cut=139x112 dW=0 dH=-1
+[step-nest] VERIFY | Kraslice rot=80 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | National Animal - Tatra chamois art=139x137 cut=139x137 dW=0 dH=0
+[step-nest] VERIFY | National Animal - Tatra chamois rot=-91 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Bryndzové halušky art=136x120 cut=135x120 dW=1 dH=1
+[step-nest] VERIFY | Bryndzové halušky rot=-33 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Pirohy art=136x130 cut=135x130 dW=1 dH=0
+[step-nest] VERIFY | Pirohy rot=-18 bboxΔ=(1,1)  ok
+[step-nest] ART-FIT | Šúľance s Makom art=136x86 cut=135x86 dW=0 dH=0
+[step-nest] VERIFY | Šúľance s Makom rot=102 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Fujara art=53x150 cut=53x150 dW=1 dH=0
+[step-nest] VERIFY | Fujara rot=-78 bboxΔ=(0,1)  ok
+[step-nest] irregular best rotation: 90° (outside approx 194719 pt²)
+[step-nest] group-rotated 10 pair(s) by 90°
+[step-nest] irregular group placed | rotation=90° | top y=66
+[step-nest] irregular contour-fit | nested up 60pt to close the gap to 2mm.
+[step-nest] art-layer-check | on Stickers: 25 / placed: 25  ok
+[step-nest] result | matched: 25 | unmatched: 0 | art placed: 25
+Done.
+
+  Placed:     25 element(s) at nested positions
+  Unmatched:  0 element(s) — see log
+  Layout:     regular rotated -90° at artboard top-left;
+              irregular auto-rotated below with 2 mm gap
+  Art placed: 25 PNG(s) in Stickers layer
+
+Review the cutline layout, then run AI_RefineCutlines to continue.
+

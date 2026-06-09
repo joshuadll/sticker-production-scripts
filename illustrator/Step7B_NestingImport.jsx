@@ -104,6 +104,7 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
 
     var totalMatched = 0, totalUnmatched = 0, totalArtPlaced = 0;
     var regularBottomY = marginR[1]; // fallback: margin top (used when no regular group)
+    var regularCuts   = null;        // regular cutlines, kept for contour-fit of the irregular group
 
     // Each element is processed as a rigid {cut, art} PAIR: the artwork is placed on
     // the still-upright cutline (exact: centre + scale, no rotation) and then every
@@ -124,6 +125,7 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
             // Rotate the regular cluster -90° and snap its top-left to the margin corner.
             var regBounds  = _nestPlaceGroup(regResult.pairs, -90, marginR[0], marginR[1], true);
             regularBottomY = regBounds[3];
+            regularCuts    = _nestCutsOf(regResult.pairs);
             log("[step-nest] regular group placed | bottom y=" + Math.round(regularBottomY));
         } else if (regResult.pairs.length > 0) {
             log("[step-nest] [DRY RUN] would rotate regular -90° and snap to margin top-left.");
@@ -156,6 +158,22 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
 
             log("[step-nest] irregular group placed | rotation=" + bestAngle
                 + "° | top y=" + Math.round(targetTop));
+
+            // targetTop snaps the irregular BBOX 2mm below the regular BBOX bottom — but
+            // the two clusters' facing contours rarely line up in x, so that bbox gap can
+            // hide a large real gap (regular's lowest point sits over empty x). Slide the
+            // irregular cluster straight UP into the regular cluster's bottom contour until
+            // the real minimum clearance is the 2mm spacing, closing the dead band.
+            if (regularCuts && regularCuts.length > 0) {
+                var upShift = _nestMaxUpwardShift(regularCuts, _nestCutsOf(irrResult.pairs), mmToPoints(2));
+                if (upShift > 0) {
+                    _nestTranslatePairs(irrResult.pairs, 0, upShift);
+                    log("[step-nest] irregular contour-fit | nested up " + Math.round(upShift)
+                        + "pt to close the gap to 2mm.");
+                } else {
+                    log("[step-nest] irregular contour-fit | no upward room (gap already minimal).");
+                }
+            }
         } else if (irrResult.pairs.length > 0) {
             log("[step-nest] [DRY RUN] would find best rotation and place irregular below regular.");
         }
@@ -436,6 +454,67 @@ function _nestBestRotation(items, boundRect, targetTop) {
     log("[step-nest] irregular best rotation: " + bestAngle
         + "° (outside approx " + Math.round(bestOutside) + " pt²)");
     return bestAngle;
+}
+
+// Maximum upward (+y) translation for the irregular cluster (irrCuts) so its TOP
+// contour nests against the regular cluster's (regCuts) BOTTOM contour while keeping
+// >= spacingPt everywhere — i.e. how far the whole irregular group can rise before any
+// of it comes within the 2mm spacing of the regular group. Pure geometry, no objects
+// moved; the caller translates by the returned amount.
+//
+// Method: per-column skylines. Sample both clusters' cut contours to points, bin by x
+// (COLW-wide columns). regBottom[col] = lowest regular y in that column; irrTop[col] =
+// highest irregular y. For each irregular column, test it against regular columns within
+// a horizontal dilation of spacingPt: the required VERTICAL clearance shrinks with the
+// horizontal offset (sqrt(spacing² − horiz²)), so the result approximates a radial 2mm
+// gap rather than a purely vertical one. The allowed shift is the min over all nearby
+// pairs of (regBottom − irrTop − requiredVertical). Returns >= 0 (0 if the clusters
+// don't overlap in x, so there is nothing to nest up against).
+function _nestMaxUpwardShift(regCuts, irrCuts, spacingPt) {
+    var STEPS = 6;    // samples/bezier-segment — sub-mm at sticker scale
+    var COLW  = 2;    // column width (pt)
+
+    function collectPts(cuts) {
+        var out = [], i, p, v;
+        for (i = 0; i < cuts.length; i++) {
+            var polys = samplePathToPolygons(cuts[i], STEPS);
+            for (p = 0; p < polys.length; p++) {
+                var poly = polys[p];
+                for (v = 0; v < poly.length; v++) out.push(poly[v]);
+            }
+        }
+        return out;
+    }
+    var regPts = collectPts(regCuts), irrPts = collectPts(irrCuts);
+    if (regPts.length === 0 || irrPts.length === 0) return 0;
+
+    var regBottom = {}, irrTop = {}, i, col;
+    for (i = 0; i < regPts.length; i++) {
+        col = Math.floor(regPts[i].x / COLW);
+        if (regBottom[col] === undefined || regPts[i].y < regBottom[col]) regBottom[col] = regPts[i].y;
+    }
+    for (i = 0; i < irrPts.length; i++) {
+        col = Math.floor(irrPts[i].x / COLW);
+        if (irrTop[col] === undefined || irrPts[i].y > irrTop[col]) irrTop[col] = irrPts[i].y;
+    }
+
+    var dilCols  = Math.ceil(spacingPt / COLW);
+    var maxShift = Infinity, found = false, key, c, d, horiz, reqV, allow;
+    for (key in irrTop) {
+        if (!irrTop.hasOwnProperty(key)) continue;
+        c = parseInt(key, 10);
+        for (d = -dilCols; d <= dilCols; d++) {
+            if (regBottom[c + d] === undefined) continue;
+            // Conservative horizontal offset (inner edge of the column gap) → larger
+            // required clearance → never lets the groups closer than spacingPt.
+            horiz = Math.max(0, Math.abs(d) - 1) * COLW;
+            reqV  = (horiz >= spacingPt) ? 0 : Math.sqrt(spacingPt * spacingPt - horiz * horiz);
+            allow = (regBottom[c + d] - irrTop[c]) - reqV;
+            if (allow < maxShift) { maxShift = allow; found = true; }
+        }
+    }
+    if (!found) return 0;
+    return maxShift > 0 ? maxShift : 0;
 }
 
 
@@ -826,13 +905,16 @@ function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFac
 
     var placed = null;
     try {
-        placed = doc.placedItems.add();
+        // Add via the Stickers layer's own collection, NOT doc.placedItems.add(): the
+        // latter targets the topmost layer (the locked Margin band from
+        // buildWorkingDocument), which throws "Target layer cannot be modified".
+        // Layer-scoped add lands the item directly on Stickers.
+        placed = stickersLayer.placedItems.add();
         placed.file = pngFile;
         placed.name = displayName;
 
-        // doc.placedItems.add() lands the item on whatever layer Illustrator considers
-        // active, which after the cutline passes is Cutlines — not reliably the layer we
-        // set above. Move it explicitly so artwork actually lives in the Stickers layer.
+        // Defensive: ensure the item actually lives in the Stickers layer (a no-op when
+        // the layer-scoped add already placed it there).
         if (placed.layer !== stickersLayer) {
             placed.move(stickersLayer, ElementPlacement.PLACEATBEGINNING);
         }
