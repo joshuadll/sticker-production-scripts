@@ -65,7 +65,7 @@
 [step-nest] irregular best rotation: 90° (outside approx 194719 pt²)
 [step-nest] group-rotated 10 pair(s) by 90°
 [step-nest] irregular group placed | rotation=90° | top y=66
-[step-nest] irregular contour-fit | nested up 60pt to close the gap to 2mm.
+[step-nest] irregular contour-fit | nested up 58pt to close the gap to 2mm.
 [step-nest] art-layer-check | on Stickers: 25 / placed: 25  ok
 [step-nest] result | matched: 25 | unmatched: 0 | art placed: 25
 Done.

@@ -471,15 +471,25 @@ function _nestBestRotation(items, boundRect, targetTop) {
 // pairs of (regBottom − irrTop − requiredVertical). Returns >= 0 (0 if the clusters
 // don't overlap in x, so there is nothing to nest up against).
 function _nestMaxUpwardShift(regCuts, irrCuts, spacingPt) {
-    var STEPS = 6;    // samples/bezier-segment — sub-mm at sticker scale
-    var COLW  = 2;    // column width (pt)
+    var STEPS  = 12;                   // samples/bezier-segment — fine enough that the
+                                       // contour-extremum miss between samples is sub-point
+                                       // at sticker scale (elements <= ~220pt across).
+    var COLW   = 2;                    // column width (pt)
+    var SAFETY = mmToPoints(0.5);      // back-off for residual sampling miss. The skyline
+                                       // reads min/max of SAMPLED points, so a true extremum
+                                       // between two samples can sit slightly beyond it
+                                       // (regBottom biased high, irrTop biased low). At STEPS=12
+                                       // that miss is well under 0.5mm for the largest element
+                                       // (worst case ~0.3pt for a 90° arc at R~110pt), so this
+                                       // margin keeps the achieved clearance >= spacingPt — a
+                                       // sub-2mm pinch would otherwise be rejected by Step 8c.
 
     function collectPts(cuts) {
-        var out = [], i, p, v;
+        var out = [], i, p, v, poly;
         for (i = 0; i < cuts.length; i++) {
             var polys = samplePathToPolygons(cuts[i], STEPS);
             for (p = 0; p < polys.length; p++) {
-                var poly = polys[p];
+                poly = polys[p];
                 for (v = 0; v < poly.length; v++) out.push(poly[v]);
             }
         }
@@ -514,6 +524,7 @@ function _nestMaxUpwardShift(regCuts, irrCuts, spacingPt) {
         }
     }
     if (!found) return 0;
+    maxShift -= SAFETY;
     return maxShift > 0 ? maxShift : 0;
 }
 

@@ -199,12 +199,10 @@ if [ ! -f "$EXPECTED" ]; then
 elif diff -u <(strip_variable_lines < "$EXPECTED") <(strip_variable_lines < "$LOG"); then
     echo "PASS [$STEP]: log matches golden."
 else
-    echo "FAIL [$STEP]: log differs from golden (diff above)."
-    echo "  If the change is intentional (e.g. fixtures re-nested):"
-    echo "    strip_variable_lines() { grep -Ev \"^(\\[pipeline\\] === AI_ImportNesting (start|done) ===|\\[pipeline\\] (document|SVG|art folder):|Log: )\"; }  # see runner"
-    echo "    bash $0   # regenerates from the live run, or:"
-    echo "    cp \"$EXPECTED.new\" \"$EXPECTED\"  # if produced"
     strip_variable_lines < "$LOG" > "$EXPECTED.new"
+    echo "FAIL [$STEP]: log differs from golden (diff above)."
+    echo "  If the change is intentional (e.g. fixtures re-nested), accept this run's log:"
+    echo "    cp \"$EXPECTED.new\" \"$EXPECTED\""
     FAIL=1
 fi
 
