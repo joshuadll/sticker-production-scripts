@@ -1,6 +1,6 @@
 # Layout QA Consolidation — Step 8c + Nesting QA
 
-**Status:** design / proposal (branch `claude/step-8-discussion-y885qp`)
+**Status:** implemented (branch `claude/step-8-discussion-y885qp`)
 **Supersedes runtime placement of:** `docs/step8c-offset-path-qa.md`
 
 ## Problem
@@ -145,11 +145,29 @@ The new pipeline's CONFIG is the union of the two existing ones:
 
 ## File change checklist
 
-- [ ] `pipelines/AI_LayoutQA.jsx` — new
-- [ ] `illustrator/Step8c_OffsetPathQA.jsx` — idempotent reset pass + `cutlineStrokePt`
-- [ ] `pipelines/AI_ExportFinal.jsx` — `cutlineStrokePt` in CONFIG; comment phase 1 as a guard
-- [ ] `pipelines/AI_NestingQA.jsx` — delete or reduce to alias
-- [ ] `CLAUDE.md` — pipeline map (`AI_LayoutQA`, drop/redefine `AI_NestingQA`)
-- [ ] installer — register `AI_LayoutQA` Scripts-menu entry
-- [ ] `docs/step8c-offset-path-qa.md` — note runtime placement moved here
-- [ ] `tests/integration/run-ai-layout-qa.sh` — new, with idempotency assertion
+- [x] `pipelines/AI_LayoutQA.jsx` — new (two phases, combined alert)
+- [x] `illustrator/Step8c_OffsetPathQA.jsx` — idempotent reset pass + `cutlineStrokePt`
+- [x] `pipelines/AI_ExportFinal.jsx` — `cutlineStrokePt` in CONFIG; phase 1 reframed as a guard
+- [x] `pipelines/AI_NestingQA.jsx` — **deleted** (folded into `AI_LayoutQA`)
+- [x] `CLAUDE.md` — pipeline map (`AI_LayoutQA` replaces `AI_NestingQA`)
+- [x] installer — `Noteworthie 6 - Layout QA` → `AI_LayoutQA.jsx`
+- [x] `docs/step8c-offset-path-qa.md` — runtime-placement note added
+- [x] `tests/integration/run-ai-layout-qa.sh` — renamed from `run-ai-nesting-qa.sh`, asserts both phases
+- [x] `docs/nqi-checker.md` — references repointed to `AI_LayoutQA`
+
+### Not regressed
+
+- NQI algorithm (`StepQA_NestingQuality.jsx`) is unchanged — only its `#included by`
+  header comment was updated. The NQI test coverage carries over: the old
+  `run-ai-nesting-qa.sh` is renamed (not deleted), keeps the same
+  `stepQA-working.ai` fixture, and still asserts the `[stepQA] NQI=/paths:/grid:`
+  lines — now alongside the new `[step8c]` spacing/margin assertions.
+- `run-all.sh` auto-discovers `run-ai-*.sh`, so the renamed runner is picked up
+  with no change to the harness.
+
+## Follow-up still open
+
+- **Idempotency assertion in the test.** The renamed runner asserts both phases
+  log, but does not yet assert that a *second* run clears a fixed cut line's red
+  flag (the reset-pass regression guard). That needs a two-run fixture/harness
+  tweak — deferred until there's a real `stepQA-working.ai` to calibrate against.

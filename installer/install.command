@@ -78,7 +78,7 @@ if [ -n "$AI_APP" ]; then
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 3 - Import Nesting"  "AI_ImportNesting.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 4 - Refine Cutlines" "AI_RefineCutlines.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 5 - Export Final"    "AI_ExportFinal.jsx"
-    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 6 - Nesting QA"      "AI_NestingQA.jsx"
+    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 6 - Layout QA"       "AI_LayoutQA.jsx"
     echo "  ✓ Illustrator — 4 scripts"
 else
     echo "  ✗ Illustrator not found — skipped"

@@ -1,31 +1,34 @@
 #!/bin/bash
-# Integration test for StepQA (Nesting Quality Index).
-# Runs AI_NestingQA.jsx against a fixture .ai file and verifies that an NQI
-# score is computed and logged.
+# Integration test for AI_LayoutQA — the independent, re-runnable layout QA that
+# consolidates Spacing+Margin QA (Step 8c) and Nesting Quality (NQI / StepQA).
+# Runs AI_LayoutQA.jsx against a fixture .ai and verifies BOTH phases log:
+#   • Spacing+Margin — [step8c] collected / done
+#   • Nesting Quality — [stepQA] NQI= / paths: / grid:
 #
 # FIXTURE REQUIRED:
 #   tests/integration/fixtures/stepQA-working.ai
 #     A working .ai file that has been through Steps 6 + Deepnest import —
 #     must have a "Cutlines" layer with nested PathItems/CompoundPathItems.
 #     A good source: save any post-Deepnest .ai file here before running.
+#     (Same fixture the old run-ai-nesting-qa.sh used — no new fixture needed.)
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
-#   2. Verify the log shows NQI score and correct pocket count
-#   3. Commit: cp "$LOG" tests/integration/expected/ai-nesting-qa-expected.txt
+#   2. Verify the log shows the spacing/margin counts AND the NQI score/pockets
+#   3. Commit: cp "$LOG" tests/integration/expected/ai-layout-qa-expected.txt
 
 set -euo pipefail
 
-STEP="ai-nesting-qa"
+STEP="ai-layout-qa"
 APP="Adobe Illustrator"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/pipelines/AI_NestingQA.jsx"
+SCRIPT="$REPO_ROOT/pipelines/AI_LayoutQA.jsx"
 FIXTURE_AI="$REPO_ROOT/tests/integration/fixtures/stepQA-working.ai"
-EXPECTED="$REPO_ROOT/tests/integration/expected/ai-nesting-qa-expected.txt"
+EXPECTED="$REPO_ROOT/tests/integration/expected/ai-layout-qa-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
-LOG="/tmp/AI_NestingQA.log"
+LOG="/tmp/AI_LayoutQA.log"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
@@ -48,7 +51,7 @@ perl -pe '
 
 # ── Run via osascript ────────────────────────────────────────────────────────
 
-echo "[$STEP] Opening fixture and running NQI check..."
+echo "[$STEP] Opening fixture and running Layout QA (spacing/margin + NQI)..."
 osascript << EOF
 tell application "$APP"
     set doc to open (POSIX file "$FIXTURE_AI")
@@ -60,7 +63,7 @@ rm -f "$TEMP_SCRIPT"
 
 # ── Wait for log ─────────────────────────────────────────────────────────────
 
-TIMEOUT=90
+TIMEOUT=120
 ELAPSED=0
 until [ -f "$LOG" ] || [ "$ELAPSED" -ge "$TIMEOUT" ]; do
     sleep 1
@@ -72,30 +75,26 @@ if [ ! -f "$LOG" ]; then
     exit 1
 fi
 
-# ── Verify key log lines ─────────────────────────────────────────────────────
+# ── Verify key log lines (both phases) ───────────────────────────────────────
 
 FAIL=0
+check_line() {
+    # $1 = grep pattern, $2 = human description
+    if grep -q "$1" "$LOG"; then
+        echo "PASS [$STEP]: $2"
+    else
+        echo "FAIL [$STEP]: '$1' not found in log ($2)."
+        FAIL=1
+    fi
+}
 
-if grep -q "\[stepQA\] NQI=" "$LOG"; then
-    echo "PASS [$STEP]: NQI score found in log."
-else
-    echo "FAIL [$STEP]: '[stepQA] NQI=' not found in log."
-    FAIL=1
-fi
-
-if grep -q "\[stepQA\] paths:" "$LOG"; then
-    echo "PASS [$STEP]: path count found in log."
-else
-    echo "FAIL [$STEP]: '[stepQA] paths:' not found in log."
-    FAIL=1
-fi
-
-if grep -q "\[stepQA\] grid:" "$LOG"; then
-    echo "PASS [$STEP]: grid dimensions found in log."
-else
-    echo "FAIL [$STEP]: '[stepQA] grid:' not found in log."
-    FAIL=1
-fi
+# Phase 1 — Spacing + Margin QA.
+check_line "\[step8c\] collected" "spacing/margin collected cut lines"
+check_line "\[step8c\] done"      "spacing/margin completed"
+# Phase 2 — Nesting Quality.
+check_line "\[stepQA\] NQI="      "NQI score computed"
+check_line "\[stepQA\] paths:"    "NQI path count"
+check_line "\[stepQA\] grid:"     "NQI grid dimensions"
 
 if [ "$FAIL" -ne 0 ]; then
     echo "  Log contents:"
@@ -106,19 +105,19 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (=== AI_NestingQA (start|done)|document:)"
+    grep -Ev "^\[pipeline\] (=== AI_LayoutQA (start|done)|document:)"
 }
 
 if [ ! -f "$EXPECTED" ]; then
     echo ""
     echo "NOTE [$STEP]: no golden file yet — expected on first run."
     echo "  Log written to: $LOG"
-    echo "  Review: NQI score, pocket count, utilization."
+    echo "  Review: spacing/margin flagged count, NQI score, pocket count, utilization."
     echo "  If output looks correct, commit as golden file:"
     echo ""
     echo "    cp \"$LOG\" \"$EXPECTED\""
     echo "    git add \"$EXPECTED\""
-    echo "    git commit -m 'Add golden output for ai-nesting-qa'"
+    echo "    git commit -m 'Add golden output for ai-layout-qa'"
     echo ""
     exit 0
 fi
@@ -130,6 +129,6 @@ else
     echo "FAIL [$STEP]: output differs from golden file (diff above)."
     echo "  If the change is intentional:"
     echo "    cp \"$LOG\" \"$EXPECTED\""
-    echo "    git add \"$EXPECTED\" && git commit -m 'Update ai-nesting-qa golden output: <reason>'"
+    echo "    git add \"$EXPECTED\" && git commit -m 'Update ai-layout-qa golden output: <reason>'"
     exit 1
 fi

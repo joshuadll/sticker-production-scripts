@@ -24,9 +24,9 @@ to `AI_RefineCutlines.jsx`.
 AI_BuildCutlines.jsx
   → artist runs Deepnest externally on _regular.svg + _irregular.svg
   → artist imports nested results into the .ai file and joins them
-  → run AI_NestingQA.jsx          ← this script
+  → run AI_LayoutQA.jsx           ← this script (NQI is its phase 2)
   → PASS: continue with AI_RefineCutlines.jsx
-  → FAIL: rework nesting in Illustrator, re-run AI_NestingQA.jsx
+  → FAIL: rework nesting in Illustrator, re-run AI_LayoutQA.jsx
 ```
 
 ## Inputs
@@ -41,7 +41,7 @@ AI_BuildCutlines.jsx
 - **NQI Pockets** layer (if `showOverlay: true`) with red rectangles drawn over
   each flagged pocket. Delete this layer when done; it does not affect production
   paths.
-- Log file `AI_NestingQA.log` written next to the script.
+- Log file `AI_LayoutQA.log` written next to the script.
 
 ## Algorithm overview
 
@@ -97,13 +97,13 @@ per mm of arc). Error is < 0.5 mm, acceptable at the 3 mm pocket threshold.
 
 | File | Purpose |
 |------|---------|
-| `pipelines/AI_NestingQA.jsx`              | Pipeline entry point — run this |
+| `pipelines/AI_LayoutQA.jsx`               | Pipeline entry point — run this (NQI is phase 2) |
 | `illustrator/StepQA_NestingQuality.jsx`   | Phase function (algorithm)      |
 | `utils/aiUtils.jsx`                       | Shared helpers (#included)      |
 
 ## Testing
 
-See `tests/integration/run-stepQA.sh`.
+See `tests/integration/run-ai-layout-qa.sh`.
 
 Requires fixture: `tests/integration/fixtures/stepQA-working.ai` — a
 post-Deepnest `.ai` file with paths on the Cutlines layer. Save any real

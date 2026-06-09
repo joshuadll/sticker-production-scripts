@@ -14,8 +14,14 @@
 //   2. Margin QA — cut line bounding box exceeds safe area → fail.
 //      Safe area: computed from artboard top-left + CONFIG working area + margins.
 //
-// Violations are flagged red on the cut line itself. The pipeline halts on
-// flagged > 0 so the artist can fix and re-run (idempotent — no layer to rebuild).
+// Violations are flagged red on the cut line itself. The caller halts on
+// flagged > 0 so the artist can fix and re-run.
+//
+// Idempotent: every cut line is restroked to the canonical 0.25pt black BEFORE
+// re-flagging, so a cut line the artist has since fixed loses its stale red and
+// repeated runs converge. This lets the same check serve both the on-demand
+// AI_LayoutQA pipeline (run many times as the layout iterates) and the
+// AI_ExportFinal guard.
 //
 // Returns: { checked, flagged }
 
@@ -63,6 +69,20 @@ function runOffsetPathQA(doc) {
             spacingFail:  false,
             marginFail:   false
         });
+    }
+
+    // ── 2b. Reset prior QA flags (idempotent) ─────────────────────────────────
+    // Restroke every cut line to the canonical 0.25pt black before re-flagging.
+    // Every cut line in this layer is 0.25pt black by construction (Step 6/8a/8b
+    // restroke), so the reset never clobbers a legitimately different stroke — it
+    // only clears stale red from a prior run. Stamps (PlacedItem) can't be
+    // recolored, so they're skipped here just as they are when flagging.
+    var resetPt = CONFIG.cutlineStrokePt || 0.25;
+    var black   = blackCmyk();
+    for (i = 0; i < records.length; i++) {
+        if (records[i].kind === "path") {
+            strokeRecursive(records[i].item, resetPt, black);
+        }
     }
 
     // ── 3. Spacing QA — pairwise, bbox-prefiltered ────────────────────────────

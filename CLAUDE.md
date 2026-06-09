@@ -68,10 +68,11 @@ sticker-production-scripts/
 │   │                                     transforms target absolute SVG positions (converge); placed art cleared on entry.
 │   │                                                   (stop: artist reviews layout for any unmatched elements)
 │   ├── AI_RefineCutlines.jsx       ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
-│   ├── AI_ExportFinal.jsx          ← Steps 8c → 9A → 10 (Asset Export) → 11 (Final File)
+│   ├── AI_ExportFinal.jsx          ← Spacing+Margin QA guard (re-runs Step 8c's idempotent check) → 9A → 10 (Asset Export) → 11 (Final File)
 │   │                                  (Step 9B temporarily removed; peeling tab stays in workflow but pipeline placement TBD)
-│   └── AI_NestingQA.jsx            ← runs StepQA_NestingQuality; artist runs AFTER manually adjusting the
-│                                       nested layout (not immediately after Deepnest auto-output) to gate re-nest
+│   └── AI_LayoutQA.jsx             ← independent, re-runnable layout QA: Step 8c Spacing+Margin + StepQA_NestingQuality (NQI).
+│                                       Run on demand anytime between nesting and pencil (the artist loops nest ⇄ pencil); mutates
+│                                       nothing structural. Spacing/margin is the export gate; NQI is advisory. (Replaces AI_NestingQA.)
 ├── tests/integration/
 └── docs/
 ```

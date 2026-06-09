@@ -1,5 +1,5 @@
 // StepQA_NestingQuality.jsx — Phase function only.
-// #included by AI_NestingQA.jsx. Requires: aiUtils.jsx, CONFIG in scope.
+// #included by AI_LayoutQA.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
 // Builds a 1-mm-resolution occupancy grid from the exact path outlines in the
 // Cutlines layer (via de Casteljau bezier sampling + scanline fill), detects

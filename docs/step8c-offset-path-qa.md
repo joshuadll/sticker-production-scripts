@@ -1,10 +1,19 @@
 # Step 8c — Spacing + Margin QA
 
+> **Runtime placement:** this check is no longer a fixed phase of one pipeline.
+> Its function (`runOffsetPathQA`) is now idempotent (resets stale red flags
+> before re-flagging) and is invoked from two places: as **phase 1 of the
+> independent, re-runnable `AI_LayoutQA` pipeline** (run on demand as the artist
+> loops nest ⇄ pencil), and as a **blocking guard at the top of
+> `AI_ExportFinal`** (an un-cuttable file can't be exported). See
+> `docs/layout-qa-consolidation.md`.
+
 ## What it does
 
-After the manual pencil pass, check that every cut line is at least **2mm from its
-neighbours** and doesn't **exceed the safe area**. The pipeline halts on any failure
-so the artist can fix and re-run.
+Check that every cut line is at least **2mm from its neighbours** and doesn't
+**exceed the safe area**. The export guard halts on any failure so the artist can
+fix and re-run; in `AI_LayoutQA` it is advisory (reports flags, does not halt the
+NQI phase).
 
 ### Why no offset layer
 

@@ -11,13 +11,19 @@
 var CONFIG = {
     dryRun: false,
 
-    // ── Step 8c: Spacing + Margin QA ─────────────────────────────────────────
+    // ── Spacing + Margin QA guard (shared with AI_LayoutQA) ──────────────────
+    // Not a workflow step — a final manufacturability guard. The artist runs
+    // AI_LayoutQA iteratively; export re-runs the same idempotent check and halts
+    // if anything is still too close / out of margin, so an un-cuttable file can't
+    // be exported. The check resets stale red flags first, so a fixed cut line
+    // clears on the re-run.
     cutlinesLayerName:    "Cutlines",
     marginLayerName:      "Margin",
 
     spacingThresholdMm:   2,
     qaSpacingSampleSteps: 12,
     flagStrokePt:         1.0,
+    cutlineStrokePt:      0.25,   // reset target for the idempotent QA guard
 
     // Margin spec — single source of truth in aiUtils.MARGIN_SPEC (avoids drift).
     workingAreaWidthMm:  MARGIN_SPEC.workingAreaWidthMm,
@@ -66,25 +72,25 @@ function main() {
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
-    // ── Step 8c: Offset Path QA ────────────────────────────────────────────────
-    log("[pipeline] --- Step 8c: Offset Path QA ---");
+    // ── Spacing + Margin QA guard (shared idempotent check; see AI_LayoutQA) ────
+    log("[pipeline] --- Spacing + Margin QA guard ---");
     var qaResult;
 
     try {
         qaResult = runOffsetPathQA(doc);
     } catch (e) {
-        log("[pipeline] ERROR | step 8c line " + e.line + ": " + e.message);
-        scriptAlert("ERROR in Step 8c (Offset Path QA).\nLine " + e.line + ": " + e.message
+        log("[pipeline] ERROR | spacing/margin guard line " + e.line + ": " + e.message);
+        scriptAlert("ERROR in Spacing + Margin QA.\nLine " + e.line + ": " + e.message
             + "\n\nLog: " + CONFIG.logPath);
         return;
     }
-    log("[pipeline] step 8c complete | " + qaResult.checked + " path(s) checked, "
+    log("[pipeline] spacing/margin guard complete | " + qaResult.checked + " path(s) checked, "
         + qaResult.flagged + " flagged.");
 
     if (qaResult.flagged > 0) {
-        scriptAlert("Step 8c: " + qaResult.flagged + " path(s) flagged for review.\n"
+        scriptAlert("Spacing/Margin QA: " + qaResult.flagged + " path(s) flagged for review.\n"
             + "Flagged paths are highlighted in red.\n"
-            + "Fix them before continuing, then re-run this script.\n\n"
+            + "Fix them (or re-run AI_LayoutQA), then re-run this script.\n\n"
             + "Log: " + CONFIG.logPath);
         return;
     }
