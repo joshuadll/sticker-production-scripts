@@ -46,7 +46,10 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     // ── 3. Place silhouette PNG into Cutlines layer ───────────────────────────
     doc.activeLayer = cutlinesLayer;
 
-    var placed = doc.placedItems.add();
+    // Add via the layer's own collection, NOT doc.placedItems.add(): the latter targets
+    // the topmost layer (now the locked Margin band from buildWorkingDocument), which
+    // throws "Target layer cannot be modified". Layer-scoped add definitively lands here.
+    var placed = cutlinesLayer.placedItems.add();
     placed.file = pngFile;
     log("[step6] placed silhouette PNG.");
 
