@@ -85,8 +85,7 @@ function main() {
             if (pk.areaMm2 < CONFIG.pocketMinAreaMm2) continue;
             flagged++;
             pocketLines += "  " + flagged + ". " + pk.label
-                + "  — " + Math.round(pk.areaMm2) + " mm2"
-                + "  (r ≈ " + (Math.round(pk.inscribedR * 10) / 10) + " mm)\n";
+                + "  — " + Math.round(pk.areaMm2) + " mm2\n";
         }
 
         var msg = "NQI Score: " + result.nqi + " / 100  —  " + passStr

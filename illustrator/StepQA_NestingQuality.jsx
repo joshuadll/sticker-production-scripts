@@ -107,10 +107,7 @@ function runNestingQA(doc) {
     }
 
     // ── 5. Connected-component pocket detection ────────────────────────────────
-    // Chamfer (near-Euclidean) distance transform — computed AFTER dilation + margin
-    // mask so the "occupied" boundary already includes the gap band and the gutter.
-    var distXfm = _qa_distanceTransform(grid, gridW, gridH);
-    var pockets = _qa_findPockets(grid, gridW, gridH, CONFIG.cellSizeMm, distXfm);
+    var pockets = _qa_findPockets(grid, gridW, gridH, CONFIG.cellSizeMm);
 
     var recoverableCells = 0;
     var p;
@@ -119,7 +116,6 @@ function runNestingQA(doc) {
             recoverableCells += pockets[p].cellCount;
             log("[stepQA] pocket | " + pockets[p].label
                 + " | area=" + _qa_fmt(pockets[p].areaMm2) + " mm2"
-                + " | r=" + _qa_fmt(pockets[p].inscribedR) + " mm"
                 + " | center=(" + _qa_fmt(pockets[p].centX) + "," + _qa_fmt(pockets[p].centY) + ")mm"
                 + " | bbox=[" + pockets[p].minX + "," + pockets[p].minY
                 + " " + (pockets[p].maxX - pockets[p].minX + 1)
@@ -343,67 +339,10 @@ function _qa_dilate(grid, gridW, gridH, radiusCells) {
     }
 }
 
-// Chamfer distance transform (8-connected: orthogonal step = 1, diagonal step = √2)
-// — a close Euclidean approximation. For each free cell returns its distance (in
-// cells) to the nearest occupied cell; occupied cells get 0. Two sequential passes
-// (forward row-major, then backward) settle the chamfer metric exactly.
-//
-// Why not plain 4-connected BFS: that yields whole-number (Manhattan) distances,
-// which (a) over-measure the true width of diagonal gaps and (b) snap every pocket
-// radius to an integer mm, so a threshold like 4.5 can't sit between 4 and 5. The
-// chamfer metric gives fractional, near-Euclidean radii, so the pocket threshold is
-// tunable at sub-mm resolution and reflects the real inscribed-circle radius.
-function _qa_distanceTransform(grid, gridW, gridH) {
-    var INF = 1e9;
-    var D2  = 1.4142135623730951; // √2
-    var dist = [];
-    var k, n = grid.length;
-    for (k = 0; k < n; k++) dist.push(grid[k] !== 0 ? 0 : INF);
-
-    var x, y, idx, d;
-
-    // Forward pass — propagate from already-visited neighbours: up-left, up, up-right, left.
-    for (y = 0; y < gridH; y++) {
-        for (x = 0; x < gridW; x++) {
-            idx = y * gridW + x;
-            d = dist[idx];
-            if (d === 0) continue;
-            if (y > 0) {
-                if (x > 0          && dist[idx - gridW - 1] + D2 < d) d = dist[idx - gridW - 1] + D2;
-                if (                  dist[idx - gridW]     + 1  < d) d = dist[idx - gridW]     + 1;
-                if (x < gridW - 1  && dist[idx - gridW + 1] + D2 < d) d = dist[idx - gridW + 1] + D2;
-            }
-            if (x > 0              && dist[idx - 1]         + 1  < d) d = dist[idx - 1]         + 1;
-            dist[idx] = d;
-        }
-    }
-
-    // Backward pass — down-right, down, down-left, right.
-    for (y = gridH - 1; y >= 0; y--) {
-        for (x = gridW - 1; x >= 0; x--) {
-            idx = y * gridW + x;
-            d = dist[idx];
-            if (d === 0) continue;
-            if (y < gridH - 1) {
-                if (x < gridW - 1  && dist[idx + gridW + 1] + D2 < d) d = dist[idx + gridW + 1] + D2;
-                if (                  dist[idx + gridW]     + 1  < d) d = dist[idx + gridW]     + 1;
-                if (x > 0          && dist[idx + gridW - 1] + D2 < d) d = dist[idx + gridW - 1] + D2;
-            }
-            if (x < gridW - 1      && dist[idx + 1]         + 1  < d) d = dist[idx + 1]         + 1;
-            dist[idx] = d;
-        }
-    }
-
-    return dist;
-}
-
 // DFS connected-component labelling of free cells.
-// inscribedR = max(distXfm[cell]) within the component, converted to mm.
-// This is the radius of the largest circle that fits inside the pocket,
-// which correctly rejects thin corridors and wrapping free regions whose
-// bounding boxes are large but whose usable width is narrow.
-// Returns pocket array sorted descending by area.
-function _qa_findPockets(grid, gridW, gridH, cellMm, distXfm) {
+// Returns pocket array sorted descending by area. Each pocket carries its area,
+// centroid, bounding box, and the list of its free cells (for the overlay).
+function _qa_findPockets(grid, gridW, gridH, cellMm) {
     var visited = [];
     var k;
     for (k = 0; k < grid.length; k++) visited.push(0);
@@ -421,7 +360,6 @@ function _qa_findPockets(grid, gridW, gridH, cellMm, distXfm) {
                 minX: x, maxX: x,
                 minY: y, maxY: y,
                 sumX: 0, sumY: 0,
-                maxDist: 0,    // max distance-transform value in this component (cells)
                 cells: []      // every free cell index in this pocket (for exact overlay)
             };
 
@@ -441,7 +379,6 @@ function _qa_findPockets(grid, gridW, gridH, cellMm, distXfm) {
                 if (cx > comp.maxX) comp.maxX = cx;
                 if (cy < comp.minY) comp.minY = cy;
                 if (cy > comp.maxY) comp.maxY = cy;
-                if (distXfm[ci] > comp.maxDist) comp.maxDist = distXfm[ci];
 
                 // 4-connected neighbours — guard against row wrapping.
                 var ni;
@@ -463,14 +400,12 @@ function _qa_findPockets(grid, gridW, gridH, cellMm, distXfm) {
                 }
             }
 
-            var inscribedR = comp.maxDist * cellMm;
-            var centX      = (comp.sumX / comp.cellCount + 0.5) * cellMm;
-            var centY      = (comp.sumY / comp.cellCount + 0.5) * cellMm;
+            var centX = (comp.sumX / comp.cellCount + 0.5) * cellMm;
+            var centY = (comp.sumY / comp.cellCount + 0.5) * cellMm;
 
             pockets.push({
                 cellCount:  comp.cellCount,
                 areaMm2:    comp.cellCount * cellMm * cellMm,
-                inscribedR: inscribedR,
                 minX:       comp.minX,
                 maxX:       comp.maxX,
                 minY:       comp.minY,
@@ -500,10 +435,11 @@ function _qa_quadrantLabel(xMm, yMm, sheetW, sheetH) {
     return v + h;
 }
 
-// Fills the EXACT free cells of every above-threshold (recoverable) pocket with
-// semi-transparent red on a temporary "NQI Pockets" layer. Cells are run-length
-// encoded per row so the fill traces the real (often concave) empty region and
-// never covers a sticker. Sub-threshold pockets are not drawn.
+// Fills the EXACT free cells of every recoverable pocket (areaMm2 >= the limit)
+// with semi-transparent red on a temporary "NQI Pockets" layer, via greedy
+// maximal-rectangle tiling (see _qa_tilePocket) so the fill traces the real
+// (often concave) empty region and never covers a sticker. Smaller pockets are
+// not drawn.
 function _qa_drawOverlay(doc, pockets, artLeft, artTop, PT, gridW) {
     var LAYER_NAME = "NQI Pockets";
 
