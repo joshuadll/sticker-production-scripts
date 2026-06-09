@@ -121,15 +121,25 @@ The new pipeline's CONFIG is the union of the two existing ones:
 
 ## Follow-ups (not blocking)
 
-- **Shared geometry DRY.** 8c (`_collectCutlines` + `samplePathToPolygons`) and
-  StepQA (`_qa_collectPaths` + `_qa_sampleSubPath`) are two parallel
-  collect-and-sample implementations. Worth collapsing into one `aiUtils`
-  routine both consume — but keep 8c's **exact pairwise** distance for the 2 mm
-  gate (the 1 mm NQI raster is too coarse for that threshold).
-- **Sheet-dim drift.** `AI_NestingQA` CONFIG hard-codes `sheetWidthMm 264.7 /
-  sheetHeightMm 194.0` with a comment referencing the retired Production File
-  Template. The doc is now code-built A4 (210×297). These dims feed only
-  `_qa_quadrantLabel`; reconcile them with the real artboard when migrating.
+- **Shared geometry DRY → real bug fix.** ✅ Resolved, but not by merging. On
+  close inspection the two collectors have *genuinely different semantics* and
+  should NOT share a routine: 8c needs per-sticker **units** (it compares
+  sticker-to-sticker for the 2 mm gate, with exact pairwise distance), while
+  StepQA needs every **leaf** path (occupancy is a union). Forcing them together
+  would add indirection, not remove duplication. What the comparison *did*
+  surface was a real gap: 8c's `_collectCutlines` only walked top-level
+  `pageItems`, so stamps/paths an artist tucked into a **Cutlines sublayer**
+  evaded the spacing/margin gate entirely (StepQA already descends sublayers).
+  Fix: `_collectCutlines` now recurses sublayers (mirroring StepQA's proven
+  pattern) while keeping each GroupItem whole. Behaviour is identical for
+  documents without sublayers — it only adds coverage. The collectors stay
+  separate, by design.
+- **Sheet-dim drift.** ✅ Resolved. `_qa_quadrantLabel` now takes the **measured**
+  artboard size (`sheetW`/`sheetH` from `doc.artboards[0]`, already computed in
+  `runNestingQA`) threaded through `_qa_findPockets`, instead of the stale
+  `sheetWidthMm 264.7 / sheetHeightMm 194.0` constants (which referenced the
+  retired template and didn't match the code-built A4 artboard). The two CONFIG
+  keys are removed from `AI_LayoutQA`.
 
 ## Test plan
 

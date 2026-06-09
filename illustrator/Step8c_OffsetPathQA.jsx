@@ -140,15 +140,34 @@ function runOffsetPathQA(doc) {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-// Returns [{ name, item, kind }] per top-level item in the Cutlines layer.
+// Returns [{ name, item, kind }] per cutline unit in the Cutlines layer.
 //   GroupItem (separable bundle) → kind "path", item = visible cutline member
 //   bare PathItem / CompoundPathItem → kind "path", item = itself
 //   PlacedItem (stamp) → kind "stamp", item = the PlacedItem (sampled via bounds)
-function _collectCutlines(cutlinesLayer) {
-    var out = [], i;
-    for (i = 0; i < cutlinesLayer.pageItems.length; i++) {
-        var item = cutlinesLayer.pageItems[i];
-        if (item.parent !== cutlinesLayer) continue;
+//
+// Descends child SUBLAYERS first: a Cutlines layer can nest child layers, and
+// their contents are NOT in the parent's pageItems. Artist deliverables routinely
+// tuck stamps/loose paths into a sublayer (the same case StepQA's _qa_collectPaths
+// defends against) — skipping them would let those items evade the spacing/margin
+// gate entirely. Each GroupItem is kept whole (one per-sticker unit); only its
+// visible fused member is measured. NOTE: this stays a separate routine from
+// StepQA's _qa_collectPaths by design — 8c needs per-sticker UNITS (compare
+// sticker-to-sticker), StepQA needs every LEAF path (occupancy is a union).
+function _collectCutlines(container) {
+    var out = [], i, j, inner;
+
+    // Sublayers first (Layer containers have .layers; GroupItems don't — and we
+    // never recurse into groups, we treat them as units).
+    if (container.layers) {
+        for (i = 0; i < container.layers.length; i++) {
+            inner = _collectCutlines(container.layers[i]);
+            for (j = 0; j < inner.length; j++) out.push(inner[j]);
+        }
+    }
+
+    for (i = 0; i < container.pageItems.length; i++) {
+        var item = container.pageItems[i];
+        if (item.parent !== container) continue;   // direct children only (pageItems recurses groups)
         var tn = item.typename;
 
         if (tn === "GroupItem") {

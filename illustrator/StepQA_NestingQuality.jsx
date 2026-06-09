@@ -110,7 +110,7 @@ function runNestingQA(doc) {
     // Pass the area gate so only recoverable pockets retain their per-cell list
     // (the overlay only tiles those; sub-threshold pockets keep cells = null).
     var pockets = _qa_findPockets(grid, gridW, gridH, CONFIG.cellSizeMm,
-                                  CONFIG.pocketMinAreaMm2);
+                                  CONFIG.pocketMinAreaMm2, sheetW, sheetH);
 
     var recoverableCells = 0;
     var p;
@@ -347,7 +347,7 @@ function _qa_dilate(grid, gridW, gridH, radiusCells) {
 // centroid, and bounding box. The per-cell list (used only by the overlay to
 // tile the fill) is retained ONLY on recoverable pockets, area >= minAreaMm2;
 // smaller pockets get cells = null, since the overlay never tiles them.
-function _qa_findPockets(grid, gridW, gridH, cellMm, minAreaMm2) {
+function _qa_findPockets(grid, gridW, gridH, cellMm, minAreaMm2, sheetWmm, sheetHmm) {
     var visited = [];
     var k;
     for (k = 0; k < grid.length; k++) visited.push(0);
@@ -421,8 +421,10 @@ function _qa_findPockets(grid, gridW, gridH, cellMm, minAreaMm2) {
                 // Only recoverable pockets are tiled by the overlay, so only they
                 // need their cell list — drop it for the rest.
                 cells:      (areaMm2 >= minAreaMm2) ? comp.cells : null,
-                label: _qa_quadrantLabel(centX, centY,
-                            CONFIG.sheetWidthMm, CONFIG.sheetHeightMm)
+                // Quadrant label is computed against the MEASURED artboard size
+                // (sheetW/sheetH from doc.artboards[0]), not a CONFIG constant —
+                // so the label is always correct regardless of artboard dims.
+                label: _qa_quadrantLabel(centX, centY, sheetWmm, sheetHmm)
             });
         }
     }

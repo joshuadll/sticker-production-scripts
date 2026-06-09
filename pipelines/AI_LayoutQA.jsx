@@ -45,10 +45,7 @@ var CONFIG = {
     marginLeftMm:        MARGIN_SPEC.marginLeftMm,
 
     // ── Phase 2: Nesting Quality (NQI) ───────────────────────────────────────
-    // Sheet dims feed only the pocket quadrant labels.
-    sheetWidthMm:  264.7,
-    sheetHeightMm: 194.0,
-
+    // (Pocket quadrant labels use the measured artboard size, not a CONFIG dim.)
     cellSizeMm:       1,    // grid resolution → pocket detection accurate to ~0.5mm
     gapMm:            2,    // inter-sticker spacing band (same constant as spacingThresholdMm)
     pocketMinAreaMm2: 90,   // a free pocket this large (mm^2) is a reworkable opportunity
