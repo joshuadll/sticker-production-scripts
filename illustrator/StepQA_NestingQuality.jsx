@@ -107,7 +107,10 @@ function runNestingQA(doc) {
     }
 
     // ── 5. Connected-component pocket detection ────────────────────────────────
-    var pockets = _qa_findPockets(grid, gridW, gridH, CONFIG.cellSizeMm);
+    // Chamfer (near-Euclidean) distance transform — computed AFTER dilation + margin
+    // mask so the "occupied" boundary already includes the gap band and the gutter.
+    var distXfm = _qa_distanceTransform(grid, gridW, gridH);
+    var pockets = _qa_findPockets(grid, gridW, gridH, CONFIG.cellSizeMm, distXfm);
 
     var recoverableCells = 0;
     var p;
@@ -116,7 +119,11 @@ function runNestingQA(doc) {
             recoverableCells += pockets[p].cellCount;
             log("[stepQA] pocket | " + pockets[p].label
                 + " | area=" + _qa_fmt(pockets[p].areaMm2) + " mm2"
-                + " | r=" + _qa_fmt(pockets[p].inscribedR) + " mm");
+                + " | r=" + _qa_fmt(pockets[p].inscribedR) + " mm"
+                + " | center=(" + _qa_fmt(pockets[p].centX) + "," + _qa_fmt(pockets[p].centY) + ")mm"
+                + " | bbox=[" + pockets[p].minX + "," + pockets[p].minY
+                + " " + (pockets[p].maxX - pockets[p].minX + 1)
+                + "x" + (pockets[p].maxY - pockets[p].minY + 1) + "]mm");
         }
     }
 
@@ -133,7 +140,7 @@ function runNestingQA(doc) {
 
     // ── 7. Visual overlay ─────────────────────────────────────────────────────
     if (CONFIG.showOverlay && !CONFIG.dryRun) {
-        _qa_drawOverlay(doc, pockets, artLeft, artTop, PT);
+        _qa_drawOverlay(doc, pockets, artLeft, artTop, PT, gridW);
     }
 
     return {
@@ -159,15 +166,29 @@ function runNestingQA(doc) {
 // is a union, and hidden components are geometric subsets of the fused contour.
 function _qa_collectPaths(container) {
     var result = [];
-    var items  = container.pageItems;
-    var i, t;
+    var i, j, inner;
+
+    // Sublayers FIRST. A Layer can nest child Layers, and `pageItems` does NOT
+    // include their contents (only this level's loose items + groups). Cutlines
+    // are routinely tucked into a sublayer (e.g. stamps in a "Layer 1" sublayer),
+    // so skipping these silently drops whole stickers from the occupancy grid —
+    // their footprint then reads as a free pocket. GroupItems have no `.layers`,
+    // so this branch only fires for Layer containers.
+    if (container.layers) {
+        for (i = 0; i < container.layers.length; i++) {
+            inner = _qa_collectPaths(container.layers[i]);
+            for (j = 0; j < inner.length; j++) result.push(inner[j]);
+        }
+    }
+
+    var items = container.pageItems;
+    var t;
     for (i = 0; i < items.length; i++) {
         t = items[i].typename;
         if (t === "PathItem" || t === "CompoundPathItem") {
             result.push(items[i]);
         } else if (t === "GroupItem") {
-            var inner = _qa_collectPaths(items[i]);
-            var j;
+            inner = _qa_collectPaths(items[i]);
             for (j = 0; j < inner.length; j++) result.push(inner[j]);
         }
     }
@@ -322,9 +343,67 @@ function _qa_dilate(grid, gridW, gridH, radiusCells) {
     }
 }
 
+// Chamfer distance transform (8-connected: orthogonal step = 1, diagonal step = √2)
+// — a close Euclidean approximation. For each free cell returns its distance (in
+// cells) to the nearest occupied cell; occupied cells get 0. Two sequential passes
+// (forward row-major, then backward) settle the chamfer metric exactly.
+//
+// Why not plain 4-connected BFS: that yields whole-number (Manhattan) distances,
+// which (a) over-measure the true width of diagonal gaps and (b) snap every pocket
+// radius to an integer mm, so a threshold like 4.5 can't sit between 4 and 5. The
+// chamfer metric gives fractional, near-Euclidean radii, so the pocket threshold is
+// tunable at sub-mm resolution and reflects the real inscribed-circle radius.
+function _qa_distanceTransform(grid, gridW, gridH) {
+    var INF = 1e9;
+    var D2  = 1.4142135623730951; // √2
+    var dist = [];
+    var k, n = grid.length;
+    for (k = 0; k < n; k++) dist.push(grid[k] !== 0 ? 0 : INF);
+
+    var x, y, idx, d;
+
+    // Forward pass — propagate from already-visited neighbours: up-left, up, up-right, left.
+    for (y = 0; y < gridH; y++) {
+        for (x = 0; x < gridW; x++) {
+            idx = y * gridW + x;
+            d = dist[idx];
+            if (d === 0) continue;
+            if (y > 0) {
+                if (x > 0          && dist[idx - gridW - 1] + D2 < d) d = dist[idx - gridW - 1] + D2;
+                if (                  dist[idx - gridW]     + 1  < d) d = dist[idx - gridW]     + 1;
+                if (x < gridW - 1  && dist[idx - gridW + 1] + D2 < d) d = dist[idx - gridW + 1] + D2;
+            }
+            if (x > 0              && dist[idx - 1]         + 1  < d) d = dist[idx - 1]         + 1;
+            dist[idx] = d;
+        }
+    }
+
+    // Backward pass — down-right, down, down-left, right.
+    for (y = gridH - 1; y >= 0; y--) {
+        for (x = gridW - 1; x >= 0; x--) {
+            idx = y * gridW + x;
+            d = dist[idx];
+            if (d === 0) continue;
+            if (y < gridH - 1) {
+                if (x < gridW - 1  && dist[idx + gridW + 1] + D2 < d) d = dist[idx + gridW + 1] + D2;
+                if (                  dist[idx + gridW]     + 1  < d) d = dist[idx + gridW]     + 1;
+                if (x > 0          && dist[idx + gridW - 1] + D2 < d) d = dist[idx + gridW - 1] + D2;
+            }
+            if (x < gridW - 1      && dist[idx + 1]         + 1  < d) d = dist[idx + 1]         + 1;
+            dist[idx] = d;
+        }
+    }
+
+    return dist;
+}
+
 // DFS connected-component labelling of free cells.
+// inscribedR = max(distXfm[cell]) within the component, converted to mm.
+// This is the radius of the largest circle that fits inside the pocket,
+// which correctly rejects thin corridors and wrapping free regions whose
+// bounding boxes are large but whose usable width is narrow.
 // Returns pocket array sorted descending by area.
-function _qa_findPockets(grid, gridW, gridH, cellMm) {
+function _qa_findPockets(grid, gridW, gridH, cellMm, distXfm) {
     var visited = [];
     var k;
     for (k = 0; k < grid.length; k++) visited.push(0);
@@ -341,7 +420,9 @@ function _qa_findPockets(grid, gridW, gridH, cellMm) {
                 cellCount: 0,
                 minX: x, maxX: x,
                 minY: y, maxY: y,
-                sumX: 0, sumY: 0
+                sumX: 0, sumY: 0,
+                maxDist: 0,    // max distance-transform value in this component (cells)
+                cells: []      // every free cell index in this pocket (for exact overlay)
             };
 
             var stack = [idx];
@@ -353,12 +434,14 @@ function _qa_findPockets(grid, gridW, gridH, cellMm) {
                 var cy = Math.floor(ci / gridW);
 
                 comp.cellCount++;
+                comp.cells[comp.cells.length] = ci;
                 comp.sumX += cx;
                 comp.sumY += cy;
                 if (cx < comp.minX) comp.minX = cx;
                 if (cx > comp.maxX) comp.maxX = cx;
                 if (cy < comp.minY) comp.minY = cy;
                 if (cy > comp.maxY) comp.maxY = cy;
+                if (distXfm[ci] > comp.maxDist) comp.maxDist = distXfm[ci];
 
                 // 4-connected neighbours — guard against row wrapping.
                 var ni;
@@ -380,11 +463,9 @@ function _qa_findPockets(grid, gridW, gridH, cellMm) {
                 }
             }
 
-            var bbW      = (comp.maxX - comp.minX + 1) * cellMm;
-            var bbH      = (comp.maxY - comp.minY + 1) * cellMm;
-            var inscribedR = Math.min(bbW, bbH) / 2;
-            var centX    = (comp.sumX / comp.cellCount + 0.5) * cellMm;
-            var centY    = (comp.sumY / comp.cellCount + 0.5) * cellMm;
+            var inscribedR = comp.maxDist * cellMm;
+            var centX      = (comp.sumX / comp.cellCount + 0.5) * cellMm;
+            var centY      = (comp.sumY / comp.cellCount + 0.5) * cellMm;
 
             pockets.push({
                 cellCount:  comp.cellCount,
@@ -396,6 +477,7 @@ function _qa_findPockets(grid, gridW, gridH, cellMm) {
                 maxY:       comp.maxY,
                 centX:      centX,
                 centY:      centY,
+                cells:      comp.cells,
                 label: _qa_quadrantLabel(centX, centY,
                             CONFIG.sheetWidthMm, CONFIG.sheetHeightMm)
             });
@@ -418,12 +500,19 @@ function _qa_quadrantLabel(xMm, yMm, sheetW, sheetH) {
     return v + h;
 }
 
-// Draws red rectangles over all recoverable pockets on a temporary layer.
-function _qa_drawOverlay(doc, pockets, artLeft, artTop, PT) {
+// Fills the EXACT free cells of every above-threshold (recoverable) pocket with
+// semi-transparent red on a temporary "NQI Pockets" layer. Cells are run-length
+// encoded per row so the fill traces the real (often concave) empty region and
+// never covers a sticker. Sub-threshold pockets are not drawn.
+function _qa_drawOverlay(doc, pockets, artLeft, artTop, PT, gridW) {
     var LAYER_NAME = "NQI Pockets";
 
     var existing = findLayer(doc, LAYER_NAME);
-    if (existing) existing.remove();
+    if (existing) {
+        existing.locked  = false;
+        existing.visible = true;   // a hidden layer can't be removed
+        existing.remove();
+    }
 
     var overlayLayer = doc.layers.add();
     overlayLayer.name = LAYER_NAME;
@@ -431,19 +520,40 @@ function _qa_drawOverlay(doc, pockets, artLeft, artTop, PT) {
 
     var red    = redCmyk();
     var cellMm = CONFIG.cellSizeMm;
-    var i, pocket, rTop, rLeft, rWidth, rHeight, rect;
+    var i, pocket, rect;
 
     for (i = 0; i < pockets.length; i++) {
         pocket = pockets[i];
         if (pocket.inscribedR < CONFIG.pocketThresholdMm) continue;
 
-        rLeft   = artLeft + pocket.minX * cellMm * PT;
-        rTop    = artTop  - pocket.minY * cellMm * PT;
-        rWidth  = (pocket.maxX - pocket.minX + 1) * cellMm * PT;
-        rHeight = (pocket.maxY - pocket.minY + 1) * cellMm * PT;
+        var cells = pocket.cells;
+        cells.sort(function(a, b) { return a - b; }); // row-major (ci = row*gridW + col)
 
-        rect = overlayLayer.pathItems.rectangle(rTop, rLeft, rWidth, rHeight);
-        setStrokeStyle(rect, 0.5, red);
+        var runStart = -1, prev = -2, c, ci;
+        for (c = 0; c <= cells.length; c++) {
+            ci = (c < cells.length) ? cells[c] : -999;
+            // Continue the run only if this cell is the immediate right neighbour of
+            // the previous one AND on the same row (guards the right-edge → next-row
+            // wrap, where ci === prev + 1 but the row changes).
+            var sameRow = (Math.floor(ci / gridW) === Math.floor(prev / gridW));
+            if (ci === prev + 1 && sameRow) { prev = ci; continue; }
+            if (runStart >= 0) {
+                // Emit the finished run [runStart .. prev] as one rectangle.
+                var row = Math.floor(runStart / gridW);
+                var c0  = runStart % gridW;
+                var c1  = prev % gridW;
+                var rLeft   = artLeft + c0 * cellMm * PT;
+                var rTop    = artTop  - row * cellMm * PT;
+                var rWidth  = (c1 - c0 + 1) * cellMm * PT;
+                var rHeight = cellMm * PT;
+                rect = overlayLayer.pathItems.rectangle(rTop, rLeft, rWidth, rHeight);
+                rect.stroked   = false;
+                rect.filled    = true;
+                rect.fillColor = red;
+                rect.opacity   = 45;
+            }
+            runStart = ci; prev = ci;
+        }
     }
 
     log("[stepQA] overlay drawn on \"" + LAYER_NAME + "\" layer");

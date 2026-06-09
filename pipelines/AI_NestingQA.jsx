@@ -27,7 +27,7 @@ var CONFIG = {
     // A free-space pocket whose inscribed circle radius >= this (mm) is flagged
     // as a reworkable opportunity. Smaller gaps are treated as irrecoverable
     // slivers and do not reduce the score.
-    pocketThresholdMm: 3,
+    pocketThresholdMm: 4.5,
 
     // NQI >= this value is a PASS. Tune after calibration run on real sheets.
     passingNqi: 90,

@@ -37,6 +37,11 @@ sticker-production-scripts/
 │   ├── Step10_AssetExport.jsx          ← JPEG previews (white+green) + per-element PNGs; temp clip groups, no persistent Asset layer
 │   ├── Step11_FinalFile.jsx            ← Save As {STK_CODE}_final.ai; strips non-production layers; renames halfcut layer
 │   └── StepQA_NestingQuality.jsx       ← occupancy grid → NQI score (0-100); flags re-nest pockets
+│                                          (collects cutlines recursively through GROUPS *and*
+│                                           SUBLAYERS — stamps sit in a Cutlines sublayer;
+│                                           chamfer/near-Euclidean distance → largest-inscribed-
+│                                           circle radius per pocket; pocketThresholdMm 4.5mm;
+│                                           overlay = exact free-cell fill, not bounding boxes)
 ├── pipelines/
 │   ├── PS_BuildElements.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
 │   │                                                   (stop: artist reviews captions)
@@ -192,6 +197,13 @@ top. The inner rectangle is the single boundary shared by `marginRect()`: nestin
 placement (Step 7B aligns the regular/irregular clusters to the margin top-left, not
 the artboard), Step 8c margin QA, and the Nesting QA score (StepQA masks everything
 outside the margin and scores NQI/utilization against the printable area only).
+
+StepQA pocket detection: occupancy = union of all Cutlines paths (recurse groups AND
+sublayers) dilated by the 2mm spacing; free cells → connected pockets; a chamfer
+(near-Euclidean, ortho=1/diag=√2) distance transform gives each pocket the radius of
+the largest circle that fits inside it; pockets whose radius ≥ `pocketThresholdMm`
+(4.5mm) are "recoverable" and reduce NQI. Review overlay fills the exact free cells of
+each flagged pocket (semi-transparent red, run-length rects), not bounding boxes.
 
 ## Cutline structure (set by Step 6 script)
 Each non-stamp element is a GroupItem named `[Display Name]` in the Cutlines layer:
