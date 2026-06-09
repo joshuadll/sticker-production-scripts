@@ -107,7 +107,10 @@ function runNestingQA(doc) {
     }
 
     // ── 5. Connected-component pocket detection ────────────────────────────────
-    var pockets = _qa_findPockets(grid, gridW, gridH, CONFIG.cellSizeMm);
+    // Pass the area gate so only recoverable pockets retain their per-cell list
+    // (the overlay only tiles those; sub-threshold pockets keep cells = null).
+    var pockets = _qa_findPockets(grid, gridW, gridH, CONFIG.cellSizeMm,
+                                  CONFIG.pocketMinAreaMm2);
 
     var recoverableCells = 0;
     var p;
@@ -341,8 +344,10 @@ function _qa_dilate(grid, gridW, gridH, radiusCells) {
 
 // DFS connected-component labelling of free cells.
 // Returns pocket array sorted descending by area. Each pocket carries its area,
-// centroid, bounding box, and the list of its free cells (for the overlay).
-function _qa_findPockets(grid, gridW, gridH, cellMm) {
+// centroid, and bounding box. The per-cell list (used only by the overlay to
+// tile the fill) is retained ONLY on recoverable pockets, area >= minAreaMm2;
+// smaller pockets get cells = null, since the overlay never tiles them.
+function _qa_findPockets(grid, gridW, gridH, cellMm, minAreaMm2) {
     var visited = [];
     var k;
     for (k = 0; k < grid.length; k++) visited.push(0);
@@ -400,19 +405,22 @@ function _qa_findPockets(grid, gridW, gridH, cellMm) {
                 }
             }
 
-            var centX = (comp.sumX / comp.cellCount + 0.5) * cellMm;
-            var centY = (comp.sumY / comp.cellCount + 0.5) * cellMm;
+            var areaMm2 = comp.cellCount * cellMm * cellMm;
+            var centX   = (comp.sumX / comp.cellCount + 0.5) * cellMm;
+            var centY   = (comp.sumY / comp.cellCount + 0.5) * cellMm;
 
             pockets.push({
                 cellCount:  comp.cellCount,
-                areaMm2:    comp.cellCount * cellMm * cellMm,
+                areaMm2:    areaMm2,
                 minX:       comp.minX,
                 maxX:       comp.maxX,
                 minY:       comp.minY,
                 maxY:       comp.maxY,
                 centX:      centX,
                 centY:      centY,
-                cells:      comp.cells,
+                // Only recoverable pockets are tiled by the overlay, so only they
+                // need their cell list — drop it for the rest.
+                cells:      (areaMm2 >= minAreaMm2) ? comp.cells : null,
                 label: _qa_quadrantLabel(centX, centY,
                             CONFIG.sheetWidthMm, CONFIG.sheetHeightMm)
             });
