@@ -190,8 +190,19 @@ Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
 Step 8c does **pure-geometry QA** — no Offset Path layer is created. It measures
 inter-cutline distance directly (< 2mm → fail) and checks cut-line bounds against
 the safe area returned by `marginRect(doc)` (aiUtils) — the documented 190×267mm
-working area (A4 minus 10mm top/left/right + 20mm bottom). Violations are flagged
-red on the cut line. No script reads or writes an Offset Path layer.
+working area (A4 minus 10mm top/left/right + 20mm bottom). No script reads or
+writes an Offset Path layer.
+
+Cut lines are **never recoloured in place** — every QA visual goes on one shared,
+toggleable overlay layer, `"Layout QA"` (CONFIG.qaLayerName), so the real cut lines
+stay pristine 0.25pt black and the artist shows/hides all QA at once. Flags are
+**colour-coded by problem type**: SPACING pinches are **red** (an echo of each
+offending outline + a connector and dots across the sub-2mm gap — it's a point
+between two stickers); MARGIN overflow is **amber** (an outline echo + a filled
+overhang sliver beyond the safe line, clipped via `clipPolygonToHalfPlane` — it's an
+area, showing how far over and which way to pull in). The same `"Layout QA"` layer
+also carries StepQA's NQI pocket fills (Step 8c runs first and resets the layer;
+StepQA appends). Step 11 strips `"layout qa"` by name, so QA never reaches print.
 
 The **Margin** band layer IS created — by `buildWorkingDocument()` (aiUtils): a
 30%-black even-odd compound path (outer = artboard, inner = safe area), locked, on

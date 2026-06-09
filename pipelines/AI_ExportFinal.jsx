@@ -19,11 +19,13 @@ var CONFIG = {
     // clears on the re-run.
     cutlinesLayerName:    "Cutlines",
     marginLayerName:      "Margin",
+    qaLayerName:          "Layout QA",  // shared QA overlay (flags); stripped by Step 11
 
     spacingThresholdMm:   2,
     qaSpacingSampleSteps: 12,
     flagStrokePt:         1.0,
     cutlineStrokePt:      0.25,   // reset target for the idempotent QA guard
+    showFlagMarkers:      true,   // draw flags on the QA layer (Step 11 strips it)
 
     // Margin spec — single source of truth in aiUtils.MARGIN_SPEC (avoids drift).
     workingAreaWidthMm:  MARGIN_SPEC.workingAreaWidthMm,

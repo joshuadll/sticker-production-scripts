@@ -92,7 +92,7 @@ check_line "\[step8c\] done"      "spacing/margin completed"
 # Phase 2 — Nesting Quality.
 check_line "\[stepQA\] NQI="      "NQI score computed"
 check_line "\[stepQA\] paths:"    "NQI path count"
-check_line "\[stepQA\] grid:"     "NQI grid dimensions"
+check_line "\[stepQA\] sheet:.*grid:" "NQI grid dimensions"
 
 if [ "$FAIL" -ne 0 ]; then
     echo "  Log contents:"

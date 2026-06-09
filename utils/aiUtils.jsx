@@ -256,6 +256,25 @@ function redCmyk() {
     return c;
 }
 
+// Warm amber/orange — the QA colour for MARGIN overflow, distinct at a glance from
+// the red used for spacing pinches. Reads clearly over the grey margin band where
+// the overhang fill sits.
+function amberCmyk() {
+    var c = new CMYKColor();
+    c.cyan = 0; c.magenta = 55; c.yellow = 100; c.black = 0;
+    return c;
+}
+
+// Cool blue — the NEUTRAL "this element needs attention" halo colour. Deliberately
+// not red/amber so an element with BOTH a spacing and a margin issue isn't forced
+// into one type-colour: the halo just says "look here" (visible at full-sheet zoom
+// as a tint over the sticker), while the red/amber badges carry the problem type.
+function haloCmyk() {
+    var c = new CMYKColor();
+    c.cyan = 70; c.magenta = 30; c.yellow = 0; c.black = 0;
+    return c;
+}
+
 // ─── PATH STYLE HELPERS ───────────────────────────────────────────────────────
 
 // Applies stroke style to a PathItem or CompoundPathItem.
@@ -838,6 +857,24 @@ function _ptSegDist(p, a, b) {
     return Math.sqrt(fx * fx + fy * fy);
 }
 
+// Like _ptSegDist, but also returns the closest point ON segment ab to p.
+// Returns { dist, qx, qy } — qx/qy is the witness point on the segment. Used by
+// minPolygonSetDistanceEx so QA can draw a connector across the actual gap.
+function _ptSegClosest(p, a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var len2 = dx * dx + dy * dy;
+    var qx, qy;
+    if (len2 === 0) {
+        qx = a.x; qy = a.y;
+    } else {
+        var tv = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+        if (tv < 0) tv = 0; else if (tv > 1) tv = 1;
+        qx = a.x + tv * dx; qy = a.y + tv * dy;
+    }
+    var fx = p.x - qx, fy = p.y - qy;
+    return { dist: Math.sqrt(fx * fx + fy * fy), qx: qx, qy: qy };
+}
+
 // Minimum distance (points) between two sets of sampled polygons. Returns 0
 // immediately if either polygon set contains a vertex of the other (full
 // containment). Otherwise the exact minimum is the smallest point-to-edge
@@ -846,27 +883,225 @@ function _ptSegDist(p, a, b) {
 // segment and typical sticker scales, samples are ~0.4 mm apart, well inside
 // the 2 mm QA threshold.
 function minPolygonSetDistance(polysA, polysB) {
+    return minPolygonSetDistanceEx(polysA, polysB).dist;
+}
+
+// Same minimum-distance computation as minPolygonSetDistance, but also returns
+// the witness pair — the two closest points, one on each polygon set — so QA can
+// draw a connector spanning the actual gap. Returns
+//   { dist, ax, ay, bx, by }
+// where (ax,ay) lies on polysA and (bx,by) on polysB. On full containment
+// (dist 0) the witness collapses to the contained vertex (connector degenerates
+// to a dot, which still marks the spot). Points are in the polygons' own
+// coordinate space (document points, as produced by samplePathToPolygons).
+function minPolygonSetDistanceEx(polysA, polysB) {
     var minD = Infinity;
-    var ai, bi, pi, qi, d;
+    var wax = 0, way = 0, wbx = 0, wby = 0;
+    var ai, bi, pi, qi, c;
     for (ai = 0; ai < polysA.length; ai++) {
         var A = polysA[ai];
         for (bi = 0; bi < polysB.length; bi++) {
             var B = polysB[bi];
             var nA = A.length, nB = B.length;
-            if (pointInPolygon(A[0], B) || pointInPolygon(B[0], A)) return 0;
+            if (pointInPolygon(A[0], B)) {
+                return { dist: 0, ax: A[0].x, ay: A[0].y, bx: A[0].x, by: A[0].y };
+            }
+            if (pointInPolygon(B[0], A)) {
+                return { dist: 0, ax: B[0].x, ay: B[0].y, bx: B[0].x, by: B[0].y };
+            }
+            // A vertices vs B edges — witness on A is the vertex, on B the projection.
             for (pi = 0; pi < nA; pi++) {
                 for (qi = 0; qi < nB; qi++) {
-                    d = _ptSegDist(A[pi], B[qi], B[(qi + 1) % nB]);
-                    if (d < minD) minD = d;
+                    c = _ptSegClosest(A[pi], B[qi], B[(qi + 1) % nB]);
+                    if (c.dist < minD) {
+                        minD = c.dist;
+                        wax = A[pi].x; way = A[pi].y; wbx = c.qx; wby = c.qy;
+                    }
                 }
             }
+            // B vertices vs A edges — witness on B is the vertex, on A the projection.
             for (pi = 0; pi < nB; pi++) {
                 for (qi = 0; qi < nA; qi++) {
-                    d = _ptSegDist(B[pi], A[qi], A[(qi + 1) % nA]);
-                    if (d < minD) minD = d;
+                    c = _ptSegClosest(B[pi], A[qi], A[(qi + 1) % nA]);
+                    if (c.dist < minD) {
+                        minD = c.dist;
+                        wbx = B[pi].x; wby = B[pi].y; wax = c.qx; way = c.qy;
+                    }
                 }
             }
         }
     }
-    return minD;
+    return { dist: minD, ax: wax, ay: way, bx: wbx, by: wby };
+}
+
+
+// ─── QA VISUAL OVERLAY ──────────────────────────────────────────────────────────
+// One throwaway layer holds EVERY QA visual — spacing/margin flag markers (Step 8c)
+// and NQI pocket fills (StepQA) — so the artist toggles a single layer to show/hide
+// all of it, and the real cutlines stay pristine 0.25pt black (no in-place recolor).
+// Step 11 strips this layer by name, so it never reaches the final print file.
+
+// Returns the shared QA layer, creating it if absent. With reset=true, any existing
+// QA layer is removed and rebuilt empty (clears stale markers from a prior run) —
+// the FIRST phase of a run passes reset=true; later phases pass reset=false to
+// append. Brought to front and unlocked so its contents draw over the artwork.
+function getOrCreateQALayer(doc, name, reset) {
+    var existing = findLayer(doc, name);
+    if (existing) {
+        if (!reset) {
+            existing.locked  = false;
+            existing.visible = true;
+            return existing;
+        }
+        existing.locked  = false;
+        existing.visible = true;   // a hidden layer can't be removed
+        existing.remove();
+    }
+    var layer = doc.layers.add();
+    layer.name = name;
+    layer.zOrder(ZOrderMethod.BRINGTOFRONT);
+    return layer;
+}
+
+// Draws a filled dot centred at (cxPt, cyPt). Illustrator y is up, and ellipse()
+// takes the TOP edge, so top = cy + radius. Stroke off; semi-transparent fill.
+function qaDrawDot(layer, cxPt, cyPt, radiusPt, colorObj, opacity) {
+    var dot = layer.pathItems.ellipse(
+        cyPt + radiusPt, cxPt - radiusPt, radiusPt * 2, radiusPt * 2);
+    dot.stroked   = false;
+    dot.filled    = true;
+    dot.fillColor = colorObj;
+    dot.opacity   = (opacity === undefined) ? 100 : opacity;
+    return dot;
+}
+
+// Draws an open 2-point line between (x1,y1) and (x2,y2) — the gap connector.
+function qaDrawSegment(layer, x1, y1, x2, y2, colorObj, widthPt, opacity) {
+    var seg = layer.pathItems.add();
+    seg.setEntirePath([[x1, y1], [x2, y2]]);
+    seg.closed      = false;
+    seg.stroked     = true;
+    seg.filled      = false;
+    seg.strokeWidth = widthPt;
+    seg.strokeColor = colorObj;
+    seg.opacity     = (opacity === undefined) ? 100 : opacity;
+    return seg;
+}
+
+// Duplicates a cutline path onto the QA layer and strokes it the flag colour — an
+// echo of the offending sticker outline (the familiar "which sticker is bad" cue)
+// that lives on the toggleable layer instead of mutating the real cutline. Same-
+// document duplicate (not cross-doc .move, which crashes). Returns the duplicate,
+// or null if the item can't be echoed (e.g. a PlacedItem stamp).
+function qaEchoCutline(layer, item, colorObj, widthPt) {
+    var tn = item.typename;
+    if (tn !== "PathItem" && tn !== "CompoundPathItem" && tn !== "GroupItem") {
+        return null;
+    }
+    var dup = item.duplicate(layer, ElementPlacement.PLACEATEND);
+    strokeRecursive(dup, widthPt, colorObj);
+    return dup;
+}
+
+// Duplicates a cutline outline onto the QA layer and FILLS it (no stroke) with a
+// translucent colour — the element "halo" that glows over the whole sticker so a
+// flagged element is spottable at full-sheet zoom regardless of how small the
+// actual violation is. Same-document duplicate. Returns the duplicate, or null if
+// the item can't be filled (e.g. a PlacedItem stamp — halo its bbox instead).
+function qaHaloElement(layer, item, colorObj, opacity) {
+    var tn = item.typename;
+    if (tn !== "PathItem" && tn !== "CompoundPathItem" && tn !== "GroupItem") {
+        return null;
+    }
+    var dup = item.duplicate(layer, ElementPlacement.PLACEATEND);
+    _qaFillRecursive(dup, colorObj);
+    dup.opacity = (opacity === undefined) ? 100 : opacity;
+    return dup;
+}
+
+// Fills a PathItem/CompoundPathItem (or recurses a GroupItem), clearing stroke —
+// the fill half of strokeRecursive, used by qaHaloElement.
+function _qaFillRecursive(item, colorObj) {
+    if (item.typename === "PathItem") {
+        item.filled = true; item.fillColor = colorObj; item.stroked = false;
+        return;
+    }
+    if (item.typename === "CompoundPathItem") {
+        for (var c = 0; c < item.pathItems.length; c++) {
+            item.pathItems[c].filled = true;
+            item.pathItems[c].fillColor = colorObj;
+            item.pathItems[c].stroked = false;
+        }
+        return;
+    }
+    if (item.typename === "GroupItem") {
+        for (var i = 0; i < item.pageItems.length; i++) {
+            _qaFillRecursive(item.pageItems[i], colorObj);
+        }
+    }
+}
+
+// Draws a filled triangular arrow (badge) centred at (cx,cy), pointing along the
+// unit direction (dirX,dirY), with overall length sizePt. Used for the amber
+// margin badge sitting in the gutter and pointing inward (which way to pull it in).
+function qaDrawArrow(layer, cx, cy, dirX, dirY, sizePt, colorObj, opacity) {
+    var hx = dirX * sizePt / 2, hy = dirY * sizePt / 2;   // half-vector along dir
+    var px = -dirY, py = dirX;                            // perpendicular unit
+    var bw = sizePt * 0.5;                                // half base width
+    var t = layer.pathItems.add();
+    t.setEntirePath([
+        [cx + hx,            cy + hy],            // tip
+        [cx - hx + px * bw,  cy - hy + py * bw],  // base corner 1
+        [cx - hx - px * bw,  cy - hy - py * bw]   // base corner 2
+    ]);
+    t.closed    = true;
+    t.stroked   = false;
+    t.filled    = true;
+    t.fillColor = colorObj;
+    t.opacity   = (opacity === undefined) ? 100 : opacity;
+    return t;
+}
+
+// Draws a filled (unstroked) polygon on the layer from an array of {x,y} points —
+// used for the amber margin-overhang sliver. Skips degenerate (<3 point) input.
+function qaFillPolygon(layer, poly, colorObj, opacity) {
+    if (!poly || poly.length < 3) return null;
+    var pts = [], i;
+    for (i = 0; i < poly.length; i++) pts.push([poly[i].x, poly[i].y]);
+    var p = layer.pathItems.add();
+    p.setEntirePath(pts);
+    p.closed    = true;
+    p.stroked   = false;
+    p.filled    = true;
+    p.fillColor = colorObj;
+    p.opacity   = (opacity === undefined) ? 100 : opacity;
+    return p;
+}
+
+// Sutherland–Hodgman clip of a polygon ({x,y}[]) to one axis-aligned half-plane.
+// axis "x" or "y"; keeps the portion on the value side selected by keepGreater
+// (true → coord >= value, false → coord <= value). Returns the clipped polygon
+// (possibly empty). Clipping a closed outline to the OUTSIDE half-plane of a margin
+// edge yields exactly the overhang sliver beyond that edge — no boolean ops needed.
+function clipPolygonToHalfPlane(poly, axis, value, keepGreater) {
+    var out = [], n = poly.length, i;
+    function coord(p) { return (axis === "x") ? p.x : p.y; }
+    function inside(p) { return keepGreater ? (coord(p) >= value) : (coord(p) <= value); }
+    function isect(a, b) {
+        var ca = coord(a), cb = coord(b);
+        var t = (cb === ca) ? 0 : (value - ca) / (cb - ca);
+        return { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) };
+    }
+    for (i = 0; i < n; i++) {
+        var cur  = poly[i];
+        var prev = poly[(i + n - 1) % n];
+        var curIn = inside(cur), prevIn = inside(prev);
+        if (curIn) {
+            if (!prevIn) out.push(isect(prev, cur));
+            out.push(cur);
+        } else if (prevIn) {
+            out.push(isect(prev, cur));
+        }
+    }
+    return out;
 }

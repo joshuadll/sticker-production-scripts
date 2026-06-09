@@ -41,7 +41,10 @@ function runFinalFile(doc) {
     }
 
     // Remove non-production layers. Iterate backwards — safe when items are removed.
-    var REMOVE = ["margin", "offset path", "grid", "color block"];
+    // "layout qa" (and legacy "nqi pockets") = the QA overlay — flags + pocket fills;
+    // strip by name so a stray QA layer the artist forgot to hide never reaches print.
+    var REMOVE = ["margin", "offset path", "grid", "color block",
+                  "layout qa", "nqi pockets"];
     var i;
     for (i = fd.layers.length - 1; i >= 0; i--) {
         if (_s11InList(fd.layers[i].name.toLowerCase(), REMOVE)) {

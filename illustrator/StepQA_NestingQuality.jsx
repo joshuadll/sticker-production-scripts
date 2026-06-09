@@ -446,23 +446,16 @@ function _qa_quadrantLabel(xMm, yMm, sheetW, sheetH) {
 }
 
 // Fills the EXACT free cells of every recoverable pocket (areaMm2 >= the limit)
-// with semi-transparent red on a temporary "NQI Pockets" layer, via greedy
-// maximal-rectangle tiling (see _qa_tilePocket) so the fill traces the real
-// (often concave) empty region and never covers a sticker. Smaller pockets are
-// not drawn.
+// with semi-transparent red, via greedy maximal-rectangle tiling (see
+// _qa_tilePocket) so the fill traces the real (often concave) empty region and
+// never covers a sticker. Smaller pockets are not drawn.
+//
+// Appends to the SHARED QA overlay layer (CONFIG.qaLayerName) — the same layer
+// Step 8c drew its spacing/margin flags on. reset=false: Step 8c runs first and
+// owns the reset, so this only appends (removing the layer here would wipe the
+// flag markers). The artist toggles this one layer to show/hide all QA.
 function _qa_drawOverlay(doc, pockets, artLeft, artTop, PT, gridW) {
-    var LAYER_NAME = "NQI Pockets";
-
-    var existing = findLayer(doc, LAYER_NAME);
-    if (existing) {
-        existing.locked  = false;
-        existing.visible = true;   // a hidden layer can't be removed
-        existing.remove();
-    }
-
-    var overlayLayer = doc.layers.add();
-    overlayLayer.name = LAYER_NAME;
-    overlayLayer.zOrder(ZOrderMethod.BRINGTOFRONT);
+    var overlayLayer = getOrCreateQALayer(doc, CONFIG.qaLayerName, false);
 
     var red    = redCmyk();
     var cellMm = CONFIG.cellSizeMm;
@@ -475,7 +468,7 @@ function _qa_drawOverlay(doc, pockets, artLeft, artTop, PT, gridW) {
         rectCount += _qa_tilePocket(pocket, overlayLayer, red, artLeft, artTop, PT, cellMm, gridW);
     }
 
-    log("[stepQA] overlay drawn on \"" + LAYER_NAME + "\" layer | "
+    log("[stepQA] overlay drawn on \"" + CONFIG.qaLayerName + "\" layer | "
         + rectCount + " rect(s)");
 }
 

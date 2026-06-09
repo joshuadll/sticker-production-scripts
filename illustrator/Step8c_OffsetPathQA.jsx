@@ -14,14 +14,27 @@
 //   2. Margin QA — cut line bounding box exceeds safe area → fail.
 //      Safe area: computed from artboard top-left + CONFIG working area + margins.
 //
-// Violations are flagged red on the cut line itself. The caller halts on
-// flagged > 0 so the artist can fix and re-run.
+// Violations are drawn on a single shared "Layout QA" overlay layer (CONFIG.qaLayerName),
+// NOT recoloured onto the cut line itself — the artist toggles one layer to show/
+// hide all QA, and the real cut lines stay pristine 0.25pt black. The overlay uses
+// two decoupled channels so an element with BOTH problems is shown correctly:
+//   • ELEMENT HALO (neutral blue) — a translucent fill over each flagged sticker,
+//     spottable at full-sheet zoom no matter how tiny the actual violation is. It
+//     only says "look here"; it carries no type, so a both-issue element is fine.
+//   • TYPED BADGES (fixed size, so zoom-out visibility doesn't depend on violation
+//     magnitude) — SPACING = a red disc at the sub-2mm gap (+ thin connector);
+//     MARGIN = an amber arrow in the gutter pointing inward (which way to pull in),
+//     plus the amber overhang-sliver fill for zoomed-in detail.
+// A both-issue sticker gets one halo + a red disc at its pinch + an amber arrow at
+// its margin edge. The same layer also carries StepQA's NQI pocket fills. The caller
+// halts on flagged > 0 so the artist can fix and re-run.
 //
-// Idempotent: every cut line is restroked to the canonical 0.25pt black BEFORE
-// re-flagging, so a cut line the artist has since fixed loses its stale red and
-// repeated runs converge. This lets the same check serve both the on-demand
-// AI_LayoutQA pipeline (run many times as the layout iterates) and the
-// AI_ExportFinal guard.
+// Idempotent on two fronts: (1) every cut line is restroked to canonical 0.25pt
+// black up front — clearing any legacy in-place red from older runs; (2) this phase
+// runs first, so it RESETS the QA layer (rebuilds it empty) before drawing, so a
+// fixed layout loses its stale markers and repeated runs converge. StepQA appends
+// its pockets to the same layer (reset=false). This lets the check serve both the
+// on-demand AI_LayoutQA pipeline and the AI_ExportFinal guard.
 //
 // Returns: { checked, flagged }
 
@@ -86,17 +99,22 @@ function runOffsetPathQA(doc) {
     }
 
     // ── 3. Spacing QA — pairwise, bbox-prefiltered ────────────────────────────
+    // minPolygonSetDistanceEx returns the witness pair (the two closest points)
+    // so the overlay can draw a connector across the actual gap — not just recolor
+    // the whole outline.
     var spacingPairs = 0;
+    var spacingMarks = [];   // { ax, ay, bx, by } — gap endpoints per failing pair
     var a, b;
     for (a = 0; a < records.length; a++) {
         for (b = a + 1; b < records.length; b++) {
             if (!_bboxNear(records[a].bounds, records[b].bounds, threshPt)) continue;
-            var dist = minPolygonSetDistance(records[a].polys, records[b].polys);
-            if (dist < threshPt) {
+            var dm = minPolygonSetDistanceEx(records[a].polys, records[b].polys);
+            if (dm.dist < threshPt) {
                 records[a].spacingFail = true;
                 records[b].spacingFail = true;
                 spacingPairs++;
-                log("[step8c] FLAG | spacing " + _fmtMm(dist) + "mm (< "
+                spacingMarks.push(dm);
+                log("[step8c] FLAG | spacing " + _fmtMm(dm.dist) + "mm (< "
                     + CONFIG.spacingThresholdMm + "mm) | "
                     + records[a].name + " <-> " + records[b].name);
             }
@@ -104,12 +122,15 @@ function runOffsetPathQA(doc) {
     }
 
     // ── 4. Margin QA — cut-line bounds within safe area ──────────────────────
+    // For each violator, record WHICH edges it crosses so the overlay can fill the
+    // overhang sliver beyond each (the amber "out of bounds" cue, see _drawFlagOverlay).
     var marginRect  = _resolveMarginRect(doc);
     var marginItems = 0;
     if (marginRect) {
         for (i = 0; i < records.length; i++) {
             if (boundsWithin(records[i].bounds, marginRect, 0.5)) continue;
-            records[i].marginFail = true;
+            records[i].marginFail  = true;
+            records[i].marginEdges = _crossedMarginEdges(records[i].bounds, marginRect);
             marginItems++;
             log("[step8c] FLAG | cut line exceeds margin | " + records[i].name);
         }
@@ -117,18 +138,19 @@ function runOffsetPathQA(doc) {
         log("[step8c] WARN | no margin rect resolved — margin QA skipped.");
     }
 
-    // ── 5. Apply red flags ────────────────────────────────────────────────────
-    var red = redCmyk();
+    // ── 5. Draw flags on the shared QA overlay layer ──────────────────────────
+    // Cut lines are NEVER recoloured in place — every QA visual goes on one
+    // toggleable "Layout QA" layer (shared with the NQI pocket overlay). This phase
+    // runs first, so it resets the layer (clearing stale markers); StepQA appends.
     var flagged = 0;
     for (i = 0; i < records.length; i++) {
-        var r = records[i];
-        if (r.spacingFail || r.marginFail) {
-            if (r.kind === "path") {
-                strokeRecursive(r.item, CONFIG.flagStrokePt, red);
-            } else {
-                log("[step8c] NOTE | stamp violation (cannot recolor PlacedItem) | " + r.name);
-            }
-            flagged++;
+        if (records[i].spacingFail || records[i].marginFail) flagged++;
+    }
+
+    if (!CONFIG.dryRun) {
+        var qaLayer = getOrCreateQALayer(doc, CONFIG.qaLayerName, true);
+        if (CONFIG.showFlagMarkers !== false) {
+            _drawFlagOverlay(qaLayer, records, spacingMarks, marginRect);
         }
     }
 
@@ -139,6 +161,133 @@ function runOffsetPathQA(doc) {
 
 
 // ── Private helpers ───────────────────────────────────────────────────────────
+
+// Renders the QA flags onto the shared overlay layer, on two decoupled channels so
+// "which element" (zoom-out) and "what kind of problem, where" (zoom-in) never
+// collide — and an element with BOTH problems is shown correctly:
+//   ELEMENT HALO (neutral blue) — a translucent fill over every flagged sticker, so
+//     it's spottable at full-sheet zoom no matter how small the violation is.
+//   BADGES (fixed size → zoom-out visible, colour+shape coded by type):
+//     • SPACING → a red disc at each sub-2mm gap (+ a thin connector for zoom-in).
+//     • MARGIN  → an amber arrow in the gutter at each crossed edge, pointing inward
+//       (which way to pull it in), + the amber overhang sliver fill for zoom-in.
+//   Type lives on the per-issue badges, not the element, so a both-issue sticker
+//   gets one halo + a red disc at its pinch + an amber arrow at its margin edge.
+// Stamps (PlacedItem) can't be filled; their halo + overhang use the bounding box.
+function _drawFlagOverlay(qaLayer, records, spacingMarks, marginRect) {
+    var red       = redCmyk();
+    var amber      = amberCmyk();
+    var halo       = haloCmyk();
+    var connPt     = CONFIG.flagStrokePt;
+    var discR      = mmToPoints(2.5);  // spacing badge disc radius (~5mm dia)
+    var arrowPt    = mmToPoints(6);    // margin arrow length
+    var gutterPt   = mmToPoints(5);    // arrow offset into the gutter from the safe line
+    var fillSteps  = CONFIG.qaMarginFillSteps || 40;  // finer sampling for the sliver
+    var haloOpacity = 20;
+    var i;
+
+    // Channel 1 — element halo over every flagged sticker (drawn first = behind).
+    var halos = 0;
+    for (i = 0; i < records.length; i++) {
+        var r = records[i];
+        if (!(r.spacingFail || r.marginFail)) continue;
+        if (r.kind === "path") {
+            qaHaloElement(qaLayer, r.item, halo, haloOpacity);
+        } else {
+            qaFillPolygon(qaLayer, _vbToPolygon(r.bounds), halo, haloOpacity);
+        }
+        halos++;
+    }
+
+    // Channel 2a — margin overhang sliver fills (zoom-in detail; behind badges).
+    var slivers = 0;
+    if (marginRect) {
+        for (i = 0; i < records.length; i++) {
+            if (records[i].marginFail) {
+                slivers += _fillMarginOverhang(qaLayer, records[i], marginRect, amber, fillSteps);
+            }
+        }
+    }
+
+    // Channel 2b — spacing badges: red disc at the gap midpoint + a thin connector.
+    for (i = 0; i < spacingMarks.length; i++) {
+        var m = spacingMarks[i];
+        qaDrawSegment(qaLayer, m.ax, m.ay, m.bx, m.by, red, connPt, 100);
+        qaDrawDot(qaLayer, (m.ax + m.bx) / 2, (m.ay + m.by) / 2, discR, red, 90);
+    }
+
+    // Channel 2c — margin badges: amber inward-pointing arrow in the gutter.
+    var arrows = 0;
+    if (marginRect) {
+        for (i = 0; i < records.length; i++) {
+            if (records[i].marginFail) {
+                arrows += _drawMarginArrows(qaLayer, records[i], marginRect,
+                                            amber, arrowPt, gutterPt);
+            }
+        }
+    }
+
+    log("[step8c] overlay | drew flags on \"" + CONFIG.qaLayerName + "\" layer | "
+        + halos + " halo(s), " + spacingMarks.length + " spacing badge(s), "
+        + arrows + " margin arrow(s), " + slivers + " sliver(s)");
+}
+
+// Draws an inward-pointing amber arrow in the margin gutter for each safe-area edge
+// the record crosses. Positioned at the element's mid-extent along that edge, offset
+// gutterPt into the gutter, pointing toward the safe area. Returns arrows drawn.
+function _drawMarginArrows(qaLayer, record, mR, amber, arrowPt, gutterPt) {
+    var bb = record.bounds;                 // [l, t, r, b] (AI y-up)
+    var cxMid = (bb[0] + bb[2]) / 2;
+    var cyMid = (bb[1] + bb[3]) / 2;
+    var e = record.marginEdges, n = 0;
+
+    if (e.left)   { qaDrawArrow(qaLayer, mR[0] - gutterPt, cyMid,  1,  0, arrowPt, amber, 100); n++; }
+    if (e.right)  { qaDrawArrow(qaLayer, mR[2] + gutterPt, cyMid, -1,  0, arrowPt, amber, 100); n++; }
+    if (e.top)    { qaDrawArrow(qaLayer, cxMid, mR[1] + gutterPt,  0, -1, arrowPt, amber, 100); n++; }
+    if (e.bottom) { qaDrawArrow(qaLayer, cxMid, mR[3] - gutterPt,  0,  1, arrowPt, amber, 100); n++; }
+    return n;
+}
+
+// Fills the overhang of one margin violator: for each safe-area edge the record
+// crosses, clip its outline to the OUTSIDE half-plane of that edge and fill the
+// result amber. Paths are re-sampled finely (fillSteps) so the sliver hugs the
+// curve; stamps fall back to their bounding-box polygon. Returns slivers drawn.
+function _fillMarginOverhang(qaLayer, record, mR, amber, fillSteps) {
+    var polys;
+    if (record.kind === "stamp") {
+        polys = [_vbToPolygon(record.item.visibleBounds)];
+    } else {
+        polys = samplePathToPolygons(record.item, fillSteps);
+    }
+
+    // Each entry: [axis, value, keepGreater] for the outside half-plane of an edge.
+    var e = record.marginEdges, clips = [];
+    if (e.left)   clips.push(["x", mR[0], false]); // outside-left  : x <= left
+    if (e.right)  clips.push(["x", mR[2], true ]); // outside-right : x >= right
+    if (e.top)    clips.push(["y", mR[1], true ]); // outside-top   : y >= top
+    if (e.bottom) clips.push(["y", mR[3], false]); // outside-bottom: y <= bottom
+
+    var count = 0, p, c;
+    for (p = 0; p < polys.length; p++) {
+        for (c = 0; c < clips.length; c++) {
+            var sliver = clipPolygonToHalfPlane(polys[p], clips[c][0], clips[c][1], clips[c][2]);
+            if (qaFillPolygon(qaLayer, sliver, amber, 50)) count++;
+        }
+    }
+    return count;
+}
+
+// Returns { left, right, top, bottom } booleans for which safe-area edges a
+// bounding box bb = [l,t,r,b] crosses. mR = [left, top, right, bottom] (AI y-up:
+// top > bottom). 0.5pt tolerance matches the boundsWithin gate.
+function _crossedMarginEdges(bb, mR) {
+    return {
+        left:   bb[0] < mR[0] - 0.5,
+        right:  bb[2] > mR[2] + 0.5,
+        top:    bb[1] > mR[1] + 0.5,
+        bottom: bb[3] < mR[3] - 0.5
+    };
+}
 
 // Returns [{ name, item, kind }] per cutline unit in the Cutlines layer.
 //   GroupItem (separable bundle) → kind "path", item = visible cutline member

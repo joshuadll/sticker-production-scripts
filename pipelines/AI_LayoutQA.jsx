@@ -14,9 +14,13 @@
 //
 // Two phases, neither halts the other (the artist wants to see all of it at once):
 //   1. Spacing + Margin QA  — runOffsetPathQA  → { checked, flagged }
-//      Cut lines closer than 2mm or outside the safe area are flagged red.
+//      Cut lines closer than 2mm or outside the safe area are flagged.
 //   2. Nesting Quality (NQI) — runNestingQA    → { nqi, pass, pockets, utilization }
-//      Advisory packing score; reworkable pockets drawn on an "NQI Pockets" layer.
+//      Advisory packing score; reworkable pockets drawn as fills.
+//
+// Both phases draw onto ONE shared "Layout QA" overlay layer (CONFIG.qaLayerName):
+// spacing/margin flag markers + NQI pocket fills. The artist toggles a single layer
+// to show/hide all QA; the cut lines themselves are never recoloured.
 //
 // Spacing/margin is the manufacturability gate that AI_ExportFinal re-runs before
 // export. NQI is advisory only — it never blocks export.
@@ -32,11 +36,18 @@ var CONFIG = {
     cutlinesLayerName: "Cutlines",
     marginLayerName:   "Margin",
 
+    // Single overlay layer holding ALL QA visuals — spacing/margin flag markers
+    // (Step 8c) AND NQI pocket fills (StepQA). The artist toggles this one layer to
+    // show/hide everything; cut lines themselves are never recoloured. Step 11
+    // strips it by name, so it never reaches the print file.
+    qaLayerName:       "Layout QA",
+
     // ── Phase 1: Spacing + Margin QA ─────────────────────────────────────────
     spacingThresholdMm:   2,
     qaSpacingSampleSteps: 12,
-    flagStrokePt:         1.0,    // red flag stroke weight
+    flagStrokePt:         1.0,    // red flag stroke weight (echo outline + connector)
     cutlineStrokePt:      0.25,   // canonical cut-line stroke (reset target on re-run)
+    showFlagMarkers:      true,   // draw spacing/margin flags on the QA layer
 
     // Margin spec — single source of truth in aiUtils.MARGIN_SPEC (avoids drift).
     workingAreaWidthMm:  MARGIN_SPEC.workingAreaWidthMm,
@@ -136,8 +147,9 @@ function main() {
     } else {
         msg += flagged + " reworkable pocket(s):\n" + pocketLines;
     }
-    if (CONFIG.showOverlay && !CONFIG.dryRun) {
-        msg += "\"NQI Pockets\" layer added — delete when done.\n";
+    if (!CONFIG.dryRun) {
+        msg += "All flags + pockets are on the \"" + CONFIG.qaLayerName
+            + "\" layer — toggle it to show/hide; it's stripped at export.\n";
     }
 
     // Guidance.
