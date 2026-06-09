@@ -39,9 +39,10 @@ sticker-production-scripts/
 │   └── StepQA_NestingQuality.jsx       ← occupancy grid → NQI score (0-100); flags re-nest pockets
 │                                          (collects cutlines recursively through GROUPS *and*
 │                                           SUBLAYERS — stamps sit in a Cutlines sublayer;
-│                                           chamfer/near-Euclidean distance → largest-inscribed-
-│                                           circle radius per pocket; pocketThresholdMm 4.5mm;
-│                                           overlay = exact free-cell fill, not bounding boxes)
+│                                           pockets gated by AREA: pocketMinAreaMm2 90mm² — one
+│                                           CONFIG knob; inscribed-circle radius via chamfer
+│                                           distance still logged as a shape reference; overlay =
+│                                           greedy-tiled free-cell fill, not bounding boxes)
 ├── pipelines/
 │   ├── PS_BuildElements.jsx        ← Steps 1 → 2 → 3 (white edge) → 3A (caption text)
 │   │                                                   (stop: artist reviews captions)
@@ -199,11 +200,14 @@ the artboard), Step 8c margin QA, and the Nesting QA score (StepQA masks everyth
 outside the margin and scores NQI/utilization against the printable area only).
 
 StepQA pocket detection: occupancy = union of all Cutlines paths (recurse groups AND
-sublayers) dilated by the 2mm spacing; free cells → connected pockets; a chamfer
-(near-Euclidean, ortho=1/diag=√2) distance transform gives each pocket the radius of
-the largest circle that fits inside it; pockets whose radius ≥ `pocketThresholdMm`
-(4.5mm) are "recoverable" and reduce NQI. Review overlay fills the exact free cells of
-each flagged pocket (semi-transparent red, run-length rects), not bounding boxes.
+sublayers) dilated by the 2mm spacing; free cells → connected pockets. A pocket is
+"recoverable" (reduces NQI) when its **AREA ≥ `pocketMinAreaMm2`** (default 90mm² —
+the single tuning knob; measured after the spacing band is removed, so it's genuinely
+extra space). Each pocket's largest-inscribed-circle radius is still computed via a
+chamfer (near-Euclidean, ortho=1/diag=√2) distance transform and logged as a shape
+reference, but it is NOT the gate. Review overlay fills the exact free cells of each
+flagged pocket (semi-transparent red) using greedy maximal-rectangle tiling — a few
+big boxes per pocket, not one strip per row, so it draws fast (~27s, not 2min+).
 
 ## Cutline structure (set by Step 6 script)
 Each non-stamp element is a GroupItem named `[Display Name]` in the Cutlines layer:

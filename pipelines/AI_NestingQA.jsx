@@ -24,10 +24,12 @@ var CONFIG = {
     // ⚠️ CONFIRM with artist before first run.
     gapMm: 2,
 
-    // A free-space pocket whose inscribed circle radius >= this (mm) is flagged
-    // as a reworkable opportunity. Smaller gaps are treated as irrecoverable
-    // slivers and do not reduce the score.
-    pocketThresholdMm: 4.5,
+    // A free-space pocket whose AREA >= this (mm^2) is flagged as a reworkable
+    // opportunity. Smaller pockets are treated as irrecoverable slivers/noise and
+    // do not reduce the score. (Area-based, measured after the 2mm spacing band is
+    // removed — so it's genuinely extra space. The inscribed-circle radius is still
+    // computed and logged per pocket as a shape reference, but is no longer the gate.)
+    pocketMinAreaMm2: 90,
 
     // NQI >= this value is a PASS. Tune after calibration run on real sheets.
     passingNqi: 90,
@@ -56,7 +58,7 @@ function main() {
         log("[pipeline] document: " + doc.name);
         log("[pipeline] cellSizeMm=" + CONFIG.cellSizeMm
             + " | gapMm=" + CONFIG.gapMm
-            + " | pocketThresholdMm=" + CONFIG.pocketThresholdMm
+            + " | pocketMinAreaMm2=" + CONFIG.pocketMinAreaMm2
             + " | passingNqi=" + CONFIG.passingNqi);
 
         var result = runNestingQA(doc);
@@ -80,7 +82,7 @@ function main() {
 
         for (p = 0; p < result.pockets.length; p++) {
             var pk = result.pockets[p];
-            if (pk.inscribedR < CONFIG.pocketThresholdMm) continue;
+            if (pk.areaMm2 < CONFIG.pocketMinAreaMm2) continue;
             flagged++;
             pocketLines += "  " + flagged + ". " + pk.label
                 + "  — " + Math.round(pk.areaMm2) + " mm2"

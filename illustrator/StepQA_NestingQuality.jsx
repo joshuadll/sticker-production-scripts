@@ -115,7 +115,7 @@ function runNestingQA(doc) {
     var recoverableCells = 0;
     var p;
     for (p = 0; p < pockets.length; p++) {
-        if (pockets[p].inscribedR >= CONFIG.pocketThresholdMm) {
+        if (pockets[p].areaMm2 >= CONFIG.pocketMinAreaMm2) {
             recoverableCells += pockets[p].cellCount;
             log("[stepQA] pocket | " + pockets[p].label
                 + " | area=" + _qa_fmt(pockets[p].areaMm2) + " mm2"
@@ -520,43 +520,81 @@ function _qa_drawOverlay(doc, pockets, artLeft, artTop, PT, gridW) {
 
     var red    = redCmyk();
     var cellMm = CONFIG.cellSizeMm;
-    var i, pocket, rect;
+    var i, pocket;
+    var rectCount = 0;
 
     for (i = 0; i < pockets.length; i++) {
         pocket = pockets[i];
-        if (pocket.inscribedR < CONFIG.pocketThresholdMm) continue;
-
-        var cells = pocket.cells;
-        cells.sort(function(a, b) { return a - b; }); // row-major (ci = row*gridW + col)
-
-        var runStart = -1, prev = -2, c, ci;
-        for (c = 0; c <= cells.length; c++) {
-            ci = (c < cells.length) ? cells[c] : -999;
-            // Continue the run only if this cell is the immediate right neighbour of
-            // the previous one AND on the same row (guards the right-edge → next-row
-            // wrap, where ci === prev + 1 but the row changes).
-            var sameRow = (Math.floor(ci / gridW) === Math.floor(prev / gridW));
-            if (ci === prev + 1 && sameRow) { prev = ci; continue; }
-            if (runStart >= 0) {
-                // Emit the finished run [runStart .. prev] as one rectangle.
-                var row = Math.floor(runStart / gridW);
-                var c0  = runStart % gridW;
-                var c1  = prev % gridW;
-                var rLeft   = artLeft + c0 * cellMm * PT;
-                var rTop    = artTop  - row * cellMm * PT;
-                var rWidth  = (c1 - c0 + 1) * cellMm * PT;
-                var rHeight = cellMm * PT;
-                rect = overlayLayer.pathItems.rectangle(rTop, rLeft, rWidth, rHeight);
-                rect.stroked   = false;
-                rect.filled    = true;
-                rect.fillColor = red;
-                rect.opacity   = 45;
-            }
-            runStart = ci; prev = ci;
-        }
+        if (pocket.areaMm2 < CONFIG.pocketMinAreaMm2) continue;
+        rectCount += _qa_tilePocket(pocket, overlayLayer, red, artLeft, artTop, PT, cellMm, gridW);
     }
 
-    log("[stepQA] overlay drawn on \"" + LAYER_NAME + "\" layer");
+    log("[stepQA] overlay drawn on \"" + LAYER_NAME + "\" layer | "
+        + rectCount + " rect(s)");
+}
+
+// Covers one pocket's free cells with as FEW rectangles as possible (greedy
+// maximal-rectangle tiling), instead of one thin strip per row. A solid blob
+// collapses from ~N strips into a handful of boxes → far fewer path items, much
+// faster to draw/render, and no strip seams. Returns the rect count drawn.
+function _qa_tilePocket(pocket, layer, red, artLeft, artTop, PT, cellMm, gridW) {
+    // Local boolean grid over the pocket's bounding box.
+    var bx0 = pocket.minX, by0 = pocket.minY;
+    var bw  = pocket.maxX - pocket.minX + 1;
+    var bh  = pocket.maxY - pocket.minY + 1;
+
+    var present = [];   // cell belongs to this pocket
+    var used    = [];   // cell already covered by an emitted rectangle
+    var k, n = bw * bh;
+    for (k = 0; k < n; k++) { present.push(false); used.push(false); }
+
+    var cells = pocket.cells, c, ci, col, row;
+    for (c = 0; c < cells.length; c++) {
+        ci  = cells[c];
+        col = ci % gridW;
+        row = (ci - col) / gridW;
+        present[(row - by0) * bw + (col - bx0)] = true;
+    }
+
+    var count = 0;
+    var lx, ly, x1, y1, xx, canDown, ny;
+    for (ly = 0; ly < bh; ly++) {
+        for (lx = 0; lx < bw; lx++) {
+            if (!present[ly * bw + lx] || used[ly * bw + lx]) continue;
+
+            // Grow right along this row.
+            x1 = lx;
+            while (x1 + 1 < bw && present[ly * bw + (x1 + 1)] && !used[ly * bw + (x1 + 1)]) x1++;
+
+            // Grow down while every column lx..x1 is present and free.
+            y1 = ly;
+            canDown = true;
+            while (canDown && y1 + 1 < bh) {
+                ny = y1 + 1;
+                for (xx = lx; xx <= x1; xx++) {
+                    if (!present[ny * bw + xx] || used[ny * bw + xx]) { canDown = false; break; }
+                }
+                if (canDown) y1++;
+            }
+
+            // Mark covered + emit one rectangle for the block.
+            var yy;
+            for (yy = ly; yy <= y1; yy++) for (xx = lx; xx <= x1; xx++) used[yy * bw + xx] = true;
+
+            var gc0 = bx0 + lx, gr0 = by0 + ly;
+            var rLeft   = artLeft + gc0 * cellMm * PT;
+            var rTop    = artTop  - gr0 * cellMm * PT;
+            var rWidth  = (x1 - lx + 1) * cellMm * PT;
+            var rHeight = (y1 - ly + 1) * cellMm * PT;
+            var rect = layer.pathItems.rectangle(rTop, rLeft, rWidth, rHeight);
+            rect.stroked   = false;
+            rect.filled    = true;
+            rect.fillColor = red;
+            rect.opacity   = 45;
+            count++;
+        }
+    }
+    return count;
 }
 
 // Formats a number to one decimal place (ES3-safe).
