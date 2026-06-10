@@ -9,38 +9,38 @@
 [step1] template cleared.
 [step1] opened | Slovakia%20Sticker%20Set%20A4%20-%201.psd
 [step1] found | 7 group(s) in Slovakia%20Sticker%20Set%20A4%20-%201.psd
-[step1] placed | Devín Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 690px
-[step1] placed | Slovak Paradise National Park [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 690px
-[step1] placed | Spiš Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 690px
-[step1] placed | Bratislava Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 690px
-[step1] placed | Štrbské Pleso [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 690px
+[step1] placed | Devín Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 615px
+[step1] placed | Slovak Paradise National Park [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 615px
+[step1] placed | Spiš Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 615px
+[step1] placed | Bratislava Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 615px
+[step1] placed | Štrbské Pleso [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 615px
 [step1] placed | National Flower [ST] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 450px
 [step1] placed | Slovakia Map [WC-MP] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 570px
 [step1] closed | Slovakia%20Sticker%20Set%20A4%20-%201.psd
 [step1] opened | Slovakia%20Sticker%20Set%20A4%20-%202.psd
 [step1] found | 8 group(s) in Slovakia%20Sticker%20Set%20A4%20-%202.psd
-[step1] placed | St. Martin's Cathedral [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 690px
+[step1] placed | St. Martin's Cathedral [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
 [step1] placed | UFO Observation Deck, Bridge SNP [ST] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 450px
-[step1] placed | Old Town Hall (Bratislava) [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 690px
-[step1] placed | Bojnice Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 690px
-[step1] placed | Orava Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 690px
-[step1] placed | Michael's Gate [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 690px
-[step1] placed | The Blue Church - Church of St. Elizabeth [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 690px
-[step1] placed | Čumil Statue [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 540px
+[step1] placed | Old Town Hall (Bratislava) [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
+[step1] placed | Bojnice Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
+[step1] placed | Orava Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
+[step1] placed | Michael's Gate [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
+[step1] placed | The Blue Church - Church of St. Elizabeth [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
+[step1] placed | Čumil Statue [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 495px
 [step1] closed | Slovakia%20Sticker%20Set%20A4%20-%202.psd
 [step1] opened | Slovakia%20Sticker%20Set%20A4%20-%203.psd
 [step1] found | 11 group(s) in Slovakia%20Sticker%20Set%20A4%20-%203.psd
-[step1] placed | Bratislava(text) [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 540px
+[step1] placed | Bratislava(text) [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 495px
 [step1] placed | Šúľance s Makom [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
 [step1] placed | Pirohy [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
 [step1] placed | Bryndzové halušky [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
-[step1] placed | Kraslice [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 540px
-[step1] placed | Kroje [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 540px
-[step1] placed | Fujara [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 540px
+[step1] placed | Kraslice [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 495px
+[step1] placed | Kroje [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 495px
+[step1] placed | Fujara [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 495px
 [step1] placed | Tram [WC-TR] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 570px
-[step1] placed | National Animal - Tatra chamois [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 540px
-[step1] placed | Carpathian Wooden Churches [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 540px
-[step1] placed | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 690px
+[step1] placed | National Animal - Tatra chamois [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 495px
+[step1] placed | Carpathian Wooden Churches [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 495px
+[step1] placed | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 615px
 [step1] closed | Slovakia%20Sticker%20Set%20A4%20-%203.psd
 [pipeline] step 1 complete | 26 element(s) from 3 file(s).
 [pipeline] --- Step 2: Resize ---
@@ -72,32 +72,32 @@
 [step2] layer[24] = Slovak Paradise National Park [WC-LM]
 [step2] layer[25] = Devín Castle [WC-LM]
 [step2] layer[26] = Background
-[step2] resized | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM] -> 690px
-[step2] resized | Carpathian Wooden Churches [WC-IC] -> 540px
-[step2] resized | National Animal - Tatra chamois [WC-IC] -> 540px
+[step2] resized | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM] -> 615px
+[step2] resized | Carpathian Wooden Churches [WC-IC] -> 495px
+[step2] resized | National Animal - Tatra chamois [WC-IC] -> 495px
 [step2] resized | Tram [WC-TR] -> 570px
-[step2] resized | Fujara [WC-IC] -> 540px
-[step2] resized | Kroje [WC-IC] -> 540px
-[step2] resized | Kraslice [WC-IC] -> 540px
+[step2] resized | Fujara [WC-IC] -> 495px
+[step2] resized | Kroje [WC-IC] -> 495px
+[step2] resized | Kraslice [WC-IC] -> 495px
 [step2] resized | Bryndzové halušky [WC-FD] -> 525px
 [step2] resized | Pirohy [WC-FD] -> 525px
 [step2] resized | Šúľance s Makom [WC-FD] -> 525px
-[step2] resized | Bratislava(text) [WC-IC] -> 540px
-[step2] resized | Čumil Statue [WC-IC] -> 540px
-[step2] resized | The Blue Church - Church of St. Elizabeth [WC-LM] -> 690px
-[step2] resized | Michael's Gate [WC-LM] -> 690px
-[step2] resized | Orava Castle [WC-LM] -> 690px
-[step2] resized | Bojnice Castle [WC-LM] -> 690px
-[step2] resized | Old Town Hall (Bratislava) [WC-LM] -> 690px
+[step2] resized | Bratislava(text) [WC-IC] -> 495px
+[step2] resized | Čumil Statue [WC-IC] -> 495px
+[step2] resized | The Blue Church - Church of St. Elizabeth [WC-LM] -> 615px
+[step2] resized | Michael's Gate [WC-LM] -> 615px
+[step2] resized | Orava Castle [WC-LM] -> 615px
+[step2] resized | Bojnice Castle [WC-LM] -> 615px
+[step2] resized | Old Town Hall (Bratislava) [WC-LM] -> 615px
 [step2] resized | UFO Observation Deck, Bridge SNP [ST] -> 450px
-[step2] resized | St. Martin's Cathedral [WC-LM] -> 690px
+[step2] resized | St. Martin's Cathedral [WC-LM] -> 615px
 [step2] resized | Slovakia Map [WC-MP] -> 570px
 [step2] resized | National Flower [ST] -> 450px
-[step2] resized | Štrbské Pleso [WC-LM] -> 690px
-[step2] resized | Bratislava Castle [WC-LM] -> 690px
-[step2] resized | Spiš Castle [WC-LM] -> 690px
-[step2] resized | Slovak Paradise National Park [WC-LM] -> 690px
-[step2] resized | Devín Castle [WC-LM] -> 690px
+[step2] resized | Štrbské Pleso [WC-LM] -> 615px
+[step2] resized | Bratislava Castle [WC-LM] -> 615px
+[step2] resized | Spiš Castle [WC-LM] -> 615px
+[step2] resized | Slovak Paradise National Park [WC-LM] -> 615px
+[step2] resized | Devín Castle [WC-LM] -> 615px
 [step2] SKIP | "Background" — no [STYLE-CAT] code.
 [step2] grid | Devín Castle [WC-LM] -> col 0 row 0
 [step2] grid | Slovak Paradise National Park [WC-LM] -> col 1 row 0
