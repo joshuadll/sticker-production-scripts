@@ -4,9 +4,11 @@
 
 // ─── REGEX ────────────────────────────────────────────────────────────────────
 
-// Matches "Horseshoe Bend [WC-LM]" → captures (Horseshoe Bend)(WC)(LM)
-// Matches "Orlando Stamp [ST]"     → captures (Orlando Stamp)(ST)(undefined)
-var NAME_REGEX = /^(.+)\s\[([A-Z]+)(?:-([A-Z]+))?\]$/;
+// Matches "Horseshoe Bend [WC-LM]"  → captures (Horseshoe Bend)(WC)(LM)(undefined)
+// Matches "Eiffel Tower [WC-LM+]"   → captures (Eiffel Tower)(WC)(LM)(+)
+// Matches "Small Snack [WC-FD-]"    → captures (Small Snack)(WC)(FD)(-)
+// Matches "Orlando Stamp [ST]"      → captures (Orlando Stamp)(ST)(undefined)(undefined)
+var NAME_REGEX = /^(.+)\s\[([A-Z]+)(?:-([A-Z]+)([+-])?)?\]$/;
 
 // ─── PURE HELPERS ─────────────────────────────────────────────────────────────
 // No Adobe API calls — logic only.
@@ -17,18 +19,26 @@ function parseLayerName(name) {
     return {
         displayName: m[1],
         styleCode:   m[2],
-        catCode:     m[3] || null
+        catCode:     m[3] || null,
+        sizeHint:    m[4] || null   // "+" = large end, "-" = small end, null = midpoint
     };
 }
 
 // Returns target pixel size from CONFIG.sizeTable, or null if unrecognised.
 // Stamps use styleCode "ST" directly — no catCode in their name.
+// sizeHint "+" uses sizeTableLarge; "-" uses sizeTableSmall; null uses sizeTable midpoints.
 function getTargetPx(parsed) {
     if (!parsed) return null;
     if (parsed.styleCode === "ST") return CONFIG.sizeTable["ST"];
-    if (parsed.catCode && CONFIG.sizeTable[parsed.catCode] !== undefined) {
-        return CONFIG.sizeTable[parsed.catCode];
+    if (!parsed.catCode) return null;
+    var cat = parsed.catCode;
+    if (parsed.sizeHint === "+" && CONFIG.sizeTableLarge && CONFIG.sizeTableLarge[cat] !== undefined) {
+        return CONFIG.sizeTableLarge[cat];
     }
+    if (parsed.sizeHint === "-" && CONFIG.sizeTableSmall && CONFIG.sizeTableSmall[cat] !== undefined) {
+        return CONFIG.sizeTableSmall[cat];
+    }
+    if (CONFIG.sizeTable[cat] !== undefined) return CONFIG.sizeTable[cat];
     return null;
 }
 

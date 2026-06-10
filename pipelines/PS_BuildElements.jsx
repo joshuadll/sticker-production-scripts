@@ -25,15 +25,35 @@ var CONFIG = {
 
     logPath: "", // resolved below — same folder as this script
 
-    // Pixel targets at 300 DPI (longest edge).
+    // Pixel targets at 300 DPI (longest edge) — midpoints for range categories.
+    // Append + to the category code in the layer name for the large end,
+    // - for the small end: e.g. "Eiffel Tower [WC-LM+]", "Small Snack [WC-FD-]"
     sizeTable: {
-        "TL": 900,  // Title / location name        3 in
-        "LM": 690,  // Landmark / attraction         2.3 in
-        "MP": 570,  // Map / subway / station sign   1.9 in (midpoint 1.8–2)
-        "TR": 570,  // Transportation                1.9 in (midpoint 1.8–2)
-        "IC": 540,  // Cultural icon / symbol        1.8 in
-        "FD": 525,  // Food / local cuisine          1.75 in (midpoint 1.5–2)
-        "ST": 450   // Stamp (style code, no cat)    1.5 in
+        "TL": 900,  // Location names              3 in     (fixed)
+        "LM": 615,  // Landmarks & attractions     2.05 in  (midpoint 1.8–2.3)
+        "MP": 570,  // Maps / station signs        1.9 in   (midpoint 1.8–2)
+        "TR": 570,  // Transportation              1.9 in   (midpoint 1.8–2)
+        "IC": 495,  // Cultural symbols & icons    1.65 in  (midpoint 1.5–1.8)
+        "FD": 525,  // Food & local cuisine        1.75 in  (midpoint 1.5–2)
+        "ST": 450   // Stamps                      1.5 in   (fixed)
+    },
+
+    // Large-end targets — used when category code has + suffix.
+    sizeTableLarge: {
+        "LM": 690,  // 2.3 in
+        "MP": 600,  // 2.0 in
+        "TR": 600,  // 2.0 in
+        "IC": 540,  // 1.8 in
+        "FD": 600   // 2.0 in
+    },
+
+    // Small-end targets — used when category code has - suffix.
+    sizeTableSmall: {
+        "LM": 540,  // 1.8 in
+        "MP": 540,  // 1.8 in
+        "TR": 540,  // 1.8 in
+        "IC": 450,  // 1.5 in
+        "FD": 450   // 1.5 in
     },
 
     // ── Step 2A: Grid layout (after resize) ───────────────────────────────────

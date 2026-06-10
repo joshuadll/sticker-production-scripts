@@ -12,12 +12,26 @@ var CONFIG = {
     logPath:        Folder.desktop.fsName + "/test-psUtils.log",
     sizeTable: {
         "TL": 900,
-        "LM": 690,
+        "LM": 615,
         "MP": 570,
         "TR": 570,
-        "IC": 540,
+        "IC": 495,
         "FD": 525,
         "ST": 450
+    },
+    sizeTableLarge: {
+        "LM": 690,
+        "MP": 600,
+        "TR": 600,
+        "IC": 540,
+        "FD": 600
+    },
+    sizeTableSmall: {
+        "LM": 540,
+        "MP": 540,
+        "TR": 540,
+        "IC": 450,
+        "FD": 450
     }
 };
 
@@ -61,24 +75,37 @@ function assert(description, actual, expected) {
 testLog("[psUtils-test] --- parseLayerName ---");
 
 var r = parseLayerName("Horseshoe Bend [WC-LM]");
-assert("WC-LM: displayName",   r && r.displayName, "Horseshoe Bend");
-assert("WC-LM: styleCode",     r && r.styleCode,   "WC");
-assert("WC-LM: catCode",       r && r.catCode,     "LM");
+assert("WC-LM: displayName",      r && r.displayName,          "Horseshoe Bend");
+assert("WC-LM: styleCode",        r && r.styleCode,            "WC");
+assert("WC-LM: catCode",          r && r.catCode,              "LM");
+assert("WC-LM: sizeHint is null", r && String(r.sizeHint),     "null");
+
+r = parseLayerName("Eiffel Tower [WC-LM+]");
+assert("WC-LM+: displayName",     r && r.displayName,          "Eiffel Tower");
+assert("WC-LM+: catCode",         r && r.catCode,              "LM");
+assert("WC-LM+: sizeHint = +",    r && r.sizeHint,             "+");
+
+r = parseLayerName("Small Snack [WC-FD-]");
+assert("WC-FD-: displayName",     r && r.displayName,          "Small Snack");
+assert("WC-FD-: catCode",         r && r.catCode,              "FD");
+assert("WC-FD-: sizeHint = -",    r && r.sizeHint,             "-");
 
 r = parseLayerName("Key Lime Pie [WC-FD]");
-assert("WC-FD: displayName",   r && r.displayName, "Key Lime Pie");
-assert("WC-FD: catCode",       r && r.catCode,     "FD");
+assert("WC-FD: displayName",      r && r.displayName,          "Key Lime Pie");
+assert("WC-FD: catCode",          r && r.catCode,              "FD");
+assert("WC-FD: sizeHint is null", r && String(r.sizeHint),     "null");
 
 r = parseLayerName("NEMO Museum [GC-LM]");
-assert("GC-LM: styleCode",     r && r.styleCode,   "GC");
+assert("GC-LM: styleCode",        r && r.styleCode,            "GC");
 
 r = parseLayerName("Arizona [WC-TL]");
-assert("WC-TL: catCode",       r && r.catCode,     "TL");
+assert("WC-TL: catCode",          r && r.catCode,              "TL");
 
 r = parseLayerName("Orlando Stamp [ST]");
-assert("ST: displayName",      r && r.displayName, "Orlando Stamp");
-assert("ST: styleCode",        r && r.styleCode,   "ST");
-assert("ST: catCode is null",  r && String(r.catCode), "null");
+assert("ST: displayName",         r && r.displayName,          "Orlando Stamp");
+assert("ST: styleCode",           r && r.styleCode,            "ST");
+assert("ST: catCode is null",     r && String(r.catCode),      "null");
+assert("ST: sizeHint is null",    r && String(r.sizeHint),     "null");
 
 assert("no code: returns null",      String(parseLayerName("Background")),  "null");
 assert("Guide layer: returns null",  String(parseLayerName("Guide")),       "null");
@@ -93,15 +120,34 @@ assert("multi-word name: displayName", r && r.displayName, "Golden Gate Bridge")
 
 testLog("[psUtils-test] --- getTargetPx ---");
 
-assert("TL = 900", getTargetPx(parseLayerName("Arizona [WC-TL]")),             900);
-assert("LM = 690", getTargetPx(parseLayerName("Horseshoe Bend [WC-LM]")),      690);
-assert("MP = 570", getTargetPx(parseLayerName("Arizona Map [WC-MP]")),         570);
-assert("TR = 570", getTargetPx(parseLayerName("Cable Car [WC-TR]")),           570);
-assert("IC = 540", getTargetPx(parseLayerName("Liberty Bell [WC-IC]")),        540);
-assert("FD = 525", getTargetPx(parseLayerName("Key Lime Pie [WC-FD]")),        525);
-assert("ST = 450", getTargetPx(parseLayerName("Orlando Stamp [ST]")),          450);
+// Midpoints (no suffix)
+assert("TL = 900",    getTargetPx(parseLayerName("Arizona [WC-TL]")),            900);
+assert("LM = 615",    getTargetPx(parseLayerName("Horseshoe Bend [WC-LM]")),     615);
+assert("MP = 570",    getTargetPx(parseLayerName("Arizona Map [WC-MP]")),        570);
+assert("TR = 570",    getTargetPx(parseLayerName("Cable Car [WC-TR]")),          570);
+assert("IC = 495",    getTargetPx(parseLayerName("Liberty Bell [WC-IC]")),       495);
+assert("FD = 525",    getTargetPx(parseLayerName("Key Lime Pie [WC-FD]")),       525);
+assert("ST = 450",    getTargetPx(parseLayerName("Orlando Stamp [ST]")),         450);
 
-assert("GC-LM = 690", getTargetPx(parseLayerName("NEMO Museum [GC-LM]")),     690);
+assert("GC-LM = 615", getTargetPx(parseLayerName("NEMO Museum [GC-LM]")),       615);
+
+// Large-end targets (+ suffix)
+assert("LM+ = 690",   getTargetPx(parseLayerName("Eiffel Tower [WC-LM+]")),     690);
+assert("MP+ = 600",   getTargetPx(parseLayerName("Big Map [WC-MP+]")),          600);
+assert("TR+ = 600",   getTargetPx(parseLayerName("Big Train [WC-TR+]")),        600);
+assert("IC+ = 540",   getTargetPx(parseLayerName("Big Icon [WC-IC+]")),         540);
+assert("FD+ = 600",   getTargetPx(parseLayerName("Big Food [WC-FD+]")),         600);
+assert("TL+ = 900",   getTargetPx(parseLayerName("Long Name [WC-TL+]")),        900);
+assert("ST+ = 450",   getTargetPx(parseLayerName("Big Stamp [ST+]")),           450);
+
+// Small-end targets (- suffix)
+assert("LM- = 540",   getTargetPx(parseLayerName("Small Landmark [WC-LM-]")),   540);
+assert("MP- = 540",   getTargetPx(parseLayerName("Small Map [WC-MP-]")),        540);
+assert("TR- = 540",   getTargetPx(parseLayerName("Small Tram [WC-TR-]")),       540);
+assert("IC- = 450",   getTargetPx(parseLayerName("Small Icon [WC-IC-]")),       450);
+assert("FD- = 450",   getTargetPx(parseLayerName("Small Food [WC-FD-]")),       450);
+assert("TL- = 900",   getTargetPx(parseLayerName("Short Name [WC-TL-]")),       900);
+assert("ST- = 450",   getTargetPx(parseLayerName("Tiny Stamp [ST-]")),          450);
 
 assert("unrecognised catCode: null",
     String(getTargetPx(parseLayerName("Something [WC-XX]"))),  "null");

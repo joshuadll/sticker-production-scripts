@@ -5,9 +5,11 @@
 // ─── REGEX ────────────────────────────────────────────────────────────────────
 
 // Same naming convention as Photoshop — element names are consistent across apps.
-// Matches "Horseshoe Bend [WC-LM]" → captures (Horseshoe Bend)(WC)(LM)
-// Matches "Orlando Stamp [ST]"     → captures (Orlando Stamp)(ST)(undefined)
-var NAME_REGEX = /^(.+)\s\[([A-Z]+)(?:-([A-Z]+))?\]$/;
+// Matches "Horseshoe Bend [WC-LM]"  → captures (Horseshoe Bend)(WC)(LM)(undefined)
+// Matches "Eiffel Tower [WC-LM+]"   → captures (Eiffel Tower)(WC)(LM)(+)
+// Matches "Small Snack [WC-FD-]"    → captures (Small Snack)(WC)(FD)(-)
+// Matches "Orlando Stamp [ST]"      → captures (Orlando Stamp)(ST)(undefined)(undefined)
+var NAME_REGEX = /^(.+)\s\[([A-Z]+)(?:-([A-Z]+)([+-])?)?\]$/;
 
 // ─── PURE HELPERS ─────────────────────────────────────────────────────────────
 
@@ -17,7 +19,8 @@ function parseLayerName(name) {
     return {
         displayName: m[1],
         styleCode:   m[2],
-        catCode:     m[3] || null
+        catCode:     m[3] || null,
+        sizeHint:    m[4] || null   // "+" = large end, "-" = small end, null = midpoint
     };
 }
 
