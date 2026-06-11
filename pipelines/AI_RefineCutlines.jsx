@@ -1,7 +1,11 @@
 #target illustrator
 #include "../utils/aiUtils.jsx"
 #include "../illustrator/Step8a_SimplifyCutlines.jsx"
-#include "../illustrator/Step8b_CaptionNormalise.jsx"
+
+// AI_RefineCutlines — Step 8a (Simplify Cutlines), a one-time post-import cleanup.
+//
+// Caption/plate spec normalisation (former Step 8b) is now its own re-runnable
+// pipeline, AI_NormaliseCaptions, which the artist loops on during manual nesting.
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 
@@ -16,10 +20,6 @@ var CONFIG = {
     // Step 8a — Simplify. ⚠️ CONFIRM tuning with artist on a real trace.
     simplifyToleranceMm:   0.2,   // RDP epsilon — higher = fewer anchors
     simplifyCornerAngleDeg: 90,   // turns sharper than this stay hard corners
-
-    // Step 8b — Caption Normalisation (GC plates). Canonical plate heights.
-    plateHeightSingleLineCm: 0.5,
-    plateHeightTwoLineCm:    0.8,
 
     // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,
@@ -64,30 +64,13 @@ function main() {
     log("[pipeline] step 8a complete | " + simplifyResult.simplified + " path(s) simplified, "
         + simplifyResult.skipped + " skipped.");
 
-    // ── Step 8b: Caption Normalisation ─────────────────────────────
-    log("[pipeline] --- Step 8b: Caption Normalisation ---");
-    var captionResult;
-
-    try {
-        captionResult = runCaptionNormalise(doc);
-    } catch (e) {
-        log("[pipeline] ERROR | step 8b line " + e.line + ": " + e.message);
-        scriptAlert("ERROR in Step 8b (Caption Normalisation).\nLine " + e.line + ": " + e.message
-            + "\n\nLog: " + CONFIG.logPath);
-        return;
-    }
-    log("[pipeline] step 8b complete | " + captionResult.normalized + " plate(s) normalised, "
-        + captionResult.anchored + " caption(s) re-anchored, "
-        + captionResult.skipped + " skipped.");
-
     // ── Completion summary ─────────────────────────────────────────
     log("[pipeline] === AI_RefineCutlines done ===");
 
     scriptAlert("Done.\n\n"
-        + "  Simplified:  " + simplifyResult.simplified + " cutline(s).\n"
-        + "  Normalised:  " + captionResult.normalized + " GC plate(s).\n"
-        + "  Re-anchored: " + captionResult.anchored + " caption(s).\n\n"
-        + "Review cutlines, make pencil refinements, then run AI_ExportFinal.\n\n"
+        + "  Simplified:  " + simplifyResult.simplified + " cutline(s).\n\n"
+        + "Nest the elements (AI_NormaliseCaptions keeps captions at spec during the\n"
+        + "resize loop), make pencil refinements, then run AI_ExportFinal.\n\n"
         + "Log: " + CONFIG.logPath);
 }
 

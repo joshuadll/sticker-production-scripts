@@ -30,7 +30,17 @@ sticker-production-scripts/
 │   ├── Step7B_NestingImport.jsx    ← reads Deepnest SVG(s), applies full Deepnest transform (rotation + translation) to cutline GroupItems,
 │   │                                    places per-element PNGs into Stickers layer; called by AI_ImportNesting
 │   ├── Step8a_SimplifyCutlines.jsx     ← native RDP simplify of trace cutlines
-│   ├── Step8b_CaptionNormalise.jsx      ← reset GC plate to spec → re-Unite cutline
+│   ├── Step8b_CaptionNormalise.jsx      ← reset caption+plate to ABSOLUTE spec after the artist's
+│   │                                        manual nest scaling (art+caption+cutline scaled together,
+│   │                                        "Model B"). Per element: unscale = (72/sourceDPI)/captionScale;
+│   │                                        scale plate+caption about the plate∩art CONTACT centroid
+│   │                                        (_overlapCentroid; witness fallback for thin overlaps) — this
+│   │                                        PRESERVES the seating Photoshop's snapCaptionToBorder designed
+│   │                                        (overlap depth + angle) while fixing only the size, and can't float
+│   │                                        (pivot is inside the overlap). → re-Unite. Optional clamped flush
+│   │                                        ROTATION (captionSeatMaxRotateDeg, DEFAULT 0/off — auto angle is
+│   │                                        unreliable, over-slants). GC pill + WC capsule. Idempotent; run by
+│   │                                        AI_NormaliseCaptions
 │   ├── Step8c_OffsetPathQA.jsx         ← spacing + margin QA (pure geometry; no offset layer created)
 │   ├── Step9A_Halfcut.jsx              ← GC/WC elements only: bezier ray → half-cut at plate junction
 │   ├── Step9B_PeelingTab.jsx           ← stamps/unnamed: tab asset + compound path + half-cut at flat edge
@@ -67,7 +77,13 @@ sticker-production-scripts/
 │   │                                     enumerate some macOS dirs); manual dialog fallback. Re-run safe: cutline
 │   │                                     transforms target absolute SVG positions (converge); placed art cleared on entry.
 │   │                                                   (stop: artist reviews layout for any unmatched elements)
-│   ├── AI_RefineCutlines.jsx       ← Steps 8a Simplify → 8b Caption Normalise (stop: artist pencil refinements)
+│   ├── AI_RefineCutlines.jsx       ← Step 8a Simplify (one-time post-import cutline cleanup)
+│   ├── AI_NormaliseCaptions.jsx    ← independent, re-runnable caption/plate spec normalise (Step 8b).
+│   │                                   The artist nests by hand, scaling each element (art+caption+cutline)
+│   │                                   as one unit to fit the artboard, which drags caption+plate off
+│   │                                   absolute spec; this resets them back (idempotent). Run REPEATEDLY in
+│   │                                   the manual nest loop (resize → normalise → …), like AI_LayoutQA.
+│   │                                   ⚠ run BEFORE pencil refinements — it re-derives (re-Unites) the cutline.
 │   ├── AI_ExportFinal.jsx          ← Spacing+Margin QA guard (re-runs Step 8c's idempotent check) → 9A → 10 (Asset Export) → 11 (Final File)
 │   │                                  (Step 9B temporarily removed; peeling tab stays in workflow but pipeline placement TBD)
 │   └── AI_LayoutQA.jsx             ← independent, re-runnable layout QA: Step 8c Spacing+Margin + StepQA_NestingQuality (NQI).

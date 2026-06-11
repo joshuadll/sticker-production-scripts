@@ -1,68 +1,41 @@
 [pipeline] === AI_RefineCutlines start ===
 [pipeline] dryRun: false
-[pipeline] document: step8-cutlines.ai
+[pipeline] document: resize-elements.ai
 [pipeline] --- Step 8a: Simplify Cutlines ---
 [step8a] simplified | Bratislava Castle (outline sub-paths reduced: 1)
-[step8a] simplified | Štrbské Pleso (outline sub-paths reduced: 1)
-[step8a] simplified | Devín Castle (outline sub-paths reduced: 1)
-[step8a] simplified | St. Martin's Cathedral (outline sub-paths reduced: 1)
-[step8a] simplified | Slovak Paradise National Park (outline sub-paths reduced: 1)
 [step8a] simplified | Spiš Castle (outline sub-paths reduced: 1)
+[step8a] simplified | St. Martin's Cathedral (outline sub-paths reduced: 1)
 [step8a] simplified | Bojnice Castle (outline sub-paths reduced: 1)
 [step8a] simplified | The Blue Church - Church of St. Elizabeth (outline sub-paths reduced: 1)
-[step8a] simplified | Old Town Hall (Bratislava) (outline sub-paths reduced: 1)
 [step8a] simplified | St Elizabeth's Cathedral (Dóm Svätej Alzbety) (outline sub-paths reduced: 1)
-[step8a] simplified | Orava Castle (outline sub-paths reduced: 1)
-[step8a] simplified | Michael's Gate (outline sub-paths reduced: 1)
+[step8a] simplified | Štrbské Pleso (outline sub-paths reduced: 1)
+[step8a] simplified | Devín Castle (outline sub-paths reduced: 1)
 [step8a] simplified | Carpathian Wooden Churches (outline sub-paths reduced: 1)
-[step8a] simplified | Čumil Statue (outline sub-paths reduced: 1)
-[step8a] simplified | Pirohy (outline sub-paths reduced: 0)
+[step8a] simplified | Slovak Paradise National Park (outline sub-paths reduced: 1)
+[step8a] simplified | Old Town Hall (Bratislava) (outline sub-paths reduced: 1)
+[step8a] simplified | Pirohy (outline sub-paths reduced: 1)
+[step8a] simplified | Orava Castle (outline sub-paths reduced: 1)
 [step8a] simplified | Bryndzové halušky (outline sub-paths reduced: 0)
-[step8a] simplified | Kraslice (outline sub-paths reduced: 0)
-[step8a] simplified | Kroje (outline sub-paths reduced: 0)
+[step8a] simplified | Michael's Gate (outline sub-paths reduced: 1)
+[step8a] simplified | Čumil Statue (outline sub-paths reduced: 1)
 [step8a] simplified | Tram (outline sub-paths reduced: 1)
-[step8a] simplified | National Animal - Tatra chamois (outline sub-paths reduced: 1)
+[step8a] simplified | Kraslice (outline sub-paths reduced: 1)
+[step8a] simplified | Kroje (outline sub-paths reduced: 1)
 [step8a] simplified | Šúľance s Makom (outline sub-paths reduced: 1)
-[step8a] simplified | Slovakia Map (outline sub-paths reduced: 1)
 [step8a] simplified | Fujara (outline sub-paths reduced: 1)
-[step8a] simplified | Bratislava(text) (outline sub-paths reduced: 1)
+[step8a] simplified | Bratislava(text) (reduced: 1)
 [step8a] simplified | National Flower (reduced: 1)
+[step8a] simplified | Slovakia Map (reduced: 1)
+[step8a] simplified | National Animal - Tatra chamois (reduced: 1)
 [step8a] simplified | UFO Observation Deck, Bridge SNP (reduced: 1)
 [step8a] done | simplified=26 skipped=0
 [pipeline] step 8a complete | 26 path(s) simplified, 0 skipped.
-[pipeline] --- Step 8b: Caption Normalisation ---
-[step8b] SKIP | WC (plate normalisation is GC-only) | Bratislava Castle
-[step8b] SKIP | WC (plate normalisation is GC-only) | Štrbské Pleso
-[step8b] SKIP | WC (plate normalisation is GC-only) | Devín Castle
-[step8b] SKIP | WC (plate normalisation is GC-only) | St. Martin's Cathedral
-[step8b] SKIP | WC (plate normalisation is GC-only) | Slovak Paradise National Park
-[step8b] SKIP | WC (plate normalisation is GC-only) | Spiš Castle
-[step8b] SKIP | WC (plate normalisation is GC-only) | Bojnice Castle
-[step8b] SKIP | WC (plate normalisation is GC-only) | The Blue Church - Church of St. Elizabeth
-[step8b] SKIP | WC (plate normalisation is GC-only) | Old Town Hall (Bratislava)
-[step8b] SKIP | WC (plate normalisation is GC-only) | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
-[step8b] SKIP | WC (plate normalisation is GC-only) | Orava Castle
-[step8b] SKIP | WC (plate normalisation is GC-only) | Michael's Gate
-[step8b] SKIP | WC (plate normalisation is GC-only) | Carpathian Wooden Churches
-[step8b] SKIP | WC (plate normalisation is GC-only) | Čumil Statue
-[step8b] SKIP | WC (plate normalisation is GC-only) | Pirohy
-[step8b] SKIP | WC (plate normalisation is GC-only) | Bryndzové halušky
-[step8b] SKIP | WC (plate normalisation is GC-only) | Kraslice
-[step8b] SKIP | WC (plate normalisation is GC-only) | Kroje
-[step8b] SKIP | WC (plate normalisation is GC-only) | Tram
-[step8b] SKIP | WC (plate normalisation is GC-only) | National Animal - Tatra chamois
-[step8b] SKIP | WC (plate normalisation is GC-only) | Šúľance s Makom
-[step8b] SKIP | WC (plate normalisation is GC-only) | Slovakia Map
-[step8b] SKIP | WC (plate normalisation is GC-only) | Fujara
-[step8b] SKIP | WC (plate normalisation is GC-only) | Bratislava(text)
-[step8b] done | normalized=0 skipped=24
-[pipeline] step 8b complete | 0 plate(s) normalised, 24 skipped.
 [pipeline] === AI_RefineCutlines done ===
 Done.
 
   Simplified:  26 cutline(s).
-  Normalised:  0 GC plate(s).
 
-Review cutlines, make pencil refinements, then run AI_ExportFinal.
+Nest the elements (AI_NormaliseCaptions keeps captions at spec during the
+resize loop), make pencil refinements, then run AI_ExportFinal.
 
 Log: /private/tmp/AI_RefineCutlines.log

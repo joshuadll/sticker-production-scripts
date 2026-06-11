@@ -1,0 +1,37 @@
+[pipeline] === AI_NormaliseCaptions start ===
+[pipeline] dryRun: false
+[pipeline] document: resize-elements.ai
+[step8b] reset to spec | Bratislava Castle (WC, x0.714)
+[step8b] at spec | Spiš Castle (WC)
+[step8b] at spec | St. Martin's Cathedral (WC)
+[step8b] at spec | Bojnice Castle (WC)
+[step8b] at spec | The Blue Church - Church of St. Elizabeth (WC)
+[step8b] at spec | St Elizabeth's Cathedral (Dóm Svätej Alzbety) (WC)
+[step8b] at spec | Štrbské Pleso (WC)
+[step8b] at spec | Devín Castle (WC)
+[step8b] at spec | Carpathian Wooden Churches (WC)
+[step8b] at spec | Slovak Paradise National Park (WC)
+[step8b] at spec | Old Town Hall (Bratislava) (WC)
+[step8b] reset to spec | Pirohy (WC, x1.429)
+[step8b] reset to spec | Orava Castle (WC, x0.667)
+[step8b] at spec | Bryndzové halušky (WC)
+[step8b] at spec | Michael's Gate (WC)
+[step8b] at spec | Čumil Statue (WC)
+[step8b] reset to spec | Tram (WC, x0.769)
+[step8b] at spec | Kraslice (WC)
+[step8b] reset to spec | Kroje (WC, x1.667)
+[step8b] at spec | Šúľance s Makom (WC)
+[step8b] reset to spec | Fujara (WC, x1.538)
+[step8b] done | reset=6 atSpec=15 skipped=0
+[pipeline] caption normalise complete | 6 reset to spec, 15 already at spec, 0 skipped.
+[pipeline] === AI_NormaliseCaptions done ===
+Caption normalisation done.
+
+  Reset to spec:  6 caption(s).
+  Already at spec: 15 caption(s).
+  Skipped:        0 (stamps / uncaptioned).
+
+Re-run after each manual resize pass. When nesting is final, make pencil
+refinements, then run AI_ExportFinal.
+
+Log: /private/tmp/AI_NormaliseCaptions.log

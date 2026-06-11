@@ -1,14 +1,19 @@
 #!/bin/bash
-# Integration test for AI_RefineCutlines (Steps 8a Simplify + 8b Caption Normalise).
+# Integration test for AI_RefineCutlines (Step 8a Simplify).
+# Caption/plate spec normalisation (former Step 8b) is now its own pipeline — see
+# run-ai-normalise-captions.sh.
 #
 # FIXTURE REQUIRED:
-#   tests/integration/fixtures/step8-cutlines.ai
-#     Output of run-ai-import-nesting.sh (cutlines at nested positions, artwork
-#     placed). Run that test first; it publishes this fixture automatically.
+#   tests/integration/fixtures/resize-elements.ai
+#     A nested working doc (Slovakia SKU): well-formed Cutlines groups (note +
+#     outline/plate components) with the decoupled caption PNGs placed on the
+#     Sticker layer — i.e. the post-Step-7B state Step 8b consumes. NOTE: this SKU
+#     is all-WC, so it exercises 8b's WC caption re-anchor path (anchored=21);
+#     the GC plate-reset path (normalized) is intentionally not covered here.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
-#   2. Verify the log looks correct (simplified > 0, normalised >= 0, no errors)
+#   2. Verify the log looks correct (simplified > 0, no errors)
 #   3. Commit: cp "$LOG" tests/integration/expected/ai-refine-cutlines-expected.txt
 
 set -euo pipefail
@@ -19,7 +24,7 @@ APP="Adobe Illustrator"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_RefineCutlines.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
-AI_FIXTURE="$FIXTURE_DIR/step8-cutlines.ai"
+AI_FIXTURE="$FIXTURE_DIR/resize-elements.ai"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ai-refine-cutlines-expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
@@ -29,7 +34,7 @@ LOG="/tmp/AI_RefineCutlines.log"
 
 if [ ! -f "$AI_FIXTURE" ]; then
     echo "SKIP [$STEP]: fixture not found: $AI_FIXTURE"
-    echo "  Run run-ai-import-nesting.sh first to produce this fixture."
+    echo "  Expected the committed resize-elements.ai fixture in tests/integration/fixtures/."
     exit 0
 fi
 
@@ -79,13 +84,6 @@ if grep -q "\[step8a\] done |" "$LOG"; then
     echo "PASS [$STEP]: Step 8a (Simplify) completed."
 else
     echo "FAIL [$STEP]: '[step8a] done |' not found in log."
-    FAIL=1
-fi
-
-if grep -q "\[step8b\] done |" "$LOG"; then
-    echo "PASS [$STEP]: Step 8b (Caption Normalisation) completed."
-else
-    echo "FAIL [$STEP]: '[step8b] done |' not found in log."
     FAIL=1
 fi
 
