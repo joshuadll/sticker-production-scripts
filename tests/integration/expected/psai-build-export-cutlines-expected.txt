@@ -3,52 +3,52 @@
 [pipeline] document: psai-build-export-cutlines-fixture.psd
 [pipeline] revealAll | canvas 4961x7016 -> 4961x7016
 [pipeline] --- Step 3B: Caption white + grouping ---
-[step3B] snapped caption | axis=y sign=-1 maxGap=6 move=-9px
-[step3B] grouped | Devín Castle [WC-LM]
-[step3B] snapped caption | axis=y sign=-1 maxGap=5 move=-8px
-[step3B] grouped | Slovak Paradise National Park [WC-LM]
+[step3B] snapped caption | axis=y sign=-1 maxGap=9 move=-12px
+[step3B] grouped | Devín Castle [WC-LM-]
+[step3B] snapped caption | axis=y sign=-1 maxGap=4 move=-7px
+[step3B] grouped | Slovak Paradise National Park [WC-LM-]
 [step3B] snapped caption | axis=y sign=-1 maxGap=2 move=-5px
-[step3B] grouped | Spiš Castle [WC-LM]
+[step3B] grouped | Spiš Castle [WC-LM+]
 [step3B] snapped caption | axis=y sign=-1 maxGap=13 move=-16px
-[step3B] grouped | Bratislava Castle [WC-LM]
-[step3B] snapped caption | axis=y sign=-1 maxGap=10 move=-13px
-[step3B] grouped | Štrbské Pleso [WC-LM]
+[step3B] grouped | Bratislava Castle [WC-LM+]
+[step3B] snapped caption | axis=y sign=-1 maxGap=8 move=-11px
+[step3B] grouped | Štrbské Pleso [WC-LM-]
 [step3B] grouped stamp | National Flower [ST]
 [step3B] grouped (no caption) | Slovakia Map [WC-MP]
-[step3B] snapped caption | axis=y sign=-1 maxGap=6 move=-9px
+[step3B] snapped caption | axis=y sign=-1 maxGap=7 move=-10px
 [step3B] grouped | St. Martin's Cathedral [WC-LM]
 [step3B] grouped stamp | UFO Observation Deck, Bridge SNP [ST]
-[step3B] snapped caption | axis=y sign=-1 maxGap=0 move=-3px
-[step3B] grouped | Old Town Hall (Bratislava) [WC-LM]
-[step3B] snapped caption | axis=y sign=-1 maxGap=3 move=-6px
+[step3B] snapped caption | axis=y sign=-1 maxGap=2 move=-5px
+[step3B] grouped | Old Town Hall (Bratislava) [WC-LM-]
+[step3B] snapped caption | axis=y sign=-1 maxGap=2 move=-5px
 [step3B] grouped | Bojnice Castle [WC-LM]
-[step3B] snapped caption | axis=y sign=-1 maxGap=9 move=-12px
-[step3B] grouped | Orava Castle [WC-LM]
-[step3B] snapped caption | axis=y sign=-1 maxGap=12 move=-15px
-[step3B] grouped | Michael's Gate [WC-LM]
-[step3B] snapped caption | axis=y sign=-1 maxGap=5 move=-8px
+[step3B] snapped caption | axis=y sign=-1 maxGap=6 move=-9px
+[step3B] grouped | Orava Castle [WC-LM-]
+[step3B] snapped caption | axis=y sign=-1 maxGap=10 move=-13px
+[step3B] grouped | Michael's Gate [WC-LM-]
+[step3B] snapped caption | axis=y sign=-1 maxGap=4 move=-7px
 [step3B] grouped | The Blue Church - Church of St. Elizabeth [WC-LM]
-[step3B] snapped caption | axis=y sign=-1 maxGap=14 move=-17px
+[step3B] snapped caption | axis=y sign=-1 maxGap=13 move=-16px
 [step3B] grouped | Čumil Statue [WC-IC]
 [step3B] grouped (no caption) | Bratislava(text) [WC-IC]
-[step3B] snapped caption | axis=y sign=-1 maxGap=9 move=-12px
+[step3B] snapped caption | axis=y sign=-1 maxGap=7 move=-10px
 [step3B] grouped | Šúľance s Makom [WC-FD]
-[step3B] snapped caption | axis=y sign=-1 maxGap=5 move=-8px
+[step3B] snapped caption | axis=y sign=-1 maxGap=6 move=-9px
 [step3B] grouped | Pirohy [WC-FD]
-[step3B] snapped caption | axis=y sign=-1 maxGap=3 move=-6px
+[step3B] snapped caption | axis=y sign=-1 maxGap=6 move=-9px
 [step3B] grouped | Bryndzové halušky [WC-FD]
-[step3B] snapped caption | axis=y sign=-1 maxGap=12 move=-15px
+[step3B] snapped caption | axis=y sign=-1 maxGap=17 move=-20px
 [step3B] grouped | Kraslice [WC-IC]
-[step3B] snapped caption | axis=y sign=-1 maxGap=13 move=-16px
+[step3B] snapped caption | axis=y sign=-1 maxGap=10 move=-13px
 [step3B] grouped | Kroje [WC-IC]
 [step3B] snapped caption | axis=y sign=-1 maxGap=0 move=-3px
 [step3B] grouped | Fujara [WC-IC]
 [step3B] snapped caption | axis=y sign=-1 maxGap=5 move=-8px
 [step3B] grouped | Tram [WC-TR]
 [step3B] grouped (no caption) | National Animal - Tatra chamois [WC-IC]
-[step3B] snapped caption | axis=y sign=-1 maxGap=3 move=-6px
+[step3B] snapped caption | axis=y sign=-1 maxGap=2 move=-5px
 [step3B] grouped | Carpathian Wooden Churches [WC-IC]
-[step3B] snapped caption | axis=y sign=-1 maxGap=4 move=-7px
+[step3B] snapped caption | axis=y sign=-1 maxGap=3 move=-6px
 [step3B] grouped | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM]
 [pipeline] step 3B complete | 26 element(s) grouped.
 [pipeline] --- Step 5: Finalize Elements group ---
