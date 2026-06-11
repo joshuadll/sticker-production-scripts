@@ -83,7 +83,33 @@
 [pipeline] exported element PNG: Spiš Castle
 [pipeline] exported element PNG: Slovak Paradise National Park
 [pipeline] exported element PNG: Devín Castle
-[pipeline] element PNGs: 26 file(s) → /private/tmp/psai-build-export-cutlines-fixture_elements
+[pipeline] exported caption PNG: St Elizabeth's Cathedral (Dóm Svätej Alzbety)_caption
+[pipeline] exported caption PNG: Carpathian Wooden Churches_caption
+[pipeline] caption PNG SKIP | National Animal - Tatra chamois [WC-IC] — no caption.
+[pipeline] exported caption PNG: Tram_caption
+[pipeline] exported caption PNG: Fujara_caption
+[pipeline] exported caption PNG: Kroje_caption
+[pipeline] exported caption PNG: Kraslice_caption
+[pipeline] exported caption PNG: Bryndzové halušky_caption
+[pipeline] exported caption PNG: Pirohy_caption
+[pipeline] exported caption PNG: Šúľance s Makom_caption
+[pipeline] caption PNG SKIP | Bratislava(text) [WC-IC] — no caption.
+[pipeline] exported caption PNG: Čumil Statue_caption
+[pipeline] exported caption PNG: The Blue Church - Church of St. Elizabeth_caption
+[pipeline] exported caption PNG: Michael's Gate_caption
+[pipeline] exported caption PNG: Orava Castle_caption
+[pipeline] exported caption PNG: Bojnice Castle_caption
+[pipeline] exported caption PNG: Old Town Hall (Bratislava)_caption
+[pipeline] caption PNG SKIP | UFO Observation Deck, Bridge SNP [ST] — no caption.
+[pipeline] exported caption PNG: St. Martin's Cathedral_caption
+[pipeline] caption PNG SKIP | Slovakia Map [WC-MP] — no caption.
+[pipeline] caption PNG SKIP | National Flower [ST] — no caption.
+[pipeline] exported caption PNG: Štrbské Pleso_caption
+[pipeline] exported caption PNG: Bratislava Castle_caption
+[pipeline] exported caption PNG: Spiš Castle_caption
+[pipeline] exported caption PNG: Slovak Paradise National Park_caption
+[pipeline] exported caption PNG: Devín Castle_caption
+[pipeline] element PNGs: 26 art + 21 caption file(s) → /private/tmp/psai-build-export-cutlines-fixture_elements
 [pipeline] element PNGs folder: /private/tmp/psai-build-export-cutlines-fixture_elements
 [pipeline] --- BridgeTalk handoff → Illustrator (Step 6) ---
 [step5] hid 42 caption sub-layer(s).
