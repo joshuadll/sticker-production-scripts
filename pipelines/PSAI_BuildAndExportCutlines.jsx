@@ -279,6 +279,10 @@ function _isCaptionSublayer(layer) {
 // Smart Object + "White Base_Cutline" white edge) in each element group, leaving
 // only the caption visible. Used for the caption-only export pass. Returns the
 // list of layers it actually hid, for restoration.
+// PRECONDITION: every element group must be visible when this runs. layer.visible
+// reflects EFFECTIVE (parent-inherited) visibility in PS 2026, so a child inside a
+// hidden group reads visible=false and would be wrongly skipped. The caller resets
+// group visibility before calling this.
 function hideNonCaptionSublayers(elementsGroup) {
     var hidden = [];
     var g, a, s;
@@ -445,6 +449,15 @@ function exportElementPngs(doc) {
     // Hide art + white base so each caption PNG carries the caption only. Placed
     // as its own object on the Illustrator side so it stays at absolute spec when
     // the artist resizes the art during manual nest refinement.
+    //
+    // Pass 1's per-element isolation left most groups hidden. Because layer.visible
+    // reports EFFECTIVE (parent-inherited) visibility in PS 2026, hideNonCaptionSublayers
+    // would read every child as visible=false and skip it. Reset all element groups to
+    // visible first so child own-flags read correctly. (The final restore below puts the
+    // original sub-group visibility back.)
+    for (sv = 0; sv < elementsGroup.layerSets.length; sv++) {
+        elementsGroup.layerSets[sv].visible = true;
+    }
     var hiddenArtLayers = hideNonCaptionSublayers(elementsGroup);
     var capCount = _exportElementPass(doc, elementsGroup, folderPath, true);
     restoreVisibility(hiddenArtLayers);
