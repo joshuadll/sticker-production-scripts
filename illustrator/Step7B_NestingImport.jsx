@@ -102,7 +102,7 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     // is the same inner rectangle the margin band and Steps 8c/QA use.
     var marginR  = marginRect(doc);
 
-    var totalMatched = 0, totalUnmatched = 0, totalArtPlaced = 0;
+    var totalMatched = 0, totalUnmatched = 0, totalArtPlaced = 0, totalCaptionPlaced = 0;
     var regularBottomY = marginR[1]; // fallback: margin top (used when no regular group)
     var regularCuts   = null;        // regular cutlines, kept for contour-fit of the irregular group
 
@@ -117,9 +117,10 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     if (regularSvg) {
         log("[step-nest] --- processing regular SVG: " + regularSvg.name + " ---");
         var regResult = _nestProcessSingleSvg(doc, regularSvg, cutlineMap, stickersLayer, artFolder, artFactor);
-        totalMatched   += regResult.matched;
-        totalUnmatched += regResult.unmatched;
-        totalArtPlaced += regResult.artPlaced;
+        totalMatched       += regResult.matched;
+        totalUnmatched     += regResult.unmatched;
+        totalArtPlaced     += regResult.artPlaced;
+        totalCaptionPlaced += regResult.captionPlaced;
 
         if (regResult.pairs.length > 0 && !CONFIG.dryRun) {
             // Rotate the regular cluster -90° and snap its top-left to the margin corner.
@@ -136,9 +137,10 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     if (irregularSvg) {
         log("[step-nest] --- processing irregular SVG: " + irregularSvg.name + " ---");
         var irrResult = _nestProcessSingleSvg(doc, irregularSvg, cutlineMap, stickersLayer, artFolder, artFactor);
-        totalMatched   += irrResult.matched;
-        totalUnmatched += irrResult.unmatched;
-        totalArtPlaced += irrResult.artPlaced;
+        totalMatched       += irrResult.matched;
+        totalUnmatched     += irrResult.unmatched;
+        totalArtPlaced     += irrResult.artPlaced;
+        totalCaptionPlaced += irrResult.captionPlaced;
 
         if (irrResult.pairs.length > 0 && !CONFIG.dryRun) {
             // regularBottomY keeps its default (artboard top) when no regular group was
@@ -183,16 +185,23 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     // Verify art actually landed on the Stickers layer (not Cutlines): doc.placedItems
     // .add() ignores the active layer after the cutline passes, so a regression here is
     // silent unless asserted. The test gates on this line.
-    var artOnStickers = stickersLayer ? stickersLayer.placedItems.length : 0;
-    log("[step-nest] art-layer-check | on Stickers: " + artOnStickers
-        + " / placed: " + totalArtPlaced
-        + (artOnStickers === totalArtPlaced ? "  ok" : "  *** ART ON WRONG LAYER ***"));
+    // Stickers now carries both art and caption PNGs, so the expected count is the
+    // sum of the two. A mismatch means an item landed on the wrong layer (e.g. the
+    // locked Cutlines layer) — a silent regression unless asserted.
+    var placedOnStickers = stickersLayer ? stickersLayer.placedItems.length : 0;
+    var expectedOnStickers = totalArtPlaced + totalCaptionPlaced;
+    log("[step-nest] art-layer-check | on Stickers: " + placedOnStickers
+        + " / placed: " + expectedOnStickers
+        + " (art " + totalArtPlaced + " + caption " + totalCaptionPlaced + ")"
+        + (placedOnStickers === expectedOnStickers ? "  ok" : "  *** ITEM ON WRONG LAYER ***"));
 
     log("[step-nest] result | matched: " + totalMatched
         + " | unmatched: " + totalUnmatched
-        + " | art placed: " + totalArtPlaced);
+        + " | art placed: " + totalArtPlaced
+        + " | caption placed: " + totalCaptionPlaced);
 
-    return { matched: totalMatched, unmatched: totalUnmatched, artPlaced: totalArtPlaced };
+    return { matched: totalMatched, unmatched: totalUnmatched,
+             artPlaced: totalArtPlaced, captionPlaced: totalCaptionPlaced };
 }
 
 
@@ -213,9 +222,9 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
 
     var assignments = _nestAssignByArea(parts, cutlineMap);
 
-    var matched = 0, artPlaced = 0, pairs = [];
+    var matched = 0, artPlaced = 0, captionPlaced = 0, pairs = [];
     var assignedPart = {};
-    var a, svgItem, cutlineItem, rotation, artItem;
+    var a, svgItem, cutlineItem, rotation, artItem, captionItem;
 
     for (a = 0; a < assignments.length; a++) {
         svgItem     = assignments[a].part;
@@ -228,12 +237,18 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
         // no rotation, so the alignment is exact (no angle to get wrong). The pair is
         // then moved to the nest pose together by _nestApplyPairTransform.
         artItem = null;
+        captionItem = null;
         if (stickersLayer && artFolder) {
             artItem = _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFactor);
             if (artItem) artPlaced++;
+            // Caption is a separate placed object (decoupled from the art raster) so it
+            // can stay at absolute spec when the artist resizes the art later. It rides
+            // the same rigid nest transform as the cut/art via the pair below.
+            captionItem = _nestPlaceCaptionUpright(doc, stickersLayer, artFolder, cutlineItem, artFactor);
+            if (captionItem) captionPlaced++;
         }
 
-        _nestApplyPairTransform(cutlineItem, artItem, rotation, svgItem.center);
+        _nestApplyPairTransform(cutlineItem, artItem, captionItem, rotation, svgItem.center);
 
         // ── Objective correctness check ──────────────────────────────────────────
         // The cutline and the SVG part are the SAME polygon (Deepnest only rotated +
@@ -252,7 +267,7 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
                 + (bad ? "  *** ROTATION WRONG ***" : "  ok"));
         }
 
-        pairs.push({ cut: cutlineItem, art: artItem });
+        pairs.push({ cut: cutlineItem, art: artItem, caption: captionItem });
         // Remove from the shared map so the next SVG's pass can't reassign this cutline.
         delete cutlineMap[cutlineItem.name];
 
@@ -268,7 +283,8 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
             + Math.round(parts[a].center.y) + ")");
     }
 
-    return { matched: matched, unmatched: unmatched, pairs: pairs, artPlaced: artPlaced };
+    return { matched: matched, unmatched: unmatched, pairs: pairs,
+             artPlaced: artPlaced, captionPlaced: captionPlaced };
 }
 
 
@@ -347,7 +363,8 @@ function _nestRotatePairs(pairs, angleDeg, px, py) {
     for (i = 0; i < pairs.length; i++) {
         p = pairs[i];
         p.cut.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
-        if (p.art) p.art.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
+        if (p.art)     p.art.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
+        if (p.caption) p.caption.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
     }
     log("[step-nest] group-rotated " + pairs.length + " pair(s) by " + angleDeg + "°");
 }
@@ -358,7 +375,8 @@ function _nestTranslatePairs(pairs, dx, dy) {
     for (i = 0; i < pairs.length; i++) {
         p = pairs[i];
         p.cut.translate(dx, dy);
-        if (p.art) p.art.translate(dx, dy);
+        if (p.art)     p.art.translate(dx, dy);
+        if (p.caption) p.caption.translate(dx, dy);
     }
 }
 
@@ -368,20 +386,22 @@ function _nestTranslatePairs(pairs, dx, dy) {
 // centre). Using the cutline centre as the pivot for BOTH keeps the art rigidly locked
 // even when it is registered to the cutline by its element (not co-centred) — rotating
 // each about its own centre would then spin them about different points and desync.
-function _nestApplyPairTransform(cut, art, rotation, target) {
+function _nestApplyPairTransform(cut, art, caption, rotation, target) {
     if (CONFIG.dryRun) return;
 
     if (Math.abs(rotation) > 0.01) {
         var ctr = boundsCenter(cut.geometricBounds);
         var m = _nestPivotMatrix(rotation, ctr.x, ctr.y);
         cut.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
-        if (art) art.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
+        if (art)     art.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
+        if (caption) caption.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
     }
 
     var oc = boundsCenter(cut.geometricBounds); // cutline centre after rotation
     var dx = target.x - oc.x, dy = target.y - oc.y;
     cut.translate(dx, dy);
-    if (art) art.translate(dx, dy);
+    if (art)     art.translate(dx, dy);
+    if (caption) caption.translate(dx, dy);
 }
 
 // Axis-aligned bounding box of bbox [l, t, r, b] after rotating angleDeg degrees
@@ -932,8 +952,14 @@ function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFac
 
         // Size to true AI size = element_px × factor; for a 72-dpi PNG that's just
         // resize by factor×100 (placed.width == element_px, so the px term cancels).
-        // Then centre on the cutline group (cutline is upright here).
-        var cgb = cutlineItem.geometricBounds;
+        // Centre on the element-art trace — the cutline's " outline" member — NOT the
+        // full cutline. The cutline = Unite(outline, plate), so its bbox includes the
+        // caption/plate region; the art PNG is now caption-free (the caption is placed
+        // separately), so registering it to the full cutline would drift it toward the
+        // empty plate area. Stamps (PathItem, no members) fall back to full bounds.
+        var artBoundsItem = (cutlineItem.typename === "GroupItem")
+            ? findGroupMember(cutlineItem, " outline") : null;
+        var cgb = artBoundsItem ? artBoundsItem.geometricBounds : cutlineItem.geometricBounds;
         placed.resize(artFactor * 100, artFactor * 100);
 
         var cc = boundsCenter(cgb);
@@ -941,15 +967,15 @@ function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFac
                          cc.y - (placed.position[1] - placed.height / 2));
 
         // Objective fit check (upright, before the nest transform): the art and the
-        // cutline are the same element, so their bounding boxes should closely agree.
-        // Under the old height-fit, height matched but width could be far off; the
-        // absolute factor makes both agree (residual = trace inset + plate vs render).
+        // outline trace are the same element-art shape, so their bounding boxes should
+        // closely agree (residual = trace inset vs render). A large mismatch flags a
+        // sizing/centering regression.
         var agb = placed.geometricBounds;
         var aW = Math.abs(agb[2] - agb[0]), aH = Math.abs(agb[1] - agb[3]);
         var cW = Math.abs(cgb[2] - cgb[0]), cHb = Math.abs(cgb[1] - cgb[3]);
         log("[step-nest] ART-FIT | " + displayName
             + " art=" + Math.round(aW) + "x" + Math.round(aH)
-            + " cut=" + Math.round(cW) + "x" + Math.round(cHb)
+            + " outline=" + Math.round(cW) + "x" + Math.round(cHb)
             + " dW=" + Math.round(aW - cW) + " dH=" + Math.round(aH - cHb));
 
         return placed;
@@ -961,6 +987,63 @@ function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFac
         // accumulates run-over-run. Remove it so failure is clean.
         if (placed) { try { placed.remove(); } catch (e2) {} }
         log("[step-nest] WARN | art placement failed for: " + displayName
+            + " — line " + e.line + ": " + e.message);
+        return null;
+    }
+}
+
+// Places {displayName}_caption.png on its cutline's " plate" member WHILE THE CUTLINE
+// IS STILL UPRIGHT — scaled by the SAME absolute PSD→AI factor as the art, centred on
+// the plate (caption) region. The caption is decoupled from the art raster (PSAI
+// exports it as its own PNG) so the artist can resize the art during manual nest
+// refinement while the caption stays at absolute spec — only its position tracks the
+// art (re-anchored by Step 8b). The caller rides it through the rigid nest transform
+// as a third pair member, so it never needs an independent rotation. Returns the placed
+// PageItem, or null when the element has no caption (stamps / uncaptioned) or no PNG.
+function _nestPlaceCaptionUpright(doc, stickersLayer, artFolder, cutlineItem, artFactor) {
+    if (cutlineItem.typename !== "GroupItem") return null;   // stamps: PathItem, no caption
+    var plateItem = findGroupMember(cutlineItem, " plate");
+    if (!plateItem) return null;                             // uncaptioned element
+
+    var displayName = cutlineItem.name;
+    var safeName    = displayName.replace(/[\/\\:*?"<>|]/g, "_");
+    var pngFile     = new File(artFolder.fsName + "/" + safeName + "_caption.png");
+
+    if (!pngFile.exists) {
+        log("[step-nest] caption PNG not found (skipping caption) | " + displayName);
+        return null;
+    }
+    if (CONFIG.dryRun) {
+        log("[step-nest] [DRY RUN] would place caption | " + displayName);
+        return null;
+    }
+
+    doc.activeLayer = stickersLayer;
+
+    var placed = null;
+    try {
+        placed = stickersLayer.placedItems.add();
+        placed.file = pngFile;
+        placed.name = displayName + " caption";
+
+        if (placed.layer !== stickersLayer) {
+            placed.move(stickersLayer, ElementPlacement.PLACEATBEGINNING);
+        }
+
+        // Same absolute factor as the art (unit conversion, NOT a fit) → true spec size.
+        // Centre on the plate region so it lands where the caption belongs.
+        placed.resize(artFactor * 100, artFactor * 100);
+
+        var pc = boundsCenter(plateItem.geometricBounds);
+        placed.translate(pc.x - (placed.position[0] + placed.width  / 2),
+                         pc.y - (placed.position[1] - placed.height / 2));
+
+        log("[step-nest] caption placed | " + displayName);
+        return placed;
+
+    } catch (e) {
+        if (placed) { try { placed.remove(); } catch (e2) {} }
+        log("[step-nest] WARN | caption placement failed for: " + displayName
             + " — line " + e.line + ": " + e.message);
         return null;
     }

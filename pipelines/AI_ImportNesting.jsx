@@ -116,7 +116,8 @@ function main() {
             + "  Unmatched:  " + result.unmatched  + " element(s) — see log\n"
             + "  Layout:     regular rotated -90° at artboard top-left;\n"
             + "              irregular auto-rotated below with 2 mm gap\n"
-            + "  Art placed: " + result.artPlaced  + " PNG(s) in Stickers layer\n\n";
+            + "  Art placed: " + result.artPlaced  + " PNG(s) in Stickers layer\n"
+            + "  Captions:   " + result.captionPlaced + " caption PNG(s) placed (decoupled)\n\n";
 
         if (result.unmatched > 0) {
             msg += "WARNING: " + result.unmatched + " element(s) could not be matched.\n"

@@ -10,6 +10,7 @@ var CONFIG = {
 
     // Layer + stroke — must match the Production File Template / Step 6 output.
     cutlinesLayerName: "Cutlines",
+    stickersLayerName: "Sticker",   // where placed art + caption PNGs live (Step 7B)
     cutlineStrokePt:   0.25,
 
     // Step 8a — Simplify. ⚠️ CONFIRM tuning with artist on a real trace.
@@ -76,6 +77,7 @@ function main() {
         return;
     }
     log("[pipeline] step 8b complete | " + captionResult.normalized + " plate(s) normalised, "
+        + captionResult.anchored + " caption(s) re-anchored, "
         + captionResult.skipped + " skipped.");
 
     // ── Completion summary ─────────────────────────────────────────
@@ -83,7 +85,8 @@ function main() {
 
     scriptAlert("Done.\n\n"
         + "  Simplified:  " + simplifyResult.simplified + " cutline(s).\n"
-        + "  Normalised:  " + captionResult.normalized + " GC plate(s).\n\n"
+        + "  Normalised:  " + captionResult.normalized + " GC plate(s).\n"
+        + "  Re-anchored: " + captionResult.anchored + " caption(s).\n\n"
         + "Review cutlines, make pencil refinements, then run AI_ExportFinal.\n\n"
         + "Log: " + CONFIG.logPath);
 }

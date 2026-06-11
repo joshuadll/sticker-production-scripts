@@ -267,9 +267,135 @@ function writeElementsFile(doc) {
 
 // ─── PER-ELEMENT PNG EXPORT ───────────────────────────────────────────────────
 
+// True if layer is one of the caption sub-layers (TEXT, "White" pill, or the
+// "Caption plate" group). Mirrors the classification in hideCaptionSublayers
+// (Step5_Silhouette.jsx) so the art and caption passes stay in agreement.
+function _isCaptionSublayer(layer) {
+    if (layer.typename === "LayerSet") return layer.name === "Caption plate";
+    return layer.kind === LayerKind.TEXT || layer.name === "White";
+}
+
+// Complement of hideCaptionSublayers: hides every NON-caption layer (the art
+// Smart Object + "White Base_Cutline" white edge) in each element group, leaving
+// only the caption visible. Used for the caption-only export pass. Returns the
+// list of layers it actually hid, for restoration.
+function hideNonCaptionSublayers(elementsGroup) {
+    var hidden = [];
+    var g, a, s;
+    for (g = 0; g < elementsGroup.layerSets.length; g++) {
+        var grp = elementsGroup.layerSets[g];
+        for (a = 0; a < grp.artLayers.length; a++) {
+            var al = grp.artLayers[a];
+            if (!_isCaptionSublayer(al) && al.visible) {
+                al.visible = false;
+                hidden.push(al);
+            }
+        }
+        for (s = 0; s < grp.layerSets.length; s++) {
+            var ls = grp.layerSets[s];
+            if (!_isCaptionSublayer(ls) && ls.visible) {
+                ls.visible = false;
+                hidden.push(ls);
+            }
+        }
+    }
+    return hidden;
+}
+
+// True if the element group contains any caption sub-layer (regardless of
+// visibility). Stamps / uncaptioned elements return false and are skipped by the
+// caption-only pass (they would otherwise export an empty PNG).
+function groupHasCaption(grp) {
+    var a, s;
+    for (a = 0; a < grp.artLayers.length; a++) {
+        if (_isCaptionSublayer(grp.artLayers[a])) return true;
+    }
+    for (s = 0; s < grp.layerSets.length; s++) {
+        if (_isCaptionSublayer(grp.layerSets[s])) return true;
+    }
+    return false;
+}
+
+// Duplicate → trim to visible (transparent) bounds → export PNG → rename. The
+// temp-name + rename dance works around two PS 2026 Save-For-Web quirks (see the
+// inline notes). Returns true on success. Shared by the art and caption passes.
+function _exportTrimmedPng(doc, folderPath, fileBase) {
+    var dup = null;
+    var ok  = false;
+    try {
+        dup = doc.duplicate();
+        dup.trim(TrimType.TRANSPARENT, true, true, true, true);
+        var pngOpts          = new ExportOptionsSaveForWeb();
+        pngOpts.format       = SaveDocumentType.PNG;
+        pngOpts.PNG8         = false;
+        pngOpts.transparency = true;
+        pngOpts.interlaced   = false;
+        // 1. SFW silently NO-OPs over an existing file → remove target first.
+        // 2. SFW sanitises spaces/punctuation in the filename → write a space-free
+        //    temp name verbatim, then rename to the real (spaced/unicode) name.
+        var tmpFile = new File(folderPath + "/__export_tmp.png");
+        if (tmpFile.exists) tmpFile.remove();
+        dup.exportDocument(tmpFile, ExportType.SAVEFORWEB, pngOpts);
+        var outFile = new File(folderPath + "/" + fileBase + ".png");
+        if (outFile.exists) outFile.remove();
+        tmpFile.rename(fileBase + ".png");
+        ok = true;
+    } catch (e) {
+        log("[pipeline] WARN | failed to export " + fileBase + ": " + e.message);
+    }
+    if (dup) dup.close(SaveOptions.DONOTSAVECHANGES);
+    app.activeDocument = doc;
+    return ok;
+}
+
+// Runs one export pass over every element group. captionOnly=false → art PNG
+// "{displayName}.png"; captionOnly=true → caption PNG "{displayName}_caption.png"
+// (groups without a caption are skipped). Assumes the caller has already set the
+// art/caption layer visibility for the pass. Returns the count exported.
+function _exportElementPass(doc, elementsGroup, folderPath, captionOnly) {
+    var count = 0;
+    var j, k, grp, parsed, safeName, fileBase;
+    for (j = 0; j < elementsGroup.layerSets.length; j++) {
+        grp    = elementsGroup.layerSets[j];
+        parsed = parseLayerName(grp.name);
+        if (!parsed) continue;
+        if (captionOnly && !groupHasCaption(grp)) {
+            log("[pipeline] caption PNG SKIP | " + grp.name + " — no caption.");
+            continue;
+        }
+
+        // Show only this element group.
+        for (k = 0; k < elementsGroup.layerSets.length; k++) {
+            elementsGroup.layerSets[k].visible = false;
+        }
+        grp.visible = true;
+
+        safeName = parsed.displayName.replace(/[\/\\:*?"<>|]/g, "_");
+        fileBase = captionOnly ? (safeName + "_caption") : safeName;
+
+        if (CONFIG.dryRun) {
+            log("[pipeline] [DRY RUN] would export " + (captionOnly ? "caption" : "element")
+                + " PNG: " + fileBase);
+            continue;
+        }
+
+        if (_exportTrimmedPng(doc, folderPath, fileBase)) {
+            count++;
+            log("[pipeline] exported " + (captionOnly ? "caption" : "element")
+                + " PNG: " + fileBase);
+        }
+    }
+    return count;
+}
+
 // Exports each element group as a separate PNG into {baseName}_elements/.
-// Each PNG is trimmed to the element's bounding box and saved on a transparent
-// background, so AI_ImportNesting can place it at the correct scale.
+// Two passes per element so the printed caption is decoupled from the art:
+//   {displayName}.png          art + white base only (caption hidden)
+//   {displayName}_caption.png  caption (pill + text) only — placed as its own
+//                              object on the AI side so it stays at absolute spec
+//                              when the artist resizes the art during nest refinement
+// Each PNG is trimmed to its bounding box on a transparent background, so
+// AI_ImportNesting can place it at the correct scale.
 // Returns the folder path string, or null on failure.
 function exportElementPngs(doc) {
     var elementsGroup = findLayerByName(doc, "Elements");
@@ -306,66 +432,22 @@ function exportElementPngs(doc) {
         subVis[sv] = elementsGroup.layerSets[sv].visible;
     }
 
-    var count = 0;
-    var j, k, grp, parsed, safeName, pngPath, dup;
+    // (main() ran doc.revealAll() before Step 3B, so all caption pixels are
+    // on-canvas — each trim captures full bounds with no off-canvas clipping.)
 
-    for (j = 0; j < elementsGroup.layerSets.length; j++) {
-        grp    = elementsGroup.layerSets[j];
-        parsed = parseLayerName(grp.name);
-        if (!parsed) continue;
+    // ── Pass 1: art (caption-free) ──────────────────────────────────────────
+    // Hide caption sub-layers so each art PNG carries art + white base only.
+    var hiddenCaptionLayers = hideCaptionSublayers(elementsGroup);
+    var artCount = _exportElementPass(doc, elementsGroup, folderPath, false);
+    restoreVisibility(hiddenCaptionLayers);
 
-        // Show only this element group.
-        for (k = 0; k < elementsGroup.layerSets.length; k++) {
-            elementsGroup.layerSets[k].visible = false;
-        }
-        grp.visible = true;
-
-        safeName = parsed.displayName.replace(/[\/\\:*?"<>|]/g, "_");
-        pngPath  = folderPath + "/" + safeName + ".png";
-
-        if (CONFIG.dryRun) {
-            log("[pipeline] [DRY RUN] would export element PNG: " + safeName);
-            continue;
-        }
-
-        // Duplicate, trim to transparent bounds, export. (main() ran doc.revealAll()
-        // before Step 3B, so all caption pixels are on-canvas — trim captures the full
-        // element with no off-canvas clipping to undo here.)
-        dup = null;
-        try {
-            dup = doc.duplicate();
-            dup.trim(TrimType.TRANSPARENT, true, true, true, true);
-            var pngOpts       = new ExportOptionsSaveForWeb();
-            pngOpts.format       = SaveDocumentType.PNG;
-            pngOpts.PNG8         = false;
-            pngOpts.transparency = true;
-            pngOpts.interlaced   = false;
-            // Export to an ASCII temp name, then rename to the exact "{displayName}.png".
-            // Two PS 2026 Save-For-Web quirks force this dance (saveAs(PNG) is not an
-            // option — it errors on this layered CMYK duplicate):
-            //   1. SFW silently NO-OPs over an existing file (no exception — still logs OK),
-            //      so a re-run of a SKU would keep STALE art. → remove the target first.
-            //   2. SFW SANITISES the output filename (spaces → hyphens, etc.), which breaks
-            //      the exact-name convention AI_ImportNesting matches cutlines against. The
-            //      sanitiser only touches spaces/punctuation, so a space-free temp name is
-            //      written verbatim; we then rename it to the real (spaced/unicode) name.
-            var tmpFile = new File(folderPath + "/__export_tmp.png");
-            if (tmpFile.exists) tmpFile.remove();
-            dup.exportDocument(tmpFile, ExportType.SAVEFORWEB, pngOpts);
-            var outFile = new File(pngPath);
-            if (outFile.exists) outFile.remove();
-            tmpFile.rename(safeName + ".png");
-            count++;
-            log("[pipeline] exported element PNG: " + safeName);
-        } catch (e) {
-            log("[pipeline] WARN | failed to export " + safeName + ": " + e.message);
-        }
-
-        if (dup) {
-            dup.close(SaveOptions.DONOTSAVECHANGES);
-        }
-        app.activeDocument = doc;
-    }
+    // ── Pass 2: caption-only (pill + text as one unit) ──────────────────────
+    // Hide art + white base so each caption PNG carries the caption only. Placed
+    // as its own object on the Illustrator side so it stays at absolute spec when
+    // the artist resizes the art during manual nest refinement.
+    var hiddenArtLayers = hideNonCaptionSublayers(elementsGroup);
+    var capCount = _exportElementPass(doc, elementsGroup, folderPath, true);
+    restoreVisibility(hiddenArtLayers);
 
     // Restore element sub-group visibility (hidden during per-element isolation).
     for (sv = 0; sv < elementsGroup.layerSets.length; sv++) {
@@ -379,7 +461,8 @@ function exportElementPngs(doc) {
 
     app.preferences.rulerUnits = prevUnits;
 
-    log("[pipeline] element PNGs: " + count + " file(s) → " + folderPath);
+    log("[pipeline] element PNGs: " + artCount + " art + " + capCount
+        + " caption file(s) → " + folderPath);
     return folderPath;
 }
 
