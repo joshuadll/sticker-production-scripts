@@ -54,6 +54,11 @@ function runOffsetPathQA(doc) {
     }
 
     // ── 2. Collect and sample all cut lines ──────────────────────────────────
+    // Per-phase wall timing (ms via Date — $.hiresTimer is unreliable in Illustrator)
+    // to pinpoint the bottleneck on a slow run. Advisory; stripped by the golden diff.
+    var _tSample = 0, _tSpacing = 0, _tMargin = 0, _tOverlay = 0;
+    var _mark = (new Date()).getTime();
+
     var cutlines = _collectCutlines(cutlinesLayer);
     log("[step8c] collected " + cutlines.length + " cut line(s).");
 
@@ -83,6 +88,8 @@ function runOffsetPathQA(doc) {
             marginFail:   false
         });
     }
+
+    _tSample = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
 
     // ── 2b. Reset prior QA flags (idempotent) ─────────────────────────────────
     // Restroke every cut line to the canonical 0.25pt black before re-flagging.
@@ -121,6 +128,8 @@ function runOffsetPathQA(doc) {
         }
     }
 
+    _tSpacing = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
+
     // ── 4. Margin QA — cut-line bounds within safe area ──────────────────────
     // For each violator, record WHICH edges it crosses so the overlay can fill the
     // overhang sliver beyond each (the amber "out of bounds" cue, see _drawFlagOverlay).
@@ -138,6 +147,8 @@ function runOffsetPathQA(doc) {
         log("[step8c] WARN | no margin rect resolved — margin QA skipped.");
     }
 
+    _tMargin = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
+
     // ── 5. Draw flags on the shared QA overlay layer ──────────────────────────
     // Cut lines are NEVER recoloured in place — every QA visual goes on one
     // toggleable "Layout QA" layer (shared with the NQI pocket overlay). This phase
@@ -153,6 +164,12 @@ function runOffsetPathQA(doc) {
             _drawFlagOverlay(qaLayer, records, spacingMarks, marginRect);
         }
     }
+
+    _tOverlay = (new Date()).getTime() - _mark;
+
+    log("[timing] step8c | sample=" + _tSample
+        + " spacing=" + _tSpacing + " margin=" + _tMargin
+        + " overlay=" + _tOverlay + " (ms)");
 
     log("[step8c] done | checked=" + records.length + " flagged=" + flagged
         + " (spacing: " + spacingPairs + " pair(s); margin: " + marginItems + ")");

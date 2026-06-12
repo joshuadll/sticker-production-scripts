@@ -38,11 +38,19 @@ function runNestingQA(doc) {
         + " | grid: " + gridW + " x " + gridH + " cells");
 
     // ── 3. Build occupancy grid via scanline fill ──────────────────────────────
+    // Per-phase wall timing (ms via Date) so a slow run on the artist's machine
+    // reveals WHICH phase is the bottleneck. ($.hiresTimer is unreliable in
+    // Illustrator — returns nonsense deltas — so we use Date diffs.) These [timing]
+    // lines are advisory and stripped by the golden-diff harness.
+    var _tCollect = 0, _tRaster = 0, _tDilate = 0, _tMask = 0, _tPockets = 0, _tOverlay = 0;
+    var _mark = (new Date()).getTime();
+
     var grid = [];
     var k;
     for (k = 0; k < totalCells; k++) grid.push(0);
 
     var allPaths     = _qa_collectPaths(cutlinesLayer);
+    _tCollect = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
     var totalAreaMm2 = 0;
     var i;
 
@@ -51,6 +59,7 @@ function runNestingQA(doc) {
         totalAreaMm2 += Math.abs(allPaths[i].area) / (PT * PT);
         log("[stepQA] rasterized | " + allPaths[i].name);
     }
+    _tRaster = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
 
     log("[stepQA] paths: " + allPaths.length
         + " | total area: " + _qa_fmt(totalAreaMm2) + " mm2");
@@ -58,6 +67,7 @@ function runNestingQA(doc) {
     // ── 4. Gap dilation (expand occupied region by gapMm on all sides) ────────
     var gapCells = Math.ceil(CONFIG.gapMm / CONFIG.cellSizeMm);
     _qa_dilate(grid, gridW, gridH, gapCells);
+    _tDilate = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
 
     // ── 4b. Margin mask — score only the printable safe area ──────────────────
     // Cells outside the margin are marked occupied so the gutter never counts as a
@@ -109,8 +119,10 @@ function runNestingQA(doc) {
     // ── 5. Connected-component pocket detection ────────────────────────────────
     // Pass the area gate so only recoverable pockets retain their per-cell list
     // (the overlay only tiles those; sub-threshold pockets keep cells = null).
+    _tMask = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
     var pockets = _qa_findPockets(grid, gridW, gridH, CONFIG.cellSizeMm,
                                   CONFIG.pocketMinAreaMm2, sheetW, sheetH);
+    _tPockets = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
 
     var recoverableCells = 0;
     var p;
@@ -141,6 +153,12 @@ function runNestingQA(doc) {
     if (CONFIG.showOverlay && !CONFIG.dryRun) {
         _qa_drawOverlay(doc, pockets, artLeft, artTop, PT, gridW);
     }
+    _tOverlay = (new Date()).getTime() - _mark;
+
+    log("[timing] stepQA | setup+collect=" + _tCollect
+        + " raster=" + _tRaster + " dilate=" + _tDilate
+        + " marginMask=" + _tMask + " pockets=" + _tPockets
+        + " overlay=" + _tOverlay + " (ms)");
 
     return {
         nqi:         nqi,
@@ -218,12 +236,22 @@ function _qa_sampleSubPath(subPath, artLeft, artTop, PT) {
     var limit   = subPath.closed ? n : n - 1;
     var i, j, t, pt;
 
+    // Snapshot DOM PathPoints once — see _sampleSubPath in aiUtils. Identical
+    // samples, far fewer ExtendScript↔host bridge crossings.
+    var A = [], L = [], R = [], k, pp;
+    for (k = 0; k < n; k++) {
+        pp = pts[k];
+        A[k] = pp.anchor;
+        L[k] = pp.leftDirection;
+        R[k] = pp.rightDirection;
+    }
+
     for (i = 0; i < limit; i++) {
         var next = (i + 1) % n;
-        var p0   = pts[i].anchor;
-        var p1   = pts[i].rightDirection;
-        var p2   = pts[next].leftDirection;
-        var p3   = pts[next].anchor;
+        var p0   = A[i];
+        var p1   = R[i];
+        var p2   = L[next];
+        var p3   = A[next];
 
         for (j = 0; j < STEPS; j++) {
             t  = j / STEPS;
@@ -318,6 +346,14 @@ function _qa_rasterizePath(pathItem, grid, gridW, gridH, artLeft, artTop, PT) {
 
 // Morphological dilation — expands every occupied cell outward by radiusCells.
 // Reads from a snapshot so dilation does not cascade.
+//
+// Interior-cell skip: a cell whose four orthogonal neighbours are ALL occupied
+// contributes nothing new — its radius-r disk is fully covered by those neighbours'
+// disks (provable: for any cell at integer offset (dx,dy) inside the disk other than
+// the centre, max(|dx|,|dy|) >= 1, so its distance² to the nearest ortho neighbour is
+// dx²+dy²+1-2max(|dx|,|dy|) <= r²-1 < r²). So we only need to stamp BOUNDARY cells.
+// For solid stickers that drops the work from area to perimeter (~order-of-magnitude
+// fewer stamps) while producing a byte-identical occupancy grid.
 function _qa_dilate(grid, gridW, gridH, radiusCells) {
     if (radiusCells <= 0) return;
     var r2   = radiusCells * radiusCells;
@@ -325,10 +361,16 @@ function _qa_dilate(grid, gridW, gridH, radiusCells) {
     var k;
     for (k = 0; k < grid.length; k++) orig.push(grid[k]);
 
-    var x, y, dx, dy, nx, ny;
+    var x, y, dx, dy, nx, ny, idx;
     for (y = 0; y < gridH; y++) {
         for (x = 0; x < gridW; x++) {
-            if (orig[y * gridW + x] !== 1) continue;
+            idx = y * gridW + x;
+            if (orig[idx] !== 1) continue;
+            // Skip interior cells (all 4 ortho neighbours occupied). Edge-of-grid
+            // cells are never interior, so they always stamp.
+            if (x > 0 && x < gridW - 1 && y > 0 && y < gridH - 1
+                && orig[idx - 1] === 1 && orig[idx + 1] === 1
+                && orig[idx - gridW] === 1 && orig[idx + gridW] === 1) continue;
             for (dy = -radiusCells; dy <= radiusCells; dy++) {
                 for (dx = -radiusCells; dx <= radiusCells; dx++) {
                     if (dx * dx + dy * dy > r2) continue;

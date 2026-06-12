@@ -103,7 +103,10 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (=== AI_LayoutQA (start|done)|document:)"
+    # Drop run-variable lines: pipeline banners + the advisory [timing] lines (wall
+    # durations differ every run by design — they measure, they don't assert).
+    grep -Ev "^\[pipeline\] (=== AI_LayoutQA (start|done)|document:)" \
+        | grep -Ev "^\[timing\] "
 }
 
 if [ ! -f "$EXPECTED" ]; then

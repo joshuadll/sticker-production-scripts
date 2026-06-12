@@ -48,19 +48,46 @@ function isCaption(pathItem) {
 
 // ─── DOM HELPERS ──────────────────────────────────────────────────────────────
 
-function log(msg) {
-    $.writeln(msg);
+// Logging is normally immediate (one file open/write/close per line) so a crash
+// never loses context. On hot paths that emit many lines (e.g. Layout QA logs per
+// path + per pocket), the per-call syscall churn is measurable on slow disks. A
+// pipeline can opt into buffered logging with beginLogBuffer(): log() then
+// accumulates in memory and flushLog() writes the whole run in ONE open/close.
+// Default (buffer null) is the original immediate behaviour, so every other
+// pipeline is unaffected. flushLog() is also called from scriptAlert() so any
+// buffered context is on disk before a modal alert blocks the script.
+var _logBuf = null;   // non-null array → buffering active
+
+function beginLogBuffer() {
+    _logBuf = [];
+}
+
+function _writeLogLines(lines) {
+    if (lines.length === 0) return;
     var f = new File(CONFIG.logPath);
     f.encoding = "UTF-8";       // accented element names (Devín, Šúľance) write as
                                 // valid UTF-8, not invalid Mac-Roman bytes
     f.lineFeed = "Unix";        // \n terminators so grep/diff treat the log as text
     f.open("a");
-    f.writeln(msg);
+    f.write(lines.join("\n") + "\n");
     f.close();
+}
+
+function flushLog() {
+    if (_logBuf === null) return;
+    _writeLogLines(_logBuf);
+    _logBuf = null;             // back to immediate mode after a flush
+}
+
+function log(msg) {
+    $.writeln(msg);
+    if (_logBuf !== null) { _logBuf.push(msg); return; }
+    _writeLogLines([msg]);
 }
 
 function scriptAlert(msg) {
     log(msg);
+    flushLog();                 // ensure buffered context hits disk before blocking
     if (!CONFIG.suppressAlerts) alert(msg);
 }
 
@@ -709,21 +736,35 @@ function _sampleSubPath(subPath, stepsPerSeg) {
     var pts = subPath.pathPoints;
     if (!pts || pts.length < 2) return [];
 
+    var n = pts.length;
+
+    // Snapshot the DOM PathPoints ONCE. Each .anchor/.leftDirection/.rightDirection
+    // read crosses the ExtendScript↔host bridge — the dominant cost here — and the
+    // old loop read pts[i] both as the current point and (next iteration) as the
+    // previous point's neighbour, doubling the crossings. Reading each point once
+    // into plain JS arrays yields identical sample coordinates, just faster.
+    var A = [], L = [], R = [];
+    var k, pp;
+    for (k = 0; k < n; k++) {
+        pp = pts[k];
+        A[k] = pp.anchor;
+        L[k] = pp.leftDirection;
+        R[k] = pp.rightDirection;
+    }
+
     var poly = [];
-    var n     = pts.length;
     var limit = subPath.closed ? n : n - 1;
-    var i, j, t, pt;
+    var i, j, t, next;
 
     for (i = 0; i < limit; i++) {
-        var next = (i + 1) % n;
-        var p0 = pts[i].anchor;
-        var p1 = pts[i].rightDirection;
-        var p2 = pts[next].leftDirection;
-        var p3 = pts[next].anchor;
+        next = (i + 1) % n;
+        var p0 = A[i];
+        var p1 = R[i];
+        var p2 = L[next];
+        var p3 = A[next];
         for (j = 0; j < stepsPerSeg; j++) {
-            t  = j / stepsPerSeg;
-            pt = _bezierPoint(p0, p1, p2, p3, t);
-            poly.push(pt);
+            t = j / stepsPerSeg;
+            poly.push(_bezierPoint(p0, p1, p2, p3, t));
         }
     }
     return poly;
