@@ -2,7 +2,6 @@
 #include "../utils/aiUtils.jsx"
 #include "../illustrator/Step8c_OffsetPathQA.jsx"
 #include "../illustrator/Step9A_Halfcut.jsx"
-// #include "../illustrator/Step9B_PeelingTab.jsx"  // ⚠️ uncomment when peeling tab confirmed in workflow
 #include "../illustrator/Step10_AssetExport.jsx"
 #include "../illustrator/Step11_FinalFile.jsx"
 
@@ -58,8 +57,6 @@ var CONFIG = {
 CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
     : Folder.desktop.fsName) + "/AI_ExportFinal.log";
-// CONFIG.peelingTabAssetPath = new File($.fileName).parent.parent.fsName + "/assets/Peeling Tab Asset.ai";
-//   ⚠️ uncomment above (and Step9B #include) when peeling tab confirmed in workflow
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 

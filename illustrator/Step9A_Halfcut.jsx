@@ -54,7 +54,7 @@ function runHalfcut(doc) {
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 // Returns all top-level GroupItems in the Cutlines layer whose note identifies
-// them as GC or WC (the elements that have a caption plate / peeling tab seam).
+// them as GC or WC (the elements that have a caption plate seam).
 function _collectHalfcutItems(cutlinesLayer) {
     var out = [], i, item, note;
     for (i = 0; i < cutlinesLayer.pageItems.length; i++) {

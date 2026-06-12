@@ -44,7 +44,6 @@ sticker-production-scripts/
 │   │                                        Model B) + WC capsule. Idempotent; run by AI_NormaliseCaptions
 │   ├── Step8c_OffsetPathQA.jsx         ← spacing + margin QA (pure geometry; no offset layer created)
 │   ├── Step9A_Halfcut.jsx              ← GC/WC elements only: bezier ray → half-cut at plate junction
-│   ├── Step9B_PeelingTab.jsx           ← stamps/unnamed: tab asset + compound path + half-cut at flat edge
 │   ├── Step10_AssetExport.jsx          ← JPEG previews (white+green) + per-element PNGs; temp clip groups, no persistent Asset layer
 │   ├── Step11_FinalFile.jsx            ← Save As {STK_CODE}_final.ai; strips non-production layers; renames halfcut layer
 │   └── StepQA_NestingQuality.jsx       ← occupancy grid → NQI score (0-100); flags re-nest pockets
@@ -85,7 +84,6 @@ sticker-production-scripts/
 │   │                                   the manual nest loop (resize → normalise → …), like AI_LayoutQA.
 │   │                                   ⚠ run BEFORE pencil refinements — it re-derives (re-Unites) the cutline.
 │   ├── AI_ExportFinal.jsx          ← Spacing+Margin QA guard (re-runs Step 8c's idempotent check) → 9A → 10 (Asset Export) → 11 (Final File)
-│   │                                  (Step 9B temporarily removed; peeling tab stays in workflow but pipeline placement TBD)
 │   └── AI_LayoutQA.jsx             ← independent, re-runnable layout QA: Step 8c Spacing+Margin + StepQA_NestingQuality (NQI).
 │                                       Run on demand anytime between nesting and pencil (the artist loops nest ⇄ pencil); mutates
 │                                       nothing structural. Spacing/margin is the export gate; NQI is advisory. (Replaces AI_NestingQA.)
@@ -200,7 +198,7 @@ PSAI_BuildAndExportCutlines exports (written before BridgeTalk handoff, sibling 
 
 ## Illustrator layer names (exact strings except where noted)
 Exceptions (case-insensitive search, consistent standard):
-- **Halfcut layer**: Steps 9A/9B search case-insensitively via `getOrCreateHalfcutLayer()` in aiUtils (seen as "Half cut", "Halfcut", "halfcut lines"); creates as "Halfcut" if absent. Step 11 standardises to `"Halfcut/Peeling Tab"` when saving the final file.
+- **Halfcut layer**: Step 9A searches case-insensitively via `getOrCreateHalfcutLayer()` in aiUtils (seen as "Half cut", "Halfcut", "halfcut lines"); creates as "Halfcut" if absent. Step 11 standardises to `"Halfcut/Peeling Tab"` when saving the final file.
 - **Stickers layer**: `"Sticker"` (singular) everywhere. Built in code by `buildWorkingDocument` and found by exact `findLayer(doc, CONFIG.stickersLayerName)` — all pipeline CONFIGs use the same name, so no case-insensitive/plural fallback (the doc is always code-built, never from a template, so there's no naming variety to tolerate).
 - **Asset layer**: NOT created by the automated pipeline. Step 10 builds temporary clip groups per-export and discards them — the working file stays clean. (The manual workflow created a persistent Asset layer; the script does not.)
 Working file stack: Margin > Offset Path > Halfcut > Cutlines > Stickers > Grid > Color Block
@@ -256,8 +254,7 @@ Stamp elements (ST): traced silhouette path named `[Display Name]` (PathItem, no
 GroupItem.note carries caption metadata (set by Step 6, survives the Deepnest gap):
   Format: "{styleCode}|{capLines}"  e.g. "GC|2"
   Step 8b reads this to know plate spec (0.5cm / 0.8cm). Missing note → Step 8b skips (logs warn).
-  Step 9A reads this to select GC/WC elements (half-cut at plate junction); Step 9B reads this to skip GC/WC and process ST/missing (tab asset).
-  Step 10 reads this for PNG tab hiding: GC/WC → export directly (no tab on cutline); ST/null → check for compound sub-path tab to hide.
+  Step 9A reads this to select GC/WC elements (half-cut at plate junction).
 
 ## Key confirmed values
 Cut line stroke: 0.25pt black, no fill
@@ -458,7 +455,6 @@ Live collection:    doc.layers re-indexes when layers are resized/added — alwa
 
 ## Shared asset paths (committed to repo — no config needed)
 assets/Stamp Cutline Template.ai
-assets/Peeling Tab Asset.ai
 All paths resolve via: _root + "/assets/FileName.ai" where _root = new File($.fileName).parent.parent.fsName
 
 Note: the AI working document is built in code by `buildWorkingDocument()` (aiUtils.jsx).
@@ -497,5 +493,4 @@ Step 7A:    docs/step7a-deepnest-export.md
 Step 8b:    docs/step8b-caption-normalise.md
 Step 8c:    docs/step8c-offset-path-qa.md
 Step 9A:    https://www.notion.so/36e0fc58673981af80e9f007b3b7d064 (Notion — half-cut lines for GC/WC elements)
-Step 9B:    https://www.notion.so/3720fc58673981599039d3243dbf2cd6 (Notion — peeling tab for stamps/unnamed elements)
 Step 10+11: https://www.notion.so/36d0fc58673981c1a808e6ee74384aca (Notion — asset export + final file)
