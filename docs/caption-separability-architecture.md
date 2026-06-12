@@ -150,9 +150,9 @@ from the Cutlines layer. Once `separableCaptions` is enabled it must read the
 ## Scope of payoff
 
 Value concentrates on **Gouache** (discrete pill plate, where caption drift is a
-real geometric change and re-Unite is clean) and on **Step 9** (peeling-tab
-caption detection, a separately-named manual blocker that an addressable `plate`
-removes). **Watercolor** benefits little: its caption is text on a white base
+real geometric change and re-Unite is clean) and on **Step 9A** (half-cut
+junction detection, where an addressable `plate` gives the plate↔art seam
+directly instead of guessing it). **Watercolor** benefits little: its caption is text on a white base
 inside a rounded rectangle, and resetting text to 8 pt barely moves the cutline.
 
 ## Downstream beneficiaries (why this is whole-project, not just Step 8)
@@ -160,6 +160,6 @@ inside a rounded rectangle, and resetting text to 8 pt barely moves the cutline.
 | Step | Without separability | With separability |
 |---|---|---|
 | 8a caption adjust | anchor-splice surgery | reset plate → re-Unite |
-| 9 peeling tab | "ambiguous caption detection" (manual) | caption is a known object |
+| 9A half-cut | plate↔art seam guessed from geometry | caption plate is a known object |
 | 10 asset export | per-element masks from fused path | `element_outline` available directly |
 | 7 nesting | one fused contour | **unchanged** — still one fused contour |

@@ -692,7 +692,7 @@ function simplifyPathItem(path, tolerancePt, cornerAngleDeg) {
 // ─── STEP 9 SHARED HELPERS ────────────────────────────────────────────────────
 
 // Parses group.note "GC|2" → { styleCode, capLines }. Returns null for empty/missing.
-// Used by Step9A (filter GC/WC) and Step9B (filter everything else).
+// Used by Step9A (filter GC/WC) and Step10 (PNG export note lookup).
 function parseNote(note) {
     if (!note || note === "") return null;
     var parts = note.split("|");

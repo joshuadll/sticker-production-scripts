@@ -5,9 +5,8 @@
 // Temporary clip groups are built per-export and immediately discarded —
 // no persistent layer is left in the working file.
 //
-// GC/WC elements: clipped to fused cutline, no tab to hide.
-// ST/unnamed elements: clipped to cutline; if cutline is a CompoundPathItem,
-//   the tab sub-path (placed by Step 9B) is hidden for the PNG then restored.
+// GC/WC elements: clipped to fused cutline.
+// ST/unnamed elements: clipped to cutline.
 // Stamps (PlacedItem cutline): exported without a vector clip mask; a white
 //   rectangle is used as backing instead.
 //
@@ -203,26 +202,6 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
         whiteRect.zOrder(ZOrderMethod.SENDTOBACK);
     }
 
-    // Tab hiding: if cutline is a CompoundPathItem (ST/unnamed element with Step 9B
-    // tab merged in), hide the tab sub-path before export, restore after.
-    var tabSubPath = null;
-    if (!entry.isStamp && cutDupe
-            && cutDupe.typename === "CompoundPathItem"
-            && cutDupe.pathItems.length > 1) {
-        var note = parseNote(entry.note);
-        var sc   = note ? note.styleCode : null;
-        if (sc !== "GC" && sc !== "WC") {
-            tabSubPath = _s10FindTabSubPath(cutDupe, artDupe);
-            if (tabSubPath) {
-                tabSubPath.hidden = true;
-                log("[step10] tab hide | " + entry.displayName);
-            } else {
-                log("[step10] WARN | tab sub-path not found in compound | "
-                    + entry.displayName);
-            }
-        }
-    }
-
     var pngOpts       = new ExportOptionsPNG24();
     pngOpts.transparency = true;
     pngOpts.resolution   = CONFIG.pngExportScale;
@@ -233,8 +212,6 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
         ExportType.PNG24,
         pngOpts
     );
-
-    if (tabSubPath) tabSubPath.hidden = false;
 
     tmpLayer.remove();
     _s10RestoreLayers(snap);
@@ -263,27 +240,6 @@ function _s10GetCutlinePath(cutlineItem) {
         return cutlineItem;
     }
     return null;
-}
-
-// Identifies the tab sub-path inside a CompoundPathItem: the sub-path that is
-// farthest from the element centroid (normalised by sub-path bounding-box size).
-// The peeling tab placed by Step 9B is always the outlier sub-path.
-function _s10FindTabSubPath(compoundPath, element) {
-    var elCenter = boundsCenter(element.geometricBounds);
-    var best = null, bestScore = -1;
-    var i, pi, b, area, center, dx, dy, dist, score;
-    for (i = 0; i < compoundPath.pathItems.length; i++) {
-        pi     = compoundPath.pathItems[i];
-        b      = pi.geometricBounds;
-        area   = Math.abs((b[2] - b[0]) * (b[3] - b[1]));
-        center = boundsCenter(b);
-        dx     = center.x - elCenter.x;
-        dy     = center.y - elCenter.y;
-        dist   = Math.sqrt(dx * dx + dy * dy);
-        score  = dist / (area > 0 ? Math.sqrt(area) : 1);
-        if (score > bestScore) { bestScore = score; best = pi; }
-    }
-    return best;
 }
 
 // Recursively applies white fill and removes stroke on all path items within item.
