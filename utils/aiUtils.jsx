@@ -886,6 +886,48 @@ function _ptSegClosest(p, a, b) {
     return { dist: Math.sqrt(fx * fx + fy * fy), qx: qx, qy: qy };
 }
 
+// SQUARED-distance variant of _ptSegClosest — same closest point (qx, qy) but
+// returns dist2 (no sqrt). minPolygonSetDistanceEx compares squared distances in
+// its hot loop and takes a single sqrt at the very end, so the per-pair sqrt
+// (millions of calls) is eliminated. Monotonicity of sqrt makes every comparison
+// identical to the sqrt version → identical minimum and witness.
+function _ptSegClosestSq(p, a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var len2 = dx * dx + dy * dy;
+    var qx, qy;
+    if (len2 === 0) {
+        qx = a.x; qy = a.y;
+    } else {
+        var tv = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+        if (tv < 0) tv = 0; else if (tv > 1) tv = 1;
+        qx = a.x + tv * dx; qy = a.y + tv * dy;
+    }
+    var fx = p.x - qx, fy = p.y - qy;
+    return { dist2: fx * fx + fy * fy, qx: qx, qy: qy };
+}
+
+// Axis-aligned bounding box of a polygon ([{x,y}, …]) as {x0, x1, y0, y1}.
+function _polyBbox(poly) {
+    var x0 = poly[0].x, x1 = poly[0].x, y0 = poly[0].y, y1 = poly[0].y;
+    var i, p;
+    for (i = 1; i < poly.length; i++) {
+        p = poly[i];
+        if (p.x < x0) x0 = p.x; else if (p.x > x1) x1 = p.x;
+        if (p.y < y0) y0 = p.y; else if (p.y > y1) y1 = p.y;
+    }
+    return { x0: x0, x1: x1, y0: y0, y1: y1 };
+}
+
+// Squared distance from point p {x,y} to AABB bb {x0,x1,y0,y1}; 0 if inside.
+// This is a LOWER BOUND on p's distance to any point of a polygon contained in bb,
+// so if it already exceeds the running minimum the whole polygon can be skipped for
+// this vertex without affecting the exact result.
+function _ptBboxDist2(p, bb) {
+    var dx = (p.x < bb.x0) ? (bb.x0 - p.x) : (p.x > bb.x1 ? p.x - bb.x1 : 0);
+    var dy = (p.y < bb.y0) ? (bb.y0 - p.y) : (p.y > bb.y1 ? p.y - bb.y1 : 0);
+    return dx * dx + dy * dy;
+}
+
 // Minimum distance (points) between two sets of sampled polygons. Returns 0
 // immediately if either polygon set contains a vertex of the other (full
 // containment). Otherwise the exact minimum is the smallest point-to-edge
@@ -906,43 +948,56 @@ function minPolygonSetDistance(polysA, polysB) {
 // to a dot, which still marks the spot). Points are in the polygons' own
 // coordinate space (document points, as produced by samplePathToPolygons).
 function minPolygonSetDistanceEx(polysA, polysB) {
-    var minD = Infinity;
+    // Work in SQUARED distance throughout (no per-pair sqrt) and prune each vertex
+    // against the other polygon's bounding box. Both are exact: sqrt is monotonic so
+    // every comparison is unchanged, and a vertex whose distance to B's bbox already
+    // exceeds the running min cannot beat it (bbox distance is a lower bound), so
+    // skipping it leaves the minimum AND the witness pair byte-identical to brute
+    // force. This is the heavy inner loop of spacing QA — formerly ~13s of the run.
+    var minD2 = Infinity;
     var wax = 0, way = 0, wbx = 0, wby = 0;
     var ai, bi, pi, qi, c;
     for (ai = 0; ai < polysA.length; ai++) {
         var A = polysA[ai];
+        var nA = A.length;
+        var bbA = _polyBbox(A);
         for (bi = 0; bi < polysB.length; bi++) {
             var B = polysB[bi];
-            var nA = A.length, nB = B.length;
+            var nB = B.length;
             if (pointInPolygon(A[0], B)) {
                 return { dist: 0, ax: A[0].x, ay: A[0].y, bx: A[0].x, by: A[0].y };
             }
             if (pointInPolygon(B[0], A)) {
                 return { dist: 0, ax: B[0].x, ay: B[0].y, bx: B[0].x, by: B[0].y };
             }
+            var bbB = _polyBbox(B);
             // A vertices vs B edges — witness on A is the vertex, on B the projection.
             for (pi = 0; pi < nA; pi++) {
+                var ap = A[pi];
+                if (_ptBboxDist2(ap, bbB) >= minD2) continue;  // exact prune
                 for (qi = 0; qi < nB; qi++) {
-                    c = _ptSegClosest(A[pi], B[qi], B[(qi + 1) % nB]);
-                    if (c.dist < minD) {
-                        minD = c.dist;
-                        wax = A[pi].x; way = A[pi].y; wbx = c.qx; wby = c.qy;
+                    c = _ptSegClosestSq(ap, B[qi], B[(qi + 1) % nB]);
+                    if (c.dist2 < minD2) {
+                        minD2 = c.dist2;
+                        wax = ap.x; way = ap.y; wbx = c.qx; wby = c.qy;
                     }
                 }
             }
             // B vertices vs A edges — witness on B is the vertex, on A the projection.
             for (pi = 0; pi < nB; pi++) {
+                var bp = B[pi];
+                if (_ptBboxDist2(bp, bbA) >= minD2) continue;  // exact prune
                 for (qi = 0; qi < nA; qi++) {
-                    c = _ptSegClosest(B[pi], A[qi], A[(qi + 1) % nA]);
-                    if (c.dist < minD) {
-                        minD = c.dist;
-                        wbx = B[pi].x; wby = B[pi].y; wax = c.qx; way = c.qy;
+                    c = _ptSegClosestSq(bp, A[qi], A[(qi + 1) % nA]);
+                    if (c.dist2 < minD2) {
+                        minD2 = c.dist2;
+                        wbx = bp.x; wby = bp.y; wax = c.qx; way = c.qy;
                     }
                 }
             }
         }
     }
-    return { dist: minD, ax: wax, ay: way, bx: wbx, by: wby };
+    return { dist: Math.sqrt(minD2), ax: wax, ay: way, bx: wbx, by: wby };
 }
 
 
