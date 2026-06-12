@@ -26,8 +26,10 @@ var CONFIG = {
     logPath: "", // resolved below — same folder as this script
 
     // Pixel targets at 300 DPI (longest edge) — midpoints for range categories.
-    // Append + to the category code in the layer name for the large end,
-    // - for the small end: e.g. "Eiffel Tower [WC-LM+]", "Small Snack [WC-FD-]"
+    // These are the FINISHED element size (art + white edge). Step 2A resizes the
+    // art smaller by 2×whiteEdgePx so that after Step 2B adds the edge, the element
+    // measures to the target. Append + to the category code in the layer name for
+    // the large end, - for the small end: e.g. "Eiffel Tower [WC-LM+]", "Small Snack [WC-FD-]"
     sizeTable: {
         "TL": 900,  // Location names              3 in     (fixed)
         "LM": 615,  // Landmarks & attractions     2.05 in  (midpoint 1.8–2.3)

@@ -57,6 +57,12 @@ rm -f "$LOG" "$TEMP_SCRIPT"
 # Any open PSD (from a prior run or unrelated work) could be picked up as the
 # "valid template" and carry stale layers into the test.  Close everything
 # without saving so PS_BuildElements always creates a fresh template doc.
+#
+# The pipeline saves its working PSD as "<folder>/<folder>.psd" INSIDE the source
+# folder (see commit 709db5a). Left behind, that file becomes an extra source PSD
+# on the next run — Step 1 would pick it up and double every element. Remove it
+# (and the old beside-the-folder location, for safety) before each run.
+rm -f "$SOURCE_FIXTURE/$(basename "$SOURCE_FIXTURE").psd"
 rm -f "$FIXTURE_DIR/source-psds.psd"
 osascript << 'ENDCLOSE'
 tell application "Adobe Photoshop 2026"
@@ -98,7 +104,7 @@ if [ ! -f "$LOG" ]; then
 fi
 
 # ── Verify saved PSD ─────────────────────────────────────────────────────────
-EXPECTED_PSD="$FIXTURE_DIR/$(basename "$SOURCE_FIXTURE").psd"
+EXPECTED_PSD="$SOURCE_FIXTURE/$(basename "$SOURCE_FIXTURE").psd"
 if [ -f "$EXPECTED_PSD" ]; then
     echo "[$STEP] saved PSD found: $EXPECTED_PSD"
 else

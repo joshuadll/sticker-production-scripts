@@ -45,14 +45,28 @@ function runResize(doc) {
                 continue;
             }
 
-            var ok = resizeLayerToTarget(layer, targetPx);
+            // The category target is the FINISHED element size (art + white edge).
+            // Step 2B later expands each side by CONFIG.whiteEdgePx, growing the
+            // longest edge by 2×whiteEdgePx. Resize the art smaller by that amount
+            // so the final white-edged element lands on the category target.
+            var edgePx = (CONFIG.whiteEdgePx !== undefined) ? CONFIG.whiteEdgePx : 0;
+            var artTargetPx = targetPx - 2 * edgePx;
+            if (artTargetPx < 1) {
+                log("[step2] SKIP | \"" + layer.name + "\" — target " + targetPx
+                    + "px minus white edge (" + (2 * edgePx) + "px) is non-positive.");
+                skipped.push(layer.name + " (target smaller than white edge)");
+                continue;
+            }
+
+            var ok = resizeLayerToTarget(layer, artTargetPx);
             if (!ok) {
                 log("[step2] SKIP | \"" + layer.name + "\" — zero bounds (hidden or empty).");
                 skipped.push(layer.name + " (zero bounds)");
                 continue;
             }
 
-            log("[step2] resized | " + layer.name + " -> " + targetPx + "px");
+            log("[step2] resized | " + layer.name + " -> art " + artTargetPx
+                + "px (final " + targetPx + "px incl. " + (2 * edgePx) + "px white edge)");
             resized++;
         }
 
