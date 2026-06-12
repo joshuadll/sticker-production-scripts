@@ -43,14 +43,14 @@ function runNestingQA(doc) {
     // Illustrator — returns nonsense deltas — so we use Date diffs.) These [timing]
     // lines are advisory and stripped by the golden-diff harness.
     var _tCollect = 0, _tRaster = 0, _tDilate = 0, _tMask = 0, _tPockets = 0, _tOverlay = 0;
-    var _mark = (new Date()).getTime();
+    var _t = _newPhaseTimer();
 
     var grid = [];
     var k;
     for (k = 0; k < totalCells; k++) grid.push(0);
 
     var allPaths     = _qa_collectPaths(cutlinesLayer);
-    _tCollect = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
+    _tCollect = _t.lap();
     var totalAreaMm2 = 0;
     var i;
 
@@ -59,7 +59,7 @@ function runNestingQA(doc) {
         totalAreaMm2 += Math.abs(allPaths[i].area) / (PT * PT);
         log("[stepQA] rasterized | " + allPaths[i].name);
     }
-    _tRaster = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
+    _tRaster = _t.lap();
 
     log("[stepQA] paths: " + allPaths.length
         + " | total area: " + _qa_fmt(totalAreaMm2) + " mm2");
@@ -67,7 +67,7 @@ function runNestingQA(doc) {
     // ── 4. Gap dilation (expand occupied region by gapMm on all sides) ────────
     var gapCells = Math.ceil(CONFIG.gapMm / CONFIG.cellSizeMm);
     _qa_dilate(grid, gridW, gridH, gapCells);
-    _tDilate = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
+    _tDilate = _t.lap();
 
     // ── 4b. Margin mask — score only the printable safe area ──────────────────
     // Cells outside the margin are marked occupied so the gutter never counts as a
@@ -119,10 +119,10 @@ function runNestingQA(doc) {
     // ── 5. Connected-component pocket detection ────────────────────────────────
     // Pass the area gate so only recoverable pockets retain their per-cell list
     // (the overlay only tiles those; sub-threshold pockets keep cells = null).
-    _tMask = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
+    _tMask = _t.lap();
     var pockets = _qa_findPockets(grid, gridW, gridH, CONFIG.cellSizeMm,
                                   CONFIG.pocketMinAreaMm2, sheetW, sheetH);
-    _tPockets = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
+    _tPockets = _t.lap();
 
     var recoverableCells = 0;
     var p;
@@ -153,7 +153,7 @@ function runNestingQA(doc) {
     if (CONFIG.showOverlay && !CONFIG.dryRun) {
         _qa_drawOverlay(doc, pockets, artLeft, artTop, PT, gridW);
     }
-    _tOverlay = (new Date()).getTime() - _mark;
+    _tOverlay = _t.lap();
 
     log("[timing] stepQA | setup+collect=" + _tCollect
         + " raster=" + _tRaster + " dilate=" + _tDilate

@@ -84,13 +84,6 @@ function main() {
     }
     var doc = app.activeDocument;
 
-    // Buffer log lines in memory and flush in one write — both QA phases emit many
-    // per-path/per-pocket lines, and a file open/write/close per line is measurable
-    // on a slow disk. flushLog() runs at every exit point (each scriptAlert flushes;
-    // the final flush is explicit before normal return). beginLogBuffer/flushLog are
-    // no-ops for every other pipeline (default is immediate logging).
-    beginLogBuffer();
-
     log("[pipeline] === AI_LayoutQA start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
@@ -177,4 +170,15 @@ function main() {
     scriptAlert(msg);
 }
 
-main();
+// Buffer Layout QA's many per-path/per-pocket log lines and flush in ONE write (a
+// file open/write/close per line is measurable on a slow disk). The try/finally
+// guarantees flushLog() runs on ANY exit from main — normal return, early return,
+// or an uncaught throw — so buffered diagnostics are never lost (each scriptAlert
+// also flushes; flushLog is idempotent). beginLogBuffer/flushLog are no-ops for
+// every other pipeline (default is immediate logging).
+beginLogBuffer();
+try {
+    main();
+} finally {
+    flushLog();
+}

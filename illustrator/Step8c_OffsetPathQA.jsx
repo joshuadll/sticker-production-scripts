@@ -57,7 +57,7 @@ function runOffsetPathQA(doc) {
     // Per-phase wall timing (ms via Date — $.hiresTimer is unreliable in Illustrator)
     // to pinpoint the bottleneck on a slow run. Advisory; stripped by the golden diff.
     var _tSample = 0, _tSpacing = 0, _tMargin = 0, _tOverlay = 0;
-    var _mark = (new Date()).getTime();
+    var _t = _newPhaseTimer();
 
     var cutlines = _collectCutlines(cutlinesLayer);
     log("[step8c] collected " + cutlines.length + " cut line(s).");
@@ -89,7 +89,7 @@ function runOffsetPathQA(doc) {
         });
     }
 
-    _tSample = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
+    _tSample = _t.lap();
 
     // ── 2b. Reset prior QA flags (idempotent) ─────────────────────────────────
     // Restroke every cut line to the canonical 0.25pt black before re-flagging.
@@ -128,7 +128,7 @@ function runOffsetPathQA(doc) {
         }
     }
 
-    _tSpacing = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
+    _tSpacing = _t.lap();
 
     // ── 4. Margin QA — cut-line bounds within safe area ──────────────────────
     // For each violator, record WHICH edges it crosses so the overlay can fill the
@@ -147,7 +147,7 @@ function runOffsetPathQA(doc) {
         log("[step8c] WARN | no margin rect resolved — margin QA skipped.");
     }
 
-    _tMargin = (new Date()).getTime() - _mark; _mark = (new Date()).getTime();
+    _tMargin = _t.lap();
 
     // ── 5. Draw flags on the shared QA overlay layer ──────────────────────────
     // Cut lines are NEVER recoloured in place — every QA visual goes on one
@@ -165,7 +165,7 @@ function runOffsetPathQA(doc) {
         }
     }
 
-    _tOverlay = (new Date()).getTime() - _mark;
+    _tOverlay = _t.lap();
 
     log("[timing] step8c | sample=" + _tSample
         + " spacing=" + _tSpacing + " margin=" + _tMargin

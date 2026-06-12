@@ -91,6 +91,22 @@ function scriptAlert(msg) {
     if (!CONFIG.suppressAlerts) alert(msg);
 }
 
+// Per-phase wall-timer for profiling slow runs. `lap()` returns the ms elapsed
+// since the last lap (or since creation) and resets, so a phase is timed with one
+// call: `var t = _newPhaseTimer(); … phaseA(); var msA = t.lap(); phaseB(); …`.
+// Uses Date (NOT $.hiresTimer, which returns nonsense deltas in Illustrator).
+function _newPhaseTimer() {
+    return {
+        last: (new Date()).getTime(),
+        lap: function () {
+            var now = (new Date()).getTime();
+            var d = now - this.last;
+            this.last = now;
+            return d;
+        }
+    };
+}
+
 // Finds a top-level layer by exact name (case-sensitive).
 // Returns null if not found. Illustrator uses exact string matching — no fallback.
 function findLayer(doc, name) {
@@ -867,30 +883,12 @@ function boundsWithin(inner, outer, tolPt) {
            inner[3] >= outer[3] - t;     // bottom
 }
 
-// Minimum distance (points) from point p to segment a–b, AND the closest point ON
-// segment ab to p. Returns { dist, qx, qy } — qx/qy is the witness point on the
-// segment. (All {x, y}.) Used by
-// minPolygonSetDistanceEx so QA can draw a connector across the actual gap.
-function _ptSegClosest(p, a, b) {
-    var dx = b.x - a.x, dy = b.y - a.y;
-    var len2 = dx * dx + dy * dy;
-    var qx, qy;
-    if (len2 === 0) {
-        qx = a.x; qy = a.y;
-    } else {
-        var tv = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
-        if (tv < 0) tv = 0; else if (tv > 1) tv = 1;
-        qx = a.x + tv * dx; qy = a.y + tv * dy;
-    }
-    var fx = p.x - qx, fy = p.y - qy;
-    return { dist: Math.sqrt(fx * fx + fy * fy), qx: qx, qy: qy };
-}
-
-// SQUARED-distance variant of _ptSegClosest — same closest point (qx, qy) but
-// returns dist2 (no sqrt). minPolygonSetDistanceEx compares squared distances in
-// its hot loop and takes a single sqrt at the very end, so the per-pair sqrt
-// (millions of calls) is eliminated. Monotonicity of sqrt makes every comparison
-// identical to the sqrt version → identical minimum and witness.
+// Closest point ON segment a–b to point p, plus the SQUARED distance. Returns
+// { dist2, qx, qy } — qx/qy is the witness point on the segment (all {x, y}).
+// minPolygonSetDistanceEx compares squared distances in its hot loop and takes a
+// single sqrt at the very end, so the per-pair sqrt (millions of calls) is avoided;
+// monotonicity of sqrt makes every comparison identical to a sqrt-based one. (If a
+// caller ever needs the actual distance, Math.sqrt(dist2) at the call site.)
 function _ptSegClosestSq(p, a, b) {
     var dx = b.x - a.x, dy = b.y - a.y;
     var len2 = dx * dx + dy * dy;
@@ -957,6 +955,13 @@ function minPolygonSetDistanceEx(polysA, polysB) {
     var minD2 = Infinity;
     var wax = 0, way = 0, wbx = 0, wby = 0;
     var ai, bi, pi, qi, c;
+
+    // Precompute each B polygon's bbox ONCE — it doesn't depend on ai, so computing
+    // it inside the ai-loop would rescan every B once per A polygon (only bites
+    // multi-poly compound-path sets, but it's free to hoist).
+    var bbBs = [];
+    for (bi = 0; bi < polysB.length; bi++) bbBs[bi] = _polyBbox(polysB[bi]);
+
     for (ai = 0; ai < polysA.length; ai++) {
         var A = polysA[ai];
         var nA = A.length;
@@ -970,7 +975,7 @@ function minPolygonSetDistanceEx(polysA, polysB) {
             if (pointInPolygon(B[0], A)) {
                 return { dist: 0, ax: B[0].x, ay: B[0].y, bx: B[0].x, by: B[0].y };
             }
-            var bbB = _polyBbox(B);
+            var bbB = bbBs[bi];
             // A vertices vs B edges — witness on A is the vertex, on B the projection.
             for (pi = 0; pi < nA; pi++) {
                 var ap = A[pi];
