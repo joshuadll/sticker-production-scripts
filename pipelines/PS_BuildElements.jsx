@@ -98,6 +98,10 @@ var CONFIG = {
                             //     the REVIEW position the artist sees after Step 3A. Final placement is
                             //     re-seated in Step 3B (snapCaptionToBorder, CONFIG.captionBorderOverlapPx),
                             //     which slides text+pill along the pill→art centre line to an exact overlap.
+    captionMaxGapFrac: 0.5, // caption↔element positional matching ceiling: reject a caption farther
+                            //     than this × the element's smaller side. Element-relative → DPI/scale-free.
+                            //     Stops a genuinely-uncaptioned element from absorbing a far stray text
+                            //     layer. Used by Step 3A's re-run guard (buildCaptionAssignment).
 
     // [styleCode, catCode] pairs that use the plate treatment.
     // Extend this array (no code change) when new plate-style categories are added.

@@ -35,7 +35,7 @@ var WC_CAPTION_SPINES = {};   // displayName -> { off:[{dx,dy}...], radius:Numbe
 // only translates the pill, so bbox-relative offsets survive the move unchanged.
 function _stashCaptionSpine(displayName, whiteLayer, spine, radius) {
     if (!displayName || !spine || spine.length < 2 || !radius) return;
-    var b = _layerBoundsPx(whiteLayer);   // [L,T,R,B] at the current (pre-snap) position
+    var b = layerBoundsPx(whiteLayer);   // [L,T,R,B] at the current (pre-snap) position
     var off = [];
     for (var i = 0; i < spine.length; i++) {
         off.push({ dx: spine[i].x - b[0], dy: spine[i].y - b[1] });
@@ -70,6 +70,12 @@ function runCaptionWhite(doc) {
             layerRefs.push(doc.layers[i]);
         }
 
+        // Decide every caption→element binding ONCE, while all layers are still
+        // top-level (grouping below removes them from doc.layers). Indexed by element
+        // .id in the loop. Doing it up front — not per element — is what makes the
+        // assignment independent of grouping order. See buildCaptionAssignment.
+        var captionAssign = buildCaptionAssignment(doc, CONFIG.captionMaxGapFrac);
+
         for (var i = layerRefs.length - 1; i >= 0; i--) {
             var soLayer = layerRefs[i];
             var name    = soLayer.name;
@@ -100,13 +106,12 @@ function runCaptionWhite(doc) {
 
             if (!needsCaption(parsed)) continue;
 
-            // Match the caption to this element by POSITION (nearest text layer,
-            // mutually confirmed) — NOT by text equality. The artist may have shortened
-            // the caption ("National Animal - Tatra chamois" → "Tatra chamois") or moved
-            // it to any side during the review stop; string matching would silently drop
-            // it. A null here means the element genuinely has no caption beside it.
-            var capDist  = {};
-            var textLayer = findCaptionForElement(doc, soLayer, capDist);
+            // Look up this element's caption from the document-wide assignment decided
+            // above (name fast-path + global positional). A miss means the element
+            // genuinely has no caption — the artist shortened/moved one and it still
+            // binds, but a truly uncaptioned element stays unbound.
+            var match     = captionAssign[soLayer.id];
+            var textLayer = match ? match.caption : null;
             if (!textLayer) {
                 // No caption beside this element — group without caption.
                 captionLess.push(parsed.displayName);
@@ -144,7 +149,7 @@ function runCaptionWhite(doc) {
                     groupStandard(doc, elementsGroup, soLayer, textLayer, name);
                 }
                 log("[step3B] grouped | " + name + " — caption: \"" + textLayer.name
-                    + "\" (gap=" + Math.round(capDist.gap || 0) + "px)");
+                    + "\" (by " + match.by + ", gap=" + Math.round(match.gap || 0) + "px)");
                 grouped++;
             } catch (e) {
                 log("[step3B] ERROR | \"" + name + "\" line " + e.line + ": " + e.message);
@@ -324,7 +329,7 @@ function createWhiteFromText(doc, textLayer) {
     var whiteLayer  = doc.artLayers.add();
     whiteLayer.name = "White";
 
-    var bnds = spine ? spine.bounds : _layerBoundsPx(textLayer);
+    var bnds = spine ? spine.bounds : layerBoundsPx(textLayer);
     var boxH = bnds[3] - bnds[1];
 
     var usedSpine, usedRadius;
@@ -377,12 +382,6 @@ function _percentile(arr, p) {
     return a[idx];
 }
 
-// Returns layer.bounds as plain px numbers [L, T, R, B] (ruler must be PIXELS).
-function _layerBoundsPx(layer) {
-    var b = layer.bounds;
-    return [b[0].as("px"), b[1].as("px"), b[2].as("px"), b[3].as("px")];
-}
-
 // Re-seats the caption (text + pill, plus any extra layers) so the White pill
 // overlaps the element's white border by CONFIG.captionBorderOverlapPx — measured
 // against the ACTUAL ink of both shapes, not their bounding boxes. The element and
@@ -411,8 +410,8 @@ function _layerBoundsPx(layer) {
 //      much → a solid seam, no floating gap. (Anchoring the best strip would leave a
 //      one-point bridge while the rest float.)
 function snapCaptionToBorder(doc, refLayer, pillLayer, moveLayers) {
-    var rb = _layerBoundsPx(refLayer);
-    var pb = _layerBoundsPx(pillLayer);
+    var rb = layerBoundsPx(refLayer);
+    var pb = layerBoundsPx(pillLayer);
 
     // Direction from pill centre → art centre. Dominant component = travel axis.
     var dx = (rb[0] + rb[2]) / 2 - (pb[0] + pb[2]) / 2;
@@ -517,7 +516,7 @@ function _edgeProfile(doc, layer, travelIsX, lo, hi, n, pickMax) {
 // central 50% of the width so a word-space can't masquerade as an empty line.
 // Returns true when the centre band holds no ink (i.e. a gap between stacked lines).
 function _isMultiLineText(doc, textLayer) {
-    var b = _layerBoundsPx(textLayer);
+    var b = layerBoundsPx(textLayer);
     var w = b[2] - b[0], h = b[3] - b[1];
     if (w <= 0 || h <= 0) return false;
 
@@ -549,7 +548,7 @@ function _isMultiLineText(doc, textLayer) {
 // heights = per-slice ink span; the caller picks a percentile for the pen size
 // on curved text (the bounding box is used for straight text instead).
 function _sampleTextSpine(doc, textLayer) {
-    var bnds = _layerBoundsPx(textLayer);
+    var bnds = layerBoundsPx(textLayer);
     var L = bnds[0], T = bnds[1], R = bnds[2], B = bnds[3];
     if (R - L <= 0 || B - T <= 0) return null;
 
@@ -832,7 +831,7 @@ function selectAndGroup(elementsGroup, layers, groupName) {
     }
 }
 
-// selectLayerById, addLayerToSelectionById, findTextLayerByDisplayName defined in psUtils.jsx.
+// selectLayerById, addLayerToSelectionById, buildCaptionAssignment, layerBoundsPx defined in psUtils.jsx.
 
 // ─── UTILITY ──────────────────────────────────────────────────────────────────
 

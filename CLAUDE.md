@@ -126,7 +126,10 @@ Contain one phase function each. No `#target`, no `CONFIG`, no `main()`.
 ### Shared utils (utils/*.jsx)
 Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()`.
 - psUtils.jsx: NAME_REGEX, parseLayerName, getTargetPx, needsCaption, longestEdge,
-  scalePercent, isCaptionPlate, findLayerByName, findTextLayerByDisplayName,
+  scalePercent, isCaptionPlate, findLayerByName,
+  buildCaptionAssignment (positional caption↔element match; name fast-path + global
+  nearest-neighbour — NOT name-equality, since PS auto-renames a text layer to its
+  contents on edit), layerBoundsPx, boxGap,
   solidBlack, solidWhite, selectLayerById, addLayerToSelectionById,
   log, scriptAlert, isValidTemplate, clearElementLayers,
   convertToSmartObject, resizeLayerToTarget, loadLayerTransparency

@@ -184,43 +184,21 @@ function solidWhite() {
     return c;
 }
 
-// ─── TEXT LAYER SEARCH ────────────────────────────────────────────────────────
-
-// Finds the first top-level TEXT layer whose name matches displayName.
-// Returns null if not found.
-function findTextLayerByDisplayName(doc, displayName) {
-    // Normalize curly/smart apostrophes (U+2018, U+2019) to straight (U+0027).
-    // Photoshop smart-quotes text content on placement, so the T layer name may
-    // use U+2019 while displayName (parsed from the SO layer) uses U+0027.
-    function norm(s) {
-        var r = "";
-        for (var ci = 0; ci < s.length; ci++) {
-            var code = s.charCodeAt(ci);
-            r += (code === 0x2018 || code === 0x2019) ? "'" : s.charAt(ci);
-        }
-        return r;
-    }
-    var normDisplay = norm(displayName);
-    for (var i = 0; i < doc.layers.length; i++) {
-        var layer = doc.layers[i];
-        if (layer.kind !== LayerKind.TEXT) continue;
-        if (norm(layer.name) === normDisplay) return layer;
-        try {
-            if (norm(layer.textItem.contents) === normDisplay) return layer;
-        } catch (e) {}
-    }
-    return null;
-}
-
-// ─── CAPTION ↔ ELEMENT MATCHING (positional) ──────────────────────────────────
+// ─── CAPTION ↔ ELEMENT MATCHING ───────────────────────────────────────────────
 // A caption belongs to the element it sits NEXT TO, not the element whose name it
 // happens to spell. The artist legitimately shortens caption text ("National Animal
-// - Tatra chamois" → "Tatra chamois") or moves the caption to any side during the
-// review stop, which makes string-equality matching (findTextLayerByDisplayName)
-// silently drop the caption. Position is the durable bond: Step 3A places each
-// caption touching its element, and the artist keeps it there. We match by nearest
-// neighbour (minimum bounding-box gap), mutually confirmed, so it tolerates ANY text
-// edit and the caption being below / beside / above / overlapping the element.
+// - Tatra chamois" → "Tatra chamois") or moves it to any side during the review stop.
+// Photoshop AUTO-RENAMES a text layer to its contents on every edit (verified PS 2026:
+// even an explicitly script-set name is overwritten when contents change), so the
+// layer name is NOT a stable key — a process rule like "don't rename the caption" is
+// unenforceable. We therefore match the whole document at once (buildCaptionAssignment):
+//   1) name fast-path — an UN-edited caption still spells its element's display name,
+//      so bind it exactly (apostrophe-normalized). Zero ambiguity, no geometry.
+//   2) positional — remaining captions ↔ elements by GLOBAL mutual nearest-neighbour
+//      (min bounding-box gap, greedy by ascending gap, each side claimed once). One
+//      pass over the doc, so there is no per-element re-scan and no dependence on
+//      iteration order. A max-gap ceiling (element-relative) stops a genuinely
+//      uncaptioned element from absorbing a far-away stray text layer.
 
 // Returns a layer's bounds as plain px numbers [left, top, right, bottom]
 // (top < bottom; PS y increases downward). Caller need not set ruler units.
@@ -235,6 +213,27 @@ function boxGap(a, b) {
     var dx = Math.max(0, Math.max(a[0], b[0]) - Math.min(a[2], b[2]));
     var dy = Math.max(0, Math.max(a[1], b[1]) - Math.min(a[3], b[3]));
     return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Normalizes curly/smart apostrophes (U+2018, U+2019) to straight (U+0027) so a
+// caption auto-named with a smart quote ("Michael’s Gate") matches a display name
+// parsed with a straight one ("Michael's Gate"). Photoshop smart-quotes on placement.
+function _normQuotes(s) {
+    var r = "", ci, code;
+    for (ci = 0; ci < s.length; ci++) {
+        code = s.charCodeAt(ci);
+        r += (code === 0x2018 || code === 0x2019) ? "'" : s.charAt(ci);
+    }
+    return r;
+}
+
+// True if a TEXT layer's name OR contents equals displayName (quote-normalized) —
+// the un-edited-caption fast path.
+function _captionNameMatches(textLayer, displayName) {
+    var nd = _normQuotes(displayName);
+    if (_normQuotes(textLayer.name) === nd) return true;
+    try { if (_normQuotes(textLayer.textItem.contents) === nd) return true; } catch (e) {}
+    return false;
 }
 
 // All top-level TEXT layers in the document (the caption candidates).
@@ -261,42 +260,71 @@ function _captionableElements(doc) {
     return out;
 }
 
-// Returns the caption TEXT layer that belongs to soLayer by MUTUAL nearest-neighbour
-// (box-gap distance), or null when soLayer has no caption of its own. Mutual = the
-// nearest text layer to this element must also have this element as its nearest
-// captionable element; that guards against an element claiming a neighbour's caption
-// and lets a genuinely uncaptioned element (no adjacent text) resolve to null.
-// `outDist` (optional object) receives {gap} for logging the match confidence.
-// Layer identity is compared by .id — ExtendScript hands back distinct wrapper
-// objects for the same layer, so === on the wrappers is unreliable.
-function findCaptionForElement(doc, soLayer, outDist) {
+// Builds the whole-document caption→element assignment ONCE. Returns a map keyed by
+// element layer .id → { caption: textLayer, gap: px, by: "name"|"pos" }. Compare/key
+// by .id — ExtendScript hands back distinct wrapper objects for the same layer, so
+// === on wrappers is unreliable. Callers in a loop must call this ONCE up front (not
+// per element) and index the result, both for cost and so the assignment is decided
+// from the full layer set rather than a pool that shrinks as elements get grouped.
+//
+// maxGapFrac (default 0.5): a positional pair is rejected when its gap exceeds
+// maxGapFrac × the element's SMALLER side. Element-relative so it is DPI/scale-free —
+// a caption more than half an element away is not that element's caption.
+function buildCaptionAssignment(doc, maxGapFrac) {
+    if (maxGapFrac === undefined || maxGapFrac === null) { maxGapFrac = 0.5; }
+
     var texts = _topLevelTextLayers(doc);
-    if (texts.length === 0) return null;
-
-    var sb = layerBoundsPx(soLayer);
-
-    // Nearest text layer to this element.
-    var best = null, bestD = Infinity, i, d;
-    for (i = 0; i < texts.length; i++) {
-        d = boxGap(sb, layerBoundsPx(texts[i]));
-        if (d < bestD) { bestD = d; best = texts[i]; }
-    }
-    if (!best) return null;
-
-    // Mutual check: this element must be the nearest captionable element to `best`.
     var elems = _captionableElements(doc);
-    var tb = layerBoundsPx(best);
-    var bestElem = null, bestED = Infinity, e2;
-    for (i = 0; i < elems.length; i++) {
-        e2 = boxGap(layerBoundsPx(elems[i]), tb);
-        if (e2 < bestED) { bestED = e2; bestElem = elems[i]; }
+    var assign = {};            // elementId -> { caption, gap, by }
+    var claimedText = {};       // text index -> true
+    var claimedElem = {};       // elementId -> true
+    var i, j;
+
+    // Precompute bounds + display names once (DOM reads are the dominant cost).
+    var tB = [], eB = [], eName = [], eId = [];
+    for (i = 0; i < texts.length; i++) { tB.push(layerBoundsPx(texts[i])); }
+    for (j = 0; j < elems.length; j++) {
+        eB.push(layerBoundsPx(elems[j]));
+        eName.push(parseLayerName(elems[j].name).displayName);
+        eId.push(elems[j].id);
     }
 
-    if (bestElem && bestElem.id === soLayer.id) {
-        if (outDist) outDist.gap = bestD;
-        return best;
+    // 1) Name fast-path — un-edited caption still spells its element's display name.
+    for (j = 0; j < elems.length; j++) {
+        for (i = 0; i < texts.length; i++) {
+            if (claimedText[i]) continue;
+            if (_captionNameMatches(texts[i], eName[j])) {
+                assign[eId[j]] = { caption: texts[i], gap: boxGap(eB[j], tB[i]), by: "name" };
+                claimedText[i] = true; claimedElem[eId[j]] = true;
+                break;
+            }
+        }
     }
-    return null;
+
+    // 2) Positional — global mutual nearest-neighbour over the unclaimed remainder.
+    // Build all in-range pairs, sort by ascending gap, claim each side once. Greedy
+    // ascending-gap == closest mutual pairs first; deterministic ties by element then
+    // text index (ES3 sort isn't stable, so tie-break explicitly).
+    var pairs = [];
+    for (j = 0; j < elems.length; j++) {
+        if (claimedElem[eId[j]]) continue;
+        var minDim = Math.min(Math.abs(eB[j][2] - eB[j][0]), Math.abs(eB[j][3] - eB[j][1]));
+        var ceiling = maxGapFrac * minDim;
+        for (i = 0; i < texts.length; i++) {
+            if (claimedText[i]) continue;
+            var g = boxGap(eB[j], tB[i]);
+            if (g <= ceiling) { pairs.push({ e: j, t: i, g: g }); }
+        }
+    }
+    pairs.sort(function (a, b) { return (a.g - b.g) || (a.e - b.e) || (a.t - b.t); });
+    for (var k = 0; k < pairs.length; k++) {
+        var p = pairs[k];
+        if (claimedElem[eId[p.e]] || claimedText[p.t]) continue;
+        assign[eId[p.e]] = { caption: texts[p.t], gap: p.g, by: "pos" };
+        claimedElem[eId[p.e]] = true; claimedText[p.t] = true;
+    }
+
+    return assign;
 }
 
 // ─── LAYER SELECTION HELPERS ─────────────────────────────────────────────────

@@ -34,6 +34,10 @@ var CONFIG = {
     snapColumns:            9,   // # of strips sampled across the cross axis when matching the pill edge
                                  //     to the border edge (per-strip ink comparison; handles arced captions
                                  //     vs round art, any placement direction)
+    captionMaxGapFrac:      0.5, // caption↔element positional matching ceiling: reject a caption farther
+                                 //     than this × the element's smaller side (element-relative → DPI-free).
+                                 //     Stops a genuinely-uncaptioned element absorbing a far stray text layer.
+                                 //     Used by Step 3B (buildCaptionAssignment). Match PS_BuildElements.jsx.
     plateWidthPadH:         20,  // px: GC-LM caption-plate horizontal padding (independent of pill padding)
     whiteHeightPlate:  118,  // px: plate-treatment White height (1 cm at 300 DPI, 1-line)
     whiteHeightPlate2: 189,  // px: plate-treatment White height (1.6 cm at 300 DPI, 2-line)

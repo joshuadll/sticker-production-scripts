@@ -22,6 +22,13 @@ function runCaptionText(doc) {
             layerRefs.push(doc.layers[i]);
         }
 
+        // Re-run guard, computed ONCE before placing anything. On a fresh run there are
+        // no captions yet, so this is empty and every element gets one; on a re-run all
+        // captions exist and each element resolves to its own, so we skip (idempotent).
+        // Computing it up front (not per-element after captions start appearing) is what
+        // prevents a just-placed neighbour caption from being mis-claimed mid-pass.
+        var captionAssign = buildCaptionAssignment(doc, CONFIG.captionMaxGapFrac);
+
         for (var i = 0; i < layerRefs.length; i++) {
             var soLayer = layerRefs[i];
             var name    = soLayer.name;
@@ -38,11 +45,8 @@ function runCaptionText(doc) {
                 continue;
             }
 
-            // Re-run guard: skip if this element already has a caption beside it.
-            // Matched positionally (nearest text layer, mutually confirmed) — NOT by
-            // text equality — so a re-run after the artist shortened/moved the caption
-            // recognises it instead of placing a duplicate. See findCaptionForElement.
-            if (findCaptionForElement(doc, soLayer)) {
+            // Re-run guard: skip if this element already owns a caption (idempotency).
+            if (captionAssign[soLayer.id]) {
                 log("[step3A] SKIP | \"" + name + "\" — caption already present nearby.");
                 continue;
             }
