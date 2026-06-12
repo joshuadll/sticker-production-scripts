@@ -516,31 +516,6 @@ function reuniteCutline(group, outline, plate, strokePt) {
     return newCutline;
 }
 
-// ─── PLATE RESET (Step 8b) ────────────────────────────────────────────────────
-
-// Rebuilds a caption plate to a canonical absolute height (specHeightPt), anchored
-// at its top-centre (the junction with the element art) and preserving aspect so
-// the pill's corner radius stays proportional. Replaces the old plate in place,
-// keeping its name and hidden state. Returns the new plate PathItem.
-function rebuildPlateToHeight(plate, specHeightPt) {
-    var gb = plate.geometricBounds;          // [left, top, right, bottom] (AI y-up)
-    var left = gb[0], top = gb[1], right = gb[2], bottom = gb[3];
-    var curH = top - bottom;
-    if (curH <= 0) return plate;             // degenerate — leave untouched
-
-    var scale = specHeightPt / curH;
-    var newW  = (right - left) * scale;
-    var cx    = (left + right) / 2;
-
-    var newPlate = buildPlate(plate.parent,
-        [cx - newW / 2, top, cx + newW / 2, top - specHeightPt]);
-
-    newPlate.name   = plate.name;
-    newPlate.hidden = plate.hidden;
-    plate.remove();
-    return newPlate;
-}
-
 // ─── PATH SIMPLIFICATION (Step 8a) ────────────────────────────────────────────
 // Native Ramer–Douglas–Peucker anchor reduction + Catmull-Rom bezier refit with
 // corner preservation. Illustrator's Object>Path>Simplify is not scriptable

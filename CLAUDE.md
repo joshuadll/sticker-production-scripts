@@ -34,13 +34,12 @@ sticker-production-scripts/
 │   │                                        manual nest scaling (art+caption+cutline scaled together,
 │   │                                        "Model B"). Per element: unscale = (72/sourceDPI)/captionScale;
 │   │                                        scale plate+caption about the plate∩art CONTACT centroid
-│   │                                        (_overlapCentroid; witness fallback for thin overlaps) — this
-│   │                                        PRESERVES the seating Photoshop's snapCaptionToBorder designed
-│   │                                        (overlap depth + angle) while fixing only the size, and can't float
-│   │                                        (pivot is inside the overlap). → re-Unite. Optional clamped flush
-│   │                                        ROTATION (captionSeatMaxRotateDeg, DEFAULT 0/off — auto angle is
-│   │                                        unreliable, over-slants). GC pill + WC capsule. Idempotent; run by
-│   │                                        AI_NormaliseCaptions
+│   │                                        (_overlapCentroid; witness fallback for thin overlaps; null →
+│   │                                        skip+warn when there's no real overlap) — this PRESERVES the
+│   │                                        seating Photoshop's snapCaptionToBorder designed (overlap depth +
+│   │                                        angle) while fixing only the size, and can't float (pivot is inside
+│   │                                        the overlap). → re-Unite. GC pill (canonical height preserved under
+│   │                                        Model B) + WC capsule. Idempotent; run by AI_NormaliseCaptions
 │   ├── Step8c_OffsetPathQA.jsx         ← spacing + margin QA (pure geometry; no offset layer created)
 │   ├── Step9A_Halfcut.jsx              ← GC/WC elements only: bezier ray → half-cut at plate junction
 │   ├── Step9B_PeelingTab.jsx           ← stamps/unnamed: tab asset + compound path + half-cut at flat edge
@@ -133,7 +132,7 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
 - aiUtils.jsx: NAME_REGEX, parseLayerName, mmToPoints, boundsCenter, isCaption,
   blackCmyk, whiteCmyk, redCmyk, setStrokeStyle, strokeRecursive,
   buildPlate, buildCapsuleFromSpine, deriveCutline, assembleElementGroup,
-  findGroupMember, reuniteCutline, rebuildPlateToHeight,
+  findGroupMember, reuniteCutline,
   rdpSimplify, simplifyPathItem,
   samplePathToPolygons, pointInPolygon, segmentsIntersect,
   polygonsOverlap, boundsWithin, minPolygonSetDistance,

@@ -126,25 +126,19 @@ function runCaptionNormalise(doc) {
         // spec), and the caption grows/shrinks AWAY from the art. This reconstructs the
         // spec seating from the real contact — robust to irregular / multi-island art,
         // with none of the floating / one-leg / too-deep failure modes of a re-seat.
+        // GC and WC alike: a canonical-height GC plate scaled by unscale lands back at its
+        // canonical height under Model B, so no GC-specific absolute-height reset is needed.
         var pivot = _overlapCentroid(plate, outline, CONFIG.seatSampleSteps);
-        if (!pivot) pivot = boundsCenter(plate.geometricBounds);   // fallback: no overlap found
+        if (!pivot) {
+            // No real contact to preserve — the caption isn't overlapping its art (dragged
+            // off during nesting, or a degenerate trace). Scaling about a guessed pivot
+            // would silently mis-seat / fling the caption, so skip + warn instead.
+            log("[step8b] SKIP | " + group.name + " — caption does not overlap its art; cannot preserve seating.");
+            skipped++;
+            continue;
+        }
         _scaleAboutPoint(plate,   unscale, pivot);
         _scaleAboutPoint(caption, unscale, pivot);
-
-        // Optional flush ROTATION: a straight pill edge on a slanted art edge sits deeper
-        // on one side. Rotate the pill (clamped) about the contact so its art-facing edge
-        // lies parallel to the art's local slope → both sides equally seated. Pivot stays
-        // in the overlap, so it can't float. The clamp bounds the tilt (it also rotates
-        // the caption text / overrides WC's PS angle); 0 = no rotation.
-        if (CONFIG.captionSeatMaxRotateDeg > 0) {
-            var deg = _flushAngle(plate, outline, pivot, CONFIG.seatSampleSteps);
-            if (deg >  CONFIG.captionSeatMaxRotateDeg) deg =  CONFIG.captionSeatMaxRotateDeg;
-            if (deg < -CONFIG.captionSeatMaxRotateDeg) deg = -CONFIG.captionSeatMaxRotateDeg;
-            if (Math.abs(deg) > 0.5) {
-                _rotateAboutPoint(plate,   deg, pivot);
-                _rotateAboutPoint(caption, deg, pivot);
-            }
-        }
 
         // Re-derive the fused cutline from the seated spec plate + (artist-scaled) outline.
         reuniteCutline(group, outline, plate, CONFIG.cutlineStrokePt);
@@ -176,27 +170,36 @@ function _matrixScale(placedItem) {
 }
 
 // Centroid of the plate∩outline overlap region — the real contact between the caption
-// pill and the art. Grid-samples the plate's bounds, keeping points inside BOTH shapes
-// (even-odd, so outline holes count as outside). This is the pivot the spec rescale turns
-// about, so the contact (overlap depth + angle) is preserved. Returns {x,y} or null when
-// the two don't overlap (degenerate — caller falls back to the plate centre).
+// pill and the art. Grid-samples the overlap, keeping points inside BOTH shapes (even-odd,
+// so outline holes count as outside). This is the pivot the spec rescale turns about, so
+// the contact (overlap depth + angle) is preserved. Returns {x,y}, or NULL when the two do
+// not actually overlap (caller must skip — there is no contact to preserve).
 function _overlapCentroid(plate, outline, steps) {
     var platePolys = samplePathToPolygons(plate,   steps);
     var outPolys   = samplePathToPolygons(outline, steps);
-    var b = plate.geometricBounds;                       // [left, top, right, bottom]
-    var n = 24, i, j, sx = 0, sy = 0, cnt = 0;
-    for (i = 0; i <= n; i++) {
-        var x = b[0] + (b[2] - b[0]) * i / n;
-        for (j = 0; j <= n; j++) {
-            var y = b[3] + (b[1] - b[3]) * j / n;
-            if (_pointInPolysEvenOdd(x, y, platePolys)
-             && _pointInPolysEvenOdd(x, y, outPolys)) { sx += x; sy += y; cnt++; }
-        }
-    }
-    if (cnt > 0) return { x: sx / cnt, y: sy / cnt };
 
-    // Grid missed a thin overlap (small element). Fall back to the nearest-approach
-    // witness between plate and outline — a contact point regardless of overlap size.
+    // Grid only over the plate∩outline bounding-box intersection — the contact is a thin
+    // band near one plate edge, so gridding the whole plate wastes ~all points on misses.
+    var pb = plate.geometricBounds, ob = outline.geometricBounds;   // [left, top, right, bottom]
+    var left = Math.max(pb[0], ob[0]), right  = Math.min(pb[2], ob[2]);
+    var top  = Math.min(pb[1], ob[1]), bottom = Math.max(pb[3], ob[3]);
+    if (left < right && bottom < top) {
+        var n = 24, i, j, sx = 0, sy = 0, cnt = 0;
+        for (i = 0; i <= n; i++) {
+            var x = left + (right - left) * i / n;
+            for (j = 0; j <= n; j++) {
+                var y = bottom + (top - bottom) * j / n;
+                if (_pointInPolysEvenOdd(x, y, platePolys)
+                 && _pointInPolysEvenOdd(x, y, outPolys)) { sx += x; sy += y; cnt++; }
+            }
+        }
+        if (cnt > 0) return { x: sx / cnt, y: sy / cnt };
+    }
+
+    // No grid hit. A genuine (if thin) overlap still has a valid contact — use the
+    // nearest-approach witness midpoint. But a real GAP means the caption isn't on its art,
+    // so return null and let the caller skip rather than seat about a meaningless point.
+    if (!polygonsOverlap(platePolys, outPolys)) return null;
     var w = minPolygonSetDistanceEx(platePolys, outPolys);
     return { x: (w.ax + w.bx) / 2, y: (w.ay + w.by) / 2 };
 }
@@ -208,83 +211,6 @@ function _pointInPolysEvenOdd(x, y, polys) {
         if (pointInPolygon(p, polys[i])) inside = !inside;
     }
     return inside;
-}
-
-// Degrees to rotate the pill so its art-facing edge lies parallel to the art's local
-// slope — equalising the overlap depth across the caption width (vs deeper-on-one-side).
-// Compares the pill's two shoulders (near-edge endpoints) against the nearest art point
-// under each. Returns 0 when it can't be determined (caller then skips rotating).
-function _flushAngle(plate, outline, pivot, steps) {
-    var cc = boundsCenter(plate.geometricBounds);
-    var ax = cc.x - pivot.x, ay = cc.y - pivot.y;
-    var L  = Math.sqrt(ax * ax + ay * ay);
-    if (L <= 0.001) return 0;
-    var ux = ax / L, uy = ay / L;                        // outward (art → caption)
-
-    var sh = _artFacingShoulders(samplePathToPolygons(plate, steps), cc.x, cc.y, ux, uy);
-    if (!sh) return 0;
-    var outPolys = samplePathToPolygons(outline, steps);
-    var CL = _nearestPolyPoint(outPolys, sh.left.x,  sh.left.y);
-    var CR = _nearestPolyPoint(outPolys, sh.right.x, sh.right.y);
-    if (!CL || !CR) return 0;
-
-    var aPill = Math.atan2(sh.right.y - sh.left.y, sh.right.x - sh.left.x);
-    var aArt  = Math.atan2(CR.y - CL.y, CR.x - CL.x);
-    var d = (aArt - aPill) * 180 / Math.PI;
-    while (d >  180) d -= 360;
-    while (d < -180) d += 360;
-    return d;
-}
-
-// The two "shoulders" of the pill's art-facing edge — endpoints of its near edge. Of all
-// sampled plate points, take the band nearest the art (within 15% of the deepest inward
-// reach along axis u=(ux,uy) outward), then its lateral extremes. {left,right} or null.
-function _artFacingShoulders(platePolys, pcx, pcy, ux, uy) {
-    var perpx = -uy, perpy = ux;
-    var pts = [], i, k;
-    var maxDepth = -Infinity, minDepth = Infinity;
-    for (i = 0; i < platePolys.length; i++) {
-        var poly = platePolys[i];
-        for (k = 0; k < poly.length; k++) {
-            var dxp = poly[k].x - pcx, dyp = poly[k].y - pcy;
-            var depth = -(dxp * ux + dyp * uy);          // toward the art = positive
-            var lat   =  dxp * perpx + dyp * perpy;
-            pts.push({ x: poly[k].x, y: poly[k].y, depth: depth, lat: lat });
-            if (depth > maxDepth) maxDepth = depth;
-            if (depth < minDepth) minDepth = depth;
-        }
-    }
-    if (pts.length < 3 || maxDepth <= minDepth) return null;
-    var tol = (maxDepth - minDepth) * 0.15;
-    var left = null, right = null;
-    for (i = 0; i < pts.length; i++) {
-        if (pts[i].depth < maxDepth - tol) continue;
-        if (!left  || pts[i].lat < left.lat)  left  = pts[i];
-        if (!right || pts[i].lat > right.lat) right = pts[i];
-    }
-    if (!left || !right) return null;
-    return { left: { x: left.x, y: left.y }, right: { x: right.x, y: right.y } };
-}
-
-// Nearest sampled silhouette vertex to (x,y).
-function _nearestPolyPoint(polys, x, y) {
-    var best = null, bd = Infinity, i, k;
-    for (i = 0; i < polys.length; i++) {
-        for (k = 0; k < polys[i].length; k++) {
-            var dx = polys[i][k].x - x, dy = polys[i][k].y - y, d = dx * dx + dy * dy;
-            if (d < bd) { bd = d; best = polys[i][k]; }
-        }
-    }
-    return best;
-}
-
-// Rotate a page item by `deg` about a document-space point P. Preserves matrix scale, so
-// spec-detection (matrix magnitude) is unaffected.
-function _rotateAboutPoint(item, deg, P) {
-    var m = app.getRotationMatrix(deg);
-    m.mValueTX = P.x - (m.mValueA * P.x + m.mValueC * P.y);
-    m.mValueTY = P.y - (m.mValueB * P.x + m.mValueD * P.y);
-    item.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
 }
 
 // Uniform-scale a page item by `factor` about an arbitrary document-space point P.

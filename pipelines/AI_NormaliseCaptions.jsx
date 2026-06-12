@@ -32,12 +32,6 @@ var CONFIG = {
     // pivots about (steps per path segment). Higher = truer contact centroid, slower.
     seatSampleSteps: 12,
 
-    // Max degrees the caption may rotate to lie flush along the art's local slope, so it
-    // doesn't sit deeper on one side. DEFAULT 0 (off) — preserve the Photoshop angle. The
-    // auto-flush angle is computed from polygon samples and is currently UNRELIABLE when
-    // the pill overlaps the art (it can over-slant and lift an endpoint), so it's opt-in.
-    captionSeatMaxRotateDeg: 0,
-
     // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,
 

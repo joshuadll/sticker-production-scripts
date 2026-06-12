@@ -108,7 +108,7 @@ fi
 # now reports "at spec"). reset=0 on the second pass proves the pass is a safe no-op.
 RESET2=$(grep -oE "\[step8b\] done \| reset=[0-9]+" "$RUN2" | grep -oE "[0-9]+$" || echo "-1")
 ATSPEC2=$(grep -oE "atSpec=[0-9]+" "$RUN2" | grep -oE "[0-9]+$" || echo "0")
-if [ "${RESET2:-(-1)}" -eq 0 ] && [ "${ATSPEC2:-0}" -gt 0 ]; then
+if [ "$RESET2" -eq 0 ] && [ "$ATSPEC2" -gt 0 ]; then
     echo "PASS [$STEP]: run #2 idempotent (reset=0, atSpec=$ATSPEC2)."
 else
     echo "FAIL [$STEP]: run #2 not idempotent — reset=$RESET2, atSpec=$ATSPEC2 (expected reset=0)."
