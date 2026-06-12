@@ -20,7 +20,10 @@ sticker-production-scripts/
 ├── photoshop/
 │   ├── Step1_CombineElements.jsx
 │   ├── Step2A_AutoResize.jsx
-│   ├── Step2B_WhiteEdge.jsx     ← adds white edge to each SO (before caption review)
+│   ├── Step2B_WhiteEdge.jsx     ← adds white edge to each SO (before caption review); smooths
+│   │                                the expanded band (Select>Modify>Smooth, whiteEdgeSmoothRadiusPx)
+│   │                                before fill so the silhouette → trace → cutline is clean from
+│   │                                birth (replaces the old Illustrator-side RDP, former Step 8a)
 │   ├── Step3A_CaptionText.jsx   ← places T layers; artist reviews before Step 3B
 │   ├── Step3B_CaptionWhite.jsx  ← adds White pill + Caption plate; groups all layers
 │   └── Step5_Silhouette.jsx     ← finalizes Elements group; builds transient black silhouette at export (not saved)
@@ -29,7 +32,6 @@ sticker-production-scripts/
 │   ├── Step7A_DeepnestExport.jsx    ← classifies paths by extent ratio → exports _regular.svg + _irregular.svg
 │   ├── Step7B_NestingImport.jsx    ← reads Deepnest SVG(s), applies full Deepnest transform (rotation + translation) to cutline GroupItems,
 │   │                                    places per-element PNGs into Stickers layer; called by AI_ImportNesting
-│   ├── Step8a_SimplifyCutlines.jsx     ← native RDP simplify of trace cutlines
 │   ├── Step8b_CaptionNormalise.jsx      ← reset caption+plate to ABSOLUTE spec after the artist's
 │   │                                        manual nest scaling (art+caption+cutline scaled together,
 │   │                                        "Model B"). Per element: unscale = (72/sourceDPI)/captionScale;
@@ -76,7 +78,6 @@ sticker-production-scripts/
 │   │                                     enumerate some macOS dirs); manual dialog fallback. Re-run safe: cutline
 │   │                                     transforms target absolute SVG positions (converge); placed art cleared on entry.
 │   │                                                   (stop: artist reviews layout for any unmatched elements)
-│   ├── AI_RefineCutlines.jsx       ← Step 8a Simplify (one-time post-import cutline cleanup)
 │   ├── AI_NormaliseCaptions.jsx    ← independent, re-runnable caption/plate spec normalise (Step 8b).
 │   │                                   The artist nests by hand, scaling each element (art+caption+cutline)
 │   │                                   as one unit to fit the artboard, which drags caption+plate off
@@ -438,7 +439,7 @@ drives Illustrator through the real buildDocAndImport handoff (Steps 6+7A) and a
 stale /tmp artifacts at the START (not on exit), leaving outputs open for inspection. Requires
 both Adobe apps. The standalone AI-only test (run-ai-build-cutlines.sh) was removed 2026-06-05.
 
-Test runners are named after the pipeline they test (e.g. run-ps-build-elements.sh, run-ai-refine-cutlines.sh).
+Test runners are named after the pipeline they test (e.g. run-ps-build-elements.sh, run-ai-export-final.sh).
 They patch CONFIG via perl injection (sourceFolderPath + suppressAlerts + absolute #include paths)
 and run the pipeline script, not individual step files.
 
@@ -490,7 +491,6 @@ Step 4:     docs/step4-white-edge.md
 Step 5:     docs/step5-silhouette.md
 Step 6:     docs/step6-cut-lines.md
 Step 7A:    docs/step7a-deepnest-export.md
-Step 8a:    docs/step8a-simplify.md
 Step 8b:    docs/step8b-caption-normalise.md
 Step 8c:    docs/step8c-offset-path-qa.md
 Step 9A:    https://www.notion.so/36e0fc58673981af80e9f007b3b7d064 (Notion — half-cut lines for GC/WC elements)

@@ -111,6 +111,16 @@ else
     echo "WARN [$STEP]: expected saved PSD not found: $EXPECTED_PSD"
 fi
 
+# ── Verify white-edge smoothing ran ──────────────────────────────────────────
+# Path-level assertion only; the smoothing's pixel effect is invisible to a log
+# golden — eyeball the white-edge band / resulting Step 6 trace to confirm shape.
+if grep -q "^\[step2B\] smooth radius |" "$LOG"; then
+    echo "[$STEP] white-edge smoothing active: $(grep -o '\[step2B\] smooth radius | .*' "$LOG" | head -1)"
+else
+    echo "FAIL [$STEP]: '[step2B] smooth radius |' not found in log."
+    exit 1
+fi
+
 # ── Diff against golden file ─────────────────────────────────────────────────
 # Variable lines (folder name can vary by machine) are stripped before diffing.
 # Add further exclusions here if new variable lines are introduced.

@@ -163,7 +163,7 @@ function main() {
     if (qaResult.flagged > 0 || !nqiResult.pass) {
         msg += "\nAdjust the nesting / pencil, then re-run this script.";
     } else {
-        msg += "\nLayout looks good — continue with AI_RefineCutlines / AI_ExportFinal.";
+        msg += "\nLayout looks good — continue with AI_ExportFinal.";
     }
 
     msg += "\n\nLog: " + CONFIG.logPath;

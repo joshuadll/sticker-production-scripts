@@ -16,8 +16,8 @@ individual judgement.
 ## When to run
 
 After the artist imports Deepnest results back into the `.ai` file and manually
-joins the regular + irregular groups onto the Cutlines layer, before continuing
-to `AI_RefineCutlines.jsx`.
+joins the regular + irregular groups onto the Cutlines layer, during the manual
+nest loop before `AI_ExportFinal.jsx`.
 
 **Workflow:**
 ```
@@ -25,7 +25,7 @@ AI_BuildCutlines.jsx
   → artist runs Deepnest externally on _regular.svg + _irregular.svg
   → artist imports nested results into the .ai file and joins them
   → run AI_LayoutQA.jsx           ← this script (NQI is its phase 2)
-  → PASS: continue with AI_RefineCutlines.jsx
+  → PASS: continue with AI_ExportFinal.jsx
   → FAIL: rework nesting in Illustrator, re-run AI_LayoutQA.jsx
 ```
 

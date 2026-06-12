@@ -1,11 +1,11 @@
 #!/bin/bash
 # Integration test for AI_ExportFinal (Steps 8c → 9A → 10 → 11).
-# Runs against the output of run-ai-refine-cutlines.sh.
+# Runs against a nested-and-normalised cutlines fixture.
 #
 # FIXTURE REQUIRED:
 #   tests/integration/fixtures/step8c-cutlines.ai
-#     Output of run-ai-refine-cutlines.sh (cutlines simplified + normalised).
-#     Run that test first; it publishes this fixture automatically.
+#     A post-nesting .ai (cutlines imported + captions normalised) — the state
+#     the artist hands off after the manual nest loop. Set up manually.
 #
 # A temp copy is used so Step 11's saveAs (_final.ai) and Step 10's
 # JPEG/PNG exports land in /tmp rather than the fixtures directory.
@@ -34,7 +34,7 @@ LOG="/tmp/AI_ExportFinal.log"
 
 if [ ! -f "$AI_FIXTURE" ]; then
     echo "SKIP [$STEP]: fixture not found: $AI_FIXTURE"
-    echo "  Run run-ai-refine-cutlines.sh first to produce this fixture."
+    echo "  Set up a post-nesting cutlines .ai at this path (see header)."
     exit 0
 fi
 

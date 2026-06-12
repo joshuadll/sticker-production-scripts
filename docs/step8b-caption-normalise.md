@@ -14,11 +14,12 @@ It exploits the separable-caption architecture (see
 `Unite(outline, plate)`, so normalisation is *rescale the plate+caption →
 re-Unite*, never anchor-splice surgery.
 
-## It is its own pipeline now (not part of AI_RefineCutlines)
+## It is its own standalone pipeline
 
 Caption normalisation is a **standalone, re-runnable pipeline**:
-`pipelines/AI_NormaliseCaptions.jsx`. `AI_RefineCutlines` is now **Step 8a
-Simplify only**.
+`pipelines/AI_NormaliseCaptions.jsx`. (The former `AI_RefineCutlines` / Step 8a
+RDP simplify has been removed — cutlines are now smoothed upstream in Photoshop's
+white-edge step; see `docs/step4-white-edge.md`.)
 
 The artist loops **resize → normalise → resize → …** during the manual nest, the
 same way `AI_LayoutQA` is run on demand. Run it **REPEATEDLY**; it is idempotent

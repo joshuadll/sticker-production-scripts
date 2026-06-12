@@ -13,14 +13,19 @@
 // No action file dependency — fully self-contained.
 //
 // CONFIG values used:
-//   whiteEdgePx:        border width in pixels  ⚠️ confirm with artist
-//   whiteEdgeLayerName: "White Base_Cutline"    — name of the created layer
+//   whiteEdgePx:             border width in pixels  ⚠️ confirm with artist
+//   whiteEdgeSmoothRadiusPx: Select>Modify>Smooth radius applied to the band's
+//                            outer edge before fill, so the traced cutline is
+//                            clean (0 → skip smoothing)  ⚠️ tune with artist
+//   whiteEdgeLayerName:      "White Base_Cutline"    — name of the created layer
 //
 // Returns: { processed, skipped[] }
 
 function runWhiteEdge(doc) {
     var processed = 0;
     var skipped   = [];
+
+    log("[step2B] smooth radius | " + CONFIG.whiteEdgeSmoothRadiusPx + "px");
 
     var origUnits = app.preferences.rulerUnits;
     app.preferences.rulerUnits = Units.PIXELS;
@@ -93,6 +98,13 @@ function applyWhiteEdge(doc, soLayer) {
 
     // Expand to create border width.
     doc.selection.expand(CONFIG.whiteEdgePx);
+
+    // Smooth the expanded band's outer edge (Select > Modify > Smooth) BEFORE
+    // filling. This is the contour Step 5 silhouettes and Step 6 traces, so a
+    // clean band here yields clean cutlines without any Illustrator-side RDP
+    // (former Step 8a). The printed white edge and the cutline both derive from
+    // this one smoothed raster, so they stay consistent. radius 0 → no-op.
+    smoothSelection(CONFIG.whiteEdgeSmoothRadiusPx);
 
     // Create white layer, fill, deselect.
     var wbcLayer  = doc.artLayers.add();

@@ -100,5 +100,7 @@ Done.
   Art placed: 26 PNG(s) in Stickers layer
   Captions:   21 caption PNG(s) placed (decoupled)
 
-Review the cutline layout, then run AI_RefineCutlines to continue.
+Review the cutline layout, then nest the elements. Run
+AI_NormaliseCaptions during the resize loop and AI_LayoutQA to
+check spacing; run AI_ExportFinal when the layout is done.
 

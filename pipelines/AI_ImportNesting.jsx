@@ -126,7 +126,9 @@ function main() {
                 + "element display names, or position those cutlines manually.\n\n";
         }
 
-        msg += "Review the cutline layout, then run AI_RefineCutlines to continue.\n\n"
+        msg += "Review the cutline layout, then nest the elements. Run\n"
+            + "AI_NormaliseCaptions during the resize loop and AI_LayoutQA to\n"
+            + "check spacing; run AI_ExportFinal when the layout is done.\n\n"
             + "Log: " + CONFIG.logPath;
 
         scriptAlert(msg);

@@ -128,6 +128,7 @@
 [step2] grid layout done | 26 element(s), 4 col(s), cell 1020px
 [pipeline] step 2 complete | 26 element(s) resized.
 [pipeline] --- Step 3: White edge ---
+[step2B] smooth radius | 20px
 [step2B] white edge | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM]
 [step2B] white edge | Carpathian Wooden Churches [WC-IC]
 [step2B] white edge | National Animal - Tatra chamois [WC-IC]

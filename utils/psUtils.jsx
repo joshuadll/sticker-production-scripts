@@ -59,6 +59,22 @@ function loadLayerTransparency(layer) {
     executeAction(charIDToTypeID("setd"), desc, DialogModes.NO);
 }
 
+// Rounds the active selection's jagged edge — the scriptable equivalent of
+// Select > Modify > Smooth (Sample Radius). The Selection DOM object exposes
+// expand/contract/feather but NOT smooth, so this drives it via Action Manager
+// (event "smooth", radius key "Rds " in pixels).
+//
+// Used by Step 2B to smooth the expanded white-edge band BEFORE filling, so the
+// silhouette Step 5 builds from that band — and the cutline Step 6 traces from
+// the silhouette — are clean from birth (replaces the old Illustrator-side RDP
+// pass, former Step 8a). radiusPx <= 0 is a no-op.
+function smoothSelection(radiusPx) {
+    if (!radiusPx || radiusPx <= 0) return;
+    var desc = new ActionDescriptor();
+    desc.putUnitDouble(charIDToTypeID("Rds "), charIDToTypeID("#Pxl"), radiusPx);
+    executeAction(charIDToTypeID("Smth"), desc, DialogModes.NO);
+}
+
 // Returns true if the element should receive a caption (WC and GC styles only).
 function needsCaption(parsed) {
     if (!parsed) return false;

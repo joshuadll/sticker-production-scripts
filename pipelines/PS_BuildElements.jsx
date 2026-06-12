@@ -68,6 +68,15 @@ var CONFIG = {
     // To adjust a single element: delete its White Base_Cutline layer, change this
     // value, re-run — the re-run guard skips all elements that still have their layer.
     whiteEdgePx:        20,
+    // Select>Modify>Smooth radius applied to the white-edge band's outer edge
+    // (Step 2B, after expand, before fill). This is the contour Step 5
+    // silhouettes and Step 6 traces, so smoothing it here yields clean cutlines
+    // without an Illustrator-side RDP pass. ⚠️ Tune with artist on a real SKU:
+    // too large relative to whiteEdgePx (20) rounds away genuine corners, and
+    // because it acts after the expand it can marginally shift finished bounds
+    // at sharp corners (relevant to Step 2A's 2×whiteEdgePx size compensation).
+    // 0 disables smoothing. Landed at 20 on a real watercolor SKU (2026-06-12).
+    whiteEdgeSmoothRadiusPx: 20,
     whiteEdgeLayerName: "White Base_Cutline", // name given to the created layer
 
     // ── Step 3A: Caption text ──────────────────────────────────────────────────
