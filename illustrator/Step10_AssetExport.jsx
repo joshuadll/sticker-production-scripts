@@ -93,7 +93,6 @@ function _s10BuildClipData(stickersLayer, cutlinesLayer) {
             element:     item,
             cutline:     cutline,
             displayName: displayName,
-            note:        cutline.note || "",
             isStamp:     (cutline.typename === "PlacedItem")
         });
     }
