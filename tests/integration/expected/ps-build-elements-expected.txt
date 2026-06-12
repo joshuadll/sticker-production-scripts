@@ -9,11 +9,11 @@
 [step1] template cleared.
 [step1] opened | Slovakia%20Sticker%20Set%20A4%20-%201.psd
 [step1] found | 7 group(s) in Slovakia%20Sticker%20Set%20A4%20-%201.psd
-[step1] placed | Devín Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 615px
-[step1] placed | Slovak Paradise National Park [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 615px
-[step1] placed | Spiš Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 615px
-[step1] placed | Bratislava Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 615px
-[step1] placed | Štrbské Pleso [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 615px
+[step1] placed | Devín Castle [WC-LM-] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 540px
+[step1] placed | Slovak Paradise National Park [WC-LM-] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 540px
+[step1] placed | Spiš Castle [WC-LM+] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 690px
+[step1] placed | Bratislava Castle [WC-LM+] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 690px
+[step1] placed | Štrbské Pleso [WC-LM-] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 540px
 [step1] placed | National Flower [ST] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 450px
 [step1] placed | Slovakia Map [WC-MP] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 570px
 [step1] closed | Slovakia%20Sticker%20Set%20A4%20-%201.psd
@@ -21,10 +21,10 @@
 [step1] found | 8 group(s) in Slovakia%20Sticker%20Set%20A4%20-%202.psd
 [step1] placed | St. Martin's Cathedral [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
 [step1] placed | UFO Observation Deck, Bridge SNP [ST] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 450px
-[step1] placed | Old Town Hall (Bratislava) [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
+[step1] placed | Old Town Hall (Bratislava) [WC-LM-] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 540px
 [step1] placed | Bojnice Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
-[step1] placed | Orava Castle [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
-[step1] placed | Michael's Gate [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
+[step1] placed | Orava Castle [WC-LM-] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 540px
+[step1] placed | Michael's Gate [WC-LM-] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 540px
 [step1] placed | The Blue Church - Church of St. Elizabeth [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 615px
 [step1] placed | Čumil Statue [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 495px
 [step1] closed | Slovakia%20Sticker%20Set%20A4%20-%202.psd
@@ -58,19 +58,19 @@
 [step2] layer[10] = Bratislava(text) [WC-IC]
 [step2] layer[11] = Čumil Statue [WC-IC]
 [step2] layer[12] = The Blue Church - Church of St. Elizabeth [WC-LM]
-[step2] layer[13] = Michael's Gate [WC-LM]
-[step2] layer[14] = Orava Castle [WC-LM]
+[step2] layer[13] = Michael's Gate [WC-LM-]
+[step2] layer[14] = Orava Castle [WC-LM-]
 [step2] layer[15] = Bojnice Castle [WC-LM]
-[step2] layer[16] = Old Town Hall (Bratislava) [WC-LM]
+[step2] layer[16] = Old Town Hall (Bratislava) [WC-LM-]
 [step2] layer[17] = UFO Observation Deck, Bridge SNP [ST]
 [step2] layer[18] = St. Martin's Cathedral [WC-LM]
 [step2] layer[19] = Slovakia Map [WC-MP]
 [step2] layer[20] = National Flower [ST]
-[step2] layer[21] = Štrbské Pleso [WC-LM]
-[step2] layer[22] = Bratislava Castle [WC-LM]
-[step2] layer[23] = Spiš Castle [WC-LM]
-[step2] layer[24] = Slovak Paradise National Park [WC-LM]
-[step2] layer[25] = Devín Castle [WC-LM]
+[step2] layer[21] = Štrbské Pleso [WC-LM-]
+[step2] layer[22] = Bratislava Castle [WC-LM+]
+[step2] layer[23] = Spiš Castle [WC-LM+]
+[step2] layer[24] = Slovak Paradise National Park [WC-LM-]
+[step2] layer[25] = Devín Castle [WC-LM-]
 [step2] layer[26] = Background
 [step2] resized | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM] -> art 575px (final 615px incl. 40px white edge)
 [step2] resized | Carpathian Wooden Churches [WC-IC] -> art 455px (final 495px incl. 40px white edge)
@@ -85,33 +85,33 @@
 [step2] resized | Bratislava(text) [WC-IC] -> art 455px (final 495px incl. 40px white edge)
 [step2] resized | Čumil Statue [WC-IC] -> art 455px (final 495px incl. 40px white edge)
 [step2] resized | The Blue Church - Church of St. Elizabeth [WC-LM] -> art 575px (final 615px incl. 40px white edge)
-[step2] resized | Michael's Gate [WC-LM] -> art 575px (final 615px incl. 40px white edge)
-[step2] resized | Orava Castle [WC-LM] -> art 575px (final 615px incl. 40px white edge)
+[step2] resized | Michael's Gate [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
+[step2] resized | Orava Castle [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
 [step2] resized | Bojnice Castle [WC-LM] -> art 575px (final 615px incl. 40px white edge)
-[step2] resized | Old Town Hall (Bratislava) [WC-LM] -> art 575px (final 615px incl. 40px white edge)
+[step2] resized | Old Town Hall (Bratislava) [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
 [step2] resized | UFO Observation Deck, Bridge SNP [ST] -> art 410px (final 450px incl. 40px white edge)
 [step2] resized | St. Martin's Cathedral [WC-LM] -> art 575px (final 615px incl. 40px white edge)
 [step2] resized | Slovakia Map [WC-MP] -> art 530px (final 570px incl. 40px white edge)
 [step2] resized | National Flower [ST] -> art 410px (final 450px incl. 40px white edge)
-[step2] resized | Štrbské Pleso [WC-LM] -> art 575px (final 615px incl. 40px white edge)
-[step2] resized | Bratislava Castle [WC-LM] -> art 575px (final 615px incl. 40px white edge)
-[step2] resized | Spiš Castle [WC-LM] -> art 575px (final 615px incl. 40px white edge)
-[step2] resized | Slovak Paradise National Park [WC-LM] -> art 575px (final 615px incl. 40px white edge)
-[step2] resized | Devín Castle [WC-LM] -> art 575px (final 615px incl. 40px white edge)
+[step2] resized | Štrbské Pleso [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
+[step2] resized | Bratislava Castle [WC-LM+] -> art 650px (final 690px incl. 40px white edge)
+[step2] resized | Spiš Castle [WC-LM+] -> art 650px (final 690px incl. 40px white edge)
+[step2] resized | Slovak Paradise National Park [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
+[step2] resized | Devín Castle [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
 [step2] SKIP | "Background" — no [STYLE-CAT] code.
-[step2] grid | Devín Castle [WC-LM] -> col 0 row 0
-[step2] grid | Slovak Paradise National Park [WC-LM] -> col 1 row 0
-[step2] grid | Spiš Castle [WC-LM] -> col 2 row 0
-[step2] grid | Bratislava Castle [WC-LM] -> col 3 row 0
-[step2] grid | Štrbské Pleso [WC-LM] -> col 0 row 1
+[step2] grid | Devín Castle [WC-LM-] -> col 0 row 0
+[step2] grid | Slovak Paradise National Park [WC-LM-] -> col 1 row 0
+[step2] grid | Spiš Castle [WC-LM+] -> col 2 row 0
+[step2] grid | Bratislava Castle [WC-LM+] -> col 3 row 0
+[step2] grid | Štrbské Pleso [WC-LM-] -> col 0 row 1
 [step2] grid | National Flower [ST] -> col 1 row 1
 [step2] grid | Slovakia Map [WC-MP] -> col 2 row 1
 [step2] grid | St. Martin's Cathedral [WC-LM] -> col 3 row 1
 [step2] grid | UFO Observation Deck, Bridge SNP [ST] -> col 0 row 2
-[step2] grid | Old Town Hall (Bratislava) [WC-LM] -> col 1 row 2
+[step2] grid | Old Town Hall (Bratislava) [WC-LM-] -> col 1 row 2
 [step2] grid | Bojnice Castle [WC-LM] -> col 2 row 2
-[step2] grid | Orava Castle [WC-LM] -> col 3 row 2
-[step2] grid | Michael's Gate [WC-LM] -> col 0 row 3
+[step2] grid | Orava Castle [WC-LM-] -> col 3 row 2
+[step2] grid | Michael's Gate [WC-LM-] -> col 0 row 3
 [step2] grid | The Blue Church - Church of St. Elizabeth [WC-LM] -> col 1 row 3
 [step2] grid | Čumil Statue [WC-IC] -> col 2 row 3
 [step2] grid | Bratislava(text) [WC-IC] -> col 3 row 3
@@ -142,19 +142,19 @@
 [step2B] white edge | Bratislava(text) [WC-IC]
 [step2B] white edge | Čumil Statue [WC-IC]
 [step2B] white edge | The Blue Church - Church of St. Elizabeth [WC-LM]
-[step2B] white edge | Michael's Gate [WC-LM]
-[step2B] white edge | Orava Castle [WC-LM]
+[step2B] white edge | Michael's Gate [WC-LM-]
+[step2B] white edge | Orava Castle [WC-LM-]
 [step2B] white edge | Bojnice Castle [WC-LM]
-[step2B] white edge | Old Town Hall (Bratislava) [WC-LM]
+[step2B] white edge | Old Town Hall (Bratislava) [WC-LM-]
 [step2B] white edge | UFO Observation Deck, Bridge SNP [ST]
 [step2B] white edge | St. Martin's Cathedral [WC-LM]
 [step2B] white edge | Slovakia Map [WC-MP]
 [step2B] white edge | National Flower [ST]
-[step2B] white edge | Štrbské Pleso [WC-LM]
-[step2B] white edge | Bratislava Castle [WC-LM]
-[step2B] white edge | Spiš Castle [WC-LM]
-[step2B] white edge | Slovak Paradise National Park [WC-LM]
-[step2B] white edge | Devín Castle [WC-LM]
+[step2B] white edge | Štrbské Pleso [WC-LM-]
+[step2B] white edge | Bratislava Castle [WC-LM+]
+[step2B] white edge | Spiš Castle [WC-LM+]
+[step2B] white edge | Slovak Paradise National Park [WC-LM-]
+[step2B] white edge | Devín Castle [WC-LM-]
 [step2B] SKIP | "Background" — no [STYLE-CAT] code.
 [pipeline] step 3 complete | 26 element(s).
 [pipeline] --- Step 3A: Caption text ---
@@ -184,13 +184,13 @@
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
 [step3A] placed | The Blue Church - Church of St. Elizabeth [WC-LM]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Michael's Gate [WC-LM]
+[step3A] placed | Michael's Gate [WC-LM-]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Orava Castle [WC-LM]
+[step3A] placed | Orava Castle [WC-LM-]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
 [step3A] placed | Bojnice Castle [WC-LM]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Old Town Hall (Bratislava) [WC-LM]
+[step3A] placed | Old Town Hall (Bratislava) [WC-LM-]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
 [step3A] SKIP | "UFO Observation Deck, Bridge SNP [ST]" — style ST does not need a caption.
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
@@ -200,15 +200,15 @@
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
 [step3A] SKIP | "National Flower [ST]" — style ST does not need a caption.
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Štrbské Pleso [WC-LM]
+[step3A] placed | Štrbské Pleso [WC-LM-]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Bratislava Castle [WC-LM]
+[step3A] placed | Bratislava Castle [WC-LM+]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Spiš Castle [WC-LM]
+[step3A] placed | Spiš Castle [WC-LM+]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Slovak Paradise National Park [WC-LM]
+[step3A] placed | Slovak Paradise National Park [WC-LM-]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Devín Castle [WC-LM]
+[step3A] placed | Devín Castle [WC-LM-]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
 [step3A] SKIP | "Background" — no [STYLE-CAT] code.
 [pipeline] step 3A complete | 24 caption(s) placed.
