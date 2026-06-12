@@ -1,0 +1,104 @@
+[pipeline] === AI_LayoutQA start ===
+[pipeline] dryRun: false
+[pipeline] document: quality-check.ai
+[pipeline] --- Spacing + Margin QA ---
+[step8c] collected 34 cut line(s).
+[step8c] FLAG | spacing 1mm (< 2mm) | (unnamed) <-> (unnamed)
+[step8c] FLAG | spacing 2mm (< 2mm) | (unnamed) <-> 
+[step8c] FLAG | spacing 1.7mm (< 2mm) | (unnamed) <-> 
+[step8c] FLAG | spacing 0mm (< 2mm) | (unnamed) <-> 
+[step8c] FLAG | spacing 1.7mm (< 2mm) | (unnamed) <-> 
+[step8c] FLAG | spacing 0mm (< 2mm) | (unnamed) <-> 
+[step8c] FLAG | spacing 0mm (< 2mm) | (unnamed) <-> 
+[step8c] FLAG | spacing 1.3mm (< 2mm) | (unnamed) <-> 
+[step8c] FLAG | spacing 0mm (< 2mm) | (unnamed) <-> 
+[step8c] FLAG | spacing 1.1mm (< 2mm) | (unnamed) <-> 
+[step8c] FLAG | spacing 1.9mm (< 2mm) |  <-> (unnamed)
+[step8c] margin | 190x267mm safe area.
+[step8c] FLAG | cut line exceeds margin | (unnamed)
+[step8c] FLAG | cut line exceeds margin | 
+[step8c] FLAG | cut line exceeds margin | 
+[step8c] overlay | drew flags on "Layout QA" layer | 16 halo(s), 11 spacing badge(s), 3 margin arrow(s), 3 sliver(s)
+[timing] step8c | sample=2077 spacing=2715 margin=3 overlay=724 (ms)
+[step8c] done | checked=34 flagged=16 (spacing: 11 pair(s); margin: 3)
+[pipeline] spacing/margin complete | 34 checked, 16 flagged.
+[pipeline] --- Nesting Quality (NQI) ---
+[stepQA] sheet: 210 x 297 mm | grid: 211 x 298 cells
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] rasterized | 
+[stepQA] paths: 34 | total area: 41368.8 mm2
+[stepQA] margin: 190 x 267 mm | inMarginCells=50730
+[stepQA] pocket | Lower-left | area=553 mm2 | center=(78.5,227.6)mm | bbox=[45,213 61x33]mm
+[stepQA] pocket | Upper-left | area=296 mm2 | center=(102.6,107.6)mm | bbox=[89,93 33x27]mm
+[stepQA] pocket | Upper-right | area=295 mm2 | center=(152,106.4)mm | bbox=[130,94 44x23]mm
+[stepQA] pocket | Lower-right | area=224 mm2 | center=(155.8,158.7)mm | bbox=[146,142 21x32]mm
+[stepQA] pocket | Upper-left | area=168 mm2 | center=(53.2,55.9)mm | bbox=[44,46 19x18]mm
+[stepQA] pocket | Right edge | area=149 mm2 | center=(186.6,51.9)mm | bbox=[163,45 37x18]mm
+[stepQA] pocket | Right edge | area=142 mm2 | center=(186.1,227)mm | bbox=[178,215 13x20]mm
+[stepQA] pocket | Bottom edge | area=127 mm2 | center=(87.1,271.5)mm | bbox=[77,255 23x22]mm
+[stepQA] pocket | Left edge | area=116 mm2 | center=(13.3,212)mm | bbox=[10,198 13x26]mm
+[stepQA] pocket | Lower-left | area=110 mm2 | center=(51.3,154.7)mm | bbox=[43,143 20x18]mm
+[stepQA] pocket | Bottom edge | area=96 mm2 | center=(137,274)mm | bbox=[124,268 22x9]mm
+[stepQA] pocket | Top edge | area=92 mm2 | center=(60,12.7)mm | bbox=[49,10 31x13]mm
+[stepQA] pocket | Upper-left | area=90 mm2 | center=(50.4,115.3)mm | bbox=[44,107 16x19]mm
+[stepQA] NQI=95 | pass=true | utilization=81.5% | recoverableCells=2458/50730
+[timing] stepQA | setup+collect=2582 raster=1375 dilate=19010 marginMask=362 pockets=7772 overlay=12 (ms)
+[pipeline] === AI_LayoutQA done ===
+Layout QA
+
+Spacing/Margin: 16 of 34 cut line(s) FLAGGED (red).
+  Fix before exporting — AI_ExportFinal will halt on these.
+
+NQI Score: 95 / 100  —  PASS (threshold: 90)
+Utilization: 81.5%
+13 reworkable pocket(s):
+  1. Lower-left  — 553 mm2
+  2. Upper-left  — 296 mm2
+  3. Upper-right  — 295 mm2
+  4. Lower-right  — 224 mm2
+  5. Upper-left  — 168 mm2
+  6. Right edge  — 149 mm2
+  7. Right edge  — 142 mm2
+  8. Bottom edge  — 127 mm2
+  9. Left edge  — 116 mm2
+  10. Lower-left  — 110 mm2
+  11. Bottom edge  — 96 mm2
+  12. Top edge  — 92 mm2
+  13. Upper-left  — 90 mm2
+All flags + pockets are on the "Layout QA" layer — toggle it to show/hide; it's stripped at export.
+
+Adjust the nesting / pencil, then re-run this script.
+
+Log: /private/tmp/AI_LayoutQA.log
