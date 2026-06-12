@@ -57,7 +57,14 @@ var CONFIG = {
 
     // ── Phase 2: Nesting Quality (NQI) ───────────────────────────────────────
     // (Pocket quadrant labels use the measured artboard size, not a CONFIG dim.)
-    cellSizeMm:       1,    // grid resolution → pocket detection accurate to ~0.5mm
+    // cellSizeMm MUST divide gapMm evenly (gapCells = ceil(gapMm/cellSizeMm) is an
+    // integer count of cells, so the dilation band is only the true gapMm when the
+    // division is exact). 1 and 2 both work (band = 2.0mm); 1.5 does NOT — it makes
+    // gapCells=2 → a 3.0mm band, over-shrinking pockets (NQI reads ~3pts high, half
+    // the pockets vanish). 2mm runs the NQI grid ~12x faster than 1mm (4x fewer
+    // cells + a smaller dilation kernel) for only NQI +1 and the loss of pockets
+    // sitting right on the 90mm^2 gate. See docs/step8c — benchmarked 2026-06-12.
+    cellSizeMm:       2,    // grid resolution; must divide gapMm exactly (see note)
     gapMm:            2,    // inter-sticker spacing band (same constant as spacingThresholdMm)
     pocketMinAreaMm2: 90,   // a free pocket this large (mm^2) is a reworkable opportunity
     passingNqi:       90,   // NQI >= this is a PASS
