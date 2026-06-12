@@ -79,7 +79,8 @@ if [ -n "$AI_APP" ]; then
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 4 - Refine Cutlines" "AI_RefineCutlines.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 5 - Export Final"    "AI_ExportFinal.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 6 - Layout QA"       "AI_LayoutQA.jsx"
-    echo "  ✓ Illustrator — 4 scripts"
+    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 7 - Normalise Captions" "AI_NormaliseCaptions.jsx"
+    echo "  ✓ Illustrator — 5 scripts"
 else
     echo "  ✗ Illustrator not found — skipped"
 fi
@@ -117,7 +118,7 @@ echo ""
 echo "DO THIS ONCE:"
 echo "  1. Fully QUIT Photoshop & Illustrator — press Cmd+Q"
 echo "     (closing the window isn't enough), then reopen."
-echo "  2. Run a step from File > Scripts (the \"Noteworthie 1-6\" items)."
+echo "  2. Run a step from File > Scripts (the \"Noteworthie 1-7\" items)."
 echo ""
 echo "Pipelines auto-update on login. If the menu items ever vanish"
 echo "after an Adobe update, run this installer again."
