@@ -38,9 +38,12 @@ function runCaptionText(doc) {
                 continue;
             }
 
-            // Re-run guard: skip if T layer already exists for this element.
-            if (findTextLayerByDisplayName(doc, parsed.displayName)) {
-                log("[step3A] SKIP | \"" + name + "\" — T layer already exists.");
+            // Re-run guard: skip if this element already has a caption beside it.
+            // Matched positionally (nearest text layer, mutually confirmed) — NOT by
+            // text equality — so a re-run after the artist shortened/moved the caption
+            // recognises it instead of placing a duplicate. See findCaptionForElement.
+            if (findCaptionForElement(doc, soLayer)) {
+                log("[step3A] SKIP | \"" + name + "\" — caption already present nearby.");
                 continue;
             }
 

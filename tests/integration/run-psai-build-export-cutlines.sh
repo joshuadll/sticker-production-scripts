@@ -143,6 +143,39 @@ else
     exit 1
 fi
 
+# ── Regression: shortened/renamed caption must still bind to its element ───────
+# The fixture's "National Animal - Tatra chamois [WC-IC]" element carries a caption
+# whose text was shortened to "Tatra chamois" — so it no longer equals the element's
+# display name. String matching (the old findTextLayerByDisplayName) silently dropped
+# it (caption: null). Positional matching (findCaptionForElement) must now bind it, so
+# the sidecar carries a real caption. The genuinely-uncaptioned "Bratislava(text)"
+# element (no text layer at all) is the control: it must STAY caption: null, proving
+# the fix doesn't fabricate captions for elements that truly have none.
+python3 - "$ELEM" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1]))
+els = {e["displayName"]: e for e in data["elements"]}
+ok = True
+tatra = els.get("National Animal - Tatra chamois")
+if tatra is None:
+    print("FAIL: Tatra element missing from sidecar"); ok = False
+elif tatra.get("caption") is None:
+    print("FAIL: shortened-caption regression — 'National Animal - Tatra chamois' has caption: null"
+          " (positional match did not bind 'Tatra chamois')"); ok = False
+else:
+    print("  PASS: shortened caption bound positionally (Tatra carries a caption).")
+brat = els.get("Bratislava(text)")
+if brat is not None and brat.get("caption") is not None:
+    print("FAIL: control broken — 'Bratislava(text)' (no text layer) fabricated a caption"); ok = False
+elif brat is not None:
+    print("  PASS: control intact (uncaptioned Bratislava(text) stays caption-less).")
+sys.exit(0 if ok else 1)
+PY
+if [ $? -ne 0 ]; then
+    echo "FAIL [$STEP]: caption positional-matching regression (see above)."
+    exit 1
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PHASE 2 — Illustrator: real handoff buildDocAndImport → cutlines + SVGs
 # ═══════════════════════════════════════════════════════════════════════════════

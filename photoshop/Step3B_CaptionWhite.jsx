@@ -47,9 +47,10 @@ function runCaptionWhite(doc) {
     var origUnits = app.preferences.rulerUnits;
     app.preferences.rulerUnits = Units.PIXELS;
 
-    var grouped  = 0;
-    var skipped  = [];
-    var gcLmCount = 0;  // track how many GC-LM elements used the caption plate
+    var grouped     = 0;
+    var skipped     = [];
+    var captionLess = [];  // needs-caption elements that resolved to NO caption nearby
+    var gcLmCount   = 0;   // track how many GC-LM elements used the caption plate
 
     try {
         // Create the Elements wrapper group first so element sub-groups are built
@@ -99,10 +100,16 @@ function runCaptionWhite(doc) {
 
             if (!needsCaption(parsed)) continue;
 
-            // Find matching T layer: a TEXT layer whose name equals the display name.
-            var textLayer = findTextLayerByDisplayName(doc, parsed.displayName);
+            // Match the caption to this element by POSITION (nearest text layer,
+            // mutually confirmed) — NOT by text equality. The artist may have shortened
+            // the caption ("National Animal - Tatra chamois" → "Tatra chamois") or moved
+            // it to any side during the review stop; string matching would silently drop
+            // it. A null here means the element genuinely has no caption beside it.
+            var capDist  = {};
+            var textLayer = findCaptionForElement(doc, soLayer, capDist);
             if (!textLayer) {
-                // No caption text placed — group without caption.
+                // No caption beside this element — group without caption.
+                captionLess.push(parsed.displayName);
                 if (CONFIG.dryRun) {
                     log("[step3B] [DRY RUN] would group (no caption) | " + name);
                     grouped++;
@@ -136,12 +143,22 @@ function runCaptionWhite(doc) {
                 } else {
                     groupStandard(doc, elementsGroup, soLayer, textLayer, name);
                 }
-                log("[step3B] grouped | " + name);
+                log("[step3B] grouped | " + name + " — caption: \"" + textLayer.name
+                    + "\" (gap=" + Math.round(capDist.gap || 0) + "px)");
                 grouped++;
             } catch (e) {
                 log("[step3B] ERROR | \"" + name + "\" line " + e.line + ": " + e.message);
                 skipped.push(name + " (error: " + e.message + ")");
             }
+        }
+
+        // Loud, reviewable summary: every needs-caption element that ended up WITHOUT
+        // a caption. Genuinely uncaptioned elements (e.g. a map/text element) belong
+        // here too — the point is the artist sees the list and confirms it's intended,
+        // rather than a caption silently vanishing (the shortened-caption bug).
+        if (captionLess.length > 0) {
+            log("[step3B] caption-less summary | " + captionLess.length
+                + " element(s) with NO caption — confirm intended: " + captionLess.join(", "));
         }
 
         // Remove the original Caption plate layer once all GC-LM elements are done.
@@ -157,7 +174,7 @@ function runCaptionWhite(doc) {
         app.preferences.rulerUnits = origUnits;
     }
 
-    return { grouped: grouped, skipped: skipped };
+    return { grouped: grouped, skipped: skipped, captionLess: captionLess };
 }
 
 // ─── STAMP PATH ───────────────────────────────────────────────────────────────

@@ -3,60 +3,64 @@
 [pipeline] document: psai-build-export-cutlines-fixture.psd
 [pipeline] revealAll | canvas 4961x7016 -> 4961x7016
 [pipeline] --- Step 3B: Caption white + grouping ---
-[step3B] snapped caption | axis=y sign=-1 maxGap=9 move=-12px
-[step3B] grouped | Devín Castle [WC-LM-]
-[step3B] snapped caption | axis=y sign=-1 maxGap=4 move=-7px
-[step3B] grouped | Slovak Paradise National Park [WC-LM-]
+[step3B] snapped caption | axis=y sign=-1 maxGap=7 move=-10px
+[step3B] grouped | Devín Castle [WC-LM-] — caption: "Devín Castle" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=3 move=-6px
+[step3B] grouped | Slovak Paradise National Park [WC-LM-] — caption: "Slovak Paradise National Park" (gap=25px)
 [step3B] snapped caption | axis=y sign=-1 maxGap=2 move=-5px
-[step3B] grouped | Spiš Castle [WC-LM+]
-[step3B] snapped caption | axis=y sign=-1 maxGap=13 move=-16px
-[step3B] grouped | Bratislava Castle [WC-LM+]
-[step3B] snapped caption | axis=y sign=-1 maxGap=8 move=-11px
-[step3B] grouped | Štrbské Pleso [WC-LM-]
+[step3B] grouped | Spiš Castle [WC-LM+] — caption: "Spiš Castle" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=12 move=-15px
+[step3B] grouped | Bratislava Castle [WC-LM+] — caption: "Bratislava Castle" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=7 move=-10px
+[step3B] grouped | Štrbské Pleso [WC-LM-] — caption: "Štrbské Pleso" (gap=25px)
 [step3B] grouped stamp | National Flower [ST]
 [step3B] grouped (no caption) | Slovakia Map [WC-MP]
-[step3B] snapped caption | axis=y sign=-1 maxGap=7 move=-10px
-[step3B] grouped | St. Martin's Cathedral [WC-LM]
-[step3B] grouped stamp | UFO Observation Deck, Bridge SNP [ST]
-[step3B] snapped caption | axis=y sign=-1 maxGap=2 move=-5px
-[step3B] grouped | Old Town Hall (Bratislava) [WC-LM-]
-[step3B] snapped caption | axis=y sign=-1 maxGap=2 move=-5px
-[step3B] grouped | Bojnice Castle [WC-LM]
-[step3B] snapped caption | axis=y sign=-1 maxGap=6 move=-9px
-[step3B] grouped | Orava Castle [WC-LM-]
-[step3B] snapped caption | axis=y sign=-1 maxGap=10 move=-13px
-[step3B] grouped | Michael's Gate [WC-LM-]
-[step3B] snapped caption | axis=y sign=-1 maxGap=4 move=-7px
-[step3B] grouped | The Blue Church - Church of St. Elizabeth [WC-LM]
-[step3B] snapped caption | axis=y sign=-1 maxGap=13 move=-16px
-[step3B] grouped | Čumil Statue [WC-IC]
-[step3B] grouped (no caption) | Bratislava(text) [WC-IC]
-[step3B] snapped caption | axis=y sign=-1 maxGap=7 move=-10px
-[step3B] grouped | Šúľance s Makom [WC-FD]
-[step3B] snapped caption | axis=y sign=-1 maxGap=6 move=-9px
-[step3B] grouped | Pirohy [WC-FD]
-[step3B] snapped caption | axis=y sign=-1 maxGap=6 move=-9px
-[step3B] grouped | Bryndzové halušky [WC-FD]
-[step3B] snapped caption | axis=y sign=-1 maxGap=17 move=-20px
-[step3B] grouped | Kraslice [WC-IC]
-[step3B] snapped caption | axis=y sign=-1 maxGap=10 move=-13px
-[step3B] grouped | Kroje [WC-IC]
-[step3B] snapped caption | axis=y sign=-1 maxGap=0 move=-3px
-[step3B] grouped | Fujara [WC-IC]
 [step3B] snapped caption | axis=y sign=-1 maxGap=5 move=-8px
-[step3B] grouped | Tram [WC-TR]
-[step3B] grouped (no caption) | National Animal - Tatra chamois [WC-IC]
-[step3B] snapped caption | axis=y sign=-1 maxGap=2 move=-5px
-[step3B] grouped | Carpathian Wooden Churches [WC-IC]
+[step3B] grouped | St. Martin's Cathedral [WC-LM] — caption: "St. Martin's Cathedral" (gap=24px)
+[step3B] grouped stamp | UFO Observation Deck, Bridge SNP [ST]
+[step3B] snapped caption | axis=y sign=-1 maxGap=1 move=-4px
+[step3B] grouped | Old Town Hall (Bratislava) [WC-LM-] — caption: "Old Town Hall (Bratislava)" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=1 move=-4px
+[step3B] grouped | Bojnice Castle [WC-LM] — caption: "Bojnice Castle" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=5 move=-8px
+[step3B] grouped | Orava Castle [WC-LM-] — caption: "Orava Castle" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=9 move=-12px
+[step3B] grouped | Michael's Gate [WC-LM-] — caption: "Michael's Gate" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=6 move=-9px
+[step3B] grouped | The Blue Church - Church of St. Elizabeth [WC-LM] — caption: "The Blue Church - Church of St. Elizabeth" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=11 move=-14px
+[step3B] grouped | Čumil Statue [WC-IC] — caption: "Čumil Statue" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=23 move=-26px
+[step3B] grouped | Šúľance s Makom [WC-FD] — caption: "Šúľance s Makom" (gap=26px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=5 move=-8px
+[step3B] grouped | Pirohy [WC-FD] — caption: "Pirohy" (gap=28px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=18 move=-21px
+[step3B] grouped | Bryndzové halušky [WC-FD] — caption: "Bryndzové halušky" (gap=29px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=34 move=-37px
+[step3B] grouped | Kraslice [WC-IC] — caption: "Kraslice" (gap=29px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=11 move=-14px
+[step3B] grouped | Kroje [WC-IC] — caption: "Kroje" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=-1 move=-2px
+[step3B] grouped | Fujara [WC-IC] — caption: "Fujara" (gap=24px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=4 move=-7px
+[step3B] grouped | Tram [WC-TR] — caption: "Tram" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=1 move=-4px
+[step3B] grouped | National Animal - Tatra chamois [WC-IC] — caption: "Tatra chamois" (gap=25px)
+[step3B] snapped caption | axis=y sign=-1 maxGap=0 move=-3px
+[step3B] grouped | Carpathian Wooden Churches [WC-IC] — caption: "Carpathian Wooden Churches" (gap=25px)
 [step3B] snapped caption | axis=y sign=-1 maxGap=3 move=-6px
-[step3B] grouped | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM]
+[step3B] grouped | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM] — caption: "St Elizabeth's Cathedral (Dóm Svätej Alzbety)" (gap=24px)
+[step3B] grouped (no caption) | Bratislava(text) [WC-IC]
+[step3B] caption-less summary | 2 element(s) with NO caption — confirm intended: Slovakia Map, Bratislava(text)
 [pipeline] step 3B complete | 26 element(s) grouped.
+[pipeline] WARN | 2 element(s) shipped WITHOUT a caption: Slovakia Map, Bratislava(text)
 [pipeline] --- Step 5: Finalize Elements group ---
 [step5] Elements group finalized.
 [pipeline] step 5 complete | Elements finalized.
 [pipeline] revealAll (post-Step-3B) | canvas 4961x7016 -> 4961x7016
 [pipeline] saved: /private/tmp/psai-build-export-cutlines-fixture.psd
 [pipeline] --- Exporting per-element PNGs ---
+[pipeline] exported element PNG: Bratislava(text)
 [pipeline] exported element PNG: St Elizabeth's Cathedral (Dóm Svätej Alzbety)
 [pipeline] exported element PNG: Carpathian Wooden Churches
 [pipeline] exported element PNG: National Animal - Tatra chamois
@@ -67,7 +71,6 @@
 [pipeline] exported element PNG: Bryndzové halušky
 [pipeline] exported element PNG: Pirohy
 [pipeline] exported element PNG: Šúľance s Makom
-[pipeline] exported element PNG: Bratislava(text)
 [pipeline] exported element PNG: Čumil Statue
 [pipeline] exported element PNG: The Blue Church - Church of St. Elizabeth
 [pipeline] exported element PNG: Michael's Gate
@@ -83,9 +86,10 @@
 [pipeline] exported element PNG: Spiš Castle
 [pipeline] exported element PNG: Slovak Paradise National Park
 [pipeline] exported element PNG: Devín Castle
+[pipeline] caption PNG SKIP | Bratislava(text) [WC-IC] — no caption.
 [pipeline] exported caption PNG: St Elizabeth's Cathedral (Dóm Svätej Alzbety)_caption
 [pipeline] exported caption PNG: Carpathian Wooden Churches_caption
-[pipeline] caption PNG SKIP | National Animal - Tatra chamois [WC-IC] — no caption.
+[pipeline] exported caption PNG: National Animal - Tatra chamois_caption
 [pipeline] exported caption PNG: Tram_caption
 [pipeline] exported caption PNG: Fujara_caption
 [pipeline] exported caption PNG: Kroje_caption
@@ -93,7 +97,6 @@
 [pipeline] exported caption PNG: Bryndzové halušky_caption
 [pipeline] exported caption PNG: Pirohy_caption
 [pipeline] exported caption PNG: Šúľance s Makom_caption
-[pipeline] caption PNG SKIP | Bratislava(text) [WC-IC] — no caption.
 [pipeline] exported caption PNG: Čumil Statue_caption
 [pipeline] exported caption PNG: The Blue Church - Church of St. Elizabeth_caption
 [pipeline] exported caption PNG: Michael's Gate_caption
@@ -109,10 +112,10 @@
 [pipeline] exported caption PNG: Spiš Castle_caption
 [pipeline] exported caption PNG: Slovak Paradise National Park_caption
 [pipeline] exported caption PNG: Devín Castle_caption
-[pipeline] element PNGs: 26 art + 21 caption file(s) → /private/tmp/psai-build-export-cutlines-fixture_elements
+[pipeline] element PNGs: 26 art + 22 caption file(s) → /private/tmp/psai-build-export-cutlines-fixture_elements
 [pipeline] element PNGs folder: /private/tmp/psai-build-export-cutlines-fixture_elements
 [pipeline] --- BridgeTalk handoff → Illustrator (Step 6) ---
-[step5] hid 42 caption sub-layer(s).
+[step5] hid 44 caption sub-layer(s).
 [step5] transient Silhouette built.
 [pipeline] exported silhouette PNG (transient layer removed): /private/tmp/psai-build-export-cutlines-fixture_silhouette.png
 [pipeline] wrote elements sidecar: /private/tmp/psai-build-export-cutlines-fixture_elements.json (26 element(s))
@@ -134,3 +137,7 @@ After Deepnest: run AI_ImportNesting.jsx, selecting the Deepnest SVG(s)
 and the '_elements' folder shown above.
 
 Log: /tmp/PSAI_BuildAndExportCutlines.log
+
+⚠️ No caption beside these 2 element(s) — confirm intended:
+  - Slovakia Map
+  - Bratislava(text)

@@ -592,6 +592,11 @@ function main() {
         return;
     }
     log("[pipeline] step 3B complete | " + captionWhiteResult.grouped + " element(s) grouped.");
+    if (captionWhiteResult.captionLess && captionWhiteResult.captionLess.length > 0) {
+        log("[pipeline] WARN | " + captionWhiteResult.captionLess.length
+            + " element(s) shipped WITHOUT a caption: "
+            + captionWhiteResult.captionLess.join(", "));
+    }
 
     // ── Step 5: Finalize Elements group ────────────────────────────
     // (The silhouette raster is built transiently at export time — see
@@ -692,6 +697,14 @@ function main() {
         msg += "\n\nGrouping skipped (" + captionWhiteResult.skipped.length + "):";
         for (var s = 0; s < captionWhiteResult.skipped.length; s++) {
             msg += "\n  - " + captionWhiteResult.skipped[s];
+        }
+    }
+
+    if (captionWhiteResult.captionLess && captionWhiteResult.captionLess.length > 0) {
+        msg += "\n\n⚠️ No caption beside these " + captionWhiteResult.captionLess.length
+             + " element(s) — confirm intended:";
+        for (var c = 0; c < captionWhiteResult.captionLess.length; c++) {
+            msg += "\n  - " + captionWhiteResult.captionLess[c];
         }
     }
 

@@ -212,6 +212,93 @@ function findTextLayerByDisplayName(doc, displayName) {
     return null;
 }
 
+// ─── CAPTION ↔ ELEMENT MATCHING (positional) ──────────────────────────────────
+// A caption belongs to the element it sits NEXT TO, not the element whose name it
+// happens to spell. The artist legitimately shortens caption text ("National Animal
+// - Tatra chamois" → "Tatra chamois") or moves the caption to any side during the
+// review stop, which makes string-equality matching (findTextLayerByDisplayName)
+// silently drop the caption. Position is the durable bond: Step 3A places each
+// caption touching its element, and the artist keeps it there. We match by nearest
+// neighbour (minimum bounding-box gap), mutually confirmed, so it tolerates ANY text
+// edit and the caption being below / beside / above / overlapping the element.
+
+// Returns a layer's bounds as plain px numbers [left, top, right, bottom]
+// (top < bottom; PS y increases downward). Caller need not set ruler units.
+function layerBoundsPx(layer) {
+    var b = layer.bounds;
+    return [b[0].as("px"), b[1].as("px"), b[2].as("px"), b[3].as("px")];
+}
+
+// Minimum gap (px) between two axis-aligned boxes [l,t,r,b]; 0 if they touch or
+// overlap. Direction-agnostic: index 0/2 are the x-range, 1/3 the y-range.
+function boxGap(a, b) {
+    var dx = Math.max(0, Math.max(a[0], b[0]) - Math.min(a[2], b[2]));
+    var dy = Math.max(0, Math.max(a[1], b[1]) - Math.min(a[3], b[3]));
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+// All top-level TEXT layers in the document (the caption candidates).
+function _topLevelTextLayers(doc) {
+    var out = [], i;
+    for (i = 0; i < doc.layers.length; i++) {
+        if (doc.layers[i].kind === LayerKind.TEXT) out.push(doc.layers[i]);
+    }
+    return out;
+}
+
+// All top-level element layers eligible to receive a caption (valid [STYLE-CAT]
+// name, caption-bearing style, not a stamp). These are the elements a caption may
+// be assigned to. Stamps are excluded so a caption never gets pulled onto one.
+function _captionableElements(doc) {
+    var out = [], i, p;
+    for (i = 0; i < doc.layers.length; i++) {
+        p = parseLayerName(doc.layers[i].name);
+        if (!p) continue;
+        if (p.styleCode === "ST") continue;
+        if (!needsCaption(p)) continue;
+        out.push(doc.layers[i]);
+    }
+    return out;
+}
+
+// Returns the caption TEXT layer that belongs to soLayer by MUTUAL nearest-neighbour
+// (box-gap distance), or null when soLayer has no caption of its own. Mutual = the
+// nearest text layer to this element must also have this element as its nearest
+// captionable element; that guards against an element claiming a neighbour's caption
+// and lets a genuinely uncaptioned element (no adjacent text) resolve to null.
+// `outDist` (optional object) receives {gap} for logging the match confidence.
+// Layer identity is compared by .id — ExtendScript hands back distinct wrapper
+// objects for the same layer, so === on the wrappers is unreliable.
+function findCaptionForElement(doc, soLayer, outDist) {
+    var texts = _topLevelTextLayers(doc);
+    if (texts.length === 0) return null;
+
+    var sb = layerBoundsPx(soLayer);
+
+    // Nearest text layer to this element.
+    var best = null, bestD = Infinity, i, d;
+    for (i = 0; i < texts.length; i++) {
+        d = boxGap(sb, layerBoundsPx(texts[i]));
+        if (d < bestD) { bestD = d; best = texts[i]; }
+    }
+    if (!best) return null;
+
+    // Mutual check: this element must be the nearest captionable element to `best`.
+    var elems = _captionableElements(doc);
+    var tb = layerBoundsPx(best);
+    var bestElem = null, bestED = Infinity, e2;
+    for (i = 0; i < elems.length; i++) {
+        e2 = boxGap(layerBoundsPx(elems[i]), tb);
+        if (e2 < bestED) { bestED = e2; bestElem = elems[i]; }
+    }
+
+    if (bestElem && bestElem.id === soLayer.id) {
+        if (outDist) outDist.gap = bestD;
+        return best;
+    }
+    return null;
+}
+
 // ─── LAYER SELECTION HELPERS ─────────────────────────────────────────────────
 // Used by Step3B (selectAndGroup) and Step5 (grouping fallback).
 
