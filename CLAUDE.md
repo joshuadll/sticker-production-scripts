@@ -138,7 +138,12 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   rdpSimplify, simplifyPathItem,
   samplePathToPolygons, pointInPolygon, segmentsIntersect,
   polygonsOverlap, boundsWithin, minPolygonSetDistance,
-  parseNote, getOrCreateHalfcutLayer, drawHalfcutLine,
+  parseNote, getOrCreateHalfcutLayer, drawHalfcutLine, drawHalfcutPath,
+  syncHalfcut (idempotent per-element half-cut, seam-traced via plateSeamPath; called by
+    Steps 6/7B/8b/9A so the cut tracks the caption — straight seat → straight cut, curved/
+    tilted seat → curved cut), plateSeamPath, filletJunctionCorners (weld-notch softener),
+  _cutlineCrossingsAtY (bezier ray scan+bisection; moved here from Step 9A so syncHalfcut's
+    straight-chord fallback is self-contained),
   buildWorkingDocument (builds A4/CMYK doc + Margin/Stickers/Grid/Color Block layers, no template),
   marginRect (shared safe-area rect: documented 190×267mm working area),
   log, scriptAlert, findLayer, findPathInLayer
@@ -269,8 +274,17 @@ Half-cut functional requirement: the caption plate acts as a peeling tab — the
 the caption and peels the element off the backing as a separate flake sticker. The half-cut
 must connect exactly to the outer cutline at both endpoints (where the Unite boundary
 transitions from element art to plate edge) so both pieces have clean edges when separated.
-Step 9A uses bezier ray intersection (_cutlineCrossingsAtY, coarse scan + bisection)
-to find these exact crossing points — not a bounding-box approximation.
+
+The half-cut is a LIVE, derived feature, not a one-shot export step: the shared
+`syncHalfcut()` (aiUtils) re-derives it from the caption seam at EVERY caption-touching
+step — Step 6 (birth), Step 7B (after the Deepnest transform is baked), Step 8b (after the
+re-Unite), and Step 9A (canonical export pass) — so it always tracks the caption. It is
+idempotent (clears its own `{name} halfcut` first). The cut follows the real seam (the arc
+of the plate submerged in the art via `plateSeamPath`): straight for a flat seat, CURVED for
+an arc/tilted seat — derived from geometry, never assumed flat (`halfcutFollowSeam`). When the
+plate isn't seated into the art it falls back to a straight chord at the plate-top junction Y
+via bezier ray intersection (`_cutlineCrossingsAtY`, coarse scan + bisection) — not a
+bounding-box approximation.
 
 ---
 
