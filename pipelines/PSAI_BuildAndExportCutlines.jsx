@@ -34,6 +34,19 @@ var CONFIG = {
     snapColumns:            9,   // # of strips sampled across the cross axis when matching the pill edge
                                  //     to the border edge (per-strip ink comparison; handles arced captions
                                  //     vs round art, any placement direction)
+
+    // ── Step 3B: Conform-then-kiss seating (seatCaptionConform) ────────────────
+    seatConform:        true,    // rotate the caption so its inner edge runs parallel to the local
+                                 //     border tangent BEFORE the kiss (flat border → ~0° → legacy seat).
+                                 //     false = pure-kiss legacy seat.
+    seatRotationSign:   1,       // ⚠ flip to -1 if captions tilt the WRONG way / shear in validation
+                                 //     (hedges PS layer.rotate() sign convention; see seatCaptionConform).
+    maxSeatRotationDeg: 75,      // anti-degenerate cap: a tangent fit beyond this skips rotation + flags.
+    seatBandPx:         4,       // px: per-strip overlap-depth spread above which the seat is flagged
+                                 //     needsReview (the conform couldn't seat evenly).
+    whiteBridgeEnabled: false,   // EXPERIMENTAL raster op: locally grow the art's white band to close
+                                 //     residual end-gaps (white-on-white). Validate before enabling.
+    maxWhiteBridgePx:   8,       // px: max local white-band growth for the bridge.
     captionMaxGapFrac:      0.5, // caption↔element positional matching ceiling: reject a caption farther
                                  //     than this × the element's smaller side (element-relative → DPI-free).
                                  //     Stops a genuinely-uncaptioned element absorbing a far stray text layer.
@@ -242,6 +255,17 @@ function writeElementsFile(doc) {
             if (spine) {
                 el.caption.radius = spine.radius;
                 el.caption.spine  = spine.points;
+            }
+
+            // Seat metadata from Step 3B's conform (bite = junction seam endpoints for the
+            // AI fillet; needsReview = uneven seat → AI Layout QA marker). Present only
+            // when seatCaptionConform stashed them; omitted otherwise (forward-compatible).
+            if (typeof CAPTION_SEAT !== "undefined") {
+                var st = CAPTION_SEAT[parsed.displayName];
+                if (st) {
+                    if (st.bite) el.caption.bite = st.bite;
+                    if (st.needsReview) el.caption.needsReview = true;
+                }
             }
         }
 

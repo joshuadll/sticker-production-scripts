@@ -327,6 +327,15 @@ function haloCmyk() {
     return c;
 }
 
+// Strong blue — the CAPTION-SEAT review badge (Step 3B's conform flagged an uneven
+// seat via the note "…|R"). Distinct from the warm red/amber problem badges; says
+// "eyeball this caption". Advisory only — it does NOT gate export.
+function seatReviewCmyk() {
+    var c = new CMYKColor();
+    c.cyan = 90; c.magenta = 60; c.yellow = 0; c.black = 0;
+    return c;
+}
+
 // ─── PATH STYLE HELPERS ───────────────────────────────────────────────────────
 
 // Applies stroke style to a PathItem or CompoundPathItem.
@@ -691,14 +700,17 @@ function simplifyPathItem(path, tolerancePt, cornerAngleDeg) {
 
 // ─── STEP 9 SHARED HELPERS ────────────────────────────────────────────────────
 
-// Parses group.note "GC|2" → { styleCode, capLines }. Returns null for empty/missing.
-// Used by Step9A (filter GC/WC).
+// Parses group.note "GC|2" (or "GC|2|R") → { styleCode, capLines, needsReview }.
+// Returns null for empty/missing. The optional 3rd field "R" marks a caption seat that
+// Step 3B's conform flagged for review (surfaced by AI Layout QA). Used by Step 9A /
+// syncHalfcut (filter GC/WC) and Step 8c/AI_LayoutQA (the review marker).
 function parseNote(note) {
     if (!note || note === "") return null;
     var parts = note.split("|");
     return {
-        styleCode: parts[0],
-        capLines:  parts.length > 1 ? parseInt(parts[1], 10) : 1
+        styleCode:   parts[0],
+        capLines:    parts.length > 1 ? parseInt(parts[1], 10) : 1,
+        needsReview: parts.length > 2 && parts[2] === "R"
     };
 }
 

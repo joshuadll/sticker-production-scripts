@@ -78,6 +78,7 @@ function runOffsetPathQA(doc) {
             bounds = cl.item.geometricBounds;
         }
 
+        var clNote = parseNote(cl.note);
         records.push({
             name:         cl.name,
             kind:         cl.kind,
@@ -85,7 +86,8 @@ function runOffsetPathQA(doc) {
             polys:        polys,
             bounds:       bounds,
             spacingFail:  false,
-            marginFail:   false
+            marginFail:   false,
+            reviewFlag:   clNote ? clNote.needsReview : false   // PS conform flagged the seat
         });
     }
 
@@ -244,9 +246,21 @@ function _drawFlagOverlay(qaLayer, records, spacingMarks, marginRect) {
         }
     }
 
+    // Channel 3 — caption-seat review badge (advisory; does NOT gate export). A blue
+    // disc at the top of each element whose PS conform flagged an uneven seat ("…|R").
+    var reviewBlue = seatReviewCmyk();
+    var reviews = 0;
+    for (i = 0; i < records.length; i++) {
+        if (!records[i].reviewFlag) continue;
+        var rb = records[i].bounds;   // [l, t, r, b] (AI y-up)
+        qaDrawDot(qaLayer, (rb[0] + rb[2]) / 2, rb[1], mmToPoints(2.5), reviewBlue, 90);
+        reviews++;
+    }
+
     log("[step8c] overlay | drew flags on \"" + CONFIG.qaLayerName + "\" layer | "
         + halos + " halo(s), " + spacingMarks.length + " spacing badge(s), "
-        + arrows + " margin arrow(s), " + slivers + " sliver(s)");
+        + arrows + " margin arrow(s), " + slivers + " sliver(s), "
+        + reviews + " seat-review badge(s)");
 }
 
 // Draws an inward-pointing amber arrow in the margin gutter for each safe-area edge
@@ -339,7 +353,7 @@ function _collectCutlines(container) {
         if (tn === "GroupItem") {
             var cut = findGroupMember(item, "");
             if (cut) {
-                out.push({ name: item.name, item: cut, kind: "path" });
+                out.push({ name: item.name, item: cut, kind: "path", note: item.note });
             } else {
                 log("[step8c] SKIP | group has no visible cutline | " + item.name);
             }

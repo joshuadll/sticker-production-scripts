@@ -189,12 +189,17 @@ PSAI_BuildAndExportCutlines exports (written before BridgeTalk handoff, sibling 
                               { psdWidth, psdHeight, elements: [
                                   { displayName, styleCode, left, top, right, bottom,
                                     caption: null | { lines, left, top, right, bottom,
-                                                      radius?, spine?: [{x,y}, …] } } ] }
+                                                      radius?, spine?: [{x,y}, …],
+                                                      bite?: [{x,y},{x,y}], needsReview? } } ] }
                             caption is null for stamps/uncaptioned. radius + spine are
                             present only for WC captions: the fitted White-pill capsule
                             (px). Step 6 rebuilds the real curved/tilted caption capsule
                             from them, so the cutline follows the caption; GC/stamps omit
-                            radius+spine → GC uses the parametric pill. PSAI always runs
+                            radius+spine → GC uses the parametric pill. bite (the two
+                            caption-seam endpoints) + needsReview are set by Step 3B's
+                            conform seat (seatCaptionConform): bite seeds the AI junction
+                            fillet, needsReview → "{style}|{lines}|R" note → AI Layout QA
+                            seat-review badge (advisory, doesn't gate export). PSAI always runs
                             Step 3B in-session, so every WC caption carries a spine (Step 6
                             relies on this). JSON (vs the old pipe-delimited text) prevents
                             delimiter collisions with caption display names.

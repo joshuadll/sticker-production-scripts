@@ -386,8 +386,9 @@ function _buildSeparableCutline(doc, layer, element, elementOutline,
     var grp = assembleElementGroup(layer, element.displayName, elementOutline, plate, cutline);
 
     // Stash caption spec for Step 8b (Caption Normalisation), which has no sidecar.
-    // Format: "{styleCode}|{capLines}" — e.g. "GC|2".
-    grp.note = element.styleCode + "|" + cap.lines;
+    // Format: "{styleCode}|{capLines}" (+ "|R" when PS flagged the seat for review) —
+    // e.g. "GC|2" or "WC|1|R". Step 8c/AI_LayoutQA surfaces the review marker.
+    grp.note = element.styleCode + "|" + cap.lines + (cap.needsReview ? "|R" : "");
 
     // Draw the half-cut at birth so it's visible from the first cutline review and
     // tracks the caption through nesting/normalise (each step re-syncs it). GC/WC only.
