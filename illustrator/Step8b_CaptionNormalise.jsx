@@ -143,6 +143,10 @@ function runCaptionNormalise(doc) {
         // Re-derive the fused cutline from the seated spec plate + (artist-scaled) outline.
         reuniteCutline(group, outline, plate, CONFIG.cutlineStrokePt);
 
+        // Re-sync the half-cut to the rescaled seam (idempotent). Only the reset path
+        // reaches here — atSpec groups 'continue' above, so no redundant work.
+        syncHalfcut(doc, group, {});
+
         log("[step8b] reset to spec | " + group.name + " (" + styleCode
             + ", x" + unscale.toFixed(3) + ")");
         reset++;

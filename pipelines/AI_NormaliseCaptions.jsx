@@ -32,6 +32,13 @@ var CONFIG = {
     // pivots about (steps per path segment). Higher = truer contact centroid, slower.
     seatSampleSteps: 12,
 
+    // ── Half-cut (re-synced to the rescaled seam after each re-Unite) ─────────
+    halfcutLayerName:  "Halfcut",
+    halfcutStrokePt:   0.25,
+    halfcutExtendMm:   1.0,
+    halfcutFollowSeam: true,
+    halfcutSeamSteps:  16,
+
     // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,
 

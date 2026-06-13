@@ -23,6 +23,18 @@ var CONFIG = {
     cutlinesLayerName:   "Cutlines",
     stickersLayerName:   "Sticker",
 
+    // ── Caption junction + half-cut (shared aiUtils helpers) ─────────────────
+    // The half-cut is drawn at birth here and re-synced by Steps 7B/8b/9A so it
+    // always tracks the caption seam. The junction fillet softens the plate∩art
+    // notch on the fused cutline.
+    weldFilletRadiusPt:  null,     // pt; round the plate∩art notch. null = OFF
+                                   //   (enable after visual confirmation on a real file)
+    halfcutLayerName:    "Halfcut",
+    halfcutStrokePt:     0.25,
+    halfcutExtendMm:     1.0,
+    halfcutFollowSeam:   true,     // curved cut when the seat is curved/tilted
+    halfcutSeamSteps:    16,
+
     // Image Trace tuning — overrides applied on top of the "Silhouettes" preset so the
     // cutline HUGS the silhouette edge. The preset is built to *simplify* (clean solid
     // shapes), which rounds concave detail and sits the line loose; these push it back

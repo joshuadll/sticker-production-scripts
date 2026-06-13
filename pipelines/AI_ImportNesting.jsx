@@ -17,6 +17,13 @@ var CONFIG = {
     cutlinesLayerName: "Cutlines",
     stickersLayerName: "Sticker",
 
+    // ── Half-cut (re-synced to the nested pose; shared aiUtils.syncHalfcut) ───
+    halfcutLayerName:  "Halfcut",
+    halfcutStrokePt:   0.25,
+    halfcutExtendMm:   1.0,
+    halfcutFollowSeam: true,
+    halfcutSeamSteps:  16,
+
     // ── Art sizing ───────────────────────────────────────────────────────────
     // Source PSD resolution. Placed artwork is sized by the PSD→AI factor
     // (pt/px = 72/sourceDPI) so it lands at the element's true physical size
