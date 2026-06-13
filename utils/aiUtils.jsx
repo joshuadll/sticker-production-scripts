@@ -723,11 +723,348 @@ function getOrCreateHalfcutLayer(doc) {
 }
 
 // Draws a 2-point straight PathItem on layer. Stroke: CONFIG.halfcutStrokePt, black, no fill.
+// Returns the line (callers may name it). The straight-chord fallback for syncHalfcut.
 function drawHalfcutLine(layer, x1, y1, x2, y2) {
     var line = layer.pathItems.add();
     line.setEntirePath([[x1, y1], [x2, y2]]);
     line.closed = false;
     setStrokeStyle(line, CONFIG.halfcutStrokePt, blackCmyk());
+    return line;
+}
+
+// Draws an open multi-point PathItem (the half-cut seam polyline) on layer, named
+// "{baseName} halfcut" so syncHalfcut can find + clear it on the next run. pts =
+// [{x,y}, …]. Stroke = CONFIG.halfcutStrokePt, black, no fill.
+function drawHalfcutPath(layer, pts, baseName) {
+    var coords = [], i;
+    for (i = 0; i < pts.length; i++) coords.push([pts[i].x, pts[i].y]);
+    var line = layer.pathItems.add();
+    line.setEntirePath(coords);
+    line.closed = false;
+    if (baseName) line.name = baseName + " halfcut";
+    setStrokeStyle(line, CONFIG.halfcutStrokePt, blackCmyk());
+    return line;
+}
+
+// Removes any existing half-cut path(s) for one element (named "{baseName} halfcut")
+// from the halfcut layer, so syncHalfcut is idempotent under the re-run loops (Step 7B
+// clears art on entry, Step 8b runs repeatedly). Snapshots refs first — the live
+// pathItems collection re-indexes on remove. Returns the number removed.
+function _removeHalfcutFor(layer, baseName) {
+    var want = baseName + " halfcut";
+    var doomed = [], i;
+    for (i = 0; i < layer.pathItems.length; i++) {
+        if (layer.pathItems[i].name === want) doomed.push(layer.pathItems[i]);
+    }
+    for (i = 0; i < doomed.length; i++) { try { doomed[i].remove(); } catch (e) {} }
+    return doomed.length;
+}
+
+// Re-derives and draws ONE element's half-cut from its CURRENT caption seam, so the
+// half-cut tracks the caption after any step that creates/moves/rescales it (Step 6
+// birth, Step 7B nest-import, Step 8b normalise, Step 9A export). Idempotent: clears
+// this element's prior "{name} halfcut" first. GC/WC only (gated on the cutline note);
+// stamps / uncaptioned skip. The seam is the arc of the plate's outline submerged in
+// the art — straight rigid seat → a near-straight cut, arc/tilted seat → a curved cut
+// (the half-cut is derived from real geometry, never assumed flat). Returns
+// { ok, reason, curved, fallback }.
+//   opts: { extendMm, followSeam } (default from CONFIG.halfcutExtendMm / halfcutFollowSeam)
+function syncHalfcut(doc, group, opts) {
+    opts = opts || {};
+    var extendMm   = (opts.extendMm   != null) ? opts.extendMm   : CONFIG.halfcutExtendMm;
+    var followSeam = (opts.followSeam != null) ? opts.followSeam : (CONFIG.halfcutFollowSeam !== false);
+
+    if (!group || group.typename !== "GroupItem") {
+        return { ok: false, reason: "stamp / non-group (no caption seam)" };
+    }
+    var note = parseNote(group.note);
+    if (!note || (note.styleCode !== "GC" && note.styleCode !== "WC")) {
+        return { ok: false, reason: "not GC/WC" };
+    }
+
+    var plate   = findGroupMember(group, " plate");
+    var outline = findGroupMember(group, " outline");
+    var cutline = findGroupMember(group, "");
+    if (!plate)   return { ok: false, reason: "plate subpath not found in group" };
+    if (!cutline) return { ok: false, reason: "cutline not found in group" };
+
+    var hcLayer = getOrCreateHalfcutLayer(doc);
+    _removeHalfcutFor(hcLayer, group.name);
+
+    var ext = mmToPoints(extendMm);
+
+    // Primary: trace the real seam (the plate's inner edge submerged in the art).
+    if (followSeam && outline) {
+        var seam = plateSeamPath(plate, outline, ext, CONFIG.halfcutSeamSteps);
+        if (seam && seam.length >= 2) {
+            drawHalfcutPath(hcLayer, seam, group.name);
+            return { ok: true, curved: seam.length > 2 };
+        }
+    }
+
+    // Fallback: legacy flat chord at the plate-top junction Y (bezier-ray crossings).
+    var junctionY = plate.geometricBounds[1];
+    var crossings = _cutlineCrossingsAtY(cutline, junctionY);
+    var x1, x2;
+    if (crossings.length >= 2) {
+        x1 = crossings[0];
+        x2 = crossings[crossings.length - 1];
+    } else {
+        x1 = plate.geometricBounds[0];
+        x2 = plate.geometricBounds[2];
+    }
+    var line = drawHalfcutLine(hcLayer, x1 - ext, junctionY, x2 + ext, junctionY);
+    if (line) line.name = group.name + " halfcut";
+    return { ok: true, curved: false, fallback: true };
+}
+
+// Builds the half-cut seam polyline = the arc of the PLATE outline that lies INSIDE
+// the element art (the submerged inner edge), clipped to the two points where the
+// plate boundary crosses the art boundary, then extended by extendPt past each end
+// along its own tangent so both peeled flakes get a clean edge. Straight rigid seat →
+// a near-straight run (≈ the legacy chord); arc/tilted seat → a curved run. Returns
+// [{x,y}, …] (>=2 pts) or null when the plate isn't seated into the art (no inside run,
+// or fully buried) — the caller then uses the straight-chord fallback.
+function plateSeamPath(plate, outline, extendPt, steps) {
+    var s = steps || 16;
+    var platePolys = samplePathToPolygons(plate, s);
+    var artPolys   = samplePathToPolygons(outline, s);
+    if (platePolys.length === 0 || artPolys.length === 0) return null;
+    var pp = _largestPoly(platePolys);
+    if (!pp) return null;
+    var n = pp.length;
+    if (n < 4) return null;
+
+    // Inside-art flag per plate vertex (even-odd, so art holes count as outside).
+    var inside = [], i, anyIn = false, anyOut = false;
+    for (i = 0; i < n; i++) {
+        inside[i] = _pointInPolysEO(pp[i], artPolys);
+        if (inside[i]) anyIn = true; else anyOut = true;
+    }
+    if (!anyIn || !anyOut) return null;   // floating (none in) or buried (none out)
+
+    // Longest cyclic run of inside=true. Scan 2n so a run wrapping index 0 is found whole.
+    var bestStart = -1, bestLen = 0, curStart = -1, curLen = 0, idx;
+    for (i = 0; i < 2 * n; i++) {
+        idx = i % n;
+        if (inside[idx]) {
+            if (curLen === 0) curStart = idx;
+            curLen++;
+            if (curLen > bestLen) { bestLen = curLen; bestStart = curStart; }
+        } else {
+            curLen = 0;
+        }
+        if (bestLen >= n) break;
+    }
+    if (bestStart < 0 || bestLen < 1) return null;
+    if (bestLen > n) bestLen = n;
+
+    var firstIn     = bestStart;
+    var lastIn      = (bestStart + bestLen - 1) % n;
+    var beforeFirst = (firstIn - 1 + n) % n;     // outside neighbour
+    var afterLast   = (lastIn + 1) % n;          // outside neighbour
+    var crossStart  = _segCrossArt(pp[beforeFirst], pp[firstIn], artPolys);
+    var crossEnd    = _segCrossArt(pp[afterLast],   pp[lastIn],  artPolys);
+
+    var seam = [crossStart];
+    for (i = 0; i < bestLen; i++) seam.push(pp[(bestStart + i) % n]);
+    seam.push(crossEnd);
+
+    // Extend each end OUTWARD (away from the submerged run) past the cutline.
+    if (extendPt > 0 && seam.length >= 2) {
+        var L = seam.length;
+        seam[0]     = _extendPoint(seam[0],     seam[1],     extendPt);
+        seam[L - 1] = _extendPoint(seam[L - 1], seam[L - 2], extendPt);
+    }
+    return seam;
+}
+
+// Even-odd point-in-polygons test across a sampled path's subpaths (holes subtract).
+function _pointInPolysEO(pt, polys) {
+    var inside = false, i;
+    for (i = 0; i < polys.length; i++) {
+        if (pointInPolygon(pt, polys[i])) inside = !inside;
+    }
+    return inside;
+}
+
+// Largest-bbox-area polygon of a set (the plate capsule is a single sub-poly, but a
+// Unite/group can wrap extras — take the dominant one).
+function _largestPoly(polys) {
+    var best = null, bestA = -1, i, bb, a;
+    for (i = 0; i < polys.length; i++) {
+        bb = _polyBbox(polys[i]);
+        a = (bb.x1 - bb.x0) * (bb.y1 - bb.y0);
+        if (a > bestA) { bestA = a; best = polys[i]; }
+    }
+    return best;
+}
+
+// Given a OUTSIDE the art and b INSIDE the art, bisects to the boundary crossing {x,y}.
+function _segCrossArt(a, b, artPolys) {
+    var lo = a, hi = b, mid, k;
+    for (k = 0; k < 24; k++) {
+        mid = { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2 };
+        if (_pointInPolysEO(mid, artPolys)) hi = mid; else lo = mid;
+    }
+    return { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2 };
+}
+
+// Returns `from` moved AWAY from `toward` by dist (extends the seam outward past `from`).
+function _extendPoint(from, toward, dist) {
+    var dx = from.x - toward.x, dy = from.y - toward.y;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-6) return { x: from.x, y: from.y };
+    return { x: from.x + dx / len * dist, y: from.y + dy / len * dist };
+}
+
+// Returns a sorted array of X values where pathItem's outline crosses targetY (AI
+// y-up). Handles PathItem and CompoundPathItem via coarse scan + bisection (reuses
+// _bezierPoint). Used by syncHalfcut's straight-chord fallback. Moved here from
+// Step9A so the half-cut engine is self-contained (callable from Steps 6/7B/8b/9A).
+function _cutlineCrossingsAtY(pathItem, targetY) {
+    var out = [], i;
+    if (pathItem.typename === "PathItem") {
+        _crossingsInSubPath(pathItem, targetY, out);
+    } else if (pathItem.typename === "CompoundPathItem") {
+        for (i = 0; i < pathItem.pathItems.length; i++) {
+            _crossingsInSubPath(pathItem.pathItems[i], targetY, out);
+        }
+    } else if (pathItem.typename === "GroupItem") {
+        for (i = 0; i < pathItem.pathItems.length; i++) {
+            _crossingsInSubPath(pathItem.pathItems[i], targetY, out);
+        }
+        for (i = 0; i < pathItem.compoundPathItems.length; i++) {
+            var cp = pathItem.compoundPathItems[i];
+            for (var j = 0; j < cp.pathItems.length; j++) {
+                _crossingsInSubPath(cp.pathItems[j], targetY, out);
+            }
+        }
+    }
+    out.sort(function(a, b) { return a - b; });
+    return out;
+}
+
+// Walks one PathItem's bezier segments. For each segment crossing targetY, bisects to
+// the precise X and pushes it into out[].
+function _crossingsInSubPath(subPath, targetY, out) {
+    var pts   = subPath.pathPoints;
+    var n     = pts.length;
+    var limit = subPath.closed ? n : n - 1;
+    var STEPS  = 64;
+    var BISECT = 20;
+    var i, j, k, t, lo, hi, mid, ptA, ptB, curY;
+
+    for (i = 0; i < limit; i++) {
+        var next = (i + 1) % n;
+        var p0 = pts[i].anchor;
+        var p1 = pts[i].rightDirection;
+        var p2 = pts[next].leftDirection;
+        var p3 = pts[next].anchor;
+
+        var prevY = p0[1], prevT = 0;
+
+        for (j = 1; j <= STEPS; j++) {
+            t    = j / STEPS;
+            ptA  = _bezierPoint(p0, p1, p2, p3, t);
+            curY = ptA.y;
+
+            if ((prevY > targetY) !== (curY > targetY)) {
+                lo = prevT; hi = t;
+                for (k = 0; k < BISECT; k++) {
+                    mid = (lo + hi) / 2;
+                    ptB = _bezierPoint(p0, p1, p2, p3, mid);
+                    if ((ptB.y > targetY) === (prevY > targetY)) {
+                        lo = mid;
+                    } else {
+                        hi = mid;
+                    }
+                }
+                ptB = _bezierPoint(p0, p1, p2, p3, (lo + hi) / 2);
+                out.push(ptB.x);
+            }
+            prevY = curY;
+            prevT = t;
+        }
+    }
+}
+
+// ─── JUNCTION FILLET (Step 6 weld refinement) ─────────────────────────────────
+// Softens the two reflex notches where the plate meets the art on the fused cutline,
+// so the cut contour has no sharp inward spike at the caption junction. Driven by the
+// PS-known bite points (sidecar), mapped to AI by the caller — deterministic, not a
+// guess. Conservative: only a nearby SHARP corner is rounded; smooth joins are left.
+// No-op when radiusPt is null/0 or biteAi is absent (legacy elements). Returns the
+// number of corners softened.
+function filletJunctionCorners(cutline, biteAi, radiusPt) {
+    if (!radiusPt || !biteAi || biteAi.length < 1) return 0;
+    var softened = 0, bi;
+    for (bi = 0; bi < biteAi.length; bi++) {
+        softened += _softenNearestCorner(cutline, biteAi[bi], radiusPt);
+    }
+    return softened;
+}
+
+function _softenNearestCorner(item, pt, radiusPt) {
+    if (item.typename === "PathItem") {
+        var rr = _nearestAnchor(item, pt);
+        return rr ? _softenAnchor(item, rr.idx, radiusPt) : 0;
+    }
+    if (item.typename === "CompoundPathItem") {
+        var best = null, bestSub = null, i, r;
+        for (i = 0; i < item.pathItems.length; i++) {
+            r = _nearestAnchor(item.pathItems[i], pt);
+            if (r && (!best || r.d2 < best.d2)) { best = r; bestSub = item.pathItems[i]; }
+        }
+        return best ? _softenAnchor(bestSub, best.idx, radiusPt) : 0;
+    }
+    if (item.typename === "GroupItem") {
+        var s = 0, k;
+        for (k = 0; k < item.pathItems.length; k++) s += _softenNearestCorner(item.pathItems[k], pt, radiusPt);
+        for (k = 0; k < item.compoundPathItems.length; k++) s += _softenNearestCorner(item.compoundPathItems[k], pt, radiusPt);
+        return s;
+    }
+    return 0;
+}
+
+function _nearestAnchor(path, pt) {
+    var pts = path.pathPoints, n = pts.length, i, a, dx, dy, d2, best = -1, bestD = Infinity;
+    for (i = 0; i < n; i++) {
+        a = pts[i].anchor;
+        dx = a[0] - pt.x; dy = a[1] - pt.y;
+        d2 = dx * dx + dy * dy;
+        if (d2 < bestD) { bestD = d2; best = i; }
+    }
+    if (best < 0) return null;
+    return { idx: best, d2: bestD };
+}
+
+// Converts pathPoint[idx] to a SMOOTH point with short handles toward its neighbours,
+// rounding a sharp corner. Leaves already-smooth/near-straight points untouched.
+function _softenAnchor(path, idx, radiusPt) {
+    var pts = path.pathPoints, n = pts.length;
+    if (n < 3) return 0;
+    var prev = pts[(idx - 1 + n) % n].anchor;
+    var cur  = pts[idx].anchor;
+    var next = pts[(idx + 1) % n].anchor;
+    var turn = _turnAngle({ x: prev[0], y: prev[1] }, { x: cur[0], y: cur[1] }, { x: next[0], y: next[1] });
+    if (turn < 20) return 0;   // already near-straight — nothing to round
+    var hp = _towardHandle(cur, prev, radiusPt);
+    var hn = _towardHandle(cur, next, radiusPt);
+    var pp = pts[idx];
+    pp.leftDirection  = [hp.x, hp.y];
+    pp.rightDirection = [hn.x, hn.y];
+    pp.pointType = PointType.SMOOTH;
+    return 1;
+}
+
+// A handle point `radiusPt` from cur toward nb (clamped to half that edge length).
+function _towardHandle(cur, nb, radiusPt) {
+    var dx = nb[0] - cur[0], dy = nb[1] - cur[1];
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-6) return { x: cur[0], y: cur[1] };
+    var d = Math.min(radiusPt, len / 2);
+    return { x: cur[0] + dx / len * d, y: cur[1] + dy / len * d };
 }
 
 // ─── PURE GEOMETRY (Step 8c QA) ───────────────────────────────────────────────

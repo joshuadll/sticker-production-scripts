@@ -37,6 +37,9 @@ var CONFIG = {
     halfcutLayerName:    "Halfcut",
     halfcutStrokePt:     0.25,  // matches cut-line stroke weight
     halfcutExtendMm:     1.0,   // half-cut extends 1mm past each end of the edge (playbook spec)
+    halfcutFollowSeam:   true,  // trace the real plate∩art seam (curved when the seat is
+                                //   curved/tilted); false → legacy straight chord at plate-top Y
+    halfcutSeamSteps:    16,    // bezier→polygon sampling density for the seam trace
 
     // ── Step 10: Asset Export ─────────────────────────────────────────────────
     stickersLayerName:     "Sticker",      // exact (built in code by buildWorkingDocument)
