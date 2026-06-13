@@ -1,5 +1,12 @@
 # Sticker Production Scripts — Claude Code Context
 
+> ⚠ **Pending in-app validation** (branch `claude/step-9a-walkthrough-je9ipa`): the
+> caption-junction / live half-cut work is implemented + syntax-checked but has NOT been
+> run against Photoshop/Illustrator. Before anything else in a local Adobe session, follow
+> **`docs/caption-junction-validation.md`** — start with the PS rotation-sign check
+> (`CONFIG.seatRotationSign`) and regenerate the 5 golden test logs. Remove this note once
+> validated.
+
 ## Language
 All scripts are ExtendScript (ES3). No let/const, no arrow functions, no template literals.
 Always wrap main() in try/catch that alerts error with line number.
