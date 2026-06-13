@@ -36,7 +36,7 @@ var CONFIG = {
     // Layer names — case-insensitive search; created as halfcutLayerName if absent.
     halfcutLayerName:    "Halfcut",
     halfcutStrokePt:     0.25,  // matches cut-line stroke weight
-    halfcutExtendMm:     0.5,   // half-cut extends past each end of the edge
+    halfcutExtendMm:     1.0,   // half-cut extends 1mm past each end of the edge (playbook spec)
 
     // ── Step 10: Asset Export ─────────────────────────────────────────────────
     stickersLayerName:     "Sticker",      // exact (built in code by buildWorkingDocument)
