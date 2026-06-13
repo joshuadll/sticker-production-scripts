@@ -1,11 +1,21 @@
 # Sticker Production Scripts — Claude Code Context
 
-> ⚠ **Pending in-app validation** (branch `claude/step-9a-walkthrough-je9ipa`): the
-> caption-junction / live half-cut work is implemented + syntax-checked but has NOT been
-> run against Photoshop/Illustrator. Before anything else in a local Adobe session, follow
-> **`docs/caption-junction-validation.md`** — start with the PS rotation-sign check
-> (`CONFIG.seatRotationSign`) and regenerate the 5 golden test logs. Remove this note once
-> validated.
+> **In-app validation status** (branch `claude/step-9a-walkthrough-je9ipa`, run 2026-06-13):
+> - ✅ **PS rotation sign** — confirmed correct (`CONFIG.seatRotationSign = 1`): captions tilt
+>   to follow the border as one rigid unit (text+pill+plate), no shear; flat borders ≈ unchanged.
+> - ✅ **Half-cut engine** — confirmed: straight for flat seats / curved for tilted-curved,
+>   re-syncs through nest→normalise→export with **no duplicates**, endpoints land on the cut line.
+> - ⚠ **Seat-review flag** — mechanism works (`needsReview` → `|R` note → blue Layout-QA badge,
+>   advisory, doesn't gate), but **over-flags** (13/22 at `seatBandPx=4`) and misses corner
+>   armpits. Tune `seatBandPx` up; it's orthogonal to the junction issue below.
+> - ❌ **Caption-junction cut-line quality** — KNOWN ISSUE, diagnosed not fixed: the
+>   `Unite(outline, plate)` weld leaves degenerate slivers/spikes at the seam ("gap"/"horn").
+>   See **`docs/caption-junction-cutline-quality.md`** for root cause + the vector fix plan.
+>   Raster white-fill in PS is the wrong layer — don't retry it.
+> - ⬜ **Golden test logs** — behavior changed (conform seat + half-cut); 5 goldens need
+>   regenerating (see `docs/caption-junction-validation.md`). Review each diff before committing.
+>
+> Original validation plan: **`docs/caption-junction-validation.md`**.
 
 ## Language
 All scripts are ExtendScript (ES3). No let/const, no arrow functions, no template literals.
