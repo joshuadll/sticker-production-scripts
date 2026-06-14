@@ -222,10 +222,13 @@ extent (fooled by irregular art); per-sample slice-trace (reserve for parked pro
   The sagitta-submersion mitigation (`d ≥ s + margin`) is ASSUMED adequate but NOT
   validated, and it fails when `s` exceeds the submersion budget (border would reach the
   text). Couples to the deferred profile-settle. REVISIT.
-- **WC arced caption (curved inner edge) — next major case.** v1 uses the chord
-  `E0→E1`, discarding the bow; the WC capsule is curved-by-design to follow the art, so
-  WC seating is curve-into-curve, not line-to-line. Separable, non-crashing (v1 still
-  produces a seat). Tackle after the endpoint-overhang minimal rule.
+- **WC arced caption (curved inner edge) — RESOLVED: no special case.** The WC arc is
+  ARTIST-placed (Step 3A drops it straight; the artist warps it to follow the art before
+  Step 3B), so it is already conformed to the art. DECISION: keep the unified chord-rotation
+  (option 1). For a well-placed arc the chord runs ~parallel to the art → `φ` is naturally
+  SMALL; the rigid transform PRESERVES the artist's curve and just seats it; overlap depth
+  `d` submerges any residual curve-vs-border mismatch; `maxSeatRotationDeg` clamps outliers.
+  No per-pill-type branching. (Curve-aware seat rejected as overkill.)
 - **Live-span boundaries / disjoint spans (PARKED).** Finding where overhang starts/stops
   along the edge (vs just at the endpoints) — the profile-extraction work.
 - **Degenerate/ambiguous travel direction.** Caption overlapping the art center, or
