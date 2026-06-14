@@ -132,31 +132,41 @@ This REPLACES PCA-over-9-bbox-columns with a **2-point chord at the pill's actua
 endpoints**: long, stable baseline, anchored to where the pill really is, no averaging,
 no bbox band.
 
-### The kiss (v1) — pin both endpoints to the border
+### The kiss (v1) — pin E0, rotate, translate onto B0  (REVISED — simplest)
 
-Target: the inner-edge baseline lies **parallel to the chord `L` (through B0,B1)** at
-**overlap depth `d`** into the art. Compute as ONE rigid transform and apply once
-(raster rotates a single time — no degradation from iterating):
 ```
-φ = angle(B0→B1) − angle(E0→E1)
-rotate about center M by φ                       // parallel to L; lateral-neutral
-translate ALONG THE TRAVEL AXIS by the (constant) gap to L, minus depth d   // seats
+θ = robust border angle (line fit over the live span — NOT 2 raw probe points)
+φ = θ − angle(E0→E1)
+rotate the pill by φ about E0                 // E0 is pivot AND target → stays put
+translate (B0 − E0) + d  along the travel axis   // E0 → B0, submerged by depth d
 ```
-NOTE: the seat translate is **along the travel axis (vertical), NOT perpendicular to L.**
-Both make the parallel edge coincide with `L` (parallel lines have a constant *vertical*
-gap, not just perpendicular), so both endpoints still kiss simultaneously — but a vertical
-translate has no horizontal component, so it preserves lateral position. (Perpendicular
-translate would re-introduce a small sideways drift ≈ gap·sin(tilt); rejected.)
+Result: `E0` sits at depth `d` on its border point `B0`; the edge is parallel to `θ`;
+`E1` lands on the border line at distance `W` from `B0` — i.e. BETWEEN `B0` and `B1`
+(the edge is shorter than the chord: `W = |E0E1| < |B0B1| = √(W²+Δh²)`). Both endpoints
+kiss; `E1` just falls short of `B1`, which is fine (any point on a straight border =
+kissing).
 
-Because v1 treats `L` as a straight line, seating the parallel edge onto `L` puts BOTH
-endpoints on `L` simultaneously → **both kiss**. They land *somewhere on `L`*, NOT on
-`B0/B1` (a rigid edge can't hit both: `|B0B1| = √(W²+Δh²) > W = |E0E1|`) — but on a
-STRAIGHT border every point of `L` is the border, so landing anywhere on `L` = kissing.
-The "B moves when you rotate" objection only bites on a CURVED border (→ deferred
-profile-settle); for flat v1 it's harmless. Verified numerically.
+WHY THIS IS CLEAN: `E0` is the pivot *and* the target, fixed at `B0` throughout → there's
+nothing to re-project, no chicken-and-egg. Only `E1` is derived; we accept wherever it
+lands on the border. `θ` comes from the fixed border (measured once), not re-derived.
+
+PIVOT = E0 (revised from center M). Trade-off: a small SECOND-ORDER lateral drift
+`≈ (W/2)(1−cos φ)` (~1px at typical tilts) — accepted for the simpler logic.
+
+ANGLE stays robust: `θ` from a line fit over the live span, decoupled from the
+pivot/translate. (2 raw points would let a groove at `B0/B1` tilt the whole caption.)
+
+DEPTH `d` (the `+d` term) = overlap submersion. Set `d ≥ border sagitta over the span`
+(+ small margin), so the always-present gentle curvature + pixel grooves are SWALLOWED by
+the overlap (white-on-white, no gap, convex or concave). A straight pill can't hug a
+curve, so we submerge instead. Upper bound: `d` can't push the border into the text (limited
+by the pill's white padding) — sagitta beyond that = the "too deep to submerge" case that
+needs the deferred profile-settle / arced pill. `d = max(captionBorderOverlapPx, s+margin)`.
 
 ### DECISIONS
-- **v1 = flat straight-chord one-shot now.** Near-flat borders only; `L` ≈ real border.
+- **v1 kiss = pin E0, rotate by `φ` about E0, translate `E0→B0 + d`** (see revised block
+  above). Angle `θ` from a robust line fit over the live span (NOT 2 raw points). Depth
+  `d` tied to sagitta so ubiquitous gentle curvature + grooves are submerged.
 - **Curvature deferred** to a later phase via the **profile-settle** (extract the border
   facing-edge profile in ONE raster pass → settle the inner edge onto that polyline as
   PURE geometry → one physical transform). The flat chord is the degenerate case of this;
