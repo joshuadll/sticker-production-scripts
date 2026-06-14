@@ -234,6 +234,34 @@ extent (fooled by irregular art); per-sample slice-trace (reserve for parked pro
 - **Degenerate/ambiguous travel direction.** Caption overlapping the art center, or
   contact wrapping an art corner (facing edge flips bottom→side).
 
+## Additional edge cases (final sweep)
+
+NEW — decided:
+- **Near-zero baseline (circular / 1-char pill) — GUARD.** When the inner-edge length
+  `|E0−E1|` is below an epsilon, the rotation angle is undefined → **skip rotation (θ=0),
+  kiss only.** Distinct from the short-caption case (which still rotates); this is a true
+  numerical degenerate.
+- **Kiss is bidirectional — sets depth to EXACTLY `d`.** If Step 3A + rotation leaves the
+  caption submerged deeper than `d`, the kiss translates **outward**; if short, inward.
+  Signed translate. (Makes existing behaviour explicit.)
+- **Artist pre-rotated the whole caption (a tilt, not an arc) — ACCEPT re-tilt.** The
+  unified rotation re-tilts it to the border. Deliberate straight-caption tilts are rare;
+  noted that it could fight artist intent (same risk family as WC, which we trust). Not
+  special-cased.
+
+ALREADY COVERED (recorded for completeness):
+- Missing white border (WBC) → fall back to the SO art as the reference (existing code).
+- Caption above / beside the art → travel axis is direction-agnostic (the `sign` logic).
+- Notch in the middle of the contact → naturally bridged (only endpoints are pinned).
+- Donut / hole in the art column → the probe takes nearest ink = the true facing edge.
+- Multi-line caption → straight pill; inner edge = top of the stacked block.
+
+MINOR / accept:
+- Post-transform overhang (a large rotation nudges an endpoint off the art after we've
+  already probed) → mitigated by `maxSeatRotationDeg`; we do not re-probe.
+- Idempotency: re-seating an already-seated caption should converge (near-zero
+  adjustment), not drift — verify in validation, not a design change.
+
 ## Data threading needed
 
 `seatCaptionConform` currently receives `spine` only.
