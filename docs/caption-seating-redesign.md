@@ -130,10 +130,40 @@ Then:
 
 This REPLACES PCA-over-9-bbox-columns with a **2-point chord at the pill's actual
 endpoints**: long, stable baseline, anchored to where the pill really is, no averaging,
-no bbox band. Curvature (using >2 border points across the span) is a later refinement.
+no bbox band.
 
-→ NEXT on the normal path: the **kiss** — translate along the (now-aligned) normal to set
-the overlap depth.
+### The kiss (v1) — pin both endpoints to the border
+
+Target: the inner-edge baseline lies **parallel to the chord `L` (through B0,B1)** at
+perpendicular **overlap depth `d`** into the art. Compute as ONE rigid transform
+(rotate `φ` about center `M` + perpendicular translate to depth `d`) and apply once
+(raster rotates a single time — no degradation from iterating).
+
+Because v1 treats `L` as a straight line, seating the parallel edge onto `L` puts BOTH
+endpoints on `L` simultaneously → **both kiss** (the user's critical requirement). The
+"B moves when you rotate" problem is dissolved by targeting the LINE `L`, not the
+pre-rotation projection points (a rigid edge can't hit `B0` AND `B1` exactly anyway:
+`|B0B1| = √(W²+Δh²) > W = |E0E1|`).
+
+### DECISIONS
+- **v1 = flat straight-chord one-shot now.** Near-flat borders only; `L` ≈ real border.
+- **Curvature deferred** to a later phase via the **profile-settle** (extract the border
+  facing-edge profile in ONE raster pass → settle the inner edge onto that polyline as
+  PURE geometry → one physical transform). The flat chord is the degenerate case of this;
+  the profile also subsumes the parked overhang/live-span work (overhang = missing
+  profile samples). Node-testable.
+- **Contact rule = PIN ENDPOINTS** (now and in the curve phase). Accept that on a real
+  CONVEX border (rounded sticker bottom) pinned endpoints can leave a small **middle
+  gap**; revisit only if validation shows it matters. (Alternative "natural support
+  points" rejected.)
+
+### v1 LIMITATION (accepted)
+On a curved border the straight chord is an approximation: post-rotation real contact
+lands at a different height than `B0/B1`, so the two endpoints won't kiss the *real*
+curve perfectly. Fine for near-flat; the profile-settle is the fix when needed.
+
+→ NEXT on the normal path: define `d` (overlap depth, vs `captionBorderOverlapPx`) and the
+perpendicular-distance math for the one-shot transform.
 
 ## Data threading needed
 
