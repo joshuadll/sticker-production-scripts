@@ -182,28 +182,40 @@ On a curved border the straight chord is an approximation: post-rotation real co
 lands at a different height than `B0/B1`, so the two endpoints won't kiss the *real*
 curve perfectly. Fine for near-flat; the profile-settle is the fix when needed.
 
-## Step 6 — overhang solution (BRAINSTORM — NOT DECIDED)
+## Step 6 — overhang solution: BALANCED SHRINK (DECIDED)
 
-GOAL (already decided earlier): **mask to the live span** — seat against where border
-exists, let overhangs float. The METHOD is open; nothing adopted yet.
+GOAL (decided earlier): mask to the live span — seat where border exists, overhang floats.
 
-The v1 kiss pins `E0`→`B0`, which assumes `E0` has border above it. Detection of an
-endpoint overhang is FREE (the `B0`/`B1` probe returns null). Candidate methods:
+METHOD (DECIDED): take a shorter, CENTERED sub-segment of the inner edge — inset BOTH
+endpoints **equally** toward the midpoint `M` — and probe those two inset endpoints for
+border (their `B` points):
+- both find border → use them as the effective `E0',E1'` and run the **v1 kiss** on them
+  (pin one, rotate to align, translate + depth `d`). The pill's geometric ends float past
+  the contact.
+- either still overhangs → **shrink again** (inset both a bit more, equally).
+- shrunk below a MIN segment length with no contact → **WARN** (effectively case C).
 
-- **(a) Endpoint-only (minimal):** pin whichever endpoint has a border; both null → skip.
-  CHEAP but FLAWED — it can't see the interior, so "both ends overhang, MIDDLE lands"
-  (narrow centered art — common!) reads as both-null → wrongly SKIPS a seatable case.
-- **(b) Per-sample profile:** probe N points along the inner edge → liveness profile →
-  contiguous live run(s). Robust, handles disjoint spans, but N raster probes (cost).
-- **(c) Live-extent reduction (leading idea):** ONE intersection (art-border transparency
-  ∩ inner-edge band reaching `D` toward the art) → bounds give the border's horizontal
-  FOOTPRINT under the caption = the live sub-segment. Clip the inner edge to it, take the
-  live-segment endpoints as effective `E0',E1'`, probe their heights → run the v1 kiss
-  unchanged on the live segment; the geometric pill ends just float past. Cheap (1 op +
-  2 probes), handles A/B/C, reuses v1. Limitation: a concave MID-gap reads as live (bbox
-  bounds span the gap) — rare; refine later.
+WHY BALANCED (not per-end): keeps the contact span symmetric about the caption center, so
+the tilt comes from a centered region and the caption stays balanced — consistent with
+Step 3A centering the caption on the element. (Per-end / asymmetric shrink REJECTED.)
 
-Still open. Leaning (c).
+ROBUST TO IRREGULAR ART: uses point probes (the real ink edge in each slice), never a
+bounding box, so irregularity can't fool it (unlike the rejected one-shot-bounds idea).
+
+KNOBS: shrink step (inset per try, ~few % of width); MIN segment length (→ warn trigger).
+
+KNOWN LIMITATION (accepted): if the live contact zone lies ENTIRELY to one side of the
+caption center, balanced shrink can't reach it → WARNS even though a seat exists. Rare
+(Step 3A centers the caption on the element → contact is normally ~centered); warn is the
+graceful fallback. Revisit only if validation shows off-center contact is common.
+
+TRADEOFF (accepted): shorter segment → shorter angle baseline → less stable tilt on
+noisy/curved borders. Fine for the rarer overhang path (the main no-overhang path keeps
+the robust full-span fit). Could fit the angle over the found segment later if needed.
+
+REJECTED alternatives: endpoint-only (blind to interior — skips middle-lands); one-shot
+bounding-box extent (fooled by irregular/notched/flared art); full per-sample slice-trace
+(robust but costlier — keep in reserve for the parked live-span/profile work).
 
 ## Open / UNRESOLVED edge cases
 
