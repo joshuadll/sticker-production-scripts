@@ -121,14 +121,19 @@ Then:
 - **Border local tangent** = chord `B0 → B1`.
 - **Inner-edge baseline** = chord `E0 → E1`.
 - **Conform rotation** `φ` = signed angle from the inner-edge baseline to the border chord.
-- Rotate the pill rigidly by `φ` so the inner edge runs parallel to the border. (Pivot TBD.)
+- Rotate the pill rigidly by `φ` about the **inner-edge midpoint** `M = (E0+E1)/2` (= the
+  pill's horizontal center). **Pivot DECIDED = center**: a rotation leaves its pivot fixed,
+  so `M` doesn't move → rotation is **lateral-neutral** (no sideways drift; the
+  `φ·(P2−P1)` pivot term vanishes). It PRESERVES the existing center (Step 3A's job);
+  it does not re-center. Parallelism is pivot-independent, so both endpoints still cross
+  the border simultaneously on the kiss.
 
 This REPLACES PCA-over-9-bbox-columns with a **2-point chord at the pill's actual
 endpoints**: long, stable baseline, anchored to where the pill really is, no averaging,
 no bbox band. Curvature (using >2 border points across the span) is a later refinement.
 
-→ NEXT after rotation: the kiss (translate to overlap depth) on the normal path; and the
-rotation pivot choice.
+→ NEXT on the normal path: the **kiss** — translate along the (now-aligned) normal to set
+the overlap depth.
 
 ## Data threading needed
 
