@@ -5,8 +5,8 @@
 // regression — e.g. a future change reverting to a tangent-based overshoot — pushes the
 // endpoints OFF the nearest cut-line edge and trips this test.
 //
-// Direct-call test (no golden): runs the real aiUtils path — cleanCaptionJunction (fillet,
-// gate ON) then syncHalfcut (cut-line-aligned extension) — on the open fixture's caption
+// Direct-call test (no golden): runs the real syncHalfcut (cut-line-aligned extension) on the
+// open fixture's caption
 // groups, then measures each half-cut endpoint's PERPENDICULAR distance to the nearest
 // cut-line edge. Writes [halfcut-test] PASS|/FAIL| lines; the runner greps for FAIL.
 //
@@ -17,7 +17,6 @@
 var CONFIG = {
     logPath:           "~/Desktop/test-halfcut-alignment.log",
     suppressAlerts:    true,
-    weldFilletRadiusPt: 2.0,          // junction cleanup ON (matches AI_BuildCutlines)
     halfcutSeamSteps:  16,
     halfcutFollowSeam: true,
     halfcutExtendMm:   1.0,
@@ -63,7 +62,7 @@ function main() {
     }
     if (!cutL) { log("[halfcut-test] FAIL | no Cutlines layer in fixture"); return; }
 
-    // Run the real path on every caption group: fillet + half-cut.
+    // Run the real half-cut sync on every caption group.
     var groups = [], g;
     for (g = 0; g < cutL.groupItems.length; g++) groups.push(cutL.groupItems[g]);
     var processed = 0;
@@ -74,7 +73,6 @@ function main() {
         var cut     = findGroupMember(grp, "");
         if (!plate || !outline || !cut) continue;        // stamp / uncaptioned
         try {
-            cleanCaptionJunction(cut, plate, outline, { filletRadiusPt: CONFIG.weldFilletRadiusPt });
             syncHalfcut(doc, grp, {});
             processed++;
         } catch (eP) {

@@ -13,15 +13,12 @@
 >   fires on overhang-too-wide / chord-tilt-clamp / missing-geometry (the old `seatBandPx`
 >   even-overlap check is GONE). See **`docs/caption-seating-redesign.md`**. LOCAL TODO: re-confirm
 >   `seatRotationSign`, tune `seatShrinkFrac`/`captionBorderOverlapPx`, regen the PSAI golden.
-> - ✅ **Caption-junction cut-line quality** — FIXED (2026-06-14): `cleanCaptionJunction()`
->   (aiUtils) removes the `Unite(outline, plate)` spike/horn/sliver at each plate∩art junction
->   and leaves a soft rounded transition (vector cluster-bracket + circular-arc fillet, located
->   from the real crossings — not the bbox). All 22 fixture junctions render smooth (sampled
->   turn ≤37°, was 115–179°); idempotent under Step 8b's re-Unite. Half-cut now extends to the
->   cleaned cut line (+1mm along the art outline), so peel-tab endpoints stay attached even where
->   the fillet pulled the contour off the old crossing. Gated by `CONFIG.weldFilletRadiusPt`
->   (now `2.0` = ON in AI_BuildCutlines + AI_NormaliseCaptions). See
->   **`docs/caption-junction-cutline-quality.md`**. Raster white-fill in PS was the wrong layer.
+> - 🔁 **Caption-junction cut-line cleanup — REMOVED (reverted 2026-06-14)**: `cleanCaptionJunction()`
+>   and the `CONFIG.weldFilletRadiusPt` gate were removed; the export cutline is back to the raw
+>   `Unite(outline, plate)`, so the plate∩art junction may again show the boolean spike/sliver
+>   (the pre-branch behavior — intentional). The live half-cut is unchanged: `syncHalfcut`
+>   (seam-traced) with each end re-projected onto the current cut line + a 1mm tail along the
+>   cut-line contour, so peel-tab endpoints stay attached.
 > - ⬜ **Golden test logs** — behavior changed (conform seat + half-cut); 5 goldens need
 >   regenerating (see `docs/caption-junction-validation.md`). Review each diff before committing.
 >
@@ -168,11 +165,8 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   parseNote, getOrCreateHalfcutLayer, drawHalfcutLine, drawHalfcutPath,
   syncHalfcut (idempotent per-element half-cut, seam-traced via plateSeamPath; called by
     Steps 6/7B/8b/9A so the cut tracks the caption — straight seat → straight cut, curved/
-    tilted seat → curved cut; each end is extended to the cleaned cut line + 1mm along the
-    ART outline so it stays attached after the junction fillet), plateSeamPath,
-  cleanCaptionJunction (post-Unite caption-junction cleanup: removes the boolean spike/horn/
-    sliver per plate∩art crossing → soft rounded fillet; idempotent; gated by
-    CONFIG.weldFilletRadiusPt; called by Step 6 + reuniteCutline),
+    tilted seat → curved cut; each end is re-projected onto the current cut line + a 1mm tail
+    along the cut-line contour so it stays attached), plateSeamPath,
   _cutlineCrossingsAtY (bezier ray scan+bisection; moved here from Step 9A so syncHalfcut's
     straight-chord fallback is self-contained),
   buildWorkingDocument (builds A4/CMYK doc + Margin/Stickers/Grid/Color Block layers, no template),

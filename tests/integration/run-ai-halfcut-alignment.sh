@@ -1,7 +1,7 @@
 #!/bin/bash
 # Regression guard for the HALF-CUT ENDPOINT EXTENSION (utils/aiUtils.jsx).
 # Opens the post-Step-6 import-nesting.ai fixture, runs the REAL aiUtils path
-# (cleanCaptionJunction → syncHalfcut) on every caption group via
+# (syncHalfcut) on every caption group via
 # test-halfcut-alignment.jsx, and asserts every half-cut endpoint lands ON the cut line
 # (the 1mm overshoot runs along the contour, not off along the art tangent — commit d996451).
 #
