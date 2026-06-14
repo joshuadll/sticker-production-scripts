@@ -135,15 +135,25 @@ no bbox band.
 ### The kiss (v1) — pin both endpoints to the border
 
 Target: the inner-edge baseline lies **parallel to the chord `L` (through B0,B1)** at
-perpendicular **overlap depth `d`** into the art. Compute as ONE rigid transform
-(rotate `φ` about center `M` + perpendicular translate to depth `d`) and apply once
-(raster rotates a single time — no degradation from iterating).
+**overlap depth `d`** into the art. Compute as ONE rigid transform and apply once
+(raster rotates a single time — no degradation from iterating):
+```
+φ = angle(B0→B1) − angle(E0→E1)
+rotate about center M by φ                       // parallel to L; lateral-neutral
+translate ALONG THE TRAVEL AXIS by the (constant) gap to L, minus depth d   // seats
+```
+NOTE: the seat translate is **along the travel axis (vertical), NOT perpendicular to L.**
+Both make the parallel edge coincide with `L` (parallel lines have a constant *vertical*
+gap, not just perpendicular), so both endpoints still kiss simultaneously — but a vertical
+translate has no horizontal component, so it preserves lateral position. (Perpendicular
+translate would re-introduce a small sideways drift ≈ gap·sin(tilt); rejected.)
 
 Because v1 treats `L` as a straight line, seating the parallel edge onto `L` puts BOTH
-endpoints on `L` simultaneously → **both kiss** (the user's critical requirement). The
-"B moves when you rotate" problem is dissolved by targeting the LINE `L`, not the
-pre-rotation projection points (a rigid edge can't hit `B0` AND `B1` exactly anyway:
-`|B0B1| = √(W²+Δh²) > W = |E0E1|`).
+endpoints on `L` simultaneously → **both kiss**. They land *somewhere on `L`*, NOT on
+`B0/B1` (a rigid edge can't hit both: `|B0B1| = √(W²+Δh²) > W = |E0E1|`) — but on a
+STRAIGHT border every point of `L` is the border, so landing anywhere on `L` = kissing.
+The "B moves when you rotate" objection only bites on a CURVED border (→ deferred
+profile-settle); for flat v1 it's harmless. Verified numerically.
 
 ### DECISIONS
 - **v1 = flat straight-chord one-shot now.** Near-flat borders only; `L` ≈ real border.
