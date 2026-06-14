@@ -182,8 +182,41 @@ On a curved border the straight chord is an approximation: post-rotation real co
 lands at a different height than `B0/B1`, so the two endpoints won't kiss the *real*
 curve perfectly. Fine for near-flat; the profile-settle is the fix when needed.
 
-→ NEXT on the normal path: define `d` (overlap depth, vs `captionBorderOverlapPx`) and the
-perpendicular-distance math for the one-shot transform.
+## Step 6 — endpoint overhang (minimal, ADOPTED)
+
+The v1 kiss pins `E0`→`B0`, which assumes `E0` has a border above it. If `E0` overhangs
+(its probe returns null — no intersection), there is no pivot/target. This is FREQUENT
+(caption width comes from the display-name text, which can exceed a small element).
+
+Detection is FREE — it's the same `B0`/`B1` probe we already do (null ⇒ that endpoint
+overhangs). Minimal rule (ADOPTED):
+- `E0` overhangs, `E1` doesn't → **pin `E1`** instead (rotate about `E1`, translate
+  `E1→B1 + d`). Symmetric; just swap the anchor endpoint.
+- both overhang → **case C → skip + warn** (already decided).
+- neither → the v1 path as-is.
+
+Angle source for now = **(a) keep the current full-span robust fit** (smallest change).
+Restricting the fit to the live portion is left to the fuller live-span work (parked).
+
+This closes a hard hole in v1 (the pinned pivot may not exist) without the parked
+live-span machinery. It is a prerequisite for shipping the E0-pin.
+
+## Open / UNRESOLVED edge cases
+
+- **Concave/convex border behavior under pin-endpoints (UNRESOLVED).** On a curved
+  border, pinning the two endpoints leaves a CONCAVE middle gap (center bows toward art
+  interior → overlap `d − s`; needs `d ≥ s`) or over-submerges a CONVEX middle (fine).
+  The sagitta-submersion mitigation (`d ≥ s + margin`) is ASSUMED adequate but NOT
+  validated, and it fails when `s` exceeds the submersion budget (border would reach the
+  text). Couples to the deferred profile-settle. REVISIT.
+- **WC arced caption (curved inner edge) — next major case.** v1 uses the chord
+  `E0→E1`, discarding the bow; the WC capsule is curved-by-design to follow the art, so
+  WC seating is curve-into-curve, not line-to-line. Separable, non-crashing (v1 still
+  produces a seat). Tackle after the endpoint-overhang minimal rule.
+- **Live-span boundaries / disjoint spans (PARKED).** Finding where overhang starts/stops
+  along the edge (vs just at the endpoints) — the profile-extraction work.
+- **Degenerate/ambiguous travel direction.** Caption overlapping the art center, or
+  contact wrapping an art corner (facing edge flips bottom→side).
 
 ## Data threading needed
 
