@@ -47,6 +47,11 @@ var CONFIG = {
                                  //     re-probe. Still none → caption too wide for art → seat skipped + flagged.
     seatBaselineEpsPx:  2,       // px: baselines shorter than this (circular / 1-char pill) skip rotation
                                  //     (the tilt angle is numerically undefined) — kiss only.
+    captionMidProtrudeFrac: 0.25,// convex midpoint-bulge guard: if the border at the inner-edge midpoint
+                                 //     protrudes into the pill by more than this fraction of the pill
+                                 //     thickness (T = 2·radius), relieve it with one seatShrinkFrac shrink
+                                 //     (along the spine, so arced pills don't under-seat); still over
+                                 //     after that → flag for rework. 0.25 = T/4 = r/2. 0 disables.
     captionMaxGapFrac:      0.5, // caption↔element positional matching ceiling: reject a caption farther
                                  //     than this × the element's smaller side (element-relative → DPI-free).
                                  //     Stops a genuinely-uncaptioned element absorbing a far stray text layer.

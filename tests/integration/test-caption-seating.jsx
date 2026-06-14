@@ -120,14 +120,25 @@ var es = _innerEdgeEndpoints([{x:5,y:5}], 7, gBelow);
 assertPt("circular pill E0 (offset down by r)", es.E0, 5, 12);
 assertPt("circular pill E1 (== E0)",            es.E1, 5, 12);
 
-// --- _shrinkEndpoints (balanced 15% inset stays centred) ----------------------
+// --- _innerEdgeAt / _shrinkAlongSpine (curve-following balanced shrink) --------
 
-testLog("[seating-test] --- _shrinkEndpoints ---");
-var sh = _shrinkEndpoints({x:0,y:0}, {x:100,y:0}, 0.15);
-assertPt("shrink 15% E0 -> 15", sh.E0, 15, 0);
-assertPt("shrink 15% E1 -> 85", sh.E1, 85, 0);
-// midpoint preserved (centred mask)
-assertClose("shrink keeps centre", (sh.E0.x + sh.E1.x) / 2, 50);
+testLog("[seating-test] --- _innerEdgeAt / _shrinkAlongSpine ---");
+
+// Straight horizontal spine, art BELOW (sign +1): inner edge = spine + (0, r). A point at
+// fraction t sits on the same straight top → matches the old chord inset (no regression).
+var ieS = _innerEdgeAt([{x:0,y:100},{x:100,y:100}], 10, gBelow, 0.15);
+assertPt("innerEdgeAt straight t=0.15", ieS, 15, 110);
+var shS = _shrinkAlongSpine([{x:0,y:100},{x:100,y:100}], 10, gBelow, 0.15);
+assertPt("shrinkAlongSpine straight E0 -> 15%", shS.E0, 15, 110);
+assertPt("shrinkAlongSpine straight E1 -> 85%", shS.E1, 85, 110);
+assertClose("shrinkAlongSpine keeps centre", (shS.E0.x + shS.E1.x) / 2, 50);
+
+// Curved spine (downward arc, flat apex), art BELOW: the inner edge at t=0.5 must follow the
+// ARC (apex y=120 → inner 130), NOT the chord between the ends (y=100 → would give 110). This
+// is the bug guard — a chord shrink floats above an arced pill and under-seats it → gap.
+var arc = [{x:0,y:100},{x:40,y:120},{x:60,y:120},{x:100,y:100}];
+var ieC = _innerEdgeAt(arc, 10, gBelow, 0.5);
+assertPt("innerEdgeAt curved t=0.5 follows the arc (not the chord)", ieC, 50, 130);
 
 // --- _kissVector (pin-E0, signed depth, bidirectional) ------------------------
 
@@ -158,6 +169,44 @@ assertPt("rotate about pivot: pivot fixed", rotP[0], 5, 5);
 var tr = _translateSpine([{x:1,y:2}, {x:3,y:4}], 10, -5);
 assertPt("translate s0", tr[0], 11, -3);
 assertPt("translate s1", tr[1], 13, -1);
+
+// --- _midProtrusion (convex midpoint bulge, p = sagitta + depth) --------------
+
+testLog("[seating-test] --- _midProtrusion ---");
+
+// Art ABOVE (sign -1) — the Blue Church / Kraslice case. Border facing edge = art BOTTOM.
+// Convex bulge: the middle dips DOWN toward the caption (larger y) -> positive sagitta.
+assertClose("art-above convex bulge -> sag 12 + depth 3 = 15",
+    _midProtrusion({x:0,y:100}, {x:100,y:100}, {x:50,y:112}, gAbove, 3), 15);
+// Flat border -> sagitta 0 -> p == depth (no bulge; trigger never fires).
+assertClose("art-above flat -> p == depth",
+    _midProtrusion({x:0,y:100}, {x:100,y:100}, {x:50,y:100}, gAbove, 3), 3);
+// Concave (middle recedes UP, away from caption) -> negative sagitta -> p < depth.
+assertClose("art-above concave -> p < depth (-5)",
+    _midProtrusion({x:0,y:100}, {x:100,y:100}, {x:50,y:92}, gAbove, 3), -5);
+
+// Art BELOW (sign +1). Border facing edge = art TOP; convex bulge rises UP (smaller y).
+assertClose("art-below convex bulge -> 10 + 3 = 13",
+    _midProtrusion({x:0,y:100}, {x:100,y:100}, {x:50,y:90}, gBelow, 3), 13);
+
+// Horizontal travel (sign +1, art to the RIGHT). Facing edge = art LEFT; bulge goes -x.
+assertClose("art-right convex bulge -> 10 + 2 = 12",
+    _midProtrusion({x:100,y:0}, {x:100,y:40}, {x:90,y:20}, gRight, 2), 12);
+
+// Missing midpoint probe (a true mid-notch with no border above it) -> null -> ignore.
+assert("null Bm -> null (ignored)",
+    _midProtrusion({x:0,y:100}, {x:100,y:100}, null, gAbove, 3), null);
+
+// The shrink relief is real: re-measuring a convex border over the 15%..85% span yields a
+// smaller p than the full span (the kiss then pins a deeper point and the pill backs out).
+function _convexEdge(x) { return 100 - 12 * Math.pow((x - 50) / 50, 2); }  // art-above bottom
+var pFull   = _midProtrusion({x:0, y:_convexEdge(0)},  {x:100, y:_convexEdge(100)},
+                             {x:50, y:_convexEdge(50)}, gAbove, 3);
+var pShrunk = _midProtrusion({x:15, y:_convexEdge(15)}, {x:85, y:_convexEdge(85)},
+                             {x:50, y:_convexEdge(50)}, gAbove, 3);
+assertClose("convex full-span p == 15",        pFull,   15, 1e-6);
+assertClose("convex shrunk-span p == 8.88",    pShrunk, 8.88, 0.01);
+assert("shrink lowers the midpoint protrusion", pShrunk < pFull, true);
 
 // --- SUMMARY ------------------------------------------------------------------
 

@@ -436,10 +436,18 @@ function _percentile(arr, p) {
 //      depth d (= captionBorderOverlapPx). E0 is pivot AND target → nothing to
 //      re-project; E1 just lands somewhere on the border line, which is fine.
 //   4. OVERHANG. If either endpoint's ray finds no border (caption wider than the art's
-//      contact zone), inset BOTH ends by CONFIG.seatShrinkFrac (one balanced shrink) and
+//      contact zone), inset BOTH ends ALONG THE SPINE by CONFIG.seatShrinkFrac (one balanced
+//      shrink — _shrinkAlongSpine, so an arced pill stays on its real inner edge) and
 //      re-probe. Still nothing → the caption is too wide for the art: skip the seat +
 //      WARN + flag for review (the element still groups/exports). Overhang is a design
 //      problem, not something to silently ram into absent art.
+//   5. MIDPOINT BULGE. The endpoint kiss is blind to the border BETWEEN the corners: on a
+//      convex border (rounded sticker bottom) the middle submerges into the pill by d +
+//      sagitta and pokes into the text. Probe the inner-edge MIDPOINT and measure that
+//      protrusion analytically (p = sagitta + d, from B0/B1/Bm — no extra seating pass). If
+//      p crosses CONFIG.captionMidProtrudeFrac of the pill thickness (T = 2r), relieve it
+//      with the SAME balanced shrink as overhang (pins a deeper point → pill backs outward).
+//      Still over after one shrink → flag for review. Single shrink budget shared with (4).
 //
 //   refLayer    — the white border (White Base_Cutline); pass the SO as a fallback.
 //   pillLayer   — the White pill.
@@ -454,7 +462,9 @@ function _percentile(arr, p) {
 //   • θ from the 2 raw endpoint probes — a pixel groove at an endpoint can tilt the
 //     whole caption; the robust live-span line fit is the deferred upgrade.
 //   • Flat-chord depth (no sagitta term) — a straight pill can't hug a curved border,
-//     so depth d submerges the residual; the profile-settle is the curve-aware fix.
+//     so depth d submerges the residual; the profile-settle is the curve-aware fix. Step 5
+//     guards the worst symptom (a strong convex midpoint bulge into the text) by shrinking
+//     then flagging, but it does NOT make the pill follow the curve — that's still deferred.
 //
 // ⚠ PS layer.rotate sign: CONFIG.seatRotationSign multiplies the angle fed to
 //   layer.rotate() so the content rotation matches the geometric pivot correction. If
@@ -480,13 +490,14 @@ function seatCaptionConform(doc, refLayer, pillLayer, moveLayers, spine, radius)
     var E0 = ends.E0, E1 = ends.E1;
     var B0 = _probeBorder(doc, refLayer, geom, E0);
     var B1 = _probeBorder(doc, refLayer, geom, E1);
+    var shrunk = false;                       // one shrink budget, shared by overhang + bulge
 
     if (!B0 || !B1) {
-        var sh  = _shrinkEndpoints(E0, E1, CONFIG.seatShrinkFrac);
+        var sh  = _shrinkAlongSpine(spine, radius, geom, CONFIG.seatShrinkFrac);
         var sB0 = _probeBorder(doc, refLayer, geom, sh.E0);
         var sB1 = _probeBorder(doc, refLayer, geom, sh.E1);
         if (sB0 && sB1) {
-            E0 = sh.E0; E1 = sh.E1; B0 = sB0; B1 = sB1;
+            E0 = sh.E0; E1 = sh.E1; B0 = sB0; B1 = sB1; shrunk = true;
             log("[step3B] seat | overhang rescued by "
                 + Math.round(CONFIG.seatShrinkFrac * 100) + "% balanced shrink.");
         } else {
@@ -494,6 +505,45 @@ function seatCaptionConform(doc, refLayer, pillLayer, moveLayers, spine, radius)
             log("[step3B] WARN | caption too wide for art — no border under the inner "
                 + "edge even after shrink; seat skipped (element still groups).");
             return seat;
+        }
+    }
+
+    // Step 4b: convex midpoint bulge. A straight pill seated on its corners is blind to a
+    // border that bulges toward the caption BETWEEN them; the middle submerges into the pill
+    // by d + sagitta and pokes into the text. Measure that protrusion analytically at the
+    // inner-edge midpoint (p = sagitta + d, from B0/B1/Bm — no extra seating pass). If it
+    // crosses captionMidProtrudeFrac of the pill thickness (T = 2r; default T/4 = r/2),
+    // relieve it by shrinking the seated span along the spine (same rescue as overhang: the
+    // kiss then pins a deeper point so the whole pill backs outward). One shrink budget shared
+    // with overhang; still over after it → flag for rework.
+    if (CONFIG.captionMidProtrudeFrac > 0) {
+        var bulgeLimit = CONFIG.captionMidProtrudeFrac * 2 * radius;
+        var p = _midProtrusion(B0, B1,
+            _probeBorder(doc, refLayer, geom, { x: (E0.x + E1.x) / 2, y: (E0.y + E1.y) / 2 }),
+            geom, CONFIG.captionBorderOverlapPx);
+        if (p !== null && p > bulgeLimit) {
+            if (!shrunk) {
+                var bh  = _shrinkAlongSpine(spine, radius, geom, CONFIG.seatShrinkFrac);
+                var bB0 = _probeBorder(doc, refLayer, geom, bh.E0);
+                var bB1 = _probeBorder(doc, refLayer, geom, bh.E1);
+                if (bB0 && bB1) {
+                    E0 = bh.E0; E1 = bh.E1; B0 = bB0; B1 = bB1; shrunk = true;
+                    var pAfter = _midProtrusion(B0, B1,
+                        _probeBorder(doc, refLayer, geom,
+                            { x: (E0.x + E1.x) / 2, y: (E0.y + E1.y) / 2 }),
+                        geom, CONFIG.captionBorderOverlapPx);
+                    log("[step3B] seat | midpoint bulge " + Math.round(p) + "px > limit "
+                        + Math.round(bulgeLimit) + "px — relieved by "
+                        + Math.round(CONFIG.seatShrinkFrac * 100) + "% shrink to "
+                        + (pAfter === null ? "n/a" : Math.round(pAfter) + "px") + ".");
+                    p = pAfter;
+                }
+            }
+            if (p !== null && p > bulgeLimit) {
+                seat.needsReview = true;
+                log("[step3B] WARN | midpoint bulge " + Math.round(p) + "px still > limit "
+                    + Math.round(bulgeLimit) + "px after shrink — flagged for rework.");
+            }
         }
     }
 
@@ -614,13 +664,59 @@ function _normalizeDeg(d) {
     return d;
 }
 
-// Insets both endpoints toward the baseline centre by `frac` of the baseline length —
-// one balanced shrink that masks an overhanging seat to its (centred) live span. Pure
-// geometry.
-function _shrinkEndpoints(E0, E1, frac) {
-    var dx = E1.x - E0.x, dy = E1.y - E0.y;
-    return { E0: { x: E0.x + frac * dx, y: E0.y + frac * dy },
-             E1: { x: E1.x - frac * dx, y: E1.y - frac * dy } };
+// The pill's inner (art-facing) edge point at fraction t (0..1) ALONG THE SPINE — the
+// curve-following generalisation of _innerEdgeEndpoints (t=0 → E0, t=1 → E1). Interpolates
+// the spine by index fraction (the sampler spaces points ~evenly), then offsets that point
+// by r along the LOCAL spine normal toward the art. Unlike a straight chord between the two
+// endpoints, this stays ON the (possibly arced) inner edge — so a shrink built from it lands
+// on the real pill top, not floating above an arced one. Pure geometry.
+function _innerEdgeAt(spine, r, geom, t) {
+    var n = spine.length;
+    if (n < 2) return _offsetTowardArt(spine[0], _unit(0, 0), r, geom);  // single-point spine
+    var f = t * (n - 1);
+    var i = Math.floor(f);
+    if (i < 0) i = 0;
+    if (i > n - 2) i = n - 2;
+    var u  = f - i;
+    var p0 = spine[i], p1 = spine[i + 1];
+    var px = p0.x + u * (p1.x - p0.x);
+    var py = p0.y + u * (p1.y - p0.y);
+    return _offsetTowardArt({ x: px, y: py },
+        _unit(p1.x - p0.x, p1.y - p0.y), r, geom);
+}
+
+// Insets both seating endpoints to t = frac and t = 1-frac ALONG THE SPINE (not the chord) —
+// the curve-aware balanced shrink that masks an overhanging/bulging seat to its centred live
+// span. For a straight spine this equals the old chord inset; for an arced spine it follows
+// the curve, so the shrunk anchors sit on the real inner edge (no float → no under-seat gap).
+// Pure geometry.
+function _shrinkAlongSpine(spine, r, geom, frac) {
+    return { E0: _innerEdgeAt(spine, r, geom, frac),
+             E1: _innerEdgeAt(spine, r, geom, 1 - frac) };
+}
+
+// How far the border at the inner-edge MIDPOINT protrudes INTO the pill, along the travel
+// axis: p = sagitta + depth, where sagitta = the midpoint border point Bm's deviation from
+// the endpoint chord B0→B1, signed positive toward the pill (a convex border bulges in).
+// Bm is probed at the midpoint's cross coordinate (= the average of B0/B1's cross coords),
+// so the chord's travel value there is just (B0+B1)/2 — no interpolation needed. The +depth
+// folds in the kiss submersion, so p is the white edge's true depth past the inner edge once
+// the corners are seated. Returns null when any probe is missing (e.g. a true mid-notch with
+// no border above it → ignore). Pure geometry. See seatCaptionConform step 5.
+// NOTE: this is the TRAVEL-axis sagitta. After step 5a the inner edge is rotated parallel to
+// the B0→B1 chord, so the true protrusion is the PERPENDICULAR distance to that chord =
+// (this value)·cos(tilt). The travel-axis measure is thus an UPPER BOUND — conservative: it
+// over-flags a strongly tilted seat (by up to 1/cos(maxSeatRotationDeg)) but never lets a real
+// bulge slip through. Fine for the near-flat seats we see; a cos(tilt) divide is the deferred
+// refinement if a tilted border ever over-flags in validation.
+function _midProtrusion(B0, B1, Bm, geom, depth) {
+    if (!B0 || !B1 || !Bm) return null;
+    var b0 = geom.travelIsX ? B0.x : B0.y;
+    var b1 = geom.travelIsX ? B1.x : B1.y;
+    var bm = geom.travelIsX ? Bm.x : Bm.y;
+    var chordMid = (b0 + b1) / 2;
+    var sagitta  = -geom.sign * (bm - chordMid);   // + = Bm deeper into the pill than chord
+    return sagitta + depth;
 }
 
 // Translation (along the travel axis only) that lands E0 on B0 and submerges the pill
