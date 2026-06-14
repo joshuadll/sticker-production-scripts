@@ -368,16 +368,6 @@ function _buildSeparableCutline(doc, layer, element, elementOutline,
     }
     var cutline = deriveCutline(elementOutline, plate);
 
-    // Clean the plate∩art junction on the fused contour: removes the boolean-union spike/
-    // horn/sliver and leaves a soft rounded transition. Junctions are located from the real
-    // plate∩art crossings (handles the tilted WC capsule + GC pill). No-op when
-    // CONFIG.weldFilletRadiusPt is null. Idempotent under Step 8b's reuniteCutline.
-    var jc = cleanCaptionJunction(cutline, plate, elementOutline,
-        { filletRadiusPt: CONFIG.weldFilletRadiusPt });
-    if (jc.filleted > 0 || jc.slivers > 0)
-        log("[step6] junction clean | " + element.displayName
-            + " filleted=" + jc.filleted + " slivers=" + jc.slivers);
-
     strokeRecursive(cutline, CONFIG.cutlineStrokePt, blackCmyk());
     var grp = assembleElementGroup(layer, element.displayName, elementOutline, plate, cutline);
 

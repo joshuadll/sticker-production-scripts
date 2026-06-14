@@ -24,10 +24,6 @@ var CONFIG = {
     stickersLayerName: "Sticker",   // placed art + caption PNGs live here (Step 7B)
     cutlineStrokePt:   0.25,
 
-    // ENABLE-gate for cleanCaptionJunction on the re-Unite (must match AI_BuildCutlines so
-    // Step 8b's re-derived cutline gets the same junction cleanup; any +value = ON, null = OFF).
-    weldFilletRadiusPt: 2.0,
-
     // Absolute PSD→AI scale: a caption/art PNG at spec sits at 72/sourceDPI pt per px
     // (the factor Step 7B placed it at). MUST match the import pipeline's sourceDPI.
     sourceDPI: 300,

@@ -23,16 +23,9 @@ var CONFIG = {
     cutlinesLayerName:   "Cutlines",
     stickersLayerName:   "Sticker",
 
-    // ── Caption junction + half-cut (shared aiUtils helpers) ─────────────────
+    // ── Half-cut (shared aiUtils helpers) ────────────────────────────────────
     // The half-cut is drawn at birth here and re-synced by Steps 7B/8b/9A so it
-    // always tracks the caption seam. The junction fillet softens the plate∩art
-    // notch on the fused cutline.
-    weldFilletRadiusPt:  2.0,      // ENABLE-gate for cleanCaptionJunction (any +value = ON;
-                                   //   null = OFF). Removes the boolean-union spike/horn/
-                                   //   sliver at the caption junction and leaves a soft
-                                   //   rounded transition. The fillet AUTO-SIZES to each
-                                   //   junction cluster (this value is a gate, not the radius;
-                                   //   tune softness via opts.handleScale, default 1.0).
+    // always tracks the caption seam.
     halfcutLayerName:    "Halfcut",
     halfcutStrokePt:     0.25,
     halfcutExtendMm:     1.0,
