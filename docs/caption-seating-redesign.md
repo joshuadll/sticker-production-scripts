@@ -7,6 +7,32 @@
 > regen stay on the LOCAL branch (Photoshop-validated). See
 > "Branch / merge discipline" at the bottom.
 
+> ## ✅ IMPLEMENTED — v1 (2026-06-14, branch `claude/step-9a-walkthrough-je9ipa`)
+>
+> The v1 seater below is built. `seatCaptionConform` now works from the capsule
+> `spine + radius` (no bbox-band sampling):
+> - **Analytic inner edge** — `_innerEdgeEndpoints` / `_offsetTowardArt` (Steps 1–2).
+> - **Two 1px border probes** — `_probeBorder` (Step 3); the ONLY raster touch.
+> - **Overhang** — `_shrinkEndpoints` one balanced 15% shrink → re-probe → else skip
+>   seat + WARN + `needsReview` (element still groups). `CONFIG.seatShrinkFrac` (Step 6).
+> - **Kiss** — pin-E0: rotate by `φ = chord(B0→B1) − chord(E0→E1)` about `E0`
+>   (`_chordAngleDeg`/`_normalizeDeg` + the kept `_rotateLayersAbout`), then
+>   `_kissVector` slides E0 onto B0 submerged by depth `d = captionBorderOverlapPx`
+>   (bidirectional). Near-zero baseline (`seatBaselineEpsPx`) → kiss only (Step 5).
+> - **Tilt source = the STRICT 2-endpoint chord** (the artist's chosen v1; the robust
+>   multi-probe live-span fit and the flat-chord curvature **profile-settle** remain
+>   DEFERRED — see "Open / UNRESOLVED" and the v1 LIMITATIONS in the code header).
+> - **Unified GC + WC** (no type branch): WC passes its fitted spine + radius; GC's
+>   `createPillFromRect` returns a synthesized straight 2-point spine + `r = h/2`.
+> - **Removed** (obsolete): `_borderTangentAngle`, `_fitLineDir`, `_innerEdgePivot`,
+>   `_kissToBorder`, `_computeBite`, `_seatUneven`, `_whiteBridge`, `_edgeProfile`, and
+>   CONFIG `snapColumns` / `seatBandPx` / `whiteBridgeEnabled` / `maxWhiteBridgePx`.
+> - **Regression guard**: `tests/integration/test-caption-seating.jsx` (pure geometry).
+>
+> LOCAL-lane TODO (Photoshop): validate `seatRotationSign`, tune `seatShrinkFrac` /
+> `captionBorderOverlapPx`, regenerate the `psai-build-export-cutlines` golden (seat log
+> lines changed: `[step3B] seat | …` replaces `[step3B] conform/snapped …`).
+
 ## Why redesign
 
 The current seater (`seatCaptionConform` = conform-rotate → kiss-translate) decides
@@ -222,6 +248,29 @@ extent (fooled by irregular art); per-sample slice-trace (reserve for parked pro
   The sagitta-submersion mitigation (`d ≥ s + margin`) is ASSUMED adequate but NOT
   validated, and it fails when `s` exceeds the submersion budget (border would reach the
   text). Couples to the deferred profile-settle. REVISIT.
+
+  > ⚠ **OBSERVED BUG (v1, PS-validated 2026-06-14) — convex-middle over-submersion bites
+  > the caption.** The "over-submerges a CONVEX middle (fine)" assumption above is WRONG in
+  > practice. On a CONVEX art border (rounded sticker bottom, e.g. **The Blue Church** and
+  > **Kraslice** in the Slovakia fixture), the art's middle bulges toward the caption far
+  > more than the endpoints do. The pin-E0 kiss seats the ENDPOINT at depth `d`, so the
+  > convex middle ends up submerged by `d + sagitta` — and when the endpoint gap is large
+  > (B0 deep below E0 → big kiss move, e.g. Blue Church's −41px), that bulge crosses the
+  > pill's inner edge and **protrudes into the caption text**. Worst when (a) the border is
+  > strongly convex AND (b) the endpoint kiss move is large.
+  >
+  > This is the SAME failure family as the old worst-strip seater (both anchor the
+  > least-overlapping/endpoint columns, leaving the convex center deeper), just more visible
+  > now that the pin-E0 kiss closes the full endpoint gap. The flat chord + endpoint pin
+  > simply cannot respect a convex profile.
+  >
+  > FIX DIRECTION (deferred): the binding constraint on convex art is the **nearest
+  > (most-protruding) border point along the whole inner edge**, not the endpoints — seat so
+  > that point reaches depth `d` (and let the endpoints float shallower), or do the deferred
+  > **profile-settle** (settle the inner edge onto the sampled border polyline). A cheap
+  > interim guard: probe a few interior points too and cap submersion so no border point
+  > crosses into the text band. Needs the parked multi-probe profile work. See
+  > [[caption_seating_convex_bug]].
 - **WC arced caption (curved inner edge) — RESOLVED: no special case.** The WC arc is
   ARTIST-placed (Step 3A drops it straight; the artist warps it to follow the art before
   Step 3B), so it is already conformed to the art. DECISION: keep the unified chord-rotation

@@ -28,25 +28,25 @@ var CONFIG = {
                                  //     keeps the pill ~1.5x the printed 8pt text (~4.2mm). Confirm on a real render.
     whiteStraightSnapPx:    6,   // px: if the fitted spine stays within this of flat, force a perfectly straight pill
     whiteCurvedHeightPctile: 0.9,// quantile of per-slice heights used as curved-text line-height (accents included)
-    captionBorderOverlapPx: 3,   // px: the White pill is re-seated so its real ink overlaps the element's
-                                 //     white-border ink by this much at the worst (least-overlapping) column.
-                                 //     Re-seats to EXACT overlap (closes gaps and pulls back over-overlaps).
-    snapColumns:            9,   // # of strips sampled across the cross axis when matching the pill edge
-                                 //     to the border edge (per-strip ink comparison; handles arced captions
-                                 //     vs round art, any placement direction)
+    captionBorderOverlapPx: 3,   // px: depth d — the seat submerges the pill's inner edge into the
+                                 //     element's white border by this much (white-on-white). Bidirectional:
+                                 //     closes gaps AND pulls back over-overlaps. Doubles as the curvature
+                                 //     submersion budget in the flat-chord v1 seat.
 
-    // ── Step 3B: Conform-then-kiss seating (seatCaptionConform) ────────────────
-    seatConform:        true,    // rotate the caption so its inner edge runs parallel to the local
-                                 //     border tangent BEFORE the kiss (flat border → ~0° → legacy seat).
-                                 //     false = pure-kiss legacy seat.
+    // ── Step 3B: Analytic capsule seating (seatCaptionConform) ─────────────────
+    // Works from the pill's spine+radius: analytic inner-edge endpoints, two 1px border
+    // probes, then rotate (chord) + kiss (pin-E0, depth d). See docs/caption-seating-redesign.md.
+    seatConform:        true,    // rotate the caption so its inner edge runs parallel to the border
+                                 //     chord BEFORE the kiss (flat border → ~0° → straight seat).
+                                 //     false = skip rotation, kiss only.
     seatRotationSign:   1,       // ⚠ flip to -1 if captions tilt the WRONG way / shear in validation
                                  //     (hedges PS layer.rotate() sign convention; see seatCaptionConform).
-    maxSeatRotationDeg: 75,      // anti-degenerate cap: a tangent fit beyond this skips rotation + flags.
-    seatBandPx:         4,       // px: per-strip overlap-depth spread above which the seat is flagged
-                                 //     needsReview (the conform couldn't seat evenly).
-    whiteBridgeEnabled: false,   // EXPERIMENTAL raster op: locally grow the art's white band to close
-                                 //     residual end-gaps (white-on-white). Validate before enabling.
-    maxWhiteBridgePx:   8,       // px: max local white-band growth for the bridge.
+    maxSeatRotationDeg: 75,      // anti-degenerate cap: a chord tilt beyond this skips rotation + flags.
+    seatShrinkFrac:     0.15,    // overhang rescue: when an inner-edge endpoint finds no border, inset
+                                 //     BOTH ends by this fraction of the baseline (one balanced shrink) and
+                                 //     re-probe. Still none → caption too wide for art → seat skipped + flagged.
+    seatBaselineEpsPx:  2,       // px: baselines shorter than this (circular / 1-char pill) skip rotation
+                                 //     (the tilt angle is numerically undefined) — kiss only.
     captionMaxGapFrac:      0.5, // caption↔element positional matching ceiling: reject a caption farther
                                  //     than this × the element's smaller side (element-relative → DPI-free).
                                  //     Stops a genuinely-uncaptioned element absorbing a far stray text layer.

@@ -5,9 +5,14 @@
 >   to follow the border as one rigid unit (text+pill+plate), no shear; flat borders ≈ unchanged.
 > - ✅ **Half-cut engine** — confirmed: straight for flat seats / curved for tilted-curved,
 >   re-syncs through nest→normalise→export with **no duplicates**, endpoints land on the cut line.
-> - ⚠ **Seat-review flag** — mechanism works (`needsReview` → `|R` note → blue Layout-QA badge,
->   advisory, doesn't gate), but **over-flags** (13/22 at `seatBandPx=4`) and misses corner
->   armpits. Tune `seatBandPx` up; it's orthogonal to the junction issue below.
+> - 🔧 **Caption seating REWORKED** (2026-06-14, NOT yet PS-validated): `seatCaptionConform`
+>   replaced — old 9-column bbox-band PCA-conform + worst-strip kiss → **analytic capsule seat**
+>   (inner edge from `spine`+`radius`; two 1px border probes; pin-E0 rotate-by-chord + depth-`d`
+>   kiss; one 15% balanced shrink for overhang then skip-seat+flag). Unified GC/WC, no type
+>   branch. v1 = strict 2-endpoint chord (robust fit + curvature deferred). `needsReview` now
+>   fires on overhang-too-wide / chord-tilt-clamp / missing-geometry (the old `seatBandPx`
+>   even-overlap check is GONE). See **`docs/caption-seating-redesign.md`**. LOCAL TODO: re-confirm
+>   `seatRotationSign`, tune `seatShrinkFrac`/`captionBorderOverlapPx`, regen the PSAI golden.
 > - ✅ **Caption-junction cut-line quality** — FIXED (2026-06-14): `cleanCaptionJunction()`
 >   (aiUtils) removes the `Unite(outline, plate)` spike/horn/sliver at each plate∩art junction
 >   and leaves a soft rounded transition (vector cluster-bracket + circular-arc fillet, located
@@ -60,7 +65,7 @@ sticker-production-scripts/
 │   │                                        scale plate+caption about the plate∩art CONTACT centroid
 │   │                                        (_overlapCentroid; witness fallback for thin overlaps; null →
 │   │                                        skip+warn when there's no real overlap) — this PRESERVES the
-│   │                                        seating Photoshop's snapCaptionToBorder designed (overlap depth +
+│   │                                        seating Photoshop's seatCaptionConform designed (overlap depth +
 │   │                                        angle) while fixing only the size, and can't float (pivot is inside
 │   │                                        the overlap). → re-Unite. GC pill (canonical height preserved under
 │   │                                        Model B) + WC capsule. Idempotent; run by AI_NormaliseCaptions
@@ -222,10 +227,11 @@ PSAI_BuildAndExportCutlines exports (written before BridgeTalk handoff, sibling 
                             (px). Step 6 rebuilds the real curved/tilted caption capsule
                             from them, so the cutline follows the caption; GC/stamps omit
                             radius+spine → GC uses the parametric pill. bite (the two
-                            caption-seam endpoints) + needsReview are set by Step 3B's
-                            conform seat (seatCaptionConform): bite seeds the AI junction
-                            fillet, needsReview → "{style}|{lines}|R" note → AI Layout QA
-                            seat-review badge (advisory, doesn't gate export). PSAI always runs
+                            caption-seam endpoints, = the two border probe points B0/B1) +
+                            needsReview are set by Step 3B's analytic seat (seatCaptionConform):
+                            bite seeds the AI junction fillet, needsReview → "{style}|{lines}|R"
+                            note → AI Layout QA seat-review badge (advisory, doesn't gate
+                            export; now fires on overhang-too-wide / chord-tilt-clamp). PSAI always runs
                             Step 3B in-session, so every WC caption carries a spine (Step 6
                             relies on this). JSON (vs the old pipe-delimited text) prevents
                             delimiter collisions with caption display names.

@@ -14,7 +14,7 @@
 //
 // Stamp elements ([ST]) are grouped with their White Base_Cutline only (no caption).
 //
-// Returns: { grouped, skipped[] }
+// Returns: { grouped, skipped[], captionLess[] }
 //
 // ── Caption-spine carry (Mechanism B) ─────────────────────────────────────────
 // The White pill is a capsule fitted to the text spine (curved/tilted captions
@@ -46,10 +46,13 @@ function _stashCaptionSpine(displayName, whiteLayer, spine, radius) {
 }
 
 // Seat metadata carried to PSAI's writeElementsFile, keyed by display name (PSD px):
-//   bite        — the two caption-seam endpoints (where the pill inner edge meets the
-//                 art border); AI maps them to fillet the fused-cutline junction.
-//   needsReview — true when the conform couldn't seat evenly within seatBandPx; AI's
-//                 Layout QA surfaces a review marker. (See seatCaptionConform.)
+//   bite        — the two caption-seam endpoints (the border points B0/B1 where the
+//                 pill's inner-edge endpoints meet the art); AI maps them to fillet the
+//                 fused-cutline junction.
+//   needsReview — true when the analytic seat couldn't seat cleanly: the chord tilt
+//                 exceeded maxSeatRotationDeg, the caption overhangs the art too far to
+//                 rescue (skipped), or the capsule geometry was missing. AI's Layout QA
+//                 surfaces a review marker. (See seatCaptionConform.)
 // Absolute px, captured POST-seat — PSAI's revealAll keeps the top-left origin, so the
 // coordinates stay valid through grouping/canvas-reveal up to the sidecar write.
 var CAPTION_SEAT = {};   // displayName -> { bite:[{x,y},{x,y}]|null, needsReview:Bool }
@@ -230,7 +233,7 @@ function groupStandard(doc, elementsGroup, soLayer, textLayer, groupName) {
     // local border tangent, then kiss the pill into the border (falls back to the SO when
     // no border layer exists). Returns the (rotated) spine + seat metadata (bite, review).
     var seat = seatCaptionConform(doc, wbcLayer ? wbcLayer : soLayer, whiteLayer,
-        [textLayer, whiteLayer], whiteInfo.spine);
+        [textLayer, whiteLayer], whiteInfo.spine, whiteInfo.radius);
 
     // Carry the real capsule (spine + radius) to Illustrator so Step 6 can rebuild a
     // caption cutline that follows the curve/tilt. Stash AFTER the seat (rotation makes
@@ -269,7 +272,8 @@ function groupWithPlate(doc, elementsGroup, soLayer, textLayer, groupName) {
     var whiteY1 = tTop - CONFIG.platePaddingTop - CONFIG.whiteRectPadV;
     var whiteX2 = whiteX1 + targetWidth;
     var whiteY2 = whiteY1 + CONFIG.whiteHeightPlate;
-    var whiteLayer = createPillFromRect(doc, whiteX1, whiteY1, whiteX2, whiteY2);
+    var gcPill     = createPillFromRect(doc, whiteX1, whiteY1, whiteX2, whiteY2);
+    var whiteLayer = gcPill.layer;
 
     // Caption plate: duplicate template, elongate, position.
     var plateLayer = null;
@@ -303,12 +307,14 @@ function groupWithPlate(doc, elementsGroup, soLayer, textLayer, groupName) {
 
     // Conform + seat the whole caption assembly (text + pill + plate) against the border.
     // GC-LM sits below the element, so travel resolves to vertical; a tilted local border
-    // rotates the rigid plate to follow it. GC has no spine (parametric pill) → spine null.
+    // rotates the rigid plate to follow it. GC's pill is the parametric stadium, so we pass
+    // its synthesized straight spine + radius for the analytic seat; seat.spine is ignored
+    // (GC keeps the parametric pill on the AI side — only WC carries a spine to Step 6).
     var moveLayers = plateLayer
         ? [textLayer, whiteLayer, plateLayer]
         : [textLayer, whiteLayer];
     var gcSeat = seatCaptionConform(doc, wbcLayer ? wbcLayer : soLayer, whiteLayer,
-        moveLayers, null);
+        moveLayers, gcPill.spine, gcPill.radius);
     var parsedGc = parseLayerName(groupName);
     _stashCaptionSeat(parsedGc ? parsedGc.displayName : groupName, gcSeat);
 
@@ -408,95 +414,129 @@ function _percentile(arr, p) {
     return a[idx];
 }
 
-// Re-seats the caption (text + pill, plus any extra layers) so the White pill
-// overlaps the element's white border by CONFIG.captionBorderOverlapPx — measured
-// against the ACTUAL ink of both shapes, not their bounding boxes. The element and
-// its border stay put; the caption assembly slides toward them along ONE axis.
+// ── ANALYTIC CAPSULE SEATING (v1) ───────────────────────────────────────────────
+// Re-seats the caption (text + pill, plus any plate) so the White pill's INNER edge
+// (the art-facing long side) meets the element's white border, overlapping it by
+// CONFIG.captionBorderOverlapPx. The element and its border stay put; the caption
+// assembly rotates + slides toward them as one rigid unit.
 //
-//   refLayer   — the white border (White Base_Cutline) the pill must fuse with;
-//                pass the SO as a fallback when no border layer exists.
-//   pillLayer  — the White pill (its leading edge is what overlaps the border).
-//   moveLayers — every layer that travels as one rigid unit (text, pill, plate…).
+// This works from the capsule geometry we ALREADY have — the spine + radius — and
+// touches the raster for only TWO precise probes. The old seater instead sampled 9
+// columns of pill+border ink across a BOUNDING-BOX band, PCA-fit a tilt, and drove the
+// worst-overlapping strip to depth; that wasted columns on the round caps / art taper
+// and, on an overhang, rammed the pill's middle deep into the art (see redesign doc).
 //
-// Universal in direction. The caption may sit below, above, left, or right of the
-// element; the algorithm is identical, just measured along whichever axis separates
-// them. Two ideas make it work:
+//   1. ANALYTIC inner edge. The pill is a stadium (spine swept by a disk of radius r).
+//      Its inner-edge endpoints are exact: E = spineEnd + r·normal(toward art). No
+//      sampling of the pill.
+//   2. TWO border probes. Cast a 1px ray from each inner-edge endpoint toward the art
+//      and read the first border ink → B0, B1. Only where the pill actually is.
+//   3. KISS (v1, pin-E0). Rotate the rigid caption by φ = angle(B0→B1) − angle(E0→E1)
+//      about E0, then slide it along the travel axis so E0 lands on B0, submerged by
+//      depth d (= captionBorderOverlapPx). E0 is pivot AND target → nothing to
+//      re-project; E1 just lands somewhere on the border line, which is fine.
+//   4. OVERHANG. If either endpoint's ray finds no border (caption wider than the art's
+//      contact zone), inset BOTH ends by CONFIG.seatShrinkFrac (one balanced shrink) and
+//      re-probe. Still nothing → the caption is too wide for the art: skip the seat +
+//      WARN + flag for review (the element still groups/exports). Overhang is a design
+//      problem, not something to silently ram into absent art.
 //
-//   1. Travel axis = the dominant axis from the pill's centre to the art's centre
-//      (below/above → y, left/right → x). The pill only ever moves along this axis.
-//
-//   2. Why bin along the OTHER (cross) axis instead of comparing bounding boxes:
-//      both shapes are irregular. A round plate reaches furthest toward the caption
-//      at its centre; an arced caption reaches furthest toward the plate at its ends.
-//      Comparing bbox edges lines up points that are far apart on the cross axis —
-//      the boxes "touch" while the real ink has a gap. So we slice the overlap band
-//      into strips across the cross axis, read each shape's real leading edge per
-//      strip, and translate so the WORST strip (least overlap) reaches overlapPx.
-//      Anchoring the worst strip guarantees every strip overlaps by at least that
-//      much → a solid seam, no floating gap. (Anchoring the best strip would leave a
-//      one-point bridge while the rest float.)
-//
-// ── CONFORM-THEN-KISS ──────────────────────────────────────────────────────────
-// seatCaptionConform wraps the kiss with a rigid ROTATION so the pill's inner edge
-// runs parallel to the art's local border BEFORE seating. Once parallel, the kiss
-// gives uniform shallow contact for free (no fragile per-strip solve, no floating
-// middle). On a flat border the fitted tangent is ~0°, so this degrades exactly to
-// the legacy pure-kiss seat. Rotation is embraced (the caption may sit at any part of
-// an irregular border); maxSeatRotationDeg only guards a degenerate fit from flinging.
-//
-//   refLayer/pillLayer/moveLayers — as _kissToBorder.
-//   spine     — the WC capsule spine (px) to carry along the SAME transform, or null
-//               (GC parametric pill). Returned transformed in seat.spine.
+//   refLayer    — the white border (White Base_Cutline); pass the SO as a fallback.
+//   pillLayer   — the White pill.
+//   moveLayers  — every layer that travels as one rigid unit (text, pill, plate…).
+//   spine       — the capsule spine (px): WC fitted polyline or GC's synthesized 2-point
+//                 centreline. Returned transformed in seat.spine (WC carries it to
+//                 Illustrator so Step 6's cutline follows the curve/tilt; GC ignores it).
+//   radius      — the capsule radius (px).
 // Returns { rotDeg, needsReview, bite:[{x,y},{x,y}]|null, spine:[{x,y}…]|null }.
 //
-// ⚠ PS layer.rotate sign convention: CONFIG.seatRotationSign multiplies the angle fed
-//   to layer.rotate() so the content rotation matches the R(φ) used for the pivot
-//   correction. If validation shows captions tilting the WRONG way (or the assembly
-//   shearing apart), flip seatRotationSign from 1 to -1. The position-correction matrix
-//   is geometric and unchanged, so flipping the sign can't break the rigid lock.
-function seatCaptionConform(doc, refLayer, pillLayer, moveLayers, spine) {
+// v1 LIMITATIONS (accepted — see docs/caption-seating-redesign.md):
+//   • θ from the 2 raw endpoint probes — a pixel groove at an endpoint can tilt the
+//     whole caption; the robust live-span line fit is the deferred upgrade.
+//   • Flat-chord depth (no sagitta term) — a straight pill can't hug a curved border,
+//     so depth d submerges the residual; the profile-settle is the curve-aware fix.
+//
+// ⚠ PS layer.rotate sign: CONFIG.seatRotationSign multiplies the angle fed to
+//   layer.rotate() so the content rotation matches the geometric pivot correction. If
+//   captions tilt the WRONG way (or the assembly shears), flip seatRotationSign 1 → -1.
+//   The position-correction matrix is geometric and unchanged, so flipping can't break
+//   the rigid lock.
+function seatCaptionConform(doc, refLayer, pillLayer, moveLayers, spine, radius) {
     var seat = { rotDeg: 0, needsReview: false, bite: null,
                  spine: spine ? spine.slice(0) : null };
 
-    if (CONFIG.seatConform) {
-        var geom = _seatGeometry(refLayer, pillLayer);
-        var phi  = _borderTangentAngle(doc, refLayer, pillLayer, geom);
-        if (phi !== 0 && Math.abs(phi) <= CONFIG.maxSeatRotationDeg) {
-            var pivot = _innerEdgePivot(pillLayer, geom);
-            _rotateLayersAbout(moveLayers, pivot, phi);
-            if (seat.spine) seat.spine = _rotateSpine(seat.spine, pivot, phi);
-            seat.rotDeg = phi;
-            log("[step3B] conform | rotated " + phi.toFixed(1) + "° to border tangent"
-                + " (axis=" + (geom.travelIsX ? "x" : "y") + ")");
-        } else if (Math.abs(phi) > CONFIG.maxSeatRotationDeg) {
+    // We work analytically from the capsule geometry; without it, leave the caption at
+    // its Step 3A rough placement rather than guess from bounding boxes.
+    if (!spine || spine.length < 1 || !radius || radius <= 0) {
+        log("[step3B] WARN | seat skipped — no capsule geometry (spine/radius).");
+        seat.needsReview = true;
+        return seat;
+    }
+
+    var geom = _seatGeometry(refLayer, pillLayer);
+
+    // Steps 1+2: analytic inner-edge endpoints. Steps 3+4: probe + overhang shrink.
+    var ends = _innerEdgeEndpoints(spine, radius, geom);
+    var E0 = ends.E0, E1 = ends.E1;
+    var B0 = _probeBorder(doc, refLayer, geom, E0);
+    var B1 = _probeBorder(doc, refLayer, geom, E1);
+
+    if (!B0 || !B1) {
+        var sh  = _shrinkEndpoints(E0, E1, CONFIG.seatShrinkFrac);
+        var sB0 = _probeBorder(doc, refLayer, geom, sh.E0);
+        var sB1 = _probeBorder(doc, refLayer, geom, sh.E1);
+        if (sB0 && sB1) {
+            E0 = sh.E0; E1 = sh.E1; B0 = sB0; B1 = sB1;
+            log("[step3B] seat | overhang rescued by "
+                + Math.round(CONFIG.seatShrinkFrac * 100) + "% balanced shrink.");
+        } else {
             seat.needsReview = true;
-            log("[step3B] conform | tangent fit " + phi.toFixed(1)
-                + "° exceeds maxSeatRotationDeg — skipped rotation, flagged for review.");
+            log("[step3B] WARN | caption too wide for art — no border under the inner "
+                + "edge even after shrink; seat skipped (element still groups).");
+            return seat;
         }
     }
 
-    // Kiss: translate the (now parallel) pill into the border to the target depth.
-    var kiss = _kissToBorder(doc, refLayer, pillLayer, moveLayers);
-    if (seat.spine && kiss) seat.spine = _translateSpine(seat.spine, kiss.tx, kiss.ty);
-
-    // White bridge (rung 1.5): locally grow the art's white band to close any residual
-    // end-gap (white-on-white, invisible). Experimental raster op — default OFF.
-    if (CONFIG.seatConform && CONFIG.whiteBridgeEnabled) {
-        try { _whiteBridge(doc, refLayer, pillLayer); }
-        catch (e) { log("[step3B] white bridge | skipped (" + e.message + ")"); }
+    // Step 5a: rotation φ = chord(B0→B1) − baseline(E0→E1), pivoted on E0.
+    var baseLen = Math.sqrt((E1.x - E0.x) * (E1.x - E0.x)
+                          + (E1.y - E0.y) * (E1.y - E0.y));
+    if (CONFIG.seatConform && baseLen >= CONFIG.seatBaselineEpsPx) {
+        var phi = _normalizeDeg(_chordAngleDeg(B0, B1) - _chordAngleDeg(E0, E1));
+        if (Math.abs(phi) <= CONFIG.maxSeatRotationDeg) {
+            _rotateLayersAbout(moveLayers, E0, phi);
+            if (seat.spine) seat.spine = _rotateSpine(seat.spine, E0, phi);
+            seat.rotDeg = phi;
+            log("[step3B] seat | rotated " + phi.toFixed(1) + "° to border chord (axis="
+                + (geom.travelIsX ? "x" : "y") + ").");
+        } else {
+            seat.needsReview = true;
+            log("[step3B] seat | chord tilt " + phi.toFixed(1)
+                + "° exceeds maxSeatRotationDeg — rotation skipped, flagged for review.");
+        }
+    } else if (CONFIG.seatConform) {
+        // Near-zero baseline (circular / 1-char pill): the angle is undefined → kiss only.
+        log("[step3B] seat | near-zero baseline — rotation skipped (kiss only).");
     }
 
-    // Seam endpoints (for the AI junction fillet) + evenness review flag.
-    seat.bite = _computeBite(doc, refLayer, pillLayer);
-    if (_seatUneven(doc, refLayer, pillLayer)) seat.needsReview = true;
-    if (seat.needsReview) {
-        log("[step3B] FLAG | caption seat uneven beyond seatBandPx — needs review.");
-    }
+    // Step 5b: kiss — slide E0 onto B0 along the travel axis, submerged by depth d. E0 is
+    // the rotation pivot (fixed) and B0 is on the stationary border, so both still hold.
+    var k = _kissVector(E0, B0, geom, CONFIG.captionBorderOverlapPx);
+    _translateLayers(moveLayers, k.tx, k.ty);
+    if (seat.spine) seat.spine = _translateSpine(seat.spine, k.tx, k.ty);
+    log("[step3B] seat | kissed | axis=" + (geom.travelIsX ? "x" : "y") + " move="
+        + Math.round(geom.travelIsX ? k.tx : k.ty) + "px depth="
+        + CONFIG.captionBorderOverlapPx + "px");
+
+    // Seam endpoints for the AI junction fillet = the two stationary border points where
+    // the inner edge meets the art. Approximate (probe-resolution) is fine there.
+    seat.bite = [ { x: B0.x, y: B0.y }, { x: B1.x, y: B1.y } ];
+    if (seat.needsReview) log("[step3B] FLAG | caption seat needs review.");
     return seat;
 }
 
-// Travel axis (pill centre → art centre), its sign, and the cross-axis band where both
-// shapes exist. Shared by the conform tangent fit, the kiss, bite, and the review check.
+// Travel axis (pill centre → art centre) and its sign. The pill only ever slides along
+// this axis; the sign points toward the art (+1 = the larger coordinate). Shared by the
+// analytic endpoints, the border probe, and the kiss.
 function _seatGeometry(refLayer, pillLayer) {
     var rb = layerBoundsPx(refLayer);
     var pb = layerBoundsPx(pillLayer);
@@ -504,70 +544,99 @@ function _seatGeometry(refLayer, pillLayer) {
     var dy = (rb[1] + rb[3]) / 2 - (pb[1] + pb[3]) / 2;
     var travelIsX = Math.abs(dx) > Math.abs(dy);
     var sign = travelIsX ? (dx >= 0 ? 1 : -1) : (dy >= 0 ? 1 : -1);
-    var lo = travelIsX ? Math.max(rb[1], pb[1]) : Math.max(rb[0], pb[0]);
-    var hi = travelIsX ? Math.min(rb[3], pb[3]) : Math.min(rb[2], pb[2]);
-    return { travelIsX: travelIsX, sign: sign, lo: lo, hi: hi, rb: rb, pb: pb };
+    return { travelIsX: travelIsX, sign: sign, rb: rb, pb: pb };
 }
 
-// Angle (deg) to rotate the pill so its inner edge runs parallel to the art's local
-// border. Samples the border's facing edge across the cross band, total-least-squares
-// fits its direction, and returns the signed angle from the current inner-edge direction
-// to that tangent (normalised to (-90,90]). 0 when too few samples (→ no rotation).
-function _borderTangentAngle(doc, refLayer, pillLayer, geom) {
-    if (geom.hi - geom.lo <= 4) return 0;
-    var n = CONFIG.snapColumns || 9;
-    // Border faces the pill → its extreme is in the −sign travel direction.
-    var artEdge = _edgeProfile(doc, refLayer, geom.travelIsX, geom.lo, geom.hi, n, geom.sign < 0);
+// The pill's inner (art-facing) edge endpoints, computed analytically from the capsule
+// spine + radius — no raster sampling. E = spineEnd + r·n, where n is the spine normal at
+// that end chosen to point toward the art. For a straight spine these are the flat top's
+// corners; for a curved/tilted WC spine they follow the curve. Pure geometry.
+function _innerEdgeEndpoints(spine, r, geom) {
+    var n = spine.length;
+    var s0 = spine[0], s1 = spine[n - 1];
+    var nextI = (n > 1) ? 1 : 0;            // forward neighbour of the start
+    var prevI = (n > 1) ? n - 2 : 0;        // backward neighbour of the end
+    var t0 = _unit(spine[nextI].x - s0.x, spine[nextI].y - s0.y);  // tangent at start
+    var t1 = _unit(s1.x - spine[prevI].x, s1.y - spine[prevI].y);  // tangent at end
+    return { E0: _offsetTowardArt(s0, t0, r, geom),
+             E1: _offsetTowardArt(s1, t1, r, geom) };
+}
 
-    var pts = [], i;
-    for (i = 0; i < artEdge.length; i++) {
-        if (!artEdge[i]) continue;
-        pts.push(geom.travelIsX ? { x: artEdge[i].v, y: artEdge[i].c }
-                                : { x: artEdge[i].c, y: artEdge[i].v });
+// Offsets point p by r along the spine normal that points toward the art (the normal
+// whose dot with the travel direction is positive). A degenerate tangent (single-point
+// spine) offsets straight along the travel axis. Pure geometry.
+function _offsetTowardArt(p, tan, r, geom) {
+    var ux = geom.travelIsX ? geom.sign : 0;
+    var uy = geom.travelIsX ? 0 : geom.sign;
+    var nx = -tan[1], ny = tan[0];                  // a unit normal to the tangent
+    var d  = nx * ux + ny * uy;
+    if (d < 0) { nx = -nx; ny = -ny; }              // flip to face the art
+    if (Math.abs(d) < 1e-6) { nx = ux; ny = uy; }   // degenerate → use the travel axis
+    return { x: p.x + r * nx, y: p.y + r * ny };
+}
+
+// Casts a 1px ray from inner-edge endpoint E toward the art and returns the first border
+// ink as {x,y}, or null when the ray finds no border (overhang). Reads the border's
+// facing edge — the ink extreme nearest the pill — in a 1px-wide strip at E's cross
+// coordinate. This is the ONLY raster touch in the seat.
+function _probeBorder(doc, refLayer, geom, E) {
+    var docW = doc.width.as("px"), docH = doc.height.as("px");
+    var cross = geom.travelIsX ? E.y : E.x;         // strip centre on the cross axis
+    var c0 = cross - 0.5, c1 = cross + 0.5;
+    var rect = geom.travelIsX
+        ? [[0, c0], [docW, c0], [docW, c1], [0, c1]]    // y-row  (travel = x)
+        : [[c0, 0], [c1, 0], [c1, docH], [c0, docH]];   // x-col  (travel = y)
+
+    loadLayerTransparency(refLayer);
+    var b = null;
+    try {
+        doc.selection.select(rect, SelectionType.INTERSECT, 0, false);
+        b = doc.selection.bounds;
+    } catch (e) { b = null; }                       // empty intersection → no ink
+    try { doc.selection.deselect(); } catch (e2) {}
+    if (!b) return null;
+
+    var loV = (geom.travelIsX ? b[0] : b[1]).as("px");   // min on travel axis
+    var hiV = (geom.travelIsX ? b[2] : b[3]).as("px");   // max on travel axis
+    var edge = (geom.sign > 0) ? loV : hiV;              // facing edge = nearest the pill
+    return geom.travelIsX ? { x: edge, y: cross } : { x: cross, y: edge };
+}
+
+// Signed angle (deg) of the chord p→q in PS y-down space. Pure geometry.
+function _chordAngleDeg(p, q) {
+    return Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI;
+}
+
+// Normalises an angle to (-180, 180]. Pure geometry.
+function _normalizeDeg(d) {
+    while (d <= -180) d += 360;
+    while (d >   180) d -= 360;
+    return d;
+}
+
+// Insets both endpoints toward the baseline centre by `frac` of the baseline length —
+// one balanced shrink that masks an overhanging seat to its (centred) live span. Pure
+// geometry.
+function _shrinkEndpoints(E0, E1, frac) {
+    var dx = E1.x - E0.x, dy = E1.y - E0.y;
+    return { E0: { x: E0.x + frac * dx, y: E0.y + frac * dy },
+             E1: { x: E1.x - frac * dx, y: E1.y - frac * dy } };
+}
+
+// Translation (along the travel axis only) that lands E0 on B0 and submerges the pill
+// into the border by depth d. Bidirectional: if the caption already sits deeper than d,
+// the move is outward (signed). Pure geometry.
+function _kissVector(E0, B0, geom, depth) {
+    var dT = (geom.travelIsX ? (B0.x - E0.x) : (B0.y - E0.y)) + geom.sign * depth;
+    return geom.travelIsX ? { tx: dT, ty: 0 } : { tx: 0, ty: dT };
+}
+
+// Translates each layer rigidly by (tx, ty). No-op below sub-pixel.
+function _translateLayers(layers, tx, ty) {
+    if (Math.abs(tx) < 1e-9 && Math.abs(ty) < 1e-9) return;
+    for (var i = 0; i < layers.length; i++) {
+        if (layers[i]) layers[i].translate(tx, ty);
     }
-    if (pts.length < 3) return 0;
-
-    var dir = _fitLineDir(pts);
-    if (!dir) return 0;
-
-    // Current inner-edge direction: travel=y → edge along x (1,0); travel=x → along y (0,1).
-    var e0x = geom.travelIsX ? 0 : 1;
-    var e0y = geom.travelIsX ? 1 : 0;
-    var phi = (Math.atan2(dir.y, dir.x) - Math.atan2(e0y, e0x)) * 180 / Math.PI;
-    while (phi >   90) phi -= 180;
-    while (phi <= -90) phi += 180;
-    return phi;
-}
-
-// Total-least-squares (PCA) principal direction of a point set, as a unit {x,y}.
-// Robust to vertical/steep borders (unlike a y = mx + b slope fit). Null if degenerate.
-function _fitLineDir(pts) {
-    var n = pts.length, mx = 0, my = 0, i;
-    for (i = 0; i < n; i++) { mx += pts[i].x; my += pts[i].y; }
-    mx /= n; my /= n;
-    var sxx = 0, sxy = 0, syy = 0, dx, dy;
-    for (i = 0; i < n; i++) {
-        dx = pts[i].x - mx; dy = pts[i].y - my;
-        sxx += dx * dx; sxy += dx * dy; syy += dy * dy;
-    }
-    var tr = sxx + syy, det = sxx * syy - sxy * sxy;
-    var disc = tr * tr / 4 - det;
-    if (disc < 0) disc = 0;
-    var l1 = tr / 2 + Math.sqrt(disc);   // larger eigenvalue
-    var vx, vy;
-    if (Math.abs(sxy) > 1e-6) { vx = l1 - syy; vy = sxy; }
-    else { vx = (sxx >= syy) ? 1 : 0; vy = (sxx >= syy) ? 0 : 1; }
-    var len = Math.sqrt(vx * vx + vy * vy);
-    if (len < 1e-9) return null;
-    return { x: vx / len, y: vy / len };
-}
-
-// Midpoint of the pill's inner (leading) edge — the rotation pivot.
-function _innerEdgePivot(pillLayer, geom) {
-    var pb = layerBoundsPx(pillLayer);
-    var cx = (pb[0] + pb[2]) / 2, cy = (pb[1] + pb[3]) / 2;
-    if (geom.travelIsX) return { x: (geom.sign > 0 ? pb[2] : pb[0]), y: cy };
-    return { x: cx, y: (geom.sign > 0 ? pb[3] : pb[1]) };   // y-down: bottom = pb[3]
 }
 
 // Rotates each layer rigidly about the shared pivot by phiDeg. PS layer.rotate spins a
@@ -609,191 +678,6 @@ function _translateSpine(spine, tx, ty) {
     for (i = 0; i < spine.length; i++) out.push({ x: spine[i].x + tx, y: spine[i].y + ty });
     return out;
 }
-
-// The two caption-seam endpoints = the border's facing edge at the extremes of the
-// cross band (where the pill inner edge meets the art). Returns [{x,y},{x,y}] (px) or
-// null. Feeds the AI junction fillet; approximate (sample-resolution) is fine there.
-function _computeBite(doc, refLayer, pillLayer) {
-    var geom = _seatGeometry(refLayer, pillLayer);
-    if (geom.hi - geom.lo <= 4) return null;
-    var n = CONFIG.snapColumns || 9;
-    var artEdge = _edgeProfile(doc, refLayer, geom.travelIsX, geom.lo, geom.hi, n, geom.sign < 0);
-    var first = null, last = null, i;
-    for (i = 0; i < artEdge.length; i++) {
-        if (!artEdge[i]) continue;
-        if (!first) first = artEdge[i];
-        last = artEdge[i];
-    }
-    if (!first || !last) return null;
-    function toXY(e) { return geom.travelIsX ? { x: e.v, y: e.c } : { x: e.c, y: e.v }; }
-    return [toXY(first), toXY(last)];
-}
-
-// True when, after seating, the per-strip overlap depth varies by more than seatBandPx —
-// i.e. the contact is not the even shallow band the conform aims for (curved/awkward
-// border the rigid rotation couldn't fully match). Drives the review flag.
-function _seatUneven(doc, refLayer, pillLayer) {
-    var geom = _seatGeometry(refLayer, pillLayer);
-    if (geom.hi - geom.lo <= 4) return false;
-    var n = CONFIG.snapColumns || 9;
-    var pillEdge = _edgeProfile(doc, pillLayer, geom.travelIsX, geom.lo, geom.hi, n, geom.sign > 0);
-    var artEdge  = _edgeProfile(doc, refLayer,  geom.travelIsX, geom.lo, geom.hi, n, geom.sign < 0);
-    var minG = null, maxG = null, i, g;
-    for (i = 0; i < pillEdge.length; i++) {
-        if (!pillEdge[i] || !artEdge[i]) continue;
-        g = geom.sign * (artEdge[i].v - pillEdge[i].v);
-        if (minG === null || g < minG) minG = g;
-        if (maxG === null || g > maxG) maxG = g;
-    }
-    if (minG === null) return false;
-    return (maxG - minG) > CONFIG.seatBandPx;
-}
-
-// Rung 1.5 — locally grow the art's white band into the residual end-gaps so a rigid
-// seat on a gently-curved border fuses gap-free, white-on-white (invisible in print),
-// while the caption text stays straight. Per cross-strip: if the pill leads the border
-// by 0 < gap <= maxWhiteBridgePx, fill white on refLayer from the border edge toward the
-// pill by `gap`. EXPERIMENTAL raster op — default OFF (whiteBridgeEnabled); the caller
-// wraps it in try/catch so a failure can never break the seat.
-function _whiteBridge(doc, refLayer, pillLayer) {
-    var geom = _seatGeometry(refLayer, pillLayer);
-    if (geom.hi - geom.lo <= 4) return;
-    var n   = CONFIG.snapColumns || 9;
-    var cap = CONFIG.maxWhiteBridgePx;
-    var pillEdge = _edgeProfile(doc, pillLayer, geom.travelIsX, geom.lo, geom.hi, n, geom.sign > 0);
-    var artEdge  = _edgeProfile(doc, refLayer,  geom.travelIsX, geom.lo, geom.hi, n, geom.sign < 0);
-
-    var prevActive = doc.activeLayer;
-    doc.activeLayer = refLayer;
-    var w = (geom.hi - geom.lo) / n;
-    var filled = 0, i;
-    for (i = 0; i < pillEdge.length; i++) {
-        if (!pillEdge[i] || !artEdge[i]) continue;
-        // gap > 0 → pill leads the border (a real end-gap to bridge).
-        var gap = geom.sign * (pillEdge[i].v - artEdge[i].v);
-        if (gap <= 0 || gap > cap) continue;
-        var c0 = geom.lo + i * w, c1 = c0 + w;
-        var aV = artEdge[i].v, pV = pillEdge[i].v;       // border edge / pill edge (travel axis)
-        var rect = geom.travelIsX
-            ? [[aV, c0], [pV, c0], [pV, c1], [aV, c1]]    // travel=x → fill x:[aV..pV]
-            : [[c0, aV], [c1, aV], [c1, pV], [c0, pV]];   // travel=y → fill y:[aV..pV]
-        try {
-            doc.selection.select(rect, SelectionType.REPLACE, 0, false);
-            doc.selection.fill(solidWhite());
-            filled++;
-        } catch (e) { /* empty strip / degenerate rect — skip */ }
-    }
-    try { doc.selection.deselect(); } catch (e2) {}
-    try { doc.activeLayer = prevActive; } catch (e3) {}
-    if (filled > 0) log("[step3B] white bridge | grew band in " + filled + " strip(s) (<= "
-        + cap + "px)");
-}
-
-// Translates the caption (text + pill, plus any extras) along ONE axis so the pill's
-// real ink overlaps the border's real ink by CONFIG.captionBorderOverlapPx at the worst
-// (least-overlapping) strip — the "kiss". Returns the applied translation { tx, ty } so
-// the caller can move the carried spine identically. (Formerly snapCaptionToBorder; the
-// per-strip worst-anchor logic is unchanged — see the header above.)
-function _kissToBorder(doc, refLayer, pillLayer, moveLayers) {
-    var rb = layerBoundsPx(refLayer);
-    var pb = layerBoundsPx(pillLayer);
-
-    // Direction from pill centre → art centre. Dominant component = travel axis.
-    var dx = (rb[0] + rb[2]) / 2 - (pb[0] + pb[2]) / 2;
-    var dy = (rb[1] + rb[3]) / 2 - (pb[1] + pb[3]) / 2;
-    var travelIsX = Math.abs(dx) > Math.abs(dy);
-    var sign      = travelIsX ? (dx >= 0 ? 1 : -1) : (dy >= 0 ? 1 : -1); // +1 toward larger coord
-
-    // Cross-axis band where both shapes exist — contact can only happen here.
-    var lo = travelIsX ? Math.max(rb[1], pb[1]) : Math.max(rb[0], pb[0]);
-    var hi = travelIsX ? Math.min(rb[3], pb[3]) : Math.min(rb[2], pb[2]);
-
-    var n = CONFIG.snapColumns || 9;
-    // pickMax = true → take the shape's MAX edge on the travel axis (right/bottom),
-    // false → MIN edge (left/top). The pill leads toward the art (extreme in +sign);
-    // the art faces the pill (extreme in −sign).
-    var pillEdge = (hi - lo > 4) ? _edgeProfile(doc, pillLayer, travelIsX, lo, hi, n, sign > 0) : [];
-    var artEdge  = (hi - lo > 4) ? _edgeProfile(doc, refLayer,  travelIsX, lo, hi, n, sign < 0) : [];
-
-    // Gap measured along the +sign travel direction: positive = pill short of art.
-    //   gap = sign · (artFacingEdge − pillLeadingEdge)
-    var maxGap = null;
-    for (var i = 0; i < pillEdge.length; i++) {
-        if (!pillEdge[i] || !artEdge[i]) continue;
-        var gap = sign * (artEdge[i].v - pillEdge[i].v);
-        if (maxGap === null || gap > maxGap) maxGap = gap;
-    }
-
-    var move; // signed distance to travel along +sign
-    if (maxGap === null) {
-        // No shared-ink strip (caption outside the art's cross-span, or an opaque
-        // ref layer). Fall back to bbox leading/facing edges.
-        var pLead = (sign > 0) ? (travelIsX ? pb[2] : pb[3]) : (travelIsX ? pb[0] : pb[1]);
-        var aFace = (sign > 0) ? (travelIsX ? rb[0] : rb[1]) : (travelIsX ? rb[2] : rb[3]);
-        move = sign * (aFace - pLead) + CONFIG.captionBorderOverlapPx;
-        log("[step3B] snapped caption (bbox fallback) | axis=" + (travelIsX ? "x" : "y")
-            + " sign=" + sign + " move=" + Math.round(sign * move) + "px");
-    } else {
-        // Drive the worst strip to exactly overlapPx of overlap.
-        move = maxGap + CONFIG.captionBorderOverlapPx;
-        log("[step3B] snapped caption | axis=" + (travelIsX ? "x" : "y") + " sign=" + sign
-            + " maxGap=" + Math.round(maxGap) + " move=" + Math.round(sign * move) + "px");
-    }
-
-    var t  = sign * move;
-    var tx = travelIsX ? t : 0;
-    var ty = travelIsX ? 0 : t;
-    for (var j = 0; j < moveLayers.length; j++) {
-        if (moveLayers[j]) moveLayers[j].translate(tx, ty);
-    }
-    return { tx: tx, ty: ty };
-}
-
-// Samples a layer's real ink edge per strip across the cross axis [lo, hi].
-//   travelIsX — true: strips are y-rows, edge measured on x; false: x-columns, edge on y.
-//   pickMax   — true: take the MAX edge on the travel axis (right/bottom);
-//               false: the MIN edge (left/top).
-// Returns an array of length n: { c: strip-centre on cross axis, v: edge on travel
-// axis }, or null where a strip holds no ink. Uses the transparency selection so
-// concave/arced shapes are measured truthfully, not as bounding boxes.
-function _edgeProfile(doc, layer, travelIsX, lo, hi, n, pickMax) {
-    var out  = [];
-    var span = hi - lo;
-    if (span <= 0 || n < 1) return out;
-
-    var w    = span / n;
-    var docW = doc.width.as("px");
-    var docH = doc.height.as("px");
-
-    for (var i = 0; i < n; i++) {
-        var c0 = lo + i * w;
-        var c1 = c0 + w;
-        // Strip spans [c0,c1] on the cross axis, the full document on the travel axis.
-        var rect = travelIsX
-            ? [[0, c0], [docW, c0], [docW, c1], [0, c1]]   // y-row  (travel = x)
-            : [[c0, 0], [c1, 0], [c1, docH], [c0, docH]];  // x-col  (travel = y)
-
-        loadLayerTransparency(layer);  // selection = full layer ink
-        var b = null;
-        try {
-            doc.selection.select(rect, SelectionType.INTERSECT);
-            b = doc.selection.bounds;
-        } catch (e) {
-            b = null; // empty intersection → no ink in this strip
-        }
-
-        if (b) {
-            var loV = (travelIsX ? b[0] : b[1]).as("px"); // min edge on travel axis
-            var hiV = (travelIsX ? b[2] : b[3]).as("px"); // max edge on travel axis
-            out.push({ c: (c0 + c1) / 2, v: pickMax ? hiV : loV });
-        } else {
-            out.push(null);
-        }
-    }
-    try { doc.selection.deselect(); } catch (e2) {}
-    return out;
-}
-
 
 // Detects whether the caption is stacked on two (or more) lines, using a single
 // cheap probe: a thin horizontal band across the centre of the text's bounding box.
@@ -1007,6 +891,10 @@ function _unit(x, y) {
 // Used for the plate treatment where White dimensions are fixed rather than
 // derived from text bounds.
 // Pill = centre rectangle + two semicircular end caps (three fills on one layer).
+// Returns { layer, spine:[{x,y},{x,y}], radius } — the spine is the straight centreline
+// between the two cap centres and radius = h/2, so the analytic seat (seatCaptionConform)
+// can treat the GC plate pill exactly like a WC capsule (one unified path, no type
+// branch). seat.spine is not carried to Illustrator for GC (parametric pill there).
 function createPillFromRect(doc, x1, y1, x2, y2) {
     var h = y2 - y1;
     var r = h / 2; // radius = half height → fully rounded ends
@@ -1029,7 +917,10 @@ function createPillFromRect(doc, x1, y1, x2, y2) {
     doc.selection.fill(white);
 
     doc.selection.deselect();
-    return layer;
+    var midY = (y1 + y2) / 2;
+    return { layer: layer,
+             spine:  [ { x: x1 + r, y: midY }, { x: x2 - r, y: midY } ],
+             radius: r };
 }
 
 // loadLayerTransparency() is defined in psUtils.jsx.
