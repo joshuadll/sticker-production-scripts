@@ -557,6 +557,10 @@ function reuniteCutline(group, outline, plate, strokePt) {
     var oldCutline = findGroupMember(group, "");
 
     var newCutline = deriveCutline(outline, plate);
+    // Clean the caption junction on the fresh union (no-op when weldFilletRadiusPt is null).
+    // Idempotent: a re-Unite re-spikes, this re-cleans → converges. syncHalfcut (called by
+    // the Step 8b caller after this) re-fits the half-cut to the cleaned contour.
+    cleanCaptionJunction(newCutline, plate, outline, { filletRadiusPt: CONFIG.weldFilletRadiusPt });
     strokeRecursive(newCutline, strokePt, blackCmyk());
 
     if (oldCutline) oldCutline.remove();
@@ -805,10 +809,15 @@ function syncHalfcut(doc, group, opts) {
 
     var ext = mmToPoints(extendMm);
 
-    // Primary: trace the real seam (the plate's inner edge submerged in the art).
+    // Primary: trace the real seam (the plate's inner edge submerged in the art). Build the
+    // seam with RAW ends (extendPt 0), then extend each end to the actual cut line + a 1mm
+    // overshoot ALONG THE ART OUTLINE — so the half-cut meets the cut line even where the
+    // junction fillet has pulled the contour in off the old plate∩art crossing, and the
+    // overshoot tucks along the body cut (not into the caption). cutline is the cleaned member.
     if (followSeam && outline) {
-        var seam = plateSeamPath(plate, outline, ext, CONFIG.halfcutSeamSteps);
+        var seam = plateSeamPath(plate, outline, 0, CONFIG.halfcutSeamSteps);
         if (seam && seam.length >= 2) {
+            _extendHalfcutEndsToCutline(seam, cutline, outline, ext, CONFIG.halfcutSeamSteps);
             drawHalfcutPath(hcLayer, seam, group.name);
             return { ok: true, curved: seam.length > 2 };
         }
@@ -930,6 +939,115 @@ function _extendPoint(from, toward, dist) {
     return { x: from.x + dx / len * dist, y: from.y + dy / len * dist };
 }
 
+// Extends both ends of a raw seam polyline so each meets the CUT LINE, with an overshootPt
+// (1mm) tail that follows the ART outline (the body cut, not the caption). Mutates seam[0]
+// and seam[last] in place. This decouples the half-cut endpoint from the old plate∩art
+// crossing: after the junction fillet pulls the contour off that crossing, the seam end is
+// re-projected onto the cleaned cut line so the peel tab still closes. Falls back to a fixed
+// outward extension when the cut line can't be sampled or the seam tangent never crosses it.
+function _extendHalfcutEndsToCutline(seam, cutline, outline, overshootPt, steps) {
+    var L = seam.length;
+    if (L < 2) return;
+    var cutPolys = cutline ? samplePathToPolygons(cutline, steps) : [];
+    var artPolys = outline ? samplePathToPolygons(outline, steps) : [];
+    if (cutPolys.length === 0) {                              // can't sample cut line → legacy
+        seam[0]     = _extendPoint(seam[0],     seam[1],     overshootPt);
+        seam[L - 1] = _extendPoint(seam[L - 1], seam[L - 2], overshootPt);
+        return;
+    }
+    var capPt = overshootPt + mmToPoints(10);                // reach a retracted shoulder, bounded
+    seam[0]     = _seamEndToCutline(seam[0],     seam[1],     cutPolys, artPolys, overshootPt, capPt);
+    seam[L - 1] = _seamEndToCutline(seam[L - 1], seam[L - 2], cutPolys, artPolys, overshootPt, capPt);
+}
+
+// Re-projects one seam endpoint onto the cut line: walks the seam's end-tangent line to the
+// nearest cut-line crossing P, then returns P + overshootPt along the ART outline tangent at
+// P (oriented to continue outward). Falls back to a fixed seam-tangent extension when no
+// crossing is found within capPt.
+function _seamEndToCutline(endPt, innerPt, cutPolys, artPolys, overshootPt, capPt) {
+    var dx = endPt.x - innerPt.x, dy = endPt.y - innerPt.y;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-6) return { x: endPt.x, y: endPt.y };
+    var ux = dx / len, uy = dy / len;
+    var P = _rayCutlineCross(endPt, ux, uy, cutPolys, capPt);
+    // Fallback when the seam tangent never meets the cut line (a partial-overlap seam ends
+    // mid-pill, with the real junction shoulder off the tangent): aim at the nearest cut-line
+    // point lying outward of the seam end, so the half-cut still reaches the contour.
+    if (!P) P = _nearestCutPointOutward(endPt, ux, uy, cutPolys, capPt);
+    if (!P) return _extendPoint(endPt, innerPt, overshootPt);
+    var tan = (artPolys.length > 0) ? _artTangentAt(P, artPolys) : null;
+    if (!tan) return { x: P.x + ux * overshootPt, y: P.y + uy * overshootPt };
+    if (tan.x * ux + tan.y * uy < 0) { tan = { x: -tan.x, y: -tan.y }; }   // continue outward
+    return { x: P.x + tan.x * overshootPt, y: P.y + tan.y * overshootPt };
+}
+
+// Nearest cut-line sample vertex that lies OUTWARD of the seam end (positive projection on
+// the seam tangent) and within capPt. The half-cut-reach fallback for partial-overlap seams.
+function _nearestCutPointOutward(endPt, ux, uy, polys, capPt) {
+    var best = null, bd = Infinity, cap2 = capPt * capPt, i, j, poly, v, rx, ry, d2;
+    for (i = 0; i < polys.length; i++) {
+        poly = polys[i];
+        for (j = 0; j < poly.length; j++) {
+            v = poly[j];
+            rx = v.x - endPt.x; ry = v.y - endPt.y;
+            if (rx * ux + ry * uy < 1.0) continue;     // must be outward of the seam end
+            d2 = rx * rx + ry * ry;
+            if (d2 > cap2) continue;
+            if (d2 < bd) { bd = d2; best = { x: v.x, y: v.y }; }
+        }
+    }
+    return best;
+}
+
+// Nearest crossing of the line through P (direction ±(ux,uy)) with the cut-line polygons,
+// found by even-odd inside-test sign change + bisection, picking the crossing closest to P
+// (searches both directions). Returns {x,y} or null. Used to land a half-cut end on the
+// cut line regardless of which side of it the raw seam endpoint fell.
+function _rayCutlineCross(P, ux, uy, polys, capPt) {
+    var step = 0.5, base = _pointInPolysEO(P, polys);
+    var best = null, bestAbs = Infinity, s, sgn, prevIn, prevT, kk, t, p2, ins, b, lo, hi, loIn, mid, mp, mi, ct;
+    for (s = 0; s < 2; s++) {
+        sgn = (s === 0) ? 1 : -1;
+        prevIn = base; prevT = 0;
+        for (kk = 1; kk * step <= capPt; kk++) {
+            t = sgn * kk * step;
+            p2 = { x: P.x + ux * t, y: P.y + uy * t };
+            ins = _pointInPolysEO(p2, polys);
+            if (ins !== prevIn) {
+                lo = prevT; hi = t; loIn = prevIn;
+                for (b = 0; b < 20; b++) {
+                    mid = (lo + hi) / 2; mp = { x: P.x + ux * mid, y: P.y + uy * mid };
+                    mi = _pointInPolysEO(mp, polys);
+                    if (mi === loIn) lo = mid; else hi = mid;
+                }
+                ct = (lo + hi) / 2;
+                if (Math.abs(ct) < bestAbs) { bestAbs = Math.abs(ct); best = { x: P.x + ux * ct, y: P.y + uy * ct }; }
+                break;
+            }
+            prevIn = ins; prevT = t;
+        }
+    }
+    return best;
+}
+
+// Unit tangent of the art outline at the polygon vertex nearest P (central difference).
+function _artTangentAt(P, artPolys) {
+    var bi = -1, bp = -1, bd = Infinity, i, j, poly, dx, dy, d;
+    for (i = 0; i < artPolys.length; i++) {
+        poly = artPolys[i];
+        for (j = 0; j < poly.length; j++) {
+            dx = poly[j].x - P.x; dy = poly[j].y - P.y; d = dx * dx + dy * dy;
+            if (d < bd) { bd = d; bi = i; bp = j; }
+        }
+    }
+    if (bi < 0) return null;
+    poly = artPolys[bi]; var n = poly.length;
+    var a = poly[(bp - 1 + n) % n], c = poly[(bp + 1) % n];
+    var tx = c.x - a.x, ty = c.y - a.y, tl = Math.sqrt(tx * tx + ty * ty);
+    if (tl < 1e-6) return null;
+    return { x: tx / tl, y: ty / tl };
+}
+
 // Returns a sorted array of X values where pathItem's outline crosses targetY (AI
 // y-up). Handles PathItem and CompoundPathItem via coarse scan + bisection (reuses
 // _bezierPoint). Used by syncHalfcut's straight-chord fallback. Moved here from
@@ -1001,82 +1119,285 @@ function _crossingsInSubPath(subPath, targetY, out) {
     }
 }
 
-// ─── JUNCTION FILLET (Step 6 weld refinement) ─────────────────────────────────
-// Softens the two reflex notches where the plate meets the art on the fused cutline,
-// so the cut contour has no sharp inward spike at the caption junction. Driven by the
-// PS-known bite points (sidecar), mapped to AI by the caller — deterministic, not a
-// guess. Conservative: only a nearby SHARP corner is rounded; smooth joins are left.
-// No-op when radiusPt is null/0 or biteAi is absent (legacy elements). Returns the
-// number of corners softened.
-function filletJunctionCorners(cutline, biteAi, radiusPt) {
-    if (!radiusPt || !biteAi || biteAi.length < 1) return 0;
-    var softened = 0, bi;
-    for (bi = 0; bi < biteAi.length; bi++) {
-        softened += _softenNearestCorner(cutline, biteAi[bi], radiusPt);
-    }
-    return softened;
-}
+// ─── CAPTION-JUNCTION CLEANUP (post-Unite spike/sliver removal) ───────────────
+// The fused cutline = Unite(element_outline, caption_plate). Where the pill grazes the
+// art near-tangentially, Pathfinder leaves a degenerate self-intersection at each
+// plate∩art junction: a near-180° "open break" / reversal, a 120–160° "horn", and
+// sometimes a tiny sliver sub-path. cleanCaptionJunction removes those. Per junction it
+// brackets the whole spike CLUSTER (not one anchor — deleting one promotes its neighbour)
+// to clean anchors on each side and rebuilds that span as a smooth circular-arc cubic
+// (kappa handle = (4/3)·tan(θ/4)·R, R implied by the bracket chord + turn angle), so the
+// junction becomes a soft rounded transition. Junctions are located from the REAL pill∩art
+// crossings (works for the tilted WC capsule + the GC pill — not the axis-aligned bbox).
+// Idempotent: a fresh Unite's spike is a CORNER anchor and fires; the SMOOTH anchors this
+// leaves don't re-fire, so re-running (Step 8b's reuniteCutline) converges. Keeps ONE
+// closed contour. No-op when filletRadiusPt is null/0. Returns { filleted, slivers }.
+//
+// See docs/caption-junction-cutline-quality.md for the diagnosis + why the rejected
+// alternatives (raster white-fill, plate-edge extrusion, single-anchor delete) don't work.
+function cleanCaptionJunction(cutline, plate, outline, opts) {
+    opts = opts || {};
+    var R = (opts.filletRadiusPt != null) ? opts.filletRadiusPt : null;
+    if (R == null || R <= 0 || !plate || !outline || !cutline) return { filleted: 0, slivers: 0 };
+    var steps = (opts.seamSteps != null) ? opts.seamSteps
+              : ((typeof CONFIG !== "undefined" && CONFIG.halfcutSeamSteps) ? CONFIG.halfcutSeamSteps : 16);
 
-function _softenNearestCorner(item, pt, radiusPt) {
-    if (item.typename === "PathItem") {
-        var rr = _nearestAnchor(item, pt);
-        return rr ? _softenAnchor(item, rr.idx, radiusPt) : 0;
-    }
-    if (item.typename === "CompoundPathItem") {
-        var best = null, bestSub = null, i, r;
-        for (i = 0; i < item.pathItems.length; i++) {
-            r = _nearestAnchor(item.pathItems[i], pt);
-            if (r && (!best || r.d2 < best.d2)) { best = r; bestSub = item.pathItems[i]; }
+    var crossings = _captionCrossings(plate, outline, steps);
+    if (crossings.length === 0) return { filleted: 0, slivers: 0 };
+
+    // Merge near-duplicate crossings (a sliver presents two crossings a few pt apart).
+    var mergeD = (opts.mergeDistPt != null) ? opts.mergeDistPt : 6;
+    var merged = [], i, k, dup;
+    for (i = 0; i < crossings.length; i++) {
+        dup = false;
+        for (k = 0; k < merged.length; k++) {
+            var dx = crossings[i].x - merged[k].x, dy = crossings[i].y - merged[k].y;
+            if (dx * dx + dy * dy <= mergeD * mergeD) { dup = true; break; }
         }
-        return best ? _softenAnchor(bestSub, best.idx, radiusPt) : 0;
+        if (!dup) merged.push(crossings[i]);
     }
-    if (item.typename === "GroupItem") {
-        var s = 0, k;
-        for (k = 0; k < item.pathItems.length; k++) s += _softenNearestCorner(item.pathItems[k], pt, radiusPt);
-        for (k = 0; k < item.compoundPathItems.length; k++) s += _softenNearestCorner(item.compoundPathItems[k], pt, radiusPt);
-        return s;
+
+    var slivers = _removeJunctionSlivers(cutline, crossings,
+        (opts.sliverBandPt != null) ? opts.sliverBandPt : 30,
+        (opts.sliverMaxAreaPt2 != null) ? opts.sliverMaxAreaPt2 : 400);
+
+    var main = _largestLeafPath(cutline);
+    if (!main) return { filleted: 0, slivers: slivers };
+
+    // Collapse near-coincident consecutive anchors first — the Unite leaves degenerate
+    // zero-length-segment folds (duplicate anchors) at some junctions; their noise-angle
+    // turns survive the fillet otherwise. Tol stays well under the pill-cap step (~2px) so
+    // real cap/art anchors are untouched.
+    _collapseDuplicateAnchors(main, (opts.dupTolPt != null) ? opts.dupTolPt : 0.8);
+
+    var filleted = 0, ci;
+    for (ci = 0; ci < merged.length; ci++) {
+        if (_filletAtCrossing(main, merged[ci], opts)) filleted++;
     }
-    return 0;
+    return { filleted: filleted, slivers: slivers };
 }
 
-function _nearestAnchor(path, pt) {
-    var pts = path.pathPoints, n = pts.length, i, a, dx, dy, d2, best = -1, bestD = Infinity;
+// Every pill∩art boundary crossing (each inside<->outside transition on the pill polygon)
+// = one junction corner. Robust to partial / multi-island overlap (returns all of them),
+// unlike plateSeamPath's single longest-run. Returns [{x,y}, ...] in document points.
+function _captionCrossings(plate, outline, steps) {
+    var platePolys = samplePathToPolygons(plate, steps);
+    var artPolys   = samplePathToPolygons(outline, steps);
+    if (platePolys.length === 0 || artPolys.length === 0) return [];
+    var pp = _largestPoly(platePolys);
+    if (!pp || pp.length < 4) return [];
+    var n = pp.length, inside = [], i;
+    for (i = 0; i < n; i++) inside[i] = _pointInPolysEO(pp[i], artPolys);
+    var out = [], j;
     for (i = 0; i < n; i++) {
-        a = pts[i].anchor;
-        dx = a[0] - pt.x; dy = a[1] - pt.y;
-        d2 = dx * dx + dy * dy;
-        if (d2 < bestD) { bestD = d2; best = i; }
+        j = (i + 1) % n;
+        if (inside[i] !== inside[j]) {
+            var a = inside[i] ? pp[j] : pp[i];   // outside vertex
+            var b = inside[i] ? pp[i] : pp[j];   // inside vertex
+            out.push(_segCrossArt(a, b, artPolys));
+        }
     }
-    if (best < 0) return null;
-    return { idx: best, d2: bestD };
+    return out;
 }
 
-// Converts pathPoint[idx] to a SMOOTH point with short handles toward its neighbours,
-// rounding a sharp corner. Leaves already-smooth/near-straight points untouched.
-function _softenAnchor(path, idx, radiusPt) {
-    var pts = path.pathPoints, n = pts.length;
-    if (n < 3) return 0;
-    var prev = pts[(idx - 1 + n) % n].anchor;
-    var cur  = pts[idx].anchor;
-    var next = pts[(idx + 1) % n].anchor;
-    var turn = _turnAngle({ x: prev[0], y: prev[1] }, { x: cur[0], y: cur[1] }, { x: next[0], y: next[1] });
-    if (turn < 20) return 0;   // already near-straight — nothing to round
-    var hp = _towardHandle(cur, prev, radiusPt);
-    var hn = _towardHandle(cur, next, radiusPt);
-    var pp = pts[idx];
-    pp.leftDirection  = [hp.x, hp.y];
-    pp.rightDirection = [hn.x, hn.y];
-    pp.pointType = PointType.SMOOTH;
-    return 1;
+// All leaf PathItems of a cutline (PathItem / CompoundPathItem / GroupItem).
+function _cjLeafPaths(item, acc) {
+    var t = item.typename, i;
+    if (t === "PathItem") { acc.push(item); }
+    else if (t === "CompoundPathItem") { for (i = 0; i < item.pathItems.length; i++) acc.push(item.pathItems[i]); }
+    else if (t === "GroupItem") { for (i = 0; i < item.pageItems.length; i++) _cjLeafPaths(item.pageItems[i], acc); }
+    return acc;
 }
 
-// A handle point `radiusPt` from cur toward nb (clamped to half that edge length).
-function _towardHandle(cur, nb, radiusPt) {
-    var dx = nb[0] - cur[0], dy = nb[1] - cur[1];
-    var len = Math.sqrt(dx * dx + dy * dy);
-    if (len < 1e-6) return { x: cur[0], y: cur[1] };
-    var d = Math.min(radiusPt, len / 2);
-    return { x: cur[0] + dx / len * d, y: cur[1] + dy / len * d };
+function _cjBboxAreaOf(p) { var b = p.geometricBounds; return Math.abs((b[2] - b[0]) * (b[1] - b[3])); }
+
+// Largest-bbox leaf path of a cutline = the real outer contour (slivers are tiny).
+function _largestLeafPath(cutline) {
+    var leaves = _cjLeafPaths(cutline, []), best = null, bestA = -1, i, a;
+    for (i = 0; i < leaves.length; i++) { a = _cjBboxAreaOf(leaves[i]); if (a > bestA) { bestA = a; best = leaves[i]; } }
+    return best;
+}
+
+// Removes degenerate sliver sub-paths: a NON-largest leaf that is tiny (bbox area below
+// maxAreaPt2) AND sits entirely within bandPt of the junction crossings — i.e. the union's
+// self-intersection sliver, not a real hole in the art. Returns the count removed.
+function _removeJunctionSlivers(cutline, crossings, bandPt, maxAreaPt2) {
+    var leaves = _cjLeafPaths(cutline, []);
+    if (leaves.length < 2) return 0;
+    var largest = _largestLeafPath(cutline);
+    var doomed = [], i, kk, p;
+    for (i = 0; i < leaves.length; i++) {
+        p = leaves[i];
+        if (p === largest) continue;
+        if (_cjBboxAreaOf(p) > maxAreaPt2) continue;          // big hole → real, keep
+        var pts = p.pathPoints, allNear = true;
+        for (kk = 0; kk < pts.length; kk++) {
+            var an = { x: pts[kk].anchor[0], y: pts[kk].anchor[1] };
+            var near = false, c;
+            for (c = 0; c < crossings.length; c++) {
+                var dx = an.x - crossings[c].x, dy = an.y - crossings[c].y;
+                if (dx * dx + dy * dy <= bandPt * bandPt) { near = true; break; }
+            }
+            if (!near) { allNear = false; break; }
+        }
+        if (allNear) doomed.push(p);
+    }
+    for (i = 0; i < doomed.length; i++) { try { doomed[i].remove(); } catch (e) {} }
+    return doomed.length;
+}
+
+// Removes consecutive (and wrap-around) anchors within tolPt of the previous kept anchor —
+// degenerate zero-length-segment folds from the boolean Unite. Preserves handles/types of
+// the kept anchors. Returns the count removed. Safe: tolPt is far below the pill-cap step.
+function _collapseDuplicateAnchors(sub, tolPt) {
+    if (sub.typename !== "PathItem") return 0;
+    var pts = sub.pathPoints, n = pts.length;
+    if (n < 5) return 0;
+    var A = [], L = [], R = [], PT = [], i;
+    for (i = 0; i < n; i++) { A[i] = pts[i].anchor; L[i] = pts[i].leftDirection; R[i] = pts[i].rightDirection; PT[i] = pts[i].pointType; }
+    var tol2 = tolPt * tolPt, keep = [], removed = 0, dx, dy;
+    for (i = 0; i < n; i++) {
+        if (keep.length > 0) {
+            var pk = keep[keep.length - 1];
+            dx = A[i][0] - A[pk][0]; dy = A[i][1] - A[pk][1];
+            if (dx * dx + dy * dy <= tol2) { removed++; continue; }
+        }
+        keep.push(i);
+    }
+    if (keep.length >= 4) {                                  // wrap: last vs first
+        var f = keep[0], l = keep[keep.length - 1];
+        dx = A[l][0] - A[f][0]; dy = A[l][1] - A[f][1];
+        if (dx * dx + dy * dy <= tol2) { keep.pop(); removed++; }
+    }
+    if (removed === 0 || keep.length < 4) return 0;
+    var coords = [], oL = [], oR = [], oT = [], k;
+    for (k = 0; k < keep.length; k++) { coords.push([A[keep[k]][0], A[keep[k]][1]]); oL.push(L[keep[k]]); oR.push(R[keep[k]]); oT.push(PT[keep[k]]); }
+    sub.setEntirePath(coords);
+    sub.closed = true;
+    var np = sub.pathPoints;
+    for (k = 0; k < coords.length && k < np.length; k++) {
+        np[k].leftDirection  = oL[k];
+        np[k].rightDirection = oR[k];
+        np[k].pointType      = oT[k];
+    }
+    return removed;
+}
+
+function _cjTurnAt(A, i, n) {
+    var p = A[(i - 1 + n) % n], c = A[i], q = A[(i + 1) % n];
+    return _turnAngle({ x: p[0], y: p[1] }, { x: c[0], y: c[1] }, { x: q[0], y: q[1] });
+}
+function _cjDist(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return Math.sqrt(dx * dx + dy * dy); }
+function _cjUnit(ax, ay) { var l = Math.sqrt(ax * ax + ay * ay) || 1; return [ax / l, ay / l]; }
+
+// Fillets one junction crossing C on the main cut-line subpath. Finds the spike apex
+// (sharp CORNER anchor nearest C), brackets the whole cluster to clean anchors on each
+// side, removes the in-between anchors, and rebuilds the span as a smooth circular-arc
+// cubic tangent to both clean edges. Returns true if it acted (idempotent: a no-op once the
+// crossing carries only SMOOTH/gentle anchors). opts knobs documented on cleanCaptionJunction.
+function _filletAtCrossing(sub, C, opts) {
+    if (sub.typename !== "PathItem" || !sub.closed) return false;
+    var sharpDeg  = (opts.junctionSharpDeg  != null) ? opts.junctionSharpDeg  : 50;
+    var cleanDeg  = (opts.cornerCleanDeg    != null) ? opts.cornerCleanDeg    : 35;
+    var maxSeed   = (opts.maxSeedDistPt     != null) ? opts.maxSeedDistPt     : 8;
+    var hScale    = (opts.handleScale       != null) ? opts.handleScale       : 1.0;
+    var reversalDeg = (opts.reversalDeg     != null) ? opts.reversalDeg       : 95;
+    var maxAbsorb   = (opts.maxAbsorbEach   != null) ? opts.maxAbsorbEach     : 8;
+
+    var pts = sub.pathPoints, n = pts.length;
+    if (n < 5) return false;
+    var A = [], L = [], R = [], PT = [], i;
+    for (i = 0; i < n; i++) { A[i] = pts[i].anchor; L[i] = pts[i].leftDirection; R[i] = pts[i].rightDirection; PT[i] = pts[i].pointType; }
+
+    // seed = anchor nearest C (the spike apex sits on the crossing)
+    var seed = -1, bestD = Infinity;
+    for (i = 0; i < n; i++) { var d = _cjDist(A[i], [C.x, C.y]); if (d < bestD) { bestD = d; seed = i; } }
+    if (seed < 0 || bestD > maxSeed) return false;
+    if (_cjTurnAt(A, seed, n) < sharpDeg) return false;     // already clean here
+
+    // Idempotency guard: a junction this pass already filleted leaves SMOOTH bracket anchors
+    // at the crossing. If the sharpest CORNER-type anchor within maxSeed of C is below
+    // sharpDeg, there's no spike left — no-op. A fresh Unite's spike is always a CORNER point.
+    var haveSharpCorner = false, qi;
+    for (qi = 0; qi < n; qi++) {
+        if (_cjDist(A[qi], [C.x, C.y]) > maxSeed) continue;
+        if (PT[qi] === PointType.SMOOTH) continue;
+        if (_cjTurnAt(A, qi, n) >= sharpDeg) { haveSharpCorner = true; break; }
+    }
+    if (!haveSharpCorner) return false;
+
+    // Initial bracket: first anchor (each direction) with turn < cleanDeg.
+    var iA = (seed - 1 + n) % n, ka = 0;
+    while (ka < 12 && _cjTurnAt(A, iA, n) >= cleanDeg) { iA = (iA - 1 + n) % n; ka++; }
+    var iB = (seed + 1) % n, kb = 0;
+    while (kb < 12 && _cjTurnAt(A, iB, n) >= cleanDeg) { iB = (iB + 1) % n; kb++; }
+    if (iA === iB) return false;
+
+    // Iteratively expand each bracket while the bracket anchor would itself be a reversal
+    // relative to the proposed straight bridge iA<->iB. Re-evaluating after each expansion
+    // absorbs the whole cluster — including the near-tangential RETURN anchor — instead of
+    // promoting it to a new spike (the failure mode of single-anchor deletion).
+    function bracketReverses(iEnd, iOther, fwd) {
+        var nb = fwd ? (iEnd + 1) % n : (iEnd - 1 + n) % n;
+        var v1 = [A[iEnd][0] - A[iOther][0], A[iEnd][1] - A[iOther][1]];   // chord into iEnd
+        var v2 = [A[nb][0] - A[iEnd][0], A[nb][1] - A[iEnd][1]];          // outward edge
+        var m1 = Math.sqrt(v1[0]*v1[0]+v1[1]*v1[1]), m2 = Math.sqrt(v2[0]*v2[0]+v2[1]*v2[1]);
+        if (m1 < 1e-6 || m2 < 1e-6) return false;
+        var c = (v1[0]*v2[0]+v1[1]*v2[1])/(m1*m2); if (c > 1) c = 1; else if (c < -1) c = -1;
+        return (Math.acos(c) * 180 / Math.PI) >= reversalDeg;
+    }
+    var guard = 0;
+    while (guard++ < 2 * maxAbsorb) {
+        var moved = false;
+        if (bracketReverses(iB, iA, true)  && kb < maxAbsorb) { iB = (iB + 1) % n; kb++; moved = true; }
+        if (bracketReverses(iA, iB, false) && ka < maxAbsorb) { iA = (iA - 1 + n) % n; ka++; moved = true; }
+        if (!moved) break;
+        if (iA === iB) return false;
+    }
+
+    // Cluster = indices strictly between iA and iB through the seed (forward arc).
+    var cluster = [], ii = (iA + 1) % n;
+    while (ii !== iB) { cluster.push(ii); ii = (ii + 1) % n; if (cluster.length > n) return false; }
+
+    // Clean edge directions + circular-arc cubic handle (kappa formula, R from the chord).
+    var dirA = _cjUnit(A[iA][0] - A[(iA - 1 + n) % n][0], A[iA][1] - A[(iA - 1 + n) % n][1]);  // into iA
+    var dirB = _cjUnit(A[(iB + 1) % n][0] - A[iB][0], A[(iB + 1) % n][1] - A[iB][1]);            // out of iB
+    var chord = _cjDist(A[iA], A[iB]);
+    var dot = dirA[0]*dirB[0] + dirA[1]*dirB[1]; if (dot > 1) dot = 1; else if (dot < -1) dot = -1;
+    var theta = Math.acos(dot);                          // deflection between clean edges (rad)
+    var s2 = Math.sin(theta / 2), h;
+    if (s2 < 1e-3) { h = chord / 3; }
+    else { h = (4 / 3) * Math.tan(theta / 4) * (chord / (2 * s2)); }
+    h *= hScale;
+    if (h < 0) h = 0;
+    if (h > chord * 0.42) h = chord * 0.42;              // cap so the handle can't dip the bridge
+
+    var rm = {}; for (i = 0; i < cluster.length; i++) rm[cluster[i]] = true;
+    rm[iA] = false; rm[iB] = false;
+
+    var coords = [], oL = [], oR = [], oT = [], newIA = -1, newIB = -1;
+    for (i = 0; i < n; i++) {
+        if (rm[i]) continue;
+        if (i === iA) newIA = coords.length;
+        if (i === iB) newIB = coords.length;
+        coords.push([A[i][0], A[i][1]]); oL.push(L[i]); oR.push(R[i]); oT.push(PT[i]);
+    }
+    if (coords.length < 4 || newIA < 0 || newIB < 0) return false;
+
+    oR[newIA] = [A[iA][0] + dirA[0] * h, A[iA][1] + dirA[1] * h];   // iA right handle along +dirA
+    oT[newIA] = PointType.SMOOTH;
+    oL[newIB] = [A[iB][0] - dirB[0] * h, A[iB][1] - dirB[1] * h];   // iB left handle along -dirB
+    oT[newIB] = PointType.SMOOTH;
+
+    sub.setEntirePath(coords);
+    sub.closed = true;                                   // setEntirePath can drop the flag
+    var np = sub.pathPoints;
+    for (i = 0; i < coords.length && i < np.length; i++) {
+        np[i].leftDirection  = oL[i];
+        np[i].rightDirection = oR[i];
+        np[i].pointType      = oT[i];
+    }
+    return true;
 }
 
 // ─── PURE GEOMETRY (Step 8c QA) ───────────────────────────────────────────────

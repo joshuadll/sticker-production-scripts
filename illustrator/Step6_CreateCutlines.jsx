@@ -368,19 +368,15 @@ function _buildSeparableCutline(doc, layer, element, elementOutline,
     }
     var cutline = deriveCutline(elementOutline, plate);
 
-    // Soften the two plate∩art notches on the fused contour (weld refinement). Driven
-    // by the PS-known junction (bite) points from the sidecar; no-op when bite is
-    // absent (legacy) or CONFIG.weldFilletRadiusPt is null.
-    if (cap.bite && cap.bite.length >= 2) {
-        var biteAi = [], bk;
-        for (bk = 0; bk < cap.bite.length; bk++) {
-            biteAi.push(_psPointToAi(cap.bite[bk].x, cap.bite[bk].y,
-                data, pngLeft, pngTop, pngWidth, pngHeight));
-        }
-        var soft = filletJunctionCorners(cutline, biteAi, CONFIG.weldFilletRadiusPt);
-        if (soft > 0) log("[step6] junction fillet | " + element.displayName
-            + " softened " + soft + " corner(s)");
-    }
+    // Clean the plate∩art junction on the fused contour: removes the boolean-union spike/
+    // horn/sliver and leaves a soft rounded transition. Junctions are located from the real
+    // plate∩art crossings (handles the tilted WC capsule + GC pill). No-op when
+    // CONFIG.weldFilletRadiusPt is null. Idempotent under Step 8b's reuniteCutline.
+    var jc = cleanCaptionJunction(cutline, plate, elementOutline,
+        { filletRadiusPt: CONFIG.weldFilletRadiusPt });
+    if (jc.filleted > 0 || jc.slivers > 0)
+        log("[step6] junction clean | " + element.displayName
+            + " filleted=" + jc.filleted + " slivers=" + jc.slivers);
 
     strokeRecursive(cutline, CONFIG.cutlineStrokePt, blackCmyk());
     var grp = assembleElementGroup(layer, element.displayName, elementOutline, plate, cutline);

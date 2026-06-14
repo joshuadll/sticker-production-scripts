@@ -18,8 +18,8 @@
 [step8c] FLAG | cut line exceeds margin | (unnamed)
 [step8c] FLAG | cut line exceeds margin | 
 [step8c] FLAG | cut line exceeds margin | 
-[step8c] overlay | drew flags on "Layout QA" layer | 16 halo(s), 11 spacing badge(s), 3 margin arrow(s), 3 sliver(s)
-[timing] step8c | sample=2145 spacing=2662 margin=2 overlay=1464 (ms)
+[step8c] overlay | drew flags on "Layout QA" layer | 16 halo(s), 11 spacing badge(s), 3 margin arrow(s), 3 sliver(s), 0 seat-review badge(s)
+[timing] step8c | sample=3394 spacing=2942 margin=5 overlay=593 (ms)
 [step8c] done | checked=34 flagged=16 (spacing: 11 pair(s); margin: 3)
 [pipeline] spacing/margin complete | 34 checked, 16 flagged.
 [pipeline] --- Nesting Quality (NQI) ---
@@ -72,7 +72,7 @@
 [stepQA] pocket | Top edge | area=92 mm2 | center=(61.7,12.1)mm | bbox=[25,5 15x4]mm
 [stepQA] pocket | Left edge | area=92 mm2 | center=(12.9,211.9)mm | bbox=[5,100 5x11]mm
 [stepQA] NQI=96 | pass=true | utilization=81.5% | recoverableCells=464/12730
-[timing] stepQA | setup+collect=134 raster=368 dilate=402 marginMask=15 pockets=321 overlay=5 (ms)
+[timing] stepQA | setup+collect=135 raster=463 dilate=547 marginMask=22 pockets=345 overlay=4 (ms)
 [pipeline] === AI_LayoutQA done ===
 Layout QA
 

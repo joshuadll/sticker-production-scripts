@@ -1,9 +1,13 @@
-# Caption-Junction Cut-line Quality — diagnosis + fix plan
+# Caption-Junction Cut-line Quality — diagnosis + fix
 
-> **Status:** diagnosed, **not fixed.** This is a scoped follow-up task. The branch's
-> rotation-sign and half-cut work is validated and working; this is a separate cut-line
-> *quality* problem at the caption junction. Captured here (2026-06-13) so the live-session
-> investigation isn't lost.
+> **Status: FIXED (2026-06-14).** Implemented as `cleanCaptionJunction()` in
+> `utils/aiUtils.jsx`, wired into Step 6 (`_buildSeparableCutline`) and `reuniteCutline`
+> (Step 8b), gated by `CONFIG.weldFilletRadiusPt` (set to `2.0` = ON in AI_BuildCutlines and
+> AI_NormaliseCaptions). Validated in-app on the clean fixture: all 22 caption junctions now
+> render smooth (densely-sampled curve turn ≤ 37°, was 115–179°), the 6 caption-junction
+> slivers are gone, it's idempotent under the re-Unite, and the half-cut stays attached.
+> The diagnosis below is retained for context; the **Implementation** section at the bottom
+> records what shipped.
 
 ## Symptom (what the artist sees)
 
@@ -139,3 +143,57 @@ reset between attempts:
 For each captioned element: no near-180° reversal and no sub-90° spike at the junction; a
 soft rounded transition where pill meets art; the rounded END POINTS of the pill unchanged;
 one closed contour; half-cut endpoints still on the cut line; idempotent under re-Unite.
+
+## Implementation (what shipped, 2026-06-14)
+
+`cleanCaptionJunction(cutline, plate, outline, opts)` in `utils/aiUtils.jsx`. Per element,
+after `deriveCutline`:
+
+1. **Locate junctions from the real geometry.** `_captionCrossings` returns *every*
+   plate∩art boundary crossing (each inside↔outside transition on the sampled pill polygon),
+   not the axis-aligned bbox and not `plateSeamPath`'s single longest run — so it handles the
+   tilted WC capsule, the GC pill, and partial/multi-island overlap (Michael's Gate has 4).
+   Near-duplicate crossings are merged.
+
+2. **Remove degenerate slivers.** `_removeJunctionSlivers` drops a non-largest cut-line
+   sub-path that is tiny (bbox area < 400 pt²) *and* sits entirely within 30 pt of the
+   crossings — the union's self-intersection sliver. A real hole, or a trace sliver elsewhere
+   in the art (e.g. Tram's area-188 blob at mid-element), is left alone.
+
+3. **Collapse zero-length folds.** `_collapseDuplicateAnchors` (tol 0.8 pt, well under the
+   ~2 px pill-cap step) removes duplicate consecutive anchors the Unite leaves at some
+   junctions — their noise-angle turns would otherwise survive the fillet (this is what was
+   leaving Kroje at 96°).
+
+4. **Fillet each junction.** `_filletAtCrossing` finds the spike apex (sharpest CORNER anchor
+   nearest the crossing), then *brackets the whole cluster* — iteratively expanding each
+   bracket while the bracket anchor is itself a reversal relative to the straight bridge, so
+   it absorbs the near-tangential RETURN anchor instead of promoting it to a new spike (the
+   failure mode of single-anchor deletion). It removes the in-between anchors and rebuilds the
+   span as a smooth circular-arc cubic tangent to both clean edges (κ handle =
+   `(4/3)·tan(θ/4)·R`, R implied by the bracket chord + turn). The handle is capped at
+   0.42·chord so it can't dip the bridge.
+
+5. **Idempotency.** A fresh Unite's spike is a CORNER anchor → fires. The fillet leaves SMOOTH
+   bracket anchors → the re-trigger guard (sharpest CORNER within 8 pt of the crossing) finds
+   nothing → re-running is a no-op. Step 8b's `reuniteCutline` re-derives the spike and
+   re-cleans, converging. Verified: pass 2 = 0 fillets / 0 slivers.
+
+6. **Half-cut attachment.** Smoothing the spike pulls the contour off the old plate∩art
+   crossing the half-cut used to meet. `syncHalfcut` now builds the seam with raw ends and
+   `_extendHalfcutEndsToCutline` re-projects each end onto the cleaned cut line — march the
+   seam tangent to the nearest cut-line crossing (fallback: nearest outward cut-line point,
+   for the mid-pill partial-seam case), then **+1 mm along the ART outline tangent** (the body
+   cut, not the caption). Fixture half-cut endpoint gaps are now ≤ 2.9 pt (= the 1 mm
+   overshoot), down from up to 14 pt.
+
+**Tuning knobs** (`opts`, with defaults): `junctionSharpDeg` 50, `cornerCleanDeg` 35,
+`maxSeedDistPt` 8, `reversalDeg` 95, `maxAbsorbEach` 8, `handleScale` 1.0 (softness),
+`sliverMaxAreaPt2` 400, `sliverBandPt` 30, `dupTolPt` 0.8. `CONFIG.weldFilletRadiusPt` is the
+on/off gate (any +value = ON); the fillet auto-sizes to each cluster, so the value is not a
+literal radius — tune softness via `handleScale`.
+
+**Known residual:** the partial-seam elements (St Elizabeth, Carpathian, etc.) get a clean
+*cut line* but a trapezoidal half-cut (the seam is `plateSeamPath`'s mid-pill longest run,
+extended to the contour) rather than a shoulder-to-shoulder run. It connects and peels; a
+fuller fix would widen `plateSeamPath` to span the outermost crossings (separate follow-up).
