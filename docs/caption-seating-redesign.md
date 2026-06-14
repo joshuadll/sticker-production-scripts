@@ -182,24 +182,28 @@ On a curved border the straight chord is an approximation: post-rotation real co
 lands at a different height than `B0/B1`, so the two endpoints won't kiss the *real*
 curve perfectly. Fine for near-flat; the profile-settle is the fix when needed.
 
-## Step 6 — endpoint overhang (minimal, ADOPTED)
+## Step 6 — overhang solution (BRAINSTORM — NOT DECIDED)
 
-The v1 kiss pins `E0`→`B0`, which assumes `E0` has a border above it. If `E0` overhangs
-(its probe returns null — no intersection), there is no pivot/target. This is FREQUENT
-(caption width comes from the display-name text, which can exceed a small element).
+GOAL (already decided earlier): **mask to the live span** — seat against where border
+exists, let overhangs float. The METHOD is open; nothing adopted yet.
 
-Detection is FREE — it's the same `B0`/`B1` probe we already do (null ⇒ that endpoint
-overhangs). Minimal rule (ADOPTED):
-- `E0` overhangs, `E1` doesn't → **pin `E1`** instead (rotate about `E1`, translate
-  `E1→B1 + d`). Symmetric; just swap the anchor endpoint.
-- both overhang → **case C → skip + warn** (already decided).
-- neither → the v1 path as-is.
+The v1 kiss pins `E0`→`B0`, which assumes `E0` has border above it. Detection of an
+endpoint overhang is FREE (the `B0`/`B1` probe returns null). Candidate methods:
 
-Angle source for now = **(a) keep the current full-span robust fit** (smallest change).
-Restricting the fit to the live portion is left to the fuller live-span work (parked).
+- **(a) Endpoint-only (minimal):** pin whichever endpoint has a border; both null → skip.
+  CHEAP but FLAWED — it can't see the interior, so "both ends overhang, MIDDLE lands"
+  (narrow centered art — common!) reads as both-null → wrongly SKIPS a seatable case.
+- **(b) Per-sample profile:** probe N points along the inner edge → liveness profile →
+  contiguous live run(s). Robust, handles disjoint spans, but N raster probes (cost).
+- **(c) Live-extent reduction (leading idea):** ONE intersection (art-border transparency
+  ∩ inner-edge band reaching `D` toward the art) → bounds give the border's horizontal
+  FOOTPRINT under the caption = the live sub-segment. Clip the inner edge to it, take the
+  live-segment endpoints as effective `E0',E1'`, probe their heights → run the v1 kiss
+  unchanged on the live segment; the geometric pill ends just float past. Cheap (1 op +
+  2 probes), handles A/B/C, reuses v1. Limitation: a concave MID-gap reads as live (bbox
+  bounds span the gap) — rare; refine later.
 
-This closes a hard hole in v1 (the pinned pivot may not exist) without the parked
-live-span machinery. It is a prerequisite for shipping the E0-pin.
+Still open. Leaning (c).
 
 ## Open / UNRESOLVED edge cases
 
