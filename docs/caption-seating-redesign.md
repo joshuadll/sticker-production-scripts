@@ -212,6 +212,10 @@ extent (fooled by irregular art); per-sample slice-trace (reserve for parked pro
 
 ## Open / UNRESOLVED edge cases
 
+- **Short-baseline angle (RESOLVED — always rotate).** A short `E0→E1` baseline (very
+  narrow caption, or the 70%-shrunk segment) makes the tilt noise-sensitive. DECISION:
+  still rotate, NO seat-flat fallback — short captions are rare; accept the small risk.
+
 - **Concave/convex border behavior under pin-endpoints (UNRESOLVED).** On a curved
   border, pinning the two endpoints leaves a CONCAVE middle gap (center bows toward art
   interior → overlap `d − s`; needs `d ≥ s`) or over-submerges a CONVEX middle (fine).
