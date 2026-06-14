@@ -810,14 +810,15 @@ function syncHalfcut(doc, group, opts) {
     var ext = mmToPoints(extendMm);
 
     // Primary: trace the real seam (the plate's inner edge submerged in the art). Build the
-    // seam with RAW ends (extendPt 0), then extend each end to the actual cut line + a 1mm
-    // overshoot ALONG THE ART OUTLINE — so the half-cut meets the cut line even where the
-    // junction fillet has pulled the contour in off the old plate∩art crossing, and the
-    // overshoot tucks along the body cut (not into the caption). cutline is the cleaned member.
+    // seam with RAW ends (extendPt 0), then extend each end onto the actual cut line with a
+    // 1mm tail that RUNS ALONG the cut line — so the half-cut meets the contour even where the
+    // junction fillet has pulled it off the old plate∩art crossing, and the overshoot
+    // superimposes on the cut line (invisible against it) instead of straying off into the art.
+    // See the HALF-CUT ENDPOINT EXTENSION section. cutline is the cleaned member.
     if (followSeam && outline) {
         var seam = plateSeamPath(plate, outline, 0, CONFIG.halfcutSeamSteps);
         if (seam && seam.length >= 2) {
-            _extendHalfcutEndsToCutline(seam, cutline, outline, ext, CONFIG.halfcutSeamSteps);
+            seam = _extendHalfcutEndsToCutline(seam, cutline, plate, ext, CONFIG.halfcutSeamSteps);
             drawHalfcutPath(hcLayer, seam, group.name);
             return { ok: true, curved: seam.length > 2 };
         }
@@ -939,46 +940,121 @@ function _extendPoint(from, toward, dist) {
     return { x: from.x + dx / len * dist, y: from.y + dy / len * dist };
 }
 
-// Extends both ends of a raw seam polyline so each meets the CUT LINE, with an overshootPt
-// (1mm) tail that follows the ART outline (the body cut, not the caption). Mutates seam[0]
-// and seam[last] in place. This decouples the half-cut endpoint from the old plate∩art
-// crossing: after the junction fillet pulls the contour off that crossing, the seam end is
-// re-projected onto the cleaned cut line so the peel tab still closes. Falls back to a fixed
-// outward extension when the cut line can't be sampled or the seam tangent never crosses it.
-function _extendHalfcutEndsToCutline(seam, cutline, outline, overshootPt, steps) {
+// ─── HALF-CUT ENDPOINT EXTENSION (cut-line-aligned overshoot) ──────────────────
+// SELF-CONTAINED unit, called only by syncHalfcut. The half-cut traces the caption seam
+// (the plate's inner edge submerged in the art); each end must reach the outer cut line so
+// the peel tab separates cleanly. The junction fillet (cleanCaptionJunction) pulls the cut
+// line off the old plate∩art crossing the seam used to meet, so we re-project each seam end
+// onto the CURRENT cut line and run a 1mm tail ALONG the cut-line contour (not the art
+// operand's tangent — that strays off the fused line into the art). The tail therefore
+// superimposes on the cut line: invisible unless the cut-line layer is hidden. Keep this
+// section together; nothing else depends on these helpers.
+
+// Rebuilds a raw seam polyline so each end lands on the cut line with a 1mm tail running
+// along the contour, away from the caption plate. Returns the new seam (does not mutate).
+// Falls back to a fixed outward extension when the cut line can't be sampled.
+function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps) {
     var L = seam.length;
-    if (L < 2) return;
-    var cutPolys = cutline ? samplePathToPolygons(cutline, steps) : [];
-    var artPolys = outline ? samplePathToPolygons(outline, steps) : [];
-    if (cutPolys.length === 0) {                              // can't sample cut line → legacy
+    if (L < 2) return seam;
+    var cutPoly = cutline ? _largestPoly(samplePathToPolygons(cutline, steps)) : null;
+    if (!cutPoly) {                                          // can't sample cut line → legacy
         seam[0]     = _extendPoint(seam[0],     seam[1],     overshootPt);
         seam[L - 1] = _extendPoint(seam[L - 1], seam[L - 2], overshootPt);
-        return;
+        return seam;
     }
-    var capPt = overshootPt + mmToPoints(10);                // reach a retracted shoulder, bounded
-    seam[0]     = _seamEndToCutline(seam[0],     seam[1],     cutPolys, artPolys, overshootPt, capPt);
-    seam[L - 1] = _seamEndToCutline(seam[L - 1], seam[L - 2], cutPolys, artPolys, overshootPt, capPt);
+    var plateC = _seamPlateCentroid(plate, steps);           // away-from-plate = into the body
+    var capPt  = overshootPt + mmToPoints(12);               // reach a retracted shoulder, bounded
+    var tail0 = _cutlineOvershootTail(seam[0],     seam[1],     cutPoly, plateC, overshootPt, capPt); // [P0..end0]
+    var tailN = _cutlineOvershootTail(seam[L - 1], seam[L - 2], cutPoly, plateC, overshootPt, capPt); // [PN..endN]
+
+    // end0 … P0  +  interior seam  +  PN … endN. The raw ends seam[0]/seam[L-1] are dropped;
+    // their on-contour crossings P0/PN take their place (tail*[0]).
+    var out = [], i;
+    for (i = tail0.length - 1; i >= 0; i--) out.push(tail0[i]);
+    for (i = 1; i < L - 1; i++) out.push(seam[i]);
+    for (i = 0; i < tailN.length; i++) out.push(tailN[i]);
+    return out;
 }
 
-// Re-projects one seam endpoint onto the cut line: walks the seam's end-tangent line to the
-// nearest cut-line crossing P, then returns P + overshootPt along the ART outline tangent at
-// P (oriented to continue outward). Falls back to a fixed seam-tangent extension when no
-// crossing is found within capPt.
-function _seamEndToCutline(endPt, innerPt, cutPolys, artPolys, overshootPt, capPt) {
+// One seam end → an ordered list of points [P, …, tailEnd] that all lie ON the cut line: P is
+// where the seam tangent meets the contour (or the nearest outward contour point for a
+// partial-overlap seam that ends mid-pill), then a walk of overshootPt arc length along the
+// cut-line polygon in the direction heading AWAY from the plate (into the body). So the tail
+// tracks the cut line exactly rather than diverging along the art operand's tangent.
+function _cutlineOvershootTail(endPt, innerPt, cutPoly, plateC, overshootPt, capPt) {
     var dx = endPt.x - innerPt.x, dy = endPt.y - innerPt.y;
     var len = Math.sqrt(dx * dx + dy * dy);
-    if (len < 1e-6) return { x: endPt.x, y: endPt.y };
+    if (len < 1e-6) return [{ x: endPt.x, y: endPt.y }];
     var ux = dx / len, uy = dy / len;
-    var P = _rayCutlineCross(endPt, ux, uy, cutPolys, capPt);
-    // Fallback when the seam tangent never meets the cut line (a partial-overlap seam ends
-    // mid-pill, with the real junction shoulder off the tangent): aim at the nearest cut-line
-    // point lying outward of the seam end, so the half-cut still reaches the contour.
-    if (!P) P = _nearestCutPointOutward(endPt, ux, uy, cutPolys, capPt);
-    if (!P) return _extendPoint(endPt, innerPt, overshootPt);
-    var tan = (artPolys.length > 0) ? _artTangentAt(P, artPolys) : null;
-    if (!tan) return { x: P.x + ux * overshootPt, y: P.y + uy * overshootPt };
-    if (tan.x * ux + tan.y * uy < 0) { tan = { x: -tan.x, y: -tan.y }; }   // continue outward
-    return { x: P.x + tan.x * overshootPt, y: P.y + tan.y * overshootPt };
+    var P = _rayCutlineCross(endPt, ux, uy, [cutPoly], capPt);
+    if (!P) P = _nearestCutPointOutward(endPt, ux, uy, [cutPoly], capPt);
+    if (!P) return [_extendPoint(endPt, innerPt, overshootPt)];        // no contour → fixed
+    var ei = _nearestEdgeIndex(cutPoly, P);
+    // Pick the contour direction that heads INTO THE BODY (the art cut line), not back around
+    // the pill toward the tab. Decide by PROBING ~2mm each way and taking the branch whose
+    // endpoint ends up farther from the plate centroid — the pill outer edge wraps around the
+    // plate (stays close), the body perimeter pulls away. A single next-vertex test is too
+    // local to tell these apart at the rounded shoulder.
+    var probe = Math.max(overshootPt, mmToPoints(2));
+    var fEnd = _walkCutPolyArc(cutPoly, P, ei,  1, probe);
+    var bEnd = _walkCutPolyArc(cutPoly, P, ei, -1, probe);
+    var fp = fEnd[fEnd.length - 1], bp = bEnd[bEnd.length - 1];
+    var dF = (fp.x - plateC.x) * (fp.x - plateC.x) + (fp.y - plateC.y) * (fp.y - plateC.y);
+    var dB = (bp.x - plateC.x) * (bp.x - plateC.x) + (bp.y - plateC.y) * (bp.y - plateC.y);
+    return _walkCutPolyArc(cutPoly, P, ei, (dF >= dB) ? 1 : -1, overshootPt);
+}
+
+// Walks the cut-line polygon from P (on edge edgeIdx) by `dist` arc length in stepDir
+// (+1 toward edgeIdx+1, −1 toward edgeIdx). Returns [P, intermediate verts…, finalPt],
+// all on the contour, with the final point interpolated to land exactly `dist` away.
+function _walkCutPolyArc(cutPoly, P, edgeIdx, stepDir, dist) {
+    var n = cutPoly.length, out = [{ x: P.x, y: P.y }], acc = 0;
+    var cur = { x: P.x, y: P.y };
+    var idx = (stepDir > 0) ? (edgeIdx + 1) % n : edgeIdx;
+    var guard = 0, v, sx, sy, slen, f;
+    while (acc < dist && guard < n + 1) {
+        v = cutPoly[idx];
+        sx = v.x - cur.x; sy = v.y - cur.y; slen = Math.sqrt(sx * sx + sy * sy);
+        if (slen < 1e-9) { idx = (stepDir > 0) ? (idx + 1) % n : (idx - 1 + n) % n; guard++; continue; }
+        if (acc + slen >= dist) {
+            f = (dist - acc) / slen;
+            out.push({ x: cur.x + sx * f, y: cur.y + sy * f });
+            return out;
+        }
+        out.push({ x: v.x, y: v.y });
+        acc += slen; cur = { x: v.x, y: v.y };
+        idx = (stepDir > 0) ? (idx + 1) % n : (idx - 1 + n) % n; guard++;
+    }
+    // Degenerate (ran the whole ring without reaching dist) → straight-extend the last edge.
+    if (acc < dist && out.length >= 2) {
+        var a = out[out.length - 2], bpt = out[out.length - 1];
+        var ex = bpt.x - a.x, ey = bpt.y - a.y, el = Math.sqrt(ex * ex + ey * ey);
+        if (el > 1e-9) { var r = dist - acc; out.push({ x: bpt.x + ex / el * r, y: bpt.y + ey / el * r }); }
+    }
+    return out;
+}
+
+// Index of the cut-line polygon edge nearest point P (edge between poly[i] and poly[i+1]).
+function _nearestEdgeIndex(poly, P) {
+    var n = poly.length, best = 0, bd = Infinity, i, c;
+    for (i = 0; i < n; i++) {
+        c = _ptSegClosestSq(P, poly[i], poly[(i + 1) % n]);
+        if (c.dist2 < bd) { bd = c.dist2; best = i; }
+    }
+    return best;
+}
+
+// Centroid of the caption plate (vertex mean of its largest sampled poly; bbox-centre
+// fallback) — the reference for "away from the plate" = the direction into the body.
+function _seamPlateCentroid(plate, steps) {
+    var pp = plate ? _largestPoly(samplePathToPolygons(plate, steps)) : null;
+    if (!pp || pp.length === 0) {
+        if (plate) { var b = plate.geometricBounds; return { x: (b[0] + b[2]) / 2, y: (b[1] + b[3]) / 2 }; }
+        return { x: 0, y: 0 };
+    }
+    var sx = 0, sy = 0, i;
+    for (i = 0; i < pp.length; i++) { sx += pp[i].x; sy += pp[i].y; }
+    return { x: sx / pp.length, y: sy / pp.length };
 }
 
 // Nearest cut-line sample vertex that lies OUTWARD of the seam end (positive projection on
@@ -1028,24 +1104,6 @@ function _rayCutlineCross(P, ux, uy, polys, capPt) {
         }
     }
     return best;
-}
-
-// Unit tangent of the art outline at the polygon vertex nearest P (central difference).
-function _artTangentAt(P, artPolys) {
-    var bi = -1, bp = -1, bd = Infinity, i, j, poly, dx, dy, d;
-    for (i = 0; i < artPolys.length; i++) {
-        poly = artPolys[i];
-        for (j = 0; j < poly.length; j++) {
-            dx = poly[j].x - P.x; dy = poly[j].y - P.y; d = dx * dx + dy * dy;
-            if (d < bd) { bd = d; bi = i; bp = j; }
-        }
-    }
-    if (bi < 0) return null;
-    poly = artPolys[bi]; var n = poly.length;
-    var a = poly[(bp - 1 + n) % n], c = poly[(bp + 1) % n];
-    var tx = c.x - a.x, ty = c.y - a.y, tl = Math.sqrt(tx * tx + ty * ty);
-    if (tl < 1e-6) return null;
-    return { x: tx / tl, y: ty / tl };
 }
 
 // Returns a sorted array of X values where pathItem's outline crosses targetY (AI
