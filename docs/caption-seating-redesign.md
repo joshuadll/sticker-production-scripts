@@ -103,8 +103,32 @@ Sub-cases:
 Disjoint live spans (concave art with a mid-gap): use the union of all live points for
 the fit and the kiss.
 
-→ NEXT: locating the live-span boundaries (where overhang↔contact transitions) — needs
-probing the inner edge at more than the 2 endpoints (interval scan / bisection).
+**PARKED (revisit later):** locating the live-span boundaries (overhang↔contact
+transitions) is more involved than first thought — needs probing the inner edge at more
+than the 2 endpoints (interval scan / bisection along the inner edge, distance cap `D`,
+disjoint-span handling). Leading idea: extract the art-border facing-edge **profile** in
+ONE PS pass (N probes along the inner edge, by spacing not fixed count), return
+`[{c, edge}|null]`; then live span / tilt / kiss become PURE geometry (Node-testable).
+Deferred — we first nail the NORMAL (no-overhang) path below.
+
+## Step 5 — NORMAL path (no overhang): rotation from the two border points
+
+Both inner-edge endpoints land on real border. Let:
+- `E0, E1` = inner-edge endpoints (analytic; Step 2)
+- `B0, B1` = their projections on the white border (probe; Step 3)
+
+Then:
+- **Border local tangent** = chord `B0 → B1`.
+- **Inner-edge baseline** = chord `E0 → E1`.
+- **Conform rotation** `φ` = signed angle from the inner-edge baseline to the border chord.
+- Rotate the pill rigidly by `φ` so the inner edge runs parallel to the border. (Pivot TBD.)
+
+This REPLACES PCA-over-9-bbox-columns with a **2-point chord at the pill's actual
+endpoints**: long, stable baseline, anchored to where the pill really is, no averaging,
+no bbox band. Curvature (using >2 border points across the span) is a later refinement.
+
+→ NEXT after rotation: the kiss (translate to overlap depth) on the normal path; and the
+rotation pivot choice.
 
 ## Data threading needed
 
