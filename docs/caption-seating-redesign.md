@@ -182,40 +182,33 @@ On a curved border the straight chord is an approximation: post-rotation real co
 lands at a different height than `B0/B1`, so the two endpoints won't kiss the *real*
 curve perfectly. Fine for near-flat; the profile-settle is the fix when needed.
 
-## Step 6 — overhang solution: BALANCED SHRINK (DECIDED)
+## Step 6 — overhang solution: SINGLE BALANCED SHRINK + ERROR (DECIDED)
 
-GOAL (decided earlier): mask to the live span — seat where border exists, overhang floats.
+GOAL: mask to the live span — seat where border exists, overhang floats.
 
-METHOD (DECIDED): take a shorter, CENTERED sub-segment of the inner edge — inset BOTH
-endpoints **equally** toward the midpoint `M` — and probe those two inset endpoints for
-border (their `B` points):
-- both find border → use them as the effective `E0',E1'` and run the **v1 kiss** on them
-  (pin one, rotate to align, translate + depth `d`). The pill's geometric ends float past
-  the contact.
-- either still overhangs → **shrink again** (inset both a bit more, equally).
-- shrunk below a MIN segment length with no contact → **WARN** (effectively case C).
+METHOD (DECIDED — simplest, ONE attempt):
+1. Try the full inner-edge endpoints `E0,E1` (normal v1 path).
+2. If EITHER overhangs (its probe finds no border) → ONE balanced shrink: inset BOTH ends
+   by **15% of the width** (→ a centered segment spanning 15%..85%, i.e. 70% width).
+   Re-probe the two new endpoints.
+3. Both now find border → run the **v1 kiss** on the 70% segment (pin one, rotate, translate
+   + depth `d`); the pill's geometric ends just float past the contact.
+4. Still no → **ERROR to the user** (caption too wide for the art); skip seating this caption.
 
-WHY BALANCED (not per-end): keeps the contact span symmetric about the caption center, so
-the tilt comes from a centered region and the caption stays balanced — consistent with
-Step 3A centering the caption on the element. (Per-end / asymmetric shrink REJECTED.)
+ONE attempt only — no loop, no min-length/iteration knobs. Rationale: a caption much wider
+than its art is a DESIGN problem, not something to silently rescue. Mild overhang (art ≥
+~70% of caption width, ≤15%/side) is auto-corrected by the single nudge; anything wider
+ERRORS for the operator to fix (resize caption or element).
 
-ROBUST TO IRREGULAR ART: uses point probes (the real ink edge in each slice), never a
-bounding box, so irregularity can't fool it (unlike the rejected one-shot-bounds idea).
+BALANCED (both ends 15%): keeps the seat centered — consistent with Step 3A centering the
+caption on the element.
+ROBUST TO IRREGULAR ART: point probes at the two inset endpoints, never a bounding box.
 
-KNOBS: shrink step (inset per try, ~few % of width); MIN segment length (→ warn trigger).
-
-KNOWN LIMITATION (accepted): if the live contact zone lies ENTIRELY to one side of the
-caption center, balanced shrink can't reach it → WARNS even though a seat exists. Rare
-(Step 3A centers the caption on the element → contact is normally ~centered); warn is the
-graceful fallback. Revisit only if validation shows off-center contact is common.
-
-TRADEOFF (accepted): shorter segment → shorter angle baseline → less stable tilt on
-noisy/curved borders. Fine for the rarer overhang path (the main no-overhang path keeps
-the robust full-span fit). Could fit the angle over the found segment later if needed.
-
-REJECTED alternatives: endpoint-only (blind to interior — skips middle-lands); one-shot
-bounding-box extent (fooled by irregular/notched/flared art); full per-sample slice-trace
-(robust but costlier — keep in reserve for the parked live-span/profile work).
+SCOPE: rescues overhang ≤ ~15% per side only; beyond that = ERROR (by design).
+ONE KNOB: shrink fraction = 15% (CONFIG; tune in validation).
+TRADEOFF (accepted): the 70% segment is a fixed, slightly shorter angle baseline — fine.
+REJECTED: multi-iteration shrink; endpoint-only (blind to interior); one-shot bounding-box
+extent (fooled by irregular art); per-sample slice-trace (reserve for parked profile work).
 
 ## Open / UNRESOLVED edge cases
 
