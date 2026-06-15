@@ -36,7 +36,6 @@ var CONFIG = {
     halfcutLayerName:  "Halfcut",
     halfcutStrokePt:   0.25,
     halfcutExtendMm:   1.0,
-    halfcutFollowSeam: true,
     halfcutSeamSteps:  16,
 
     // For automated testing only — suppresses alert() dialogs for headless runs.

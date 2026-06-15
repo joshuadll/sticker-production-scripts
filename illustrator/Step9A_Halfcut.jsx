@@ -44,7 +44,7 @@ function runHalfcut(doc) {
         if (result.ok) {
             placed++;
             log("[step9a] placed | " + entry.name
-                + (result.curved ? " (curved seam)" : (result.fallback ? " (straight, fallback)" : " (straight)")));
+                + (result.curved ? " (curved seam)" : " (straight)"));
         } else {
             flags.push({ name: entry.name, reason: result.reason });
             log("[step9a] FLAG | " + entry.name + " | " + result.reason);

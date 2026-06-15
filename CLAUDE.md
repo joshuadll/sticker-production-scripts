@@ -5,6 +5,13 @@
 >   to follow the border as one rigid unit (text+pill+plate), no shear; flat borders ≈ unchanged.
 > - ✅ **Half-cut engine** — confirmed: straight for flat seats / curved for tilted-curved,
 >   re-syncs through nest→normalise→export with **no duplicates**, endpoints land on the cut line.
+> - 🔧 **Half-cut REWORKED (2026-06-15, NOT yet PS-validated)**: `plateSeamPath` rewritten —
+>   old longest-inside-run → **farthest-pair over the submerged plate arc** (inner edge + both
+>   caps; drops only the outer "grab" edge; notches bridged, cap-wrap kept; short spans allowed).
+>   **Straight-chord fallback REMOVED** (`_cutlineCrossingsAtY`/`_crossingsInSubPath` deleted) —
+>   an unseated caption (not connected / fully inside / `<2` crossings) is now a HARD ERROR:
+>   `AI_ExportFinal` alerts with the element name(s) and aborts before Steps 10/11. LOCAL TODO:
+>   PS-validate seam shapes (notch/cap-wrap), regen the half-cut goldens.
 > - 🔧 **Caption seating REWORKED** (2026-06-14, NOT yet PS-validated): `seatCaptionConform`
 >   replaced — old 9-column bbox-band PCA-conform + worst-strip kiss → **analytic capsule seat**
 >   (inner edge from `spine`+`radius`; two 1px border probes; pin-E0 rotate-by-chord + depth-`d`
@@ -162,13 +169,16 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   rdpSimplify, simplifyPathItem,
   samplePathToPolygons, pointInPolygon, segmentsIntersect,
   polygonsOverlap, boundsWithin, minPolygonSetDistance,
-  parseNote, getOrCreateHalfcutLayer, drawHalfcutLine, drawHalfcutPath,
+  parseNote, getOrCreateHalfcutLayer, drawHalfcutPath,
   syncHalfcut (idempotent per-element half-cut, seam-traced via plateSeamPath; called by
     Steps 6/7B/8b/9A so the cut tracks the caption — straight seat → straight cut, curved/
     tilted seat → curved cut; each end is re-projected onto the current cut line + a 1mm tail
-    along the cut-line contour so it stays attached), plateSeamPath,
-  _cutlineCrossingsAtY (bezier ray scan+bisection; moved here from Step 9A so syncHalfcut's
-    straight-chord fallback is self-contained),
+    along the cut-line contour so it stays attached. NO fallback: an unseated caption returns
+    {ok:false} for the caller to surface as a hard error),
+  plateSeamPath (the submerged plate arc = inner edge + both caps, spanning the two
+    FARTHEST-APART plate∩art crossings; drops only the outer "grab" edge, so notches stay
+    bridged and a cap-wrap seam is kept; short spans allowed; returns null = not seated
+    → error, no flat-cut fallback),
   buildWorkingDocument (builds A4/CMYK doc + Margin/Stickers/Grid/Color Block layers, no template),
   marginRect (shared safe-area rect: documented 190×267mm working area),
   log, scriptAlert, findLayer, findPathInLayer
@@ -310,12 +320,19 @@ The half-cut is a LIVE, derived feature, not a one-shot export step: the shared
 `syncHalfcut()` (aiUtils) re-derives it from the caption seam at EVERY caption-touching
 step — Step 6 (birth), Step 7B (after the Deepnest transform is baked), Step 8b (after the
 re-Unite), and Step 9A (canonical export pass) — so it always tracks the caption. It is
-idempotent (clears its own `{name} halfcut` first). The cut follows the real seam (the arc
-of the plate submerged in the art via `plateSeamPath`): straight for a flat seat, CURVED for
-an arc/tilted seat — derived from geometry, never assumed flat (`halfcutFollowSeam`). When the
-plate isn't seated into the art it falls back to a straight chord at the plate-top junction Y
-via bezier ray intersection (`_cutlineCrossingsAtY`, coarse scan + bisection) — not a
-bounding-box approximation.
+idempotent (clears its own `{name} halfcut` first). The cut follows the real seam (the
+submerged plate arc — inner edge + both caps — via `plateSeamPath`): it spans the two
+FARTHEST-APART plate∩art crossings, dropping only the outer "grab" edge, so a notch where the
+inner edge briefly exits a concave art stays BRIDGED and a seam that wraps onto a cap is kept.
+Straight for a flat seat, CURVED for an arc/tilted seat or a cap wrap — derived from geometry,
+never assumed flat. Short spans (shallow seats) are allowed.
+
+There is **no fallback**. When the caption is not seated into the art — not connected (nothing
+inside), completely inside it (nothing outside), or `< 2` crossings — `plateSeamPath` returns
+null and `syncHalfcut` returns `{ok:false}`. `AI_ExportFinal` treats any flagged element as a
+**hard error**: it alerts the artist with the element name(s) and aborts BEFORE Steps 10/11, so
+no final file ships with a missing/broken peel tab. The artist fixes the caption seating in
+Photoshop and re-runs.
 
 ---
 

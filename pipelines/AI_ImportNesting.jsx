@@ -21,7 +21,6 @@ var CONFIG = {
     halfcutLayerName:  "Halfcut",
     halfcutStrokePt:   0.25,
     halfcutExtendMm:   1.0,
-    halfcutFollowSeam: true,
     halfcutSeamSteps:  16,
 
     // ── Art sizing ───────────────────────────────────────────────────────────

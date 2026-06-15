@@ -37,8 +37,6 @@ var CONFIG = {
     halfcutLayerName:    "Halfcut",
     halfcutStrokePt:     0.25,  // matches cut-line stroke weight
     halfcutExtendMm:     1.0,   // half-cut extends 1mm past each end of the edge (playbook spec)
-    halfcutFollowSeam:   true,  // trace the real plate∩art seam (curved when the seat is
-                                //   curved/tilted); false → legacy straight chord at plate-top Y
     halfcutSeamSteps:    16,    // bezier→polygon sampling density for the seam trace
 
     // ── Step 10: Asset Export ─────────────────────────────────────────────────
@@ -110,6 +108,24 @@ function main() {
         return;
     }
     log("[pipeline] step 9a complete | " + halfcutResult.placed + " half-cut(s) placed.");
+
+    // Half-cut is a hard gate: a flagged element means a caption could not produce a half-cut
+    // (not seated into the art — not connected, or fully inside it). Abort BEFORE Steps 10/11
+    // so no final file ships with a missing/broken peel tab; the artist fixes the seat and re-runs.
+    if (halfcutResult.flagged > 0) {
+        var hcMsg = "Half-cut ERROR — export halted.\n\n"
+            + halfcutResult.flagged + " caption(s) could not produce a half-cut:\n";
+        var hi;
+        for (hi = 0; hi < halfcutResult.flags.length; hi++) {
+            hcMsg += "  - " + halfcutResult.flags[hi].name
+                + ": " + halfcutResult.flags[hi].reason + "\n";
+        }
+        hcMsg += "\nThe caption plate must overlap the element art. Fix the seating in "
+            + "Photoshop, then re-run.\nNo final file was written.\n\nLog: " + CONFIG.logPath;
+        log("[pipeline] HALT | step 9a flagged " + halfcutResult.flagged + " element(s) — aborting before export.");
+        scriptAlert(hcMsg);
+        return;
+    }
 
     // ── Step 10: Asset Export ──────────────────────────────────────────────────
     log("[pipeline] --- Step 10: Asset Export ---");

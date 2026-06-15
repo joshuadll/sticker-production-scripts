@@ -734,16 +734,6 @@ function getOrCreateHalfcutLayer(doc) {
     return newLayer;
 }
 
-// Draws a 2-point straight PathItem on layer. Stroke: CONFIG.halfcutStrokePt, black, no fill.
-// Returns the line (callers may name it). The straight-chord fallback for syncHalfcut.
-function drawHalfcutLine(layer, x1, y1, x2, y2) {
-    var line = layer.pathItems.add();
-    line.setEntirePath([[x1, y1], [x2, y2]]);
-    line.closed = false;
-    setStrokeStyle(line, CONFIG.halfcutStrokePt, blackCmyk());
-    return line;
-}
-
 // Draws an open multi-point PathItem (the half-cut seam polyline) on layer, named
 // "{baseName} halfcut" so syncHalfcut can find + clear it on the next run. pts =
 // [{x,y}, …]. Stroke = CONFIG.halfcutStrokePt, black, no fill.
@@ -778,13 +768,14 @@ function _removeHalfcutFor(layer, baseName) {
 // this element's prior "{name} halfcut" first. GC/WC only (gated on the cutline note);
 // stamps / uncaptioned skip. The seam is the arc of the plate's outline submerged in
 // the art — straight rigid seat → a near-straight cut, arc/tilted seat → a curved cut
-// (the half-cut is derived from real geometry, never assumed flat). Returns
-// { ok, reason, curved, fallback }.
-//   opts: { extendMm, followSeam } (default from CONFIG.halfcutExtendMm / halfcutFollowSeam)
+// (the half-cut is derived from real geometry, never assumed flat). There is NO fallback:
+// an unseated caption (not connected to the art, or completely inside it) returns
+// { ok:false, reason } so the caller can surface it as a hard error. Returns
+// { ok, reason, curved }.
+//   opts: { extendMm } (default from CONFIG.halfcutExtendMm)
 function syncHalfcut(doc, group, opts) {
     opts = opts || {};
     var extendMm   = (opts.extendMm   != null) ? opts.extendMm   : CONFIG.halfcutExtendMm;
-    var followSeam = (opts.followSeam != null) ? opts.followSeam : (CONFIG.halfcutFollowSeam !== false);
 
     if (!group || group.typename !== "GroupItem") {
         return { ok: false, reason: "stamp / non-group (no caption seam)" };
@@ -799,50 +790,64 @@ function syncHalfcut(doc, group, opts) {
     var cutline = findGroupMember(group, "");
     if (!plate)   return { ok: false, reason: "plate subpath not found in group" };
     if (!cutline) return { ok: false, reason: "cutline not found in group" };
+    if (!outline) return { ok: false, reason: "outline subpath not found in group" };
 
     var hcLayer = getOrCreateHalfcutLayer(doc);
     _removeHalfcutFor(hcLayer, group.name);
 
     var ext = mmToPoints(extendMm);
 
-    // Primary: trace the real seam (the plate's inner edge submerged in the art). Build the
-    // seam with RAW ends (extendPt 0), then extend each end onto the actual cut line with a
-    // 1mm tail that RUNS ALONG the cut line — so the half-cut meets the contour even where the
-    // junction fillet has pulled it off the old plate∩art crossing, and the overshoot
-    // superimposes on the cut line (invisible against it) instead of straying off into the art.
-    // See the HALF-CUT ENDPOINT EXTENSION section. cutline is the cleaned member.
-    if (followSeam && outline) {
-        var seam = plateSeamPath(plate, outline, 0, CONFIG.halfcutSeamSteps);
-        if (seam && seam.length >= 2) {
-            seam = _extendHalfcutEndsToCutline(seam, cutline, plate, ext, CONFIG.halfcutSeamSteps);
-            drawHalfcutPath(hcLayer, seam, group.name);
-            return { ok: true, curved: seam.length > 2 };
-        }
+    // Trace the real seam (the plate's submerged arc — inner edge + caps). Build it with RAW
+    // ends (extendPt 0), then extend each end onto the actual cut line with a 1mm tail that
+    // RUNS ALONG the cut line — so the half-cut meets the contour even where the junction
+    // fillet has pulled it off the plate∩art crossing, and the overshoot superimposes on the
+    // cut line (invisible against it) instead of straying off into the art. See the HALF-CUT
+    // ENDPOINT EXTENSION section.
+    //
+    // NO fallback: a null seam means the caption is not seated into the art (not connected, or
+    // fully inside it) — a hard error for the artist to fix, not a flat-cut guess.
+    var seam = plateSeamPath(plate, outline, 0, CONFIG.halfcutSeamSteps);
+    if (!seam || seam.length < 2) {
+        return { ok: false, reason: "caption not seated into the art (not connected, or completely inside it)" };
     }
-
-    // Fallback: legacy flat chord at the plate-top junction Y (bezier-ray crossings).
-    var junctionY = plate.geometricBounds[1];
-    var crossings = _cutlineCrossingsAtY(cutline, junctionY);
-    var x1, x2;
-    if (crossings.length >= 2) {
-        x1 = crossings[0];
-        x2 = crossings[crossings.length - 1];
-    } else {
-        x1 = plate.geometricBounds[0];
-        x2 = plate.geometricBounds[2];
-    }
-    var line = drawHalfcutLine(hcLayer, x1 - ext, junctionY, x2 + ext, junctionY);
-    if (line) line.name = group.name + " halfcut";
-    return { ok: true, curved: false, fallback: true };
+    var curved = _seamCurved(seam, mmToPoints(0.12));
+    seam = _extendHalfcutEndsToCutline(seam, cutline, plate, ext, CONFIG.halfcutSeamSteps);
+    drawHalfcutPath(hcLayer, seam, group.name);
+    return { ok: true, curved: curved };
 }
 
-// Builds the half-cut seam polyline = the arc of the PLATE outline that lies INSIDE
-// the element art (the submerged inner edge), clipped to the two points where the
-// plate boundary crosses the art boundary, then extended by extendPt past each end
-// along its own tangent so both peeled flakes get a clean edge. Straight rigid seat →
-// a near-straight run (≈ the legacy chord); arc/tilted seat → a curved run. Returns
-// [{x,y}, …] (>=2 pts) or null when the plate isn't seated into the art (no inside run,
-// or fully buried) — the caller then uses the straight-chord fallback.
+// True if the polyline bows off the chord between its endpoints by more than tol (points) —
+// a flat seat traces a near-straight run, an arc/tilted seat or a cap wrap bows away. Used
+// only for the log label (straight vs curved); not load-bearing.
+function _seamCurved(pts, tol) {
+    var n = pts.length;
+    if (n < 3) return false;
+    var ax = pts[0].x, ay = pts[0].y;
+    var dx = pts[n - 1].x - ax, dy = pts[n - 1].y - ay;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-6) return false;
+    var ux = dx / len, uy = dy / len, i, px, py, perp;
+    for (i = 1; i < n - 1; i++) {
+        px = pts[i].x - ax; py = pts[i].y - ay;
+        perp = px * (-uy) + py * ux;
+        if (perp < 0) perp = -perp;
+        if (perp > tol) return true;
+    }
+    return false;
+}
+
+// Builds the half-cut seam polyline = the SUBMERGED arc of the plate boundary (the inner
+// edge plus the two caps), spanning the two FARTHEST-APART points where the plate boundary
+// crosses the art boundary. The only part dropped is the outer "grab" edge — the single
+// outside-the-art boundary segment farthest from the art centroid — so any notch where the
+// inner edge briefly pops out of a concave art stays BRIDGED inside the span, and a seam
+// that wraps onto a cap is kept. The cut follows the arc between the two extreme crossings:
+// straight for a flat seat, curved for an arc/tilted seat or a cap wrap. Short spans (a
+// shallow seat) are allowed.
+//
+// Returns [{x,y}, …] (>=2 pts), or NULL when the caption is NOT seated into the art: nothing
+// inside (not connected), nothing outside (completely inside the art), or fewer than two
+// crossings. The caller treats null as a hard error — there is no flat-cut fallback.
 function plateSeamPath(plate, outline, extendPt, steps) {
     var s = steps || 16;
     var platePolys = samplePathToPolygons(plate, s);
@@ -854,47 +859,84 @@ function plateSeamPath(plate, outline, extendPt, steps) {
     if (n < 4) return null;
 
     // Inside-art flag per plate vertex (even-odd, so art holes count as outside).
-    var inside = [], i, anyIn = false, anyOut = false;
+    var inside = [], i, countIn = 0;
     for (i = 0; i < n; i++) {
         inside[i] = _pointInPolysEO(pp[i], artPolys);
-        if (inside[i]) anyIn = true; else anyOut = true;
+        if (inside[i]) countIn++;
     }
-    if (!anyIn || !anyOut) return null;   // floating (none in) or buried (none out)
+    // Not seated: nothing inside (not connected) or nothing outside (fully buried).
+    if (countIn === 0 || countIn === n) return null;
 
-    // Longest cyclic run of inside=true. Scan 2n so a run wrapping index 0 is found whole.
-    var bestStart = -1, bestLen = 0, curStart = -1, curLen = 0, idx;
-    for (i = 0; i < 2 * n; i++) {
-        idx = i % n;
-        if (inside[idx]) {
-            if (curLen === 0) curStart = idx;
-            curLen++;
-            if (curLen > bestLen) { bestLen = curLen; bestStart = curStart; }
-        } else {
-            curLen = 0;
+    // Crossings: every adjacent (cyclic) vertex pair whose inside-state flips, bisected to the
+    // art boundary. Recorded in loop order by the edge index (between pp[edge] and pp[edge+1]).
+    var crossings = [], j, a, b;
+    for (i = 0; i < n; i++) {
+        j = (i + 1) % n;
+        if (inside[i] !== inside[j]) {
+            a = inside[i] ? pp[j] : pp[i];   // outside endpoint
+            b = inside[i] ? pp[i] : pp[j];   // inside endpoint
+            crossings.push({ edge: i, pt: _segCrossArt(a, b, artPolys) });
         }
-        if (bestLen >= n) break;
     }
-    if (bestStart < 0 || bestLen < 1) return null;
-    if (bestLen > n) bestLen = n;
+    var m = crossings.length;
+    if (m < 2) return null;   // tangent / single touch — not a real seam
 
-    var firstIn     = bestStart;
-    var lastIn      = (bestStart + bestLen - 1) % n;
-    var beforeFirst = (firstIn - 1 + n) % n;     // outside neighbour
-    var afterLast   = (lastIn + 1) % n;          // outside neighbour
-    var crossStart  = _segCrossArt(pp[beforeFirst], pp[firstIn], artPolys);
-    var crossEnd    = _segCrossArt(pp[afterLast],   pp[lastIn],  artPolys);
+    // The crossings split the loop into segments, each wholly inside or outside the art. Drop
+    // only the OUTSIDE segment whose vertices reach farthest from the art centroid (the outer
+    // grab edge); the remaining contiguous arc — inner edge + caps + any bridged notch — is
+    // the seam, running between the two crossings that bounded the dropped segment.
+    var Ca = _polyCentroidPt(_largestPoly(artPolys));
+    var grab = -1, grabDist = -1, startV, segDist;
+    for (i = 0; i < m; i++) {
+        startV = (crossings[i].edge + 1) % n;       // first vertex AFTER crossing i
+        if (inside[startV]) continue;               // keep inside segments
+        segDist = _segMaxDist2(pp, startV, crossings[(i + 1) % m].edge, n, Ca);
+        if (segDist > grabDist) { grabDist = segDist; grab = i; }
+    }
+    if (grab < 0) return null;   // no outside segment (guarded by the count check above)
 
-    var seam = [crossStart];
-    for (i = 0; i < bestLen; i++) seam.push(pp[(bestStart + i) % n]);
-    seam.push(crossEnd);
+    // Seam = crossing ending the grab segment → loop vertices → crossing starting it.
+    var startCross = (grab + 1) % m;
+    var seam = [crossings[startCross].pt];
+    var endEdge = crossings[grab].edge;
+    var v = (crossings[startCross].edge + 1) % n, guard = 0;
+    while (guard <= n) {
+        seam.push({ x: pp[v].x, y: pp[v].y });
+        if (v === endEdge) break;
+        v = (v + 1) % n;
+        guard++;
+    }
+    seam.push(crossings[grab].pt);
 
-    // Extend each end OUTWARD (away from the submerged run) past the cutline.
+    // Optional outward extension past each end (caller passes 0; cutline tail added later).
     if (extendPt > 0 && seam.length >= 2) {
         var L = seam.length;
         seam[0]     = _extendPoint(seam[0],     seam[1],     extendPt);
         seam[L - 1] = _extendPoint(seam[L - 1], seam[L - 2], extendPt);
     }
     return seam;
+}
+
+// Vertex-average centroid of a sampled polygon (good enough to rank "which segment is
+// farthest from the art"; not a true area centroid).
+function _polyCentroidPt(poly) {
+    if (!poly || poly.length === 0) return { x: 0, y: 0 };
+    var sx = 0, sy = 0, i;
+    for (i = 0; i < poly.length; i++) { sx += poly[i].x; sy += poly[i].y; }
+    return { x: sx / poly.length, y: sy / poly.length };
+}
+
+// Max squared distance from C among the loop vertices startV..endV (walked forward, cyclic).
+function _segMaxDist2(poly, startV, endV, n, C) {
+    var d = -1, v = startV, guard = 0, dx, dy, dd;
+    while (guard <= n) {
+        dx = poly[v].x - C.x; dy = poly[v].y - C.y; dd = dx * dx + dy * dy;
+        if (dd > d) d = dd;
+        if (v === endV) break;
+        v = (v + 1) % n;
+        guard++;
+    }
+    return d;
 }
 
 // Even-odd point-in-polygons test across a sampled path's subpaths (holes subtract).
@@ -1100,77 +1142,6 @@ function _rayCutlineCross(P, ux, uy, polys, capPt) {
         }
     }
     return best;
-}
-
-// Returns a sorted array of X values where pathItem's outline crosses targetY (AI
-// y-up). Handles PathItem and CompoundPathItem via coarse scan + bisection (reuses
-// _bezierPoint). Used by syncHalfcut's straight-chord fallback. Moved here from
-// Step9A so the half-cut engine is self-contained (callable from Steps 6/7B/8b/9A).
-function _cutlineCrossingsAtY(pathItem, targetY) {
-    var out = [], i;
-    if (pathItem.typename === "PathItem") {
-        _crossingsInSubPath(pathItem, targetY, out);
-    } else if (pathItem.typename === "CompoundPathItem") {
-        for (i = 0; i < pathItem.pathItems.length; i++) {
-            _crossingsInSubPath(pathItem.pathItems[i], targetY, out);
-        }
-    } else if (pathItem.typename === "GroupItem") {
-        for (i = 0; i < pathItem.pathItems.length; i++) {
-            _crossingsInSubPath(pathItem.pathItems[i], targetY, out);
-        }
-        for (i = 0; i < pathItem.compoundPathItems.length; i++) {
-            var cp = pathItem.compoundPathItems[i];
-            for (var j = 0; j < cp.pathItems.length; j++) {
-                _crossingsInSubPath(cp.pathItems[j], targetY, out);
-            }
-        }
-    }
-    out.sort(function(a, b) { return a - b; });
-    return out;
-}
-
-// Walks one PathItem's bezier segments. For each segment crossing targetY, bisects to
-// the precise X and pushes it into out[].
-function _crossingsInSubPath(subPath, targetY, out) {
-    var pts   = subPath.pathPoints;
-    var n     = pts.length;
-    var limit = subPath.closed ? n : n - 1;
-    var STEPS  = 64;
-    var BISECT = 20;
-    var i, j, k, t, lo, hi, mid, ptA, ptB, curY;
-
-    for (i = 0; i < limit; i++) {
-        var next = (i + 1) % n;
-        var p0 = pts[i].anchor;
-        var p1 = pts[i].rightDirection;
-        var p2 = pts[next].leftDirection;
-        var p3 = pts[next].anchor;
-
-        var prevY = p0[1], prevT = 0;
-
-        for (j = 1; j <= STEPS; j++) {
-            t    = j / STEPS;
-            ptA  = _bezierPoint(p0, p1, p2, p3, t);
-            curY = ptA.y;
-
-            if ((prevY > targetY) !== (curY > targetY)) {
-                lo = prevT; hi = t;
-                for (k = 0; k < BISECT; k++) {
-                    mid = (lo + hi) / 2;
-                    ptB = _bezierPoint(p0, p1, p2, p3, mid);
-                    if ((ptB.y > targetY) === (prevY > targetY)) {
-                        lo = mid;
-                    } else {
-                        hi = mid;
-                    }
-                }
-                ptB = _bezierPoint(p0, p1, p2, p3, (lo + hi) / 2);
-                out.push(ptB.x);
-            }
-            prevY = curY;
-            prevT = t;
-        }
-    }
 }
 
 // ─── PURE GEOMETRY (Step 8c QA) ───────────────────────────────────────────────

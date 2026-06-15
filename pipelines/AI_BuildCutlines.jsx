@@ -29,7 +29,6 @@ var CONFIG = {
     halfcutLayerName:    "Halfcut",
     halfcutStrokePt:     0.25,
     halfcutExtendMm:     1.0,
-    halfcutFollowSeam:   true,     // curved cut when the seat is curved/tilted
     halfcutSeamSteps:    16,
 
     // Image Trace tuning — overrides applied on top of the "Silhouettes" preset so the
