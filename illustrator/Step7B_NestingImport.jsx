@@ -181,6 +181,26 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         }
     }
 
+    // ── 5b. Re-sync each GC/WC half-cut to its final nested pose ──────────────────
+    // The half-cut tracks the caption seam; nesting only rotated/translated each cutline
+    // group, so re-derive it on the new pose (idempotent — clears its own prior output).
+    if (!CONFIG.dryRun) {
+        var hcSynced = 0, gi, gItem, gNote;
+        for (gi = 0; gi < cutlinesLayer.groupItems.length; gi++) {
+            gItem = cutlinesLayer.groupItems[gi];
+            if (gItem.parent !== cutlinesLayer) continue;
+            gNote = parseNote(gItem.note);
+            if (!gNote || (gNote.styleCode !== "GC" && gNote.styleCode !== "WC")) continue;
+            // syncHalfcut clears the prior tab BEFORE re-deriving, so a re-sync that fails to
+            // re-seat leaves NO half-cut — name the element rather than silently undercount.
+            var hcRes = syncHalfcut(doc, gItem, {});
+            if (hcRes.ok) hcSynced++;
+            else log("[step-nest] half-cut SKIP | " + gItem.name + " — " + hcRes.reason
+                + " (peel tab missing; AI_ExportFinal will hard-error until the seat is fixed)");
+        }
+        log("[step-nest] half-cut sync | " + hcSynced + " GC/WC element(s) re-synced to nested pose");
+    }
+
     // ── 6. Summary ───────────────────────────────────────────────────────────────
     // Verify art actually landed on the Stickers layer (not Cutlines): doc.placedItems
     // .add() ignores the active layer after the cutline passes, so a regression here is

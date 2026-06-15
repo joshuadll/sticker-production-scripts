@@ -89,6 +89,8 @@
 [step-nest] group-rotated 11 pair(s) by 90°
 [step-nest] irregular group placed | rotation=90° | top y=201
 [step-nest] irregular contour-fit | nested up 8pt to close the gap to 2mm.
+[step9] created halfcut layer: Halfcut
+[step-nest] half-cut sync | 21 GC/WC element(s) re-synced to nested pose
 [step-nest] art-layer-check | on Stickers: 47 / placed: 47 (art 26 + caption 21)  ok
 [step-nest] result | matched: 26 | unmatched: 0 | art placed: 26 | caption placed: 21
 Done.

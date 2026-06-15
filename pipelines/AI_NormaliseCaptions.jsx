@@ -28,9 +28,24 @@ var CONFIG = {
     // (the factor Step 7B placed it at). MUST match the import pipeline's sourceDPI.
     sourceDPI: 300,
 
-    // Bezier→polygon sampling density for finding the plate∩art contact the spec rescale
-    // pivots about (steps per path segment). Higher = truer contact centroid, slower.
-    seatSampleSteps: 12,
+    // ── Caption vector seat (aiUtils.seatPlateToOutline) ─────────────────────
+    // After the spec rescale, re-seat the plate + caption against the TRACED outline (the
+    // cut's own vector). Replaces the old contact-centroid "preserve the PS seat" scale.
+    // MUST match AI_BuildCutlines so birth and resize seat identically.
+    seatSampleSteps:     24,     // bezier→polygon density for the seat probe — keep == AI_BuildCutlines
+    seatOverlapMm:       0.1,    // ⚠ KEY KNOB: submerged depth d into the art (mm) — keep == AI_BuildCutlines
+    seatConform:         true,   // rotate the plate so its inner edge runs parallel to the outline
+    seatRotationSign:    1,      // ⚠ flip to -1 if captions tilt the WRONG way (AI y-up; getRotationMatrix)
+    maxSeatRotationDeg:  75,     // chord tilt beyond this skips rotation + flags
+    seatShrinkFrac:      0.15,   // overhang/bulge rescue inset fraction (both inner-edge ends)
+    seatBaselineEpsPt:   0.5,    // pt: shorter baselines (circular/1-char pill) skip rotation
+    captionMidProtrudeFrac: 0.25,// convex midpoint-bulge guard (fraction of pill thickness 2·r); 0 = off
+
+    // ── Half-cut (re-synced to the rescaled seam after each re-Unite) ─────────
+    halfcutLayerName:  "Halfcut",
+    halfcutStrokePt:   0.25,
+    halfcutExtendMm:   1.0,
+    halfcutSeamSteps:  16,
 
     // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,

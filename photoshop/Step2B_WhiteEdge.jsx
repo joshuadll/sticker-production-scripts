@@ -106,6 +106,16 @@ function applyWhiteEdge(doc, soLayer) {
     // this one smoothed raster, so they stay consistent. radius 0 → no-op.
     smoothSelection(CONFIG.whiteEdgeSmoothRadiusPx);
 
+    // Harden the smoothed band to a CRISP 1-bit edge before filling. smooth (and the
+    // SO's own anti-aliasing) leave a soft fringe; the caption seat (Step3B) reads its
+    // OUTERMOST pixel while Illustrator's Image Trace (Step6) cuts the ~50% contour
+    // ~3px inside — that mismatch silently eats the caption<->art overlap and detaches
+    // the caption cutline on flat-bottomed elements. Hardening at the 50% contour makes
+    // both readers agree, so the seat's overlap survives into the traced cutline (and
+    // can be small). Keeps the smoothed SHAPE; only crisps the EDGE. See
+    // memory: caption_overlap_translation_bug.
+    hardenSelection(doc);
+
     // Create white layer, fill, deselect.
     var wbcLayer  = doc.artLayers.add();
     wbcLayer.name = CONFIG.whiteEdgeLayerName;

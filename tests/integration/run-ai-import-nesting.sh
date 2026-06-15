@@ -39,7 +39,11 @@ EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ai-import-nesting-expected.txt
 # result) — the fixtures are stable committed inputs and the test never saves the
 # .ai, so each run starts from the same upright-cutline state.
 strip_variable_lines() {
-    grep -Ev "^(\[pipeline\] === AI_ImportNesting (start|done) ===|\[pipeline\] (document|SVG|art folder):|Log: )"
+    # Also drop the per-element [seat]/[halfcut] lines: they carry absolute bezier-sample
+    # coordinates (pixel-level, fixture-position-dependent) — the geometry they describe is
+    # asserted by the dedicated unit tests (test-ai-caption-seat, test-halfcut-alignment),
+    # and the COUNTS are still checked by the "half-cut sync | N" / "result | matched" lines.
+    grep -Ev "^(\[pipeline\] === AI_ImportNesting (start|done) ===|\[pipeline\] (document|SVG|art folder):|Log: |\[seat\]|\[seatdbg\]|\[halfcut\])"
 }
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────

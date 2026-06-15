@@ -1,6 +1,7 @@
 [pipeline] === AI_NormaliseCaptions start ===
 [pipeline] dryRun: false
 [pipeline] document: resize-elements.ai
+[step9] created halfcut layer: Halfcut
 [step8b] reset to spec | Bratislava Castle (WC, x0.714)
 [step8b] at spec | Spiš Castle (WC)
 [step8b] at spec | St. Martin's Cathedral (WC)

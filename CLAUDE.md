@@ -1,5 +1,50 @@
 # Sticker Production Scripts — Claude Code Context
 
+> **In-app validation status** (branch `claude/step-9a-walkthrough-je9ipa`, run 2026-06-13):
+> - ✅ **PS rotation sign** — confirmed correct (`CONFIG.seatRotationSign = 1`): captions tilt
+>   to follow the border as one rigid unit (text+pill+plate), no shear; flat borders ≈ unchanged.
+> - ✅ **Half-cut engine** — confirmed: straight for flat seats / curved for tilted-curved,
+>   re-syncs through nest→normalise→export with **no duplicates**, endpoints land on the cut line.
+> - 🔧 **Half-cut REWORKED (2026-06-15, NOT yet PS-validated)**: `plateSeamPath` rewritten —
+>   old longest-inside-run → **farthest-pair over the submerged plate arc** (inner edge + both
+>   caps; drops only the outer "grab" edge; notches bridged, cap-wrap kept; short spans allowed).
+>   **Straight-chord fallback REMOVED** (`_cutlineCrossingsAtY`/`_crossingsInSubPath` deleted) —
+>   an unseated caption (not connected / fully inside / `<2` crossings) is now a HARD ERROR:
+>   `AI_ExportFinal` alerts with the element name(s) and aborts before Steps 10/11. LOCAL TODO:
+>   PS-validate seam shapes (notch/cap-wrap), regen the half-cut goldens.
+> - 🔧 **Caption seating REWORKED** (2026-06-14, NOT yet PS-validated): `seatCaptionConform`
+>   replaced — old 9-column bbox-band PCA-conform + worst-strip kiss → **analytic capsule seat**
+>   (inner edge from `spine`+`radius`; two 1px border probes; pin-E0 rotate-by-chord + depth-`d`
+>   kiss; one 15% balanced shrink for overhang then skip-seat+flag). Unified GC/WC, no type
+>   branch. v1 = strict 2-endpoint chord (robust fit + curvature deferred). `needsReview` now
+>   fires on overhang-too-wide / chord-tilt-clamp / missing-geometry (the old `seatBandPx`
+>   even-overlap check is GONE). See **`docs/caption-seating-redesign.md`**. LOCAL TODO: re-confirm
+>   `seatRotationSign`, tune `seatShrinkFrac`/`captionBorderOverlapPx`. (PSAI Phase-1 golden
+>   regenerated 2026-06-15 to capture this seater's output.)
+> - ✅ **Caption seat MOVED to Illustrator — vector seat "Option B", validated + committed `252f0d7`
+>   (2026-06-15)**: `aiUtils.seatPlateToOutline` seats the plate against the TRACED cutline (the
+>   vector that becomes the cut), NOT the PS raster — so the overlap is real in the cut's own space
+>   (fixes flat/shallow detachment). Called at Step 6 (birth) + Step 8b (resize — which now
+>   scales-then-re-seats; `_overlapCentroid` removed). The PS `seatCaptionConform` stays as the
+>   ROUGH starting pose; the AI seat is authoritative. Algorithm = the original (inner-edge
+>   endpoints → chord rotation + 15% overhang shrink → r/2 convex-bulge guard → endpoint kiss to
+>   depth `d`) but on the REAL plate-edge polygon (`_innerEdgeVerts`), not a PCA-chord
+>   reconstruction — the chord float was the Šúľance arc-gap; an interim all-points fit caused a
+>   spurious St Elizabeth's 8° tilt (both fixed). `seatOverlapMm = 0.1`, `seatSampleSteps = 24`
+>   (both AI pipelines; do NOT raise `halfcutSeamSteps` — it overflows `setEntirePath`). Half-cut
+>   crash-proofed: seam decimated ≤400 pts + `setEntirePath`/zero-extent guards + Step 6 try/catch.
+>   P2 end-to-end on the Slovakia fixture: 22/22 peel tabs, unmatched=0, both SVGs.
+> - 🔁 **Caption-junction cut-line cleanup — REMOVED (reverted 2026-06-14)**: `cleanCaptionJunction()`
+>   and the `CONFIG.weldFilletRadiusPt` gate were removed; the export cutline is back to the raw
+>   `Unite(outline, plate)`, so the plate∩art junction may again show the boolean spike/sliver
+>   (the pre-branch behavior — intentional). The live half-cut is unchanged: `syncHalfcut`
+>   (seam-traced) with each end re-projected onto the current cut line + a 1mm tail along the
+>   cut-line contour, so peel-tab endpoints stay attached.
+> - ⬜ **Golden test logs** — behavior changed (conform seat + half-cut); 5 goldens need
+>   regenerating (see `docs/caption-junction-validation.md`). Review each diff before committing.
+>
+> Original validation plan: **`docs/caption-junction-validation.md`**.
+
 ## Language
 All scripts are ExtendScript (ES3). No let/const, no arrow functions, no template literals.
 Always wrap main() in try/catch that alerts error with line number.
@@ -38,7 +83,7 @@ sticker-production-scripts/
 │   │                                        scale plate+caption about the plate∩art CONTACT centroid
 │   │                                        (_overlapCentroid; witness fallback for thin overlaps; null →
 │   │                                        skip+warn when there's no real overlap) — this PRESERVES the
-│   │                                        seating Photoshop's snapCaptionToBorder designed (overlap depth +
+│   │                                        seating Photoshop's seatCaptionConform designed (overlap depth +
 │   │                                        angle) while fixing only the size, and can't float (pivot is inside
 │   │                                        the overlap). → re-Unite. GC pill (canonical height preserved under
 │   │                                        Model B) + WC capsule. Idempotent; run by AI_NormaliseCaptions
@@ -138,7 +183,16 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   rdpSimplify, simplifyPathItem,
   samplePathToPolygons, pointInPolygon, segmentsIntersect,
   polygonsOverlap, boundsWithin, minPolygonSetDistance,
-  parseNote, getOrCreateHalfcutLayer, drawHalfcutLine,
+  parseNote, getOrCreateHalfcutLayer, drawHalfcutPath,
+  syncHalfcut (idempotent per-element half-cut, seam-traced via plateSeamPath; called by
+    Steps 6/7B/8b/9A so the cut tracks the caption — straight seat → straight cut, curved/
+    tilted seat → curved cut; each end is re-projected onto the current cut line + a 1mm tail
+    along the cut-line contour so it stays attached. NO fallback: an unseated caption returns
+    {ok:false} for the caller to surface as a hard error),
+  plateSeamPath (the submerged plate arc = inner edge + both caps, spanning the two
+    FARTHEST-APART plate∩art crossings; drops only the outer "grab" edge, so notches stay
+    bridged and a cap-wrap seam is kept; short spans allowed; returns null = not seated
+    → error, no flat-cut fallback),
   buildWorkingDocument (builds A4/CMYK doc + Margin/Stickers/Grid/Color Block layers, no template),
   marginRect (shared safe-area rect: documented 190×267mm working area),
   log, scriptAlert, findLayer, findPathInLayer
@@ -184,12 +238,18 @@ PSAI_BuildAndExportCutlines exports (written before BridgeTalk handoff, sibling 
                               { psdWidth, psdHeight, elements: [
                                   { displayName, styleCode, left, top, right, bottom,
                                     caption: null | { lines, left, top, right, bottom,
-                                                      radius?, spine?: [{x,y}, …] } } ] }
+                                                      radius?, spine?: [{x,y}, …],
+                                                      needsReview? } } ] }
                             caption is null for stamps/uncaptioned. radius + spine are
                             present only for WC captions: the fitted White-pill capsule
                             (px). Step 6 rebuilds the real curved/tilted caption capsule
                             from them, so the cutline follows the caption; GC/stamps omit
-                            radius+spine → GC uses the parametric pill. PSAI always runs
+                            radius+spine → GC uses the parametric pill. needsReview is set by
+                            Step 3B's analytic seat (seatCaptionConform): needsReview →
+                            "{style}|{lines}|R" note → AI Layout QA seat-review badge (advisory,
+                            doesn't gate export; fires on overhang-too-wide / chord-tilt-clamp).
+                            (The old `bite` seam-endpoints were dropped — their only consumer,
+                            the AI junction fillet, was reverted.) PSAI always runs
                             Step 3B in-session, so every WC caption carries a spine (Step 6
                             relies on this). JSON (vs the old pipe-delimited text) prevents
                             delimiter collisions with caption display names.
@@ -269,8 +329,24 @@ Half-cut functional requirement: the caption plate acts as a peeling tab — the
 the caption and peels the element off the backing as a separate flake sticker. The half-cut
 must connect exactly to the outer cutline at both endpoints (where the Unite boundary
 transitions from element art to plate edge) so both pieces have clean edges when separated.
-Step 9A uses bezier ray intersection (_cutlineCrossingsAtY, coarse scan + bisection)
-to find these exact crossing points — not a bounding-box approximation.
+
+The half-cut is a LIVE, derived feature, not a one-shot export step: the shared
+`syncHalfcut()` (aiUtils) re-derives it from the caption seam at EVERY caption-touching
+step — Step 6 (birth), Step 7B (after the Deepnest transform is baked), Step 8b (after the
+re-Unite), and Step 9A (canonical export pass) — so it always tracks the caption. It is
+idempotent (clears its own `{name} halfcut` first). The cut follows the real seam (the
+submerged plate arc — inner edge + both caps — via `plateSeamPath`): it spans the two
+FARTHEST-APART plate∩art crossings, dropping only the outer "grab" edge, so a notch where the
+inner edge briefly exits a concave art stays BRIDGED and a seam that wraps onto a cap is kept.
+Straight for a flat seat, CURVED for an arc/tilted seat or a cap wrap — derived from geometry,
+never assumed flat. Short spans (shallow seats) are allowed.
+
+There is **no fallback**. When the caption is not seated into the art — not connected (nothing
+inside), completely inside it (nothing outside), or `< 2` crossings — `plateSeamPath` returns
+null and `syncHalfcut` returns `{ok:false}`. `AI_ExportFinal` treats any flagged element as a
+**hard error**: it alerts the artist with the element name(s) and aborts BEFORE Steps 10/11, so
+no final file ships with a missing/broken peel tab. The artist fixes the caption seating in
+Photoshop and re-runs.
 
 ---
 
