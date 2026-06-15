@@ -46,21 +46,17 @@ function _stashCaptionSpine(displayName, whiteLayer, spine, radius) {
 }
 
 // Seat metadata carried to PSAI's writeElementsFile, keyed by display name (PSD px):
-//   bite        — the two caption-seam endpoints (the border points B0/B1 where the
-//                 pill's inner-edge endpoints meet the art); AI maps them to fillet the
-//                 fused-cutline junction.
 //   needsReview — true when the analytic seat couldn't seat cleanly: the chord tilt
 //                 exceeded maxSeatRotationDeg, the caption overhangs the art too far to
 //                 rescue (skipped), or the capsule geometry was missing. AI's Layout QA
 //                 surfaces a review marker. (See seatCaptionConform.)
-// Absolute px, captured POST-seat — PSAI's revealAll keeps the top-left origin, so the
-// coordinates stay valid through grouping/canvas-reveal up to the sidecar write.
-var CAPTION_SEAT = {};   // displayName -> { bite:[{x,y},{x,y}]|null, needsReview:Bool }
+// (The old `bite` seam-endpoints were removed: their only consumer was the AI junction
+// fillet, which was reverted — the export cutline is back to the raw Unite(outline, plate).)
+var CAPTION_SEAT = {};   // displayName -> { needsReview:Bool }
 
 function _stashCaptionSeat(displayName, seat) {
     if (!displayName || !seat) return;
     CAPTION_SEAT[displayName] = {
-        bite:        seat.bite || null,
         needsReview: !!seat.needsReview
     };
 }
@@ -231,7 +227,7 @@ function groupStandard(doc, elementsGroup, soLayer, textLayer, groupName) {
 
     // Conform + seat: rotate text + pill so the pill's inner edge runs parallel to the
     // local border tangent, then kiss the pill into the border (falls back to the SO when
-    // no border layer exists). Returns the (rotated) spine + seat metadata (bite, review).
+    // no border layer exists). Returns the (rotated) spine + seat metadata (needsReview).
     var seat = seatCaptionConform(doc, wbcLayer ? wbcLayer : soLayer, whiteLayer,
         [textLayer, whiteLayer], whiteInfo.spine, whiteInfo.radius);
 
@@ -456,7 +452,7 @@ function _percentile(arr, p) {
 //                 centreline. Returned transformed in seat.spine (WC carries it to
 //                 Illustrator so Step 6's cutline follows the curve/tilt; GC ignores it).
 //   radius      — the capsule radius (px).
-// Returns { rotDeg, needsReview, bite:[{x,y},{x,y}]|null, spine:[{x,y}…]|null }.
+// Returns { rotDeg, needsReview, spine:[{x,y}…]|null }.
 //
 // v1 LIMITATIONS (accepted — see docs/caption-seating-redesign.md):
 //   • θ from the 2 raw endpoint probes — a pixel groove at an endpoint can tilt the
@@ -467,12 +463,12 @@ function _percentile(arr, p) {
 //     then flagging, but it does NOT make the pill follow the curve — that's still deferred.
 //
 // ⚠ PS layer.rotate sign: CONFIG.seatRotationSign multiplies the angle fed to
-//   layer.rotate() so the content rotation matches the geometric pivot correction. If
-//   captions tilt the WRONG way (or the assembly shears), flip seatRotationSign 1 → -1.
-//   The position-correction matrix is geometric and unchanged, so flipping can't break
-//   the rigid lock.
+//   layer.rotate(). If captions tilt the WRONG way in validation, flip seatRotationSign
+//   1 → -1. _rotateLayersAbout now feeds the SAME signed angle into both the content
+//   rotation AND the pivot-correction matrix, so the rigid lock holds for either sign
+//   (an earlier version hard-coded the unsigned angle in the matrix and sheared at -1).
 function seatCaptionConform(doc, refLayer, pillLayer, moveLayers, spine, radius) {
-    var seat = { rotDeg: 0, needsReview: false, bite: null,
+    var seat = { rotDeg: 0, needsReview: false,
                  spine: spine ? spine.slice(0) : null };
 
     // We work analytically from the capsule geometry; without it, leave the caption at
@@ -577,9 +573,6 @@ function seatCaptionConform(doc, refLayer, pillLayer, moveLayers, spine, radius)
         + Math.round(geom.travelIsX ? k.tx : k.ty) + "px depth="
         + CONFIG.captionBorderOverlapPx + "px");
 
-    // Seam endpoints for the AI junction fillet = the two stationary border points where
-    // the inner edge meets the art. Approximate (probe-resolution) is fine there.
-    seat.bite = [ { x: B0.x, y: B0.y }, { x: B1.x, y: B1.y } ];
     if (seat.needsReview) log("[step3B] FLAG | caption seat needs review.");
     return seat;
 }
@@ -741,7 +734,12 @@ function _translateLayers(layers, tx, ty) {
 // y-down space, matching layer.rotate(+)=clockwise (seatRotationSign hedges that).
 function _rotateLayersAbout(layers, pivot, phiDeg) {
     if (Math.abs(phiDeg) < 0.01) return;
-    var rad = phiDeg * Math.PI / 180, c = Math.cos(rad), s = Math.sin(rad);
+    // The content is rotated by CONFIG.seatRotationSign * phiDeg (the L.rotate below), so the
+    // pivot-correction matrix MUST use the SAME signed angle — otherwise, when seatRotationSign
+    // is flipped to -1, the pixels spin one way while each layer's centre is repositioned the
+    // other way, shearing the rigid text+pill+plate assembly apart. (At sign=+1 the two agree,
+    // which is why this was invisible in validation.)
+    var rad = (CONFIG.seatRotationSign * phiDeg) * Math.PI / 180, c = Math.cos(rad), s = Math.sin(rad);
     var i, L, b, cx, cy, ex, ey, nx, ny;
     for (i = 0; i < layers.length; i++) {
         L = layers[i];
@@ -1014,9 +1012,15 @@ function createPillFromRect(doc, x1, y1, x2, y2) {
 
     doc.selection.deselect();
     var midY = (y1 + y2) / 2;
-    return { layer: layer,
-             spine:  [ { x: x1 + r, y: midY }, { x: x2 - r, y: midY } ],
-             radius: r };
+    // Normal pill (width >= 2r): the spine is the straight centreline between the two cap
+    // centres, x1+r .. x2-r. For a very short caption narrower than the pill height
+    // (width < 2r), x1+r would exceed x2-r and the spine would REVERSE — flipping E0/E1 in
+    // the seat and swinging the chord angle ~180°. Collapse to a single centre point there;
+    // _innerEdgeEndpoints treats a 1-point spine as a degenerate (circular) pill → kiss-only.
+    var spine = ((x2 - x1) > 2 * r)
+        ? [ { x: x1 + r, y: midY }, { x: x2 - r, y: midY } ]
+        : [ { x: (x1 + x2) / 2, y: midY } ];
+    return { layer: layer, spine: spine, radius: r };
 }
 
 // loadLayerTransparency() is defined in psUtils.jsx.

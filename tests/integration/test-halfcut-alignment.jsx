@@ -18,7 +18,6 @@ var CONFIG = {
     logPath:           "~/Desktop/test-halfcut-alignment.log",
     suppressAlerts:    true,
     halfcutSeamSteps:  16,
-    halfcutFollowSeam: true,
     halfcutExtendMm:   1.0,
     halfcutLayerName:  "Halfcut",
     halfcutStrokePt:   0.25,

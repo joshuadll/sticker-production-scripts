@@ -191,7 +191,12 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
             if (gItem.parent !== cutlinesLayer) continue;
             gNote = parseNote(gItem.note);
             if (!gNote || (gNote.styleCode !== "GC" && gNote.styleCode !== "WC")) continue;
-            if (syncHalfcut(doc, gItem, {}).ok) hcSynced++;
+            // syncHalfcut clears the prior tab BEFORE re-deriving, so a re-sync that fails to
+            // re-seat leaves NO half-cut — name the element rather than silently undercount.
+            var hcRes = syncHalfcut(doc, gItem, {});
+            if (hcRes.ok) hcSynced++;
+            else log("[step-nest] half-cut SKIP | " + gItem.name + " — " + hcRes.reason
+                + " (peel tab missing; AI_ExportFinal will hard-error until the seat is fixed)");
         }
         log("[step-nest] half-cut sync | " + hcSynced + " GC/WC element(s) re-synced to nested pose");
     }

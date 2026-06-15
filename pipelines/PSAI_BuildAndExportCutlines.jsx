@@ -262,15 +262,13 @@ function writeElementsFile(doc) {
                 el.caption.spine  = spine.points;
             }
 
-            // Seat metadata from Step 3B's conform (bite = junction seam endpoints for the
-            // AI fillet; needsReview = uneven seat → AI Layout QA marker). Present only
-            // when seatCaptionConform stashed them; omitted otherwise (forward-compatible).
+            // Seat metadata from Step 3B's analytic seat (needsReview = couldn't seat cleanly
+            // → AI Layout QA marker). Present only when seatCaptionConform stashed it; omitted
+            // otherwise (forward-compatible). (The old `bite` seam-endpoints were dropped — their
+            // only consumer, the AI junction fillet, was reverted.)
             if (typeof CAPTION_SEAT !== "undefined") {
                 var st = CAPTION_SEAT[parsed.displayName];
-                if (st) {
-                    if (st.bite) el.caption.bite = st.bite;
-                    if (st.needsReview) el.caption.needsReview = true;
-                }
+                if (st && st.needsReview) el.caption.needsReview = true;
             }
         }
 

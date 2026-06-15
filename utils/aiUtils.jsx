@@ -613,8 +613,13 @@ function seatPlateToOutline(name, outline, plate, captionItem, opts) {
     var epsPt    = (CONFIG.seatBaselineEpsPt != null) ? CONFIG.seatBaselineEpsPt : mmToPoints(0.2);
     var rotSign  = (CONFIG.seatRotationSign  != null) ? CONFIG.seatRotationSign  : 1;
     var maxRot   = (CONFIG.maxSeatRotationDeg!= null) ? CONFIG.maxSeatRotationDeg : 75;
+    var cache    = opts.polyCache || null;
 
-    var artPolys = samplePathToPolygons(outline, steps);
+    // Outline through the per-pass cache (it is never mutated here, so syncHalfcut can reuse this
+    // exact sample when its step count matches). The plate is sampled fresh below and deliberately
+    // NOT cached — the kiss/rotate at the end of this function moves it, so a later reader must
+    // re-sample the seated pose. See _sampleCached.
+    var artPolys = _sampleCached(cache, "outline", outline, steps);
     if (!artPolys || artPolys.length === 0) {
         log("[seat] " + name + " | SKIP — no outline geometry.");
         return { ok: false, reason: "no outline geometry" };
@@ -1130,8 +1135,8 @@ function syncHalfcut(doc, group, opts) {
 
     var ext = mmToPoints(extendMm);
 
-    // Trace the real seam (the plate's submerged arc — inner edge + caps). Build it with RAW
-    // ends (extendPt 0), then extend each end onto the actual cut line with a 1mm tail that
+    // Trace the real seam (the plate's submerged arc — inner edge + caps) with RAW ends, then
+    // extend each end onto the actual cut line with a 1mm tail that
     // RUNS ALONG the cut line — so the half-cut meets the contour even where the junction
     // fillet has pulled it off the plate∩art crossing, and the overshoot superimposes on the
     // cut line (invisible against it) instead of straying off into the art. See the HALF-CUT
@@ -1139,12 +1144,23 @@ function syncHalfcut(doc, group, opts) {
     //
     // NO fallback: a null seam means the caption is not seated into the art (not connected, or
     // fully inside it) — a hard error for the artist to fix, not a flat-cut guess.
-    var seam = plateSeamPath(plate, outline, 0, CONFIG.halfcutSeamSteps);
+    //
+    // Sample the plate ONCE for this pass and thread it through BOTH the seam trace and the
+    // endpoint extension — the plate is not mutated between them, so the second sample was pure
+    // waste. The outline goes through the per-pass cache (so it can reuse the seat's sample when
+    // the step counts match). Both samples are at halfcutSeamSteps, matching the prior behaviour
+    // exactly. See _sampleCached.
+    var cache = opts.polyCache || null;
+    var steps = CONFIG.halfcutSeamSteps || 16;   // same effective default plateSeamPath applied
+    var platePolys = samplePathToPolygons(plate, steps);
+    var artPolys   = _sampleCached(cache, "outline", outline, steps);
+
+    var seam = plateSeamPath(plate, outline, steps, platePolys, artPolys);
     if (!seam || seam.length < 2) {
         return { ok: false, reason: "caption not seated into the art (not connected, or completely inside it)" };
     }
     var curved = _seamCurved(seam, mmToPoints(0.12));
-    seam = _extendHalfcutEndsToCutline(seam, cutline, plate, ext, CONFIG.halfcutSeamSteps);
+    seam = _extendHalfcutEndsToCutline(seam, cutline, plate, ext, steps, platePolys);
     if (!_seamFinite(seam)) {   // never hand setEntirePath a <2-point / non-finite / zero-extent seam
         return { ok: false, reason: "degenerate seam (too few/coincident points after extension)" };
     }
@@ -1205,10 +1221,12 @@ function _seamCurved(pts, tol) {
 // Returns [{x,y}, …] (>=2 pts), or NULL when the caption is NOT seated into the art: nothing
 // inside (not connected), nothing outside (fully buried), or no submerged inner edge. The
 // caller treats null as a hard error — there is no flat-cut fallback.
-function plateSeamPath(plate, outline, extendPt, steps) {
+function plateSeamPath(plate, outline, steps, platePolys, artPolys) {
     var s = steps || 16;
-    var platePolys = samplePathToPolygons(plate, s);
-    var artPolys   = samplePathToPolygons(outline, s);
+    // Pre-sampled polys may be threaded in (syncHalfcut samples the plate once per pass and the
+    // outline through the per-pass cache); fall back to sampling here for any direct caller.
+    if (!platePolys) platePolys = samplePathToPolygons(plate, s);
+    if (!artPolys)   artPolys   = samplePathToPolygons(outline, s);
     if (platePolys.length === 0 || artPolys.length === 0) return null;
     var pp = _largestPoly(platePolys);
     if (!pp) return null;
@@ -1225,7 +1243,10 @@ function plateSeamPath(plate, outline, extendPt, steps) {
     if (countIn === 0 || countIn === n) return null;
 
     // The inner edge as a contiguous run (cap to cap), each vertex tagged inside/outside.
-    var run = _innerEdgeRun(pp, inside);
+    // geom (plate→art bbox direction) lets _innerEdgeRun sanity-check its submersion tally
+    // against the reliable art direction — see the wrong-majority guard there.
+    var geom = _aiSeatGeometry(plate, outline);
+    var run = _innerEdgeRun(pp, inside, geom);
     if (!run) return _chordFallback(pp, inside, artPolys);   // degenerate plate shape
 
     // Submerged span: first..last inside vertex (interior notches bridged).
@@ -1244,12 +1265,8 @@ function plateSeamPath(plate, outline, extendPt, steps) {
     for (k = f; k <= l; k++) seam.push({ x: run[k].x, y: run[k].y });
     seam.push(rightEnd);
 
-    // Optional outward extension past each end (caller passes 0; cutline tail added later).
-    if (extendPt > 0 && seam.length >= 2) {
-        var L = seam.length;
-        seam[0]     = _extendPoint(seam[0],     seam[1],     extendPt);
-        seam[L - 1] = _extendPoint(seam[L - 1], seam[L - 2], extendPt);
-    }
+    // The seam ends are the raw plate∩art crossings; syncHalfcut re-projects each onto the
+    // current cut line and adds the 1mm peel-tab tail (_extendHalfcutEndsToCutline).
     return seam;
 }
 
@@ -1321,7 +1338,7 @@ function _farthestCrossingPair(crossings) {
 // ends occupy the last r of length). The remaining long-edge vertices split by side; the INNER
 // edge is the side with more submerged vertices (a majority, robust to a notch). Its vertices
 // are contiguous in the loop — return the longest such contiguous arc.
-function _innerEdgeRun(pp, inside) {
+function _innerEdgeRun(pp, inside, geom) {
     var n = pp.length, i, dx, dy;
     var cx = 0, cy = 0;
     for (i = 0; i < n; i++) { cx += pp[i].x; cy += pp[i].y; }
@@ -1361,6 +1378,23 @@ function _innerEdgeRun(pp, inside) {
     }
     if (inPos === inNeg) return null;     // can't tell which long edge is the inner one
     var sign = inPos > inNeg ? 1 : -1;
+    // Wrong-majority guard (#4): the inner edge MUST face the art. Cross-check the submerged-
+    // vertex tally against the RELIABLE art direction (geom = plate→art bbox centroids, NOT the
+    // PCA eigenvector sign, which is fragile). vTravel is this PCA's perpendicular-axis component
+    // along the travel axis; the art-facing soff side is sign(vTravel*geom.sign) — the SAME rule
+    // the seat's _innerEdgeVerts uses. On a normal seat the submerged majority already faces the
+    // art, so they AGREE and this is a no-op. They disagree only when a shallow/tilted seat over
+    // CONVEX art submerges verts onto the OUTER edge — then the tally would trace the grab edge,
+    // so trust the art direction instead. (No-op on the validated fixture; the log flags any fire.)
+    if (geom) {
+        var vTravel = geom.travelIsX ? vx : vy;
+        var artSide = (vTravel * geom.sign >= 0) ? 1 : -1;
+        if (sign !== artSide) {
+            log("[halfcut] inner-edge | submerged-vertex tally disagreed with art direction — "
+                + "trusting art direction (wrong-majority guard)");
+            sign = artSide;
+        }
+    }
     // Mark inner-edge vertices: clear of both caps AND on the inner side.
     var isInner = [];
     for (i = 0; i < n; i++) {
@@ -1433,23 +1467,27 @@ function _extendPoint(from, toward, dist) {
 // section together; nothing else depends on these helpers.
 
 // Rebuilds a raw seam polyline so each end lands on the cut line with a 1mm tail running
-// along the contour, away from the caption plate. Returns the new seam (does not mutate).
-// Falls back to a fixed outward extension when the cut line can't be sampled.
-function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps) {
+// along the contour, away from the caption plate. Returns a NEW seam (never mutates the input).
+// Falls back to a fixed outward extension when the cut line / plate can't be sampled or the
+// rebuilt tail degenerates.
+function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps, platePolys) {
     var L = seam.length;
     if (L < 2) return seam;
+    // Straight outward overshoot of both ends, on a COPY (the shared fallback for every path
+    // that can't track the contour — keeps this function non-mutating).
+    function straightOvershoot() {
+        var lg = seam.slice(0);
+        lg[0]     = _extendPoint(lg[0],     lg[1],     overshootPt);
+        lg[L - 1] = _extendPoint(lg[L - 1], lg[L - 2], overshootPt);
+        return lg;
+    }
     var cutPoly = cutline ? _largestPoly(samplePathToPolygons(cutline, steps)) : null;
-    if (!cutPoly) {                                          // can't sample cut line → legacy
-        seam[0]     = _extendPoint(seam[0],     seam[1],     overshootPt);
-        seam[L - 1] = _extendPoint(seam[L - 1], seam[L - 2], overshootPt);
-        return seam;
-    }
-    var platePoly = plate ? _largestPoly(samplePathToPolygons(plate, steps)) : null;
-    if (!platePoly) {                                        // can't sample plate → legacy
-        seam[0]     = _extendPoint(seam[0],     seam[1],     overshootPt);
-        seam[L - 1] = _extendPoint(seam[L - 1], seam[L - 2], overshootPt);
-        return seam;
-    }
+    if (!cutPoly) return straightOvershoot();               // can't sample cut line → legacy
+    // Reuse the plate polys syncHalfcut already sampled this pass (no mutation since), else sample.
+    var platePoly = platePolys ? _largestPoly(platePolys)
+                  : (plate ? _largestPoly(samplePathToPolygons(plate, steps)) : null);
+    if (!platePoly) return straightOvershoot();             // can't sample plate → legacy
+
     var tail0 = _cutlineOvershootTail(seam[0],     seam[1],     cutPoly, platePoly, overshootPt); // [P0..end0]
     var tailN = _cutlineOvershootTail(seam[L - 1], seam[L - 2], cutPoly, platePoly, overshootPt); // [PN..endN]
 
@@ -1459,12 +1497,7 @@ function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps) {
     for (i = tail0.length - 1; i >= 0; i--) out.push(tail0[i]);
     for (i = 1; i < L - 1; i++) out.push(seam[i]);
     for (i = 0; i < tailN.length; i++) out.push(tailN[i]);
-    if (!_seamFinite(out)) {                 // cut-line tail degenerated → simple straight overshoot
-        var lg = seam.slice(0);
-        lg[0]     = _extendPoint(lg[0],     lg[1],     overshootPt);
-        lg[L - 1] = _extendPoint(lg[L - 1], lg[L - 2], overshootPt);
-        return lg;
-    }
+    if (!_seamFinite(out)) return straightOvershoot();      // cut-line tail degenerated → legacy
     return out;
 }
 
@@ -1525,7 +1558,24 @@ function _cutlineOvershootTail(endPt, innerPt, cutPoly, platePoly, overshootPt) 
     var fp = fEnd[fEnd.length - 1], bp = bEnd[bEnd.length - 1];
     var dF = _minDist2ToPolyEdges(fp, platePoly);
     var dB = _minDist2ToPolyEdges(bp, platePoly);
-    return _walkCutPolyArc(cutPoly, P, ei, (dF >= dB) ? 1 : -1, overshootPt);
+    // Clear winner: the endpoint farther from the plate is the body branch (the tab branch hugs
+    // the plate edge, distance ~0). Unchanged from the prior behaviour.
+    var dir;
+    if (Math.abs(Math.sqrt(dF) - Math.sqrt(dB)) >= mmToPoints(0.5)) {
+        dir = (dF >= dB) ? 1 : -1;
+    } else {
+        // Near-tie (#8): on a small element the ~2mm probe can wrap past the body region, so the
+        // two endpoints sit ~equidistant from the plate and a single endpoint can't separate the
+        // branches — the bare `dF >= dB` then defaults to +1, which may be the TAB side. Integrate
+        // distance-to-plate over the WHOLE walk instead: the tab branch hugs the plate edge the
+        // entire way (~0), the body branch peels away, so the summed distance decides. Only fires
+        // on a genuine tie; clear winners above are byte-identical to before.
+        var sF = _sumDist2ToPoly(fEnd, platePoly), sB = _sumDist2ToPoly(bEnd, platePoly);
+        dir = (sF >= sB) ? 1 : -1;
+        log("[halfcut] overshoot tail | near-tie on direction — broke by integrated "
+            + "distance-to-plate (" + (dir > 0 ? "fwd" : "back") + ")");
+    }
+    return _walkCutPolyArc(cutPoly, P, ei, dir, overshootPt);
 }
 
 // Nearest point on a polygon's OUTLINE to pt: { x, y, edge } (edge = index i of segment i..i+1).
@@ -1548,6 +1598,15 @@ function _minDist2ToPolyEdges(pt, poly) {
         if (c.dist2 < best) best = c.dist2;
     }
     return best;
+}
+
+// Sum of squared distances from each point of a walk to a polygon's OUTLINE. The tie-break
+// signal for the overshoot direction: a contour walk that hugs the plate edge sums ~0; one
+// that peels into the body sums large. Pure geometry.
+function _sumDist2ToPoly(pts, poly) {
+    var s = 0, i;
+    for (i = 0; i < pts.length; i++) s += _minDist2ToPolyEdges(pts[i], poly);
+    return s;
 }
 
 // Walks the cut-line polygon from P (on edge edgeIdx) by `dist` arc length in stepDir
@@ -1578,16 +1637,6 @@ function _walkCutPolyArc(cutPoly, P, edgeIdx, stepDir, dist) {
         if (el > 1e-9) { var r = dist - acc; out.push({ x: bpt.x + ex / el * r, y: bpt.y + ey / el * r }); }
     }
     return out;
-}
-
-// Index of the cut-line polygon edge nearest point P (edge between poly[i] and poly[i+1]).
-function _nearestEdgeIndex(poly, P) {
-    var n = poly.length, best = 0, bd = Infinity, i, c;
-    for (i = 0; i < n; i++) {
-        c = _ptSegClosestSq(P, poly[i], poly[(i + 1) % n]);
-        if (c.dist2 < bd) { bd = c.dist2; best = i; }
-    }
-    return best;
 }
 
 // ─── PURE GEOMETRY (Step 8c QA) ───────────────────────────────────────────────
@@ -1677,6 +1726,31 @@ function samplePathToPolygons(item, stepsPerSeg) {
             for (var m = 0; m < gp.length; m++) polys.push(gp[m]);
         }
     }
+    return polys;
+}
+
+// Per-pass polygon cache around samplePathToPolygons — the dominant DOM cost in ExtendScript
+// (it walks every bezier segment stepsPerSeg times). Within ONE per-element pipeline pass the
+// seat and the half-cut sample the same traced paths repeatedly; threading a small cache object
+// (created by the caller, e.g. Step 6 / Step 8b) lets each (path, step-count) be sampled once.
+//
+// Keyed by slot AND step count, so the seat's denser sample (CONFIG.seatSampleSteps) and the
+// half-cut's coarser one (CONFIG.halfcutSeamSteps) never alias: a cached result is reused ONLY
+// when the requested density matches, so it is always geometrically identical to a fresh sample
+// (the optimisation can never change output). With the default config the counts differ, so the
+// outline is still sampled once per density; if they are ever unified the reuse kicks in for free.
+//
+// cache may be null/undefined (then this is a plain sample). The returned polys are treated as
+// read-only by every consumer, so sharing the reference is safe. CAUTION: never cache a path the
+// same pass then MUTATES under a step count a later reader will request — the seat sidesteps this
+// by caching only the never-mutated outline (it re-rotates/translates the plate, which is why the
+// plate is sampled fresh after seating rather than served from this cache).
+function _sampleCached(cache, slot, item, steps) {
+    if (!cache) return samplePathToPolygons(item, steps);
+    var key = slot + "|" + steps;
+    if (cache[key]) return cache[key];
+    var polys = samplePathToPolygons(item, steps);
+    cache[key] = polys;
     return polys;
 }
 

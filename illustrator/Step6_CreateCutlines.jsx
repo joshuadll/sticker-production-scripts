@@ -373,7 +373,13 @@ function _buildSeparableCutline(doc, layer, element, elementOutline,
     // guarantee (Image Trace cuts ~1-3px inside the raster edge it was seated against).
     // The caption PNG isn't placed until Step 7B, so only the plate moves here; Step 8b
     // re-seats plate + caption together after a rescale. See aiUtils.seatPlateToOutline.
-    var seat = seatPlateToOutline(element.displayName, elementOutline, plate, null, {});
+    //
+    // One polygon cache per element pass, shared by the seat and the half-cut (both sample the
+    // same traced outline/plate). It lets the never-mutated outline be sampled once and the plate
+    // once per pose; the cache is step-keyed, so the seat (seatSampleSteps) and half-cut
+    // (halfcutSeamSteps) densities never alias and output is unchanged. See aiUtils._sampleCached.
+    var polyCache = {};
+    var seat = seatPlateToOutline(element.displayName, elementOutline, plate, null, { polyCache: polyCache });
     if (!seat.ok) {
         log("[step6] seat | " + element.displayName + " NOT seated (" + seat.reason
             + ") — the half-cut will hard-error at export until the caption is fixed.");
@@ -385,16 +391,21 @@ function _buildSeparableCutline(doc, layer, element, elementOutline,
     var grp = assembleElementGroup(layer, element.displayName, elementOutline, plate, cutline);
 
     // Stash caption spec for Step 8b (Caption Normalisation), which has no sidecar.
-    // Format: "{styleCode}|{capLines}" (+ "|R" when PS flagged the seat for review) —
-    // e.g. "GC|2" or "WC|1|R". Step 8c/AI_LayoutQA surfaces the review marker.
-    grp.note = element.styleCode + "|" + cap.lines + (cap.needsReview ? "|R" : "");
+    // Format: "{styleCode}|{capLines}" (+ "|R" when the seat was flagged for review) —
+    // e.g. "GC|2" or "WC|1|R". Step 8c/AI_LayoutQA surfaces the review marker. The flag is
+    // OR'd from BOTH the PS rough-pose seat (cap.needsReview, via the sidecar) AND the
+    // authoritative AI vector seat (seat.needsReview) — the AI seat measures the real cut
+    // geometry, so its review judgement (overhang / tilt-clamp / residual convex bulge)
+    // must reach the badge too, not just the PS pre-seat's.
+    grp.note = element.styleCode + "|" + cap.lines
+        + ((cap.needsReview || (seat && seat.needsReview)) ? "|R" : "");
 
     // Draw the half-cut at birth so it's visible from the first cutline review and
     // tracks the caption through nesting/normalise (each step re-syncs it). GC/WC only.
     // Never let one element's half-cut abort the whole Step 6 — a genuinely unseated caption
     // is surfaced as a hard error at AI_ExportFinal, not by crashing cutline creation.
     try {
-        var hcRes = syncHalfcut(doc, grp, {});
+        var hcRes = syncHalfcut(doc, grp, { polyCache: polyCache });
         if (hcRes && !hcRes.ok) {
             log("[step6] half-cut SKIP | " + element.displayName + " — " + hcRes.reason);
         }

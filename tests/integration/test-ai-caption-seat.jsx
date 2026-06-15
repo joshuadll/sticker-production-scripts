@@ -149,8 +149,8 @@ assertClose("kiss horizontal ty", kx.ty, 0);
 // --- _aiMidProtrusion (convex bulge, p = sagitta + depth) — PS twin ------------
 
 testLog("[ai-seat-test] --- _aiMidProtrusion ---");
-// Plate below (sign +1): facing edge = art top; a convex bulge rises toward the pill
-// (smaller y) -> positive sagitta. Bm 10 below the B0/B1 chord toward the pill.
+// Plate below the art (sign +1): the art's facing edge is its BOTTOM; a convex bulge dips
+// toward the pill (smaller y) -> positive sagitta. Bm 10 below the B0/B1 chord toward the pill.
 assertClose("below convex bulge -> 10 + 3 = 13",
     _aiMidProtrusion({x:0,y:100}, {x:100,y:100}, {x:50,y:90}, gBelow, 3), 13);
 // Flat -> p == depth.

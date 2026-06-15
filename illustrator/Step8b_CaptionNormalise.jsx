@@ -129,18 +129,31 @@ function runCaptionNormalise(doc) {
         // contact to preserve the PS seat" trick (and its no-overlap skip): the seat — overlap
         // depth + tilt — is now re-established here, in the cut's own space, so resize and
         // seating are decoupled. See aiUtils.seatPlateToOutline / docs/caption-seating-redesign.md.
-        var seat = seatPlateToOutline(group.name, outline, plate, caption, {});
+        //
+        // Per-element polygon cache shared by the seat and the half-cut, so the never-mutated
+        // outline is sampled once and the plate once per pose (step-keyed → output unchanged).
+        // See aiUtils._sampleCached.
+        var polyCache = {};
+        var seat = seatPlateToOutline(group.name, outline, plate, caption, { polyCache: polyCache });
         if (!seat.ok) {
             log("[step8b] seat | " + group.name + " NOT seated (" + seat.reason
                 + ") — re-Unite + half-cut will surface it.");
+        }
+        // The AI seat is authoritative here; carry its review flag onto the cutline note so
+        // Step 8c / AI_LayoutQA badges it (Step 6's note only knew the PS pre-seat's flag).
+        if (seat.needsReview && group.note && String(group.note).indexOf("|R") < 0) {
+            group.note = group.note + "|R";
         }
 
         // Re-derive the fused cutline from the seated spec plate + (artist-scaled) outline.
         reuniteCutline(group, outline, plate, CONFIG.cutlineStrokePt);
 
         // Re-sync the half-cut to the rescaled seam (idempotent). Only the reset path
-        // reaches here — atSpec groups 'continue' above, so no redundant work.
-        syncHalfcut(doc, group, {});
+        // reaches here — atSpec groups 'continue' above, so no redundant work. syncHalfcut
+        // clears the prior tab before re-deriving, so surface a failed re-sync (no peel tab)
+        // instead of dropping it — AI_ExportFinal will hard-error on it later regardless.
+        var hcRes = syncHalfcut(doc, group, { polyCache: polyCache });
+        if (!hcRes.ok) log("[step8b] half-cut SKIP | " + group.name + " — " + hcRes.reason);
 
         log("[step8b] reset to spec | " + group.name + " (" + styleCode
             + ", x" + unscale.toFixed(3) + ")");
