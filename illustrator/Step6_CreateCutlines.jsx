@@ -366,6 +366,19 @@ function _buildSeparableCutline(doc, layer, element, elementOutline,
                            data, pngLeft, pngTop, pngWidth, pngHeight);
         plate = buildPlate(layer, aiBounds);
     }
+
+    // Authoritatively seat the plate against the TRACED outline (the same vector that
+    // becomes the cut) before the Unite, so the overlap is real in the cut's own space —
+    // this is what fixes the flat/shallow-seat detachment that the PS raster seat can't
+    // guarantee (Image Trace cuts ~1-3px inside the raster edge it was seated against).
+    // The caption PNG isn't placed until Step 7B, so only the plate moves here; Step 8b
+    // re-seats plate + caption together after a rescale. See aiUtils.seatPlateToOutline.
+    var seat = seatPlateToOutline(element.displayName, elementOutline, plate, null, {});
+    if (!seat.ok) {
+        log("[step6] seat | " + element.displayName + " NOT seated (" + seat.reason
+            + ") — the half-cut will hard-error at export until the caption is fixed.");
+    }
+
     var cutline = deriveCutline(elementOutline, plate);
 
     strokeRecursive(cutline, CONFIG.cutlineStrokePt, blackCmyk());
@@ -378,6 +391,15 @@ function _buildSeparableCutline(doc, layer, element, elementOutline,
 
     // Draw the half-cut at birth so it's visible from the first cutline review and
     // tracks the caption through nesting/normalise (each step re-syncs it). GC/WC only.
-    syncHalfcut(doc, grp, {});
+    // Never let one element's half-cut abort the whole Step 6 — a genuinely unseated caption
+    // is surfaced as a hard error at AI_ExportFinal, not by crashing cutline creation.
+    try {
+        var hcRes = syncHalfcut(doc, grp, {});
+        if (hcRes && !hcRes.ok) {
+            log("[step6] half-cut SKIP | " + element.displayName + " — " + hcRes.reason);
+        }
+    } catch (eHc) {
+        log("[step6] half-cut ERROR | " + element.displayName + " (line " + eHc.line + "): " + eHc.message);
+    }
 }
 

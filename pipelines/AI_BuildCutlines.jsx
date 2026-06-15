@@ -31,6 +31,31 @@ var CONFIG = {
     halfcutExtendMm:     1.0,
     halfcutSeamSteps:    16,
 
+    // ── Caption vector seat (aiUtils.seatPlateToOutline) ─────────────────────
+    // Authoritatively seats the plate against the TRACED outline (the cut's own vector)
+    // before the Unite, so the overlap is real in the cut's space — fixes the flat/shallow
+    // detachment the PS raster seat can't guarantee. Ported from Step3B's seatCaptionConform
+    // (inner-edge endpoints → rotate to chord → kiss to depth), edge probe swapped to vector.
+    seatOverlapMm:       0.1,    // ⚠ KEY KNOB: submerged depth d of the inner edge into the art.
+                                 //     In vector space this is the REAL overlap (no trace inset to
+                                 //     eat it), so it can be small — raise if a caption reads detached,
+                                 //     lower if it sits too far in. 0.1mm validated with seatSampleSteps=24.
+    seatSampleSteps:     24,     // bezier→polygon density for the SEAT probe (per segment). THIS is the
+                                 //     floor lever: a finer polygon lets the seat measure the true curve,
+                                 //     so a shallow 0.1mm overlap lands accurately. (Do NOT raise
+                                 //     halfcutSeamSteps for this — that only densifies the seam and
+                                 //     overflows setEntirePath; the seam is decimated to <=400 anyway.)
+    seatConform:         true,   // rotate the plate so its inner edge runs parallel to the outline
+    seatRotationSign:    1,      // ⚠ flip to -1 if captions tilt the WRONG way in validation
+                                 //     (hedges app.getRotationMatrix's direction; AI is y-up)
+    maxSeatRotationDeg:  75,     // anti-degenerate cap: a chord tilt beyond this skips rotation + flags
+    seatBaselineEpsPt:   0.5,    // pt: baselines shorter than this (circular/1-char pill) skip rotation
+    seatShrinkFrac:      0.15,   // overhang + convex-bulge rescue: inset both inner-edge ends by this
+                                 //     fraction along the REAL boundary (also trims a rising corner off the ends)
+    captionMidProtrudeFrac: 0.25,// convex-bulge guard: if the art protrudes into the pill at the inner-edge
+                                 //     midpoint by more than this·2r (= r/2), relieve with one shrink, else flag
+    seatDebug:           false,  // true → verbose [seatdbg] per-element trace (E0/B0 + inArt)
+
     // Image Trace tuning — overrides applied on top of the "Silhouettes" preset so the
     // cutline HUGS the silhouette edge. The preset is built to *simplify* (clean solid
     // shapes), which rounds concave detail and sits the line loose; these push it back
