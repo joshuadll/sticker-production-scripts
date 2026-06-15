@@ -1000,10 +1000,15 @@ function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps) {
         seam[L - 1] = _extendPoint(seam[L - 1], seam[L - 2], overshootPt);
         return seam;
     }
-    var plateC = _seamPlateCentroid(plate, steps);           // away-from-plate = into the body
+    var platePoly = plate ? _largestPoly(samplePathToPolygons(plate, steps)) : null;
+    if (!platePoly) {                                        // can't sample plate → legacy
+        seam[0]     = _extendPoint(seam[0],     seam[1],     overshootPt);
+        seam[L - 1] = _extendPoint(seam[L - 1], seam[L - 2], overshootPt);
+        return seam;
+    }
     var capPt  = overshootPt + mmToPoints(12);               // reach a retracted shoulder, bounded
-    var tail0 = _cutlineOvershootTail(seam[0],     seam[1],     cutPoly, plateC, overshootPt, capPt); // [P0..end0]
-    var tailN = _cutlineOvershootTail(seam[L - 1], seam[L - 2], cutPoly, plateC, overshootPt, capPt); // [PN..endN]
+    var tail0 = _cutlineOvershootTail(seam[0],     seam[1],     cutPoly, platePoly, overshootPt, capPt); // [P0..end0]
+    var tailN = _cutlineOvershootTail(seam[L - 1], seam[L - 2], cutPoly, platePoly, overshootPt, capPt); // [PN..endN]
 
     // end0 … P0  +  interior seam  +  PN … endN. The raw ends seam[0]/seam[L-1] are dropped;
     // their on-contour crossings P0/PN take their place (tail*[0]).
@@ -1019,7 +1024,7 @@ function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps) {
 // partial-overlap seam that ends mid-pill), then a walk of overshootPt arc length along the
 // cut-line polygon in the direction heading AWAY from the plate (into the body). So the tail
 // tracks the cut line exactly rather than diverging along the art operand's tangent.
-function _cutlineOvershootTail(endPt, innerPt, cutPoly, plateC, overshootPt, capPt) {
+function _cutlineOvershootTail(endPt, innerPt, cutPoly, platePoly, overshootPt, capPt) {
     var dx = endPt.x - innerPt.x, dy = endPt.y - innerPt.y;
     var len = Math.sqrt(dx * dx + dy * dy);
     if (len < 1e-6) return [{ x: endPt.x, y: endPt.y }];
@@ -1030,16 +1035,28 @@ function _cutlineOvershootTail(endPt, innerPt, cutPoly, plateC, overshootPt, cap
     var ei = _nearestEdgeIndex(cutPoly, P);
     // Pick the contour direction that heads INTO THE BODY (the art cut line), not back around
     // the pill toward the tab. Decide by PROBING ~2mm each way and taking the branch whose
-    // endpoint ends up farther from the plate centroid — the pill outer edge wraps around the
-    // plate (stays close), the body perimeter pulls away. A single next-vertex test is too
-    // local to tell these apart at the rounded shoulder.
+    // endpoint ends up farther from the PLATE OUTLINE: the pill/cap branch runs along the
+    // plate's own edge and stays ~on it (distance ≈ 0), while the body branch peels away from
+    // it (distance grows). Distance-to-outline separates the two even at a rounded cap, where
+    // distance-to-CENTRE fails — a cap point is far from the plate centre yet still on its edge.
     var probe = Math.max(overshootPt, mmToPoints(2));
     var fEnd = _walkCutPolyArc(cutPoly, P, ei,  1, probe);
     var bEnd = _walkCutPolyArc(cutPoly, P, ei, -1, probe);
     var fp = fEnd[fEnd.length - 1], bp = bEnd[bEnd.length - 1];
-    var dF = (fp.x - plateC.x) * (fp.x - plateC.x) + (fp.y - plateC.y) * (fp.y - plateC.y);
-    var dB = (bp.x - plateC.x) * (bp.x - plateC.x) + (bp.y - plateC.y) * (bp.y - plateC.y);
+    var dF = _minDist2ToPolyEdges(fp, platePoly);
+    var dB = _minDist2ToPolyEdges(bp, platePoly);
     return _walkCutPolyArc(cutPoly, P, ei, (dF >= dB) ? 1 : -1, overshootPt);
+}
+
+// Minimum squared distance from a point to a polygon's OUTLINE (its edges, not its interior).
+function _minDist2ToPolyEdges(pt, poly) {
+    if (!poly || poly.length < 2) return 0;
+    var best = 1e15, i, n = poly.length, c;
+    for (i = 0; i < n; i++) {
+        c = _ptSegClosestSq(pt, poly[i], poly[(i + 1) % n]);
+        if (c.dist2 < best) best = c.dist2;
+    }
+    return best;
 }
 
 // Walks the cut-line polygon from P (on edge edgeIdx) by `dist` arc length in stepDir
@@ -1080,19 +1097,6 @@ function _nearestEdgeIndex(poly, P) {
         if (c.dist2 < bd) { bd = c.dist2; best = i; }
     }
     return best;
-}
-
-// Centroid of the caption plate (vertex mean of its largest sampled poly; bbox-centre
-// fallback) — the reference for "away from the plate" = the direction into the body.
-function _seamPlateCentroid(plate, steps) {
-    var pp = plate ? _largestPoly(samplePathToPolygons(plate, steps)) : null;
-    if (!pp || pp.length === 0) {
-        if (plate) { var b = plate.geometricBounds; return { x: (b[0] + b[2]) / 2, y: (b[1] + b[3]) / 2 }; }
-        return { x: 0, y: 0 };
-    }
-    var sx = 0, sy = 0, i;
-    for (i = 0; i < pp.length; i++) { sx += pp[i].x; sy += pp[i].y; }
-    return { x: sx / pp.length, y: sy / pp.length };
 }
 
 // Nearest cut-line sample vertex that lies OUTWARD of the seam end (positive projection on
