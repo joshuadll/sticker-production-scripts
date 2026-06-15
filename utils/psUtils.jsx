@@ -75,6 +75,31 @@ function smoothSelection(radiusPx) {
     executeAction(charIDToTypeID("Smth"), desc, DialogModes.NO);
 }
 
+// Hardens the active selection to a CRISP, 1-bit edge (at its ~50%-coverage
+// boundary). A selection off loadLayerTransparency + expand + smooth is
+// ANTI-ALIASED — its boundary fades over a few pixels. Two downstream readers then
+// disagree on where that fuzzy edge "is": the caption seat (Step3B _probeBorder)
+// reads the OUTERMOST covered pixel, while Illustrator's Image Trace (Step6) cuts
+// the ~50% coverage contour ~3px further in. That gap silently swallows the
+// caption<->art overlap and detaches the caption cutline on flat-bottomed elements
+// (the Tatra-chamois failure). Hardening removes the fuzz so BOTH readers land on
+// the same crisp contour and the seat's overlap translates 1:1 into the traced
+// cutline — letting the overlap budget stay small. Verified: a crisp white edge is
+// preserved faithfully through the silhouette build (no erosion). See
+// memory: caption_overlap_translation_bug.
+//
+// Method = path round-trip. A channel-Threshold leaves a soft band, and a fill of
+// an anti-aliased selection is itself anti-aliased, so neither crisps the result.
+// Converting the selection to a vector work path and back with anti-aliasing OFF
+// rasterises a genuinely hard (0px-fringe) selection. makeWorkPath follows the
+// ~50% contour (tolerance in px); makeSelection(antiAlias=false) makes it crisp.
+function hardenSelection(doc) {
+    doc.selection.makeWorkPath(0.5);
+    var wp = doc.pathItems[doc.pathItems.length - 1];
+    wp.makeSelection(0, false, SelectionType.REPLACE);   // feather 0, antiAlias OFF
+    try { wp.remove(); } catch (e) {}
+}
+
 // Returns true if the element should receive a caption (WC and GC styles only).
 function needsCaption(parsed) {
     if (!parsed) return false;
