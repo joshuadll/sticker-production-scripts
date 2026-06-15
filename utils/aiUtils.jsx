@@ -844,25 +844,29 @@ function _seamCurved(pts, tol) {
     return false;
 }
 
-// Builds the half-cut seam polyline = the caption plate's INNER EDGE (its submerged long
-// side), spanning the two FARTHEST-APART points where the plate boundary crosses the art
-// boundary. Both rounded CAPS and the outer "grab" edge are EXCLUDED, so the cut follows the
-// inner edge only and never wraps a cap — it stays a clean monotone run (the back-and-forth
-// "cap dip" spike is impossible by construction). A genuine concave-art notch between the two
-// end crossings is BRIDGED straight, because the cut follows the plate edge, not the art's
-// dent. Straight for a flat/tilted seat; curved only if the plate's spine is genuinely
-// curved. Short spans (a shallow seat) are allowed.
+// Builds the half-cut seam polyline = the SUBMERGED SPAN of the caption plate's INNER EDGE.
+// Both rounded CAPS and the outer "grab" edge are excluded, so the cut follows the inner edge
+// only and never wraps a cap (the back-and-forth "cap dip" spike is impossible by construction).
 //
-// Inner-edge isolation (_innerEdgeRun): the plate is a capsule, so its PCA long axis locates
-// the two caps (boundary within one radius of each axis extreme) and the two long edges (the
-// rest, split by side); the inner edge is the long edge with more of its vertices submerged
-// in the art. If that isolation degenerates (near-circular plate, ambiguous inner side) the
-// seam falls back to a straight chord between the two end crossings — still spike-free and on
-// the submerged side. (That is a shape-degeneracy guard, NOT the removed not-seated fallback.)
+// The endpoint selection is confined to the inner edge — it can't be hijacked by a stray
+// crossing on a cap or the outer edge:
+//   • Isolate the inner edge as a contiguous run of the plate boundary, each vertex tagged
+//     inside/outside the art (_innerEdgeRun).
+//   • Take the SUBMERGED sub-span: first..last inside vertex. Any interior exposed stretch (a
+//     notch) is bridged straight — so an arbitrary NUMBER of art intersections is handled by
+//     construction, not just two.
+//   • Each end is where the edge surfaces from the art (_seamWaterline): on the inner edge for
+//     a shallow seat (the edge end pokes out), or around on the CAP for a deep seat (the whole
+//     edge is buried, so the surfacing point is on the rounded end).
+// Straight for a flat/tilted seat; curved only if the plate's spine is genuinely curved.
+//
+// Degenerate plate (near-circular / ambiguous inner side) → a straight chord between the two
+// farthest crossings (still spike-free, on the submerged side) — a shape-degeneracy guard, NOT
+// the removed not-seated fallback.
 //
 // Returns [{x,y}, …] (>=2 pts), or NULL when the caption is NOT seated into the art: nothing
-// inside (not connected), nothing outside (completely inside the art), or fewer than two
-// crossings. The caller treats null as a hard error — there is no flat-cut fallback.
+// inside (not connected), nothing outside (fully buried), or no submerged inner edge. The
+// caller treats null as a hard error — there is no flat-cut fallback.
 function plateSeamPath(plate, outline, extendPt, steps) {
     var s = steps || 16;
     var platePolys = samplePathToPolygons(plate, s);
@@ -882,37 +886,25 @@ function plateSeamPath(plate, outline, extendPt, steps) {
     // Not seated: nothing inside (not connected) or nothing outside (fully buried).
     if (countIn === 0 || countIn === n) return null;
 
-    // Crossings: every adjacent (cyclic) vertex pair whose inside-state flips, bisected to the
-    // art boundary. Recorded in loop order by the edge index (between pp[edge] and pp[edge+1]).
-    var crossings = [], j, a, b;
-    for (i = 0; i < n; i++) {
-        j = (i + 1) % n;
-        if (inside[i] !== inside[j]) {
-            a = inside[i] ? pp[j] : pp[i];   // outside endpoint
-            b = inside[i] ? pp[i] : pp[j];   // inside endpoint
-            crossings.push({ edge: i, pt: _segCrossArt(a, b, artPolys) });
-        }
-    }
-    var m = crossings.length;
-    if (m < 2) return null;   // tangent / single touch — not a real seam
+    // The inner edge as a contiguous run (cap to cap), each vertex tagged inside/outside.
+    var run = _innerEdgeRun(pp, inside);
+    if (!run) return _chordFallback(pp, inside, artPolys);   // degenerate plate shape
 
-    // The two FARTHEST-APART crossings are the seat ends — where the caption emerges from the
-    // art on each side. The half-cut runs between them along the plate's submerged inner edge.
-    var ends = _farthestCrossingPair(crossings);
-    var P = crossings[ends.i].pt, Q = crossings[ends.j].pt;
-
-    // Inner-edge vertices (caps trimmed, outer grab edge dropped), ordered P-end → Q-end.
-    // Bracket them with the two end crossings so the seam lands exactly on the art boundary at
-    // each end. Degenerate plate → straight chord P→Q (still on the submerged inner side).
-    var innerRun = _innerEdgeRun(pp, artPolys, inside, P, Q);
-    var seam;
-    if (innerRun && innerRun.length > 0) {
-        seam = [P];
-        for (i = 0; i < innerRun.length; i++) seam.push(innerRun[i]);
-        seam.push(Q);
-    } else {
-        seam = [P, Q];
+    // Submerged span: first..last inside vertex (interior notches bridged).
+    var f = -1, l = -1, k;
+    for (k = 0; k < run.length; k++) {
+        if (run[k].inside) { if (f < 0) f = k; l = k; }
     }
+    if (f < 0) return null;   // inner edge fully exposed → not seated as a peel tab
+
+    // Each end = where the edge surfaces from the art (inner edge if shallow, cap if deep).
+    var leftEnd  = _seamWaterline(pp, inside, artPolys, run, f, -1);
+    var rightEnd = _seamWaterline(pp, inside, artPolys, run, l,  1);
+    if (!leftEnd || !rightEnd) return null;
+
+    var seam = [leftEnd];
+    for (k = f; k <= l; k++) seam.push({ x: run[k].x, y: run[k].y });
+    seam.push(rightEnd);
 
     // Optional outward extension past each end (caller passes 0; cutline tail added later).
     if (extendPt > 0 && seam.length >= 2) {
@@ -921,6 +913,49 @@ function plateSeamPath(plate, outline, extendPt, steps) {
         seam[L - 1] = _extendPoint(seam[L - 1], seam[L - 2], extendPt);
     }
     return seam;
+}
+
+// One seam endpoint = where the inner edge surfaces from the art, on the side away from the
+// submerged span. run[k] is the first (dir -1) or last (dir +1) submerged vertex.
+//   • Shallow seat: the neighbouring run vertex (run[k+dir]) is exposed → the edge surfaces
+//     ON the inner edge; bisect that segment to the art border.
+//   • Deep seat: run[k] is the run's end (no neighbour that way) → the whole inner edge is
+//     buried; walk the plate loop onto the CAP (step = dir) to the first crossing and bisect.
+// Returns {x,y} or null.
+function _seamWaterline(pp, inside, artPolys, run, k, dir) {
+    var nb = k + dir;
+    if (nb >= 0 && nb < run.length) {                         // shallow: surfaces on the edge
+        return _segCrossArt({ x: run[nb].x, y: run[nb].y },   // exposed neighbour (run[k±1])
+                            { x: run[k].x,  y: run[k].y },     // submerged run[k]
+                            artPolys);
+    }
+    var nn = pp.length, cur = run[k].idx, guard = 0, nx;       // deep: walk onto the cap
+    while (guard < nn) {
+        nx = (cur + dir + nn) % nn;
+        if (inside[cur] !== inside[nx]) {
+            return _segCrossArt(inside[cur] ? pp[nx] : pp[cur],
+                                inside[cur] ? pp[cur] : pp[nx], artPolys);
+        }
+        cur = nx; guard++;
+    }
+    return null;
+}
+
+// Shape-degeneracy fallback: a straight chord between the two farthest plate∩art crossings.
+// Used only when _innerEdgeRun can't split a near-circular plate. Returns [P,Q] or null (<2).
+function _chordFallback(pp, inside, artPolys) {
+    var n = pp.length, crossings = [], i, j, a, b;
+    for (i = 0; i < n; i++) {
+        j = (i + 1) % n;
+        if (inside[i] !== inside[j]) {
+            a = inside[i] ? pp[j] : pp[i];
+            b = inside[i] ? pp[i] : pp[j];
+            crossings.push({ pt: _segCrossArt(a, b, artPolys) });
+        }
+    }
+    if (crossings.length < 2) return null;
+    var e = _farthestCrossingPair(crossings);
+    return [crossings[e.i].pt, crossings[e.j].pt];
 }
 
 // Indices {i,j} of the two crossings that are farthest apart (the seat ends).
@@ -937,18 +972,18 @@ function _farthestCrossingPair(crossings) {
     return { i: bi, j: bj };
 }
 
-// Isolates the plate's submerged INNER EDGE as an ordered vertex list running from near P to
-// near Q (the two seat-end crossings), with both rounded caps trimmed off and the outer grab
-// edge dropped — so the half-cut never wraps a cap. Returns [{x,y}, …] or null when the
-// capsule geometry can't be split cleanly (caller falls back to a P→Q chord).
+// Isolates the plate's INNER EDGE as a CONTIGUOUS run of the boundary loop, one cap to the
+// other: [{x, y, idx, inside}, …] in plate-loop order, where idx is the vertex's index in pp
+// and inside is whether it's submerged in the art. Returns null when the capsule can't be split
+// (near-circular / ambiguous inner side) → caller chords it. Carries no seat info: the caller
+// finds the submerged sub-span and the surfacing endpoints itself.
 //
-// Method: PCA gives the capsule's long axis u (perpendicular v) through the vertex centroid C,
-// and r = half the perpendicular extent. A vertex is on a CAP when its axis projection is
-// within r of either extreme (the semicircular ends occupy the last r of length). Of the
-// remaining (long-edge) vertices, the INNER edge is the side with more vertices submerged in
-// the art (a per-vertex majority, robust to a notch that locally exposes the inner edge);
-// keep that side, ordered along u, oriented P→Q.
-function _innerEdgeRun(pp, artPolys, inside, P, Q) {
+// Method: PCA gives the long axis u (perpendicular v) through the vertex centroid. A vertex is
+// on a CAP when its axis projection is within one radius r of either extreme (the semicircular
+// ends occupy the last r of length). The remaining long-edge vertices split by side; the INNER
+// edge is the side with more submerged vertices (a majority, robust to a notch). Its vertices
+// are contiguous in the loop — return the longest such contiguous arc.
+function _innerEdgeRun(pp, inside) {
     var n = pp.length, i, dx, dy;
     var cx = 0, cy = 0;
     for (i = 0; i < n; i++) { cx += pp[i].x; cy += pp[i].y; }
@@ -988,33 +1023,26 @@ function _innerEdgeRun(pp, artPolys, inside, P, Q) {
     }
     if (inPos === inNeg) return null;     // can't tell which long edge is the inner one
     var sign = inPos > inNeg ? 1 : -1;
-    // Inner-edge vertices: clear of both caps (axis projection > r from each end) AND on the
-    // inner side. Carry the axis coordinate so we can order along the edge. Also clip to the
-    // axial span between the two seat-end crossings P,Q — so a tilted/asymmetric seat can't
-    // include inner-edge vertices BEYOND a crossing (which would fold back as a spike).
-    var tP = (P.x - cx) * ux + (P.y - cy) * uy;
-    var tQ = (Q.x - cx) * ux + (Q.y - cy) * uy;
-    var loT = tP < tQ ? tP : tQ, hiT = tP < tQ ? tQ : tP;
-    var run = [];
+    // Mark inner-edge vertices: clear of both caps AND on the inner side.
+    var isInner = [];
     for (i = 0; i < n; i++) {
-        if (t[i] <= tmin + r || t[i] >= tmax - r) continue;   // a cap vertex
-        if (soff[i] * sign <= 0) continue;                    // the outer long edge
-        if (t[i] < loT || t[i] > hiT) continue;               // beyond a seat-end crossing
-        run.push({ x: pp[i].x, y: pp[i].y, t: t[i] });
+        isInner[i] = (t[i] > tmin + r && t[i] < tmax - r && soff[i] * sign > 0);
     }
-    if (run.length < 1) return null;
-    run.sort(function (g, h) { return g.t - h.t; });
-    var out = [], k;
-    for (k = 0; k < run.length; k++) out.push({ x: run[k].x, y: run[k].y });
-    // Orient P → Q: reverse if the run starts nearer Q.
-    if (_dist2(out[0], P) > _dist2(out[0], Q)) out.reverse();
-    return out;
-}
-
-// Squared distance between two {x,y} points.
-function _dist2(a, b) {
-    var dx = a.x - b.x, dy = a.y - b.y;
-    return dx * dx + dy * dy;
+    // Longest contiguous cyclic arc of inner-edge vertices (one capsule side).
+    var bestStart = -1, bestLen = 0, len, j2, guard;
+    for (i = 0; i < n; i++) {
+        if (!isInner[i] || isInner[(i - 1 + n) % n]) continue;   // i starts a fresh arc
+        len = 0; j2 = i; guard = 0;
+        while (isInner[j2] && guard < n) { len++; j2 = (j2 + 1) % n; guard++; }
+        if (len > bestLen) { bestLen = len; bestStart = i; }
+    }
+    if (bestStart < 0) return null;
+    var run = [], idx = bestStart, c;
+    for (c = 0; c < bestLen; c++) {
+        run.push({ x: pp[idx].x, y: pp[idx].y, idx: idx, inside: inside[idx] });
+        idx = (idx + 1) % n;
+    }
+    return run;
 }
 
 // Even-odd point-in-polygons test across a sampled path's subpaths (holes subtract).
