@@ -1084,9 +1084,8 @@ function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps) {
         seam[L - 1] = _extendPoint(seam[L - 1], seam[L - 2], overshootPt);
         return seam;
     }
-    var capPt  = overshootPt + mmToPoints(12);               // reach a retracted shoulder, bounded
-    var tail0 = _cutlineOvershootTail(seam[0],     seam[1],     cutPoly, platePoly, overshootPt, capPt); // [P0..end0]
-    var tailN = _cutlineOvershootTail(seam[L - 1], seam[L - 2], cutPoly, platePoly, overshootPt, capPt); // [PN..endN]
+    var tail0 = _cutlineOvershootTail(seam[0],     seam[1],     cutPoly, platePoly, overshootPt); // [P0..end0]
+    var tailN = _cutlineOvershootTail(seam[L - 1], seam[L - 2], cutPoly, platePoly, overshootPt); // [PN..endN]
 
     // end0 … P0  +  interior seam  +  PN … endN. The raw ends seam[0]/seam[L-1] are dropped;
     // their on-contour crossings P0/PN take their place (tail*[0]).
@@ -1098,19 +1097,20 @@ function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps) {
 }
 
 // One seam end → an ordered list of points [P, …, tailEnd] that all lie ON the cut line: P is
-// where the seam tangent meets the contour (or the nearest outward contour point for a
-// partial-overlap seam that ends mid-pill), then a walk of overshootPt arc length along the
-// cut-line polygon in the direction heading AWAY from the plate (into the body). So the tail
-// tracks the cut line exactly rather than diverging along the art operand's tangent.
-function _cutlineOvershootTail(endPt, innerPt, cutPoly, platePoly, overshootPt, capPt) {
-    var dx = endPt.x - innerPt.x, dy = endPt.y - innerPt.y;
-    var len = Math.sqrt(dx * dx + dy * dy);
-    if (len < 1e-6) return [{ x: endPt.x, y: endPt.y }];
-    var ux = dx / len, uy = dy / len;
-    var P = _rayCutlineCross(endPt, ux, uy, [cutPoly], capPt);
-    if (!P) P = _nearestCutPointOutward(endPt, ux, uy, [cutPoly], capPt);
-    if (!P) return [_extendPoint(endPt, innerPt, overshootPt)];        // no contour → fixed
-    var ei = _nearestEdgeIndex(cutPoly, P);
+// the nearest point on the contour to the seam end (= the junction), then a walk of overshootPt
+// arc length along the cut-line polygon in the direction heading AWAY from the plate (into the
+// body). So the tail tracks the cut line exactly rather than diverging along the art tangent.
+function _cutlineOvershootTail(endPt, innerPt, cutPoly, platePoly, overshootPt) {
+    // Anchor the tail at the junction by projecting the seam end to the NEAREST point on the cut
+    // line — NOT by shooting a ray along the seam tangent. The seam runs along the pill edge, so
+    // its tangent is nearly parallel to the cut line at the junction; a ray SKIMS and lands the
+    // anchor far away on a stretch that hugs the plate, where both probe branches read ~0 and the
+    // branch test below degenerates to an arbitrary tie. Nearest-point keeps the anchor at the
+    // crossing, where one branch clearly leaves the plate.
+    var Pn = _nearestPointOnPoly(endPt, cutPoly);
+    if (!Pn) return [_extendPoint(endPt, innerPt, overshootPt)];       // no contour → fixed
+    var P = { x: Pn.x, y: Pn.y };
+    var ei = Pn.edge;
     // Pick the contour direction that heads INTO THE BODY (the art cut line), not back around
     // the pill toward the tab. Decide by PROBING ~2mm each way and taking the branch whose
     // endpoint ends up farther from the PLATE OUTLINE: the pill/cap branch runs along the
@@ -1124,6 +1124,17 @@ function _cutlineOvershootTail(endPt, innerPt, cutPoly, platePoly, overshootPt, 
     var dF = _minDist2ToPolyEdges(fp, platePoly);
     var dB = _minDist2ToPolyEdges(bp, platePoly);
     return _walkCutPolyArc(cutPoly, P, ei, (dF >= dB) ? 1 : -1, overshootPt);
+}
+
+// Nearest point on a polygon's OUTLINE to pt: { x, y, edge } (edge = index i of segment i..i+1).
+function _nearestPointOnPoly(pt, poly) {
+    if (!poly || poly.length < 2) return null;
+    var bd = 1e15, bx = 0, by = 0, bi = 0, i, n = poly.length, c;
+    for (i = 0; i < n; i++) {
+        c = _ptSegClosestSq(pt, poly[i], poly[(i + 1) % n]);
+        if (c.dist2 < bd) { bd = c.dist2; bx = c.qx; by = c.qy; bi = i; }
+    }
+    return { x: bx, y: by, edge: bi };
 }
 
 // Minimum squared distance from a point to a polygon's OUTLINE (its edges, not its interior).
@@ -1173,55 +1184,6 @@ function _nearestEdgeIndex(poly, P) {
     for (i = 0; i < n; i++) {
         c = _ptSegClosestSq(P, poly[i], poly[(i + 1) % n]);
         if (c.dist2 < bd) { bd = c.dist2; best = i; }
-    }
-    return best;
-}
-
-// Nearest cut-line sample vertex that lies OUTWARD of the seam end (positive projection on
-// the seam tangent) and within capPt. The half-cut-reach fallback for partial-overlap seams.
-function _nearestCutPointOutward(endPt, ux, uy, polys, capPt) {
-    var best = null, bd = Infinity, cap2 = capPt * capPt, i, j, poly, v, rx, ry, d2;
-    for (i = 0; i < polys.length; i++) {
-        poly = polys[i];
-        for (j = 0; j < poly.length; j++) {
-            v = poly[j];
-            rx = v.x - endPt.x; ry = v.y - endPt.y;
-            if (rx * ux + ry * uy < 1.0) continue;     // must be outward of the seam end
-            d2 = rx * rx + ry * ry;
-            if (d2 > cap2) continue;
-            if (d2 < bd) { bd = d2; best = { x: v.x, y: v.y }; }
-        }
-    }
-    return best;
-}
-
-// Nearest crossing of the line through P (direction ±(ux,uy)) with the cut-line polygons,
-// found by even-odd inside-test sign change + bisection, picking the crossing closest to P
-// (searches both directions). Returns {x,y} or null. Used to land a half-cut end on the
-// cut line regardless of which side of it the raw seam endpoint fell.
-function _rayCutlineCross(P, ux, uy, polys, capPt) {
-    var step = 0.5, base = _pointInPolysEO(P, polys);
-    var best = null, bestAbs = Infinity, s, sgn, prevIn, prevT, kk, t, p2, ins, b, lo, hi, loIn, mid, mp, mi, ct;
-    for (s = 0; s < 2; s++) {
-        sgn = (s === 0) ? 1 : -1;
-        prevIn = base; prevT = 0;
-        for (kk = 1; kk * step <= capPt; kk++) {
-            t = sgn * kk * step;
-            p2 = { x: P.x + ux * t, y: P.y + uy * t };
-            ins = _pointInPolysEO(p2, polys);
-            if (ins !== prevIn) {
-                lo = prevT; hi = t; loIn = prevIn;
-                for (b = 0; b < 20; b++) {
-                    mid = (lo + hi) / 2; mp = { x: P.x + ux * mid, y: P.y + uy * mid };
-                    mi = _pointInPolysEO(mp, polys);
-                    if (mi === loIn) lo = mid; else hi = mid;
-                }
-                ct = (lo + hi) / 2;
-                if (Math.abs(ct) < bestAbs) { bestAbs = Math.abs(ct); best = { x: P.x + ux * ct, y: P.y + uy * ct }; }
-                break;
-            }
-            prevIn = ins; prevT = t;
-        }
     }
     return best;
 }
