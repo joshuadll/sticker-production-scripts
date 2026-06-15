@@ -813,8 +813,16 @@ function syncHalfcut(doc, group, opts) {
     var curved = _seamCurved(seam, mmToPoints(0.12));
     seam = _extendHalfcutEndsToCutline(seam, cutline, plate, ext, CONFIG.halfcutSeamSteps);
     drawHalfcutPath(hcLayer, seam, group.name);
+    var e0 = seam[0], eN = seam[seam.length - 1];
+    log("[halfcut] " + group.name + " | pts=" + seam.length
+        + " end0=(" + _r1(e0.x) + "," + _r1(e0.y) + ")"
+        + " endN=(" + _r1(eN.x) + "," + _r1(eN.y) + ")"
+        + (curved ? " curved" : " straight"));
     return { ok: true, curved: curved };
 }
+
+// Rounds to 0.1 for compact log coordinates.
+function _r1(x) { return Math.round(x * 10) / 10; }
 
 // True if the polyline bows off the chord between its endpoints by more than tol (points) —
 // a flat seat traces a near-straight run, an arc/tilted seat or a cap wrap bows away. Used
@@ -836,14 +844,21 @@ function _seamCurved(pts, tol) {
     return false;
 }
 
-// Builds the half-cut seam polyline = the SUBMERGED arc of the plate boundary (the inner
-// edge plus the two caps), spanning the two FARTHEST-APART points where the plate boundary
-// crosses the art boundary. The only part dropped is the outer "grab" edge — the single
-// outside-the-art boundary segment farthest from the art centroid — so any notch where the
-// inner edge briefly pops out of a concave art stays BRIDGED inside the span, and a seam
-// that wraps onto a cap is kept. The cut follows the arc between the two extreme crossings:
-// straight for a flat seat, curved for an arc/tilted seat or a cap wrap. Short spans (a
-// shallow seat) are allowed.
+// Builds the half-cut seam polyline = the caption plate's INNER EDGE (its submerged long
+// side), spanning the two FARTHEST-APART points where the plate boundary crosses the art
+// boundary. Both rounded CAPS and the outer "grab" edge are EXCLUDED, so the cut follows the
+// inner edge only and never wraps a cap — it stays a clean monotone run (the back-and-forth
+// "cap dip" spike is impossible by construction). A genuine concave-art notch between the two
+// end crossings is BRIDGED straight, because the cut follows the plate edge, not the art's
+// dent. Straight for a flat/tilted seat; curved only if the plate's spine is genuinely
+// curved. Short spans (a shallow seat) are allowed.
+//
+// Inner-edge isolation (_innerEdgeRun): the plate is a capsule, so its PCA long axis locates
+// the two caps (boundary within one radius of each axis extreme) and the two long edges (the
+// rest, split by side); the inner edge is the long edge with more of its vertices submerged
+// in the art. If that isolation degenerates (near-circular plate, ambiguous inner side) the
+// seam falls back to a straight chord between the two end crossings — still spike-free and on
+// the submerged side. (That is a shape-degeneracy guard, NOT the removed not-seated fallback.)
 //
 // Returns [{x,y}, …] (>=2 pts), or NULL when the caption is NOT seated into the art: nothing
 // inside (not connected), nothing outside (completely inside the art), or fewer than two
@@ -881,32 +896,23 @@ function plateSeamPath(plate, outline, extendPt, steps) {
     var m = crossings.length;
     if (m < 2) return null;   // tangent / single touch — not a real seam
 
-    // The crossings split the loop into segments, each wholly inside or outside the art. Drop
-    // only the OUTSIDE segment whose vertices reach farthest from the art centroid (the outer
-    // grab edge); the remaining contiguous arc — inner edge + caps + any bridged notch — is
-    // the seam, running between the two crossings that bounded the dropped segment.
-    var Ca = _polyCentroidPt(_largestPoly(artPolys));
-    var grab = -1, grabDist = -1, startV, segDist;
-    for (i = 0; i < m; i++) {
-        startV = (crossings[i].edge + 1) % n;       // first vertex AFTER crossing i
-        if (inside[startV]) continue;               // keep inside segments
-        segDist = _segMaxDist2(pp, startV, crossings[(i + 1) % m].edge, n, Ca);
-        if (segDist > grabDist) { grabDist = segDist; grab = i; }
-    }
-    if (grab < 0) return null;   // no outside segment (guarded by the count check above)
+    // The two FARTHEST-APART crossings are the seat ends — where the caption emerges from the
+    // art on each side. The half-cut runs between them along the plate's submerged inner edge.
+    var ends = _farthestCrossingPair(crossings);
+    var P = crossings[ends.i].pt, Q = crossings[ends.j].pt;
 
-    // Seam = crossing ending the grab segment → loop vertices → crossing starting it.
-    var startCross = (grab + 1) % m;
-    var seam = [crossings[startCross].pt];
-    var endEdge = crossings[grab].edge;
-    var v = (crossings[startCross].edge + 1) % n, guard = 0;
-    while (guard <= n) {
-        seam.push({ x: pp[v].x, y: pp[v].y });
-        if (v === endEdge) break;
-        v = (v + 1) % n;
-        guard++;
+    // Inner-edge vertices (caps trimmed, outer grab edge dropped), ordered P-end → Q-end.
+    // Bracket them with the two end crossings so the seam lands exactly on the art boundary at
+    // each end. Degenerate plate → straight chord P→Q (still on the submerged inner side).
+    var innerRun = _innerEdgeRun(pp, artPolys, inside, P, Q);
+    var seam;
+    if (innerRun && innerRun.length > 0) {
+        seam = [P];
+        for (i = 0; i < innerRun.length; i++) seam.push(innerRun[i]);
+        seam.push(Q);
+    } else {
+        seam = [P, Q];
     }
-    seam.push(crossings[grab].pt);
 
     // Optional outward extension past each end (caller passes 0; cutline tail added later).
     if (extendPt > 0 && seam.length >= 2) {
@@ -917,26 +923,98 @@ function plateSeamPath(plate, outline, extendPt, steps) {
     return seam;
 }
 
-// Vertex-average centroid of a sampled polygon (good enough to rank "which segment is
-// farthest from the art"; not a true area centroid).
-function _polyCentroidPt(poly) {
-    if (!poly || poly.length === 0) return { x: 0, y: 0 };
-    var sx = 0, sy = 0, i;
-    for (i = 0; i < poly.length; i++) { sx += poly[i].x; sy += poly[i].y; }
-    return { x: sx / poly.length, y: sy / poly.length };
+// Indices {i,j} of the two crossings that are farthest apart (the seat ends).
+function _farthestCrossingPair(crossings) {
+    var m = crossings.length, bi = 0, bj = (m > 1 ? 1 : 0), best = -1, i, j, dx, dy, d;
+    for (i = 0; i < m; i++) {
+        for (j = i + 1; j < m; j++) {
+            dx = crossings[i].pt.x - crossings[j].pt.x;
+            dy = crossings[i].pt.y - crossings[j].pt.y;
+            d = dx * dx + dy * dy;
+            if (d > best) { best = d; bi = i; bj = j; }
+        }
+    }
+    return { i: bi, j: bj };
 }
 
-// Max squared distance from C among the loop vertices startV..endV (walked forward, cyclic).
-function _segMaxDist2(poly, startV, endV, n, C) {
-    var d = -1, v = startV, guard = 0, dx, dy, dd;
-    while (guard <= n) {
-        dx = poly[v].x - C.x; dy = poly[v].y - C.y; dd = dx * dx + dy * dy;
-        if (dd > d) d = dd;
-        if (v === endV) break;
-        v = (v + 1) % n;
-        guard++;
+// Isolates the plate's submerged INNER EDGE as an ordered vertex list running from near P to
+// near Q (the two seat-end crossings), with both rounded caps trimmed off and the outer grab
+// edge dropped — so the half-cut never wraps a cap. Returns [{x,y}, …] or null when the
+// capsule geometry can't be split cleanly (caller falls back to a P→Q chord).
+//
+// Method: PCA gives the capsule's long axis u (perpendicular v) through the vertex centroid C,
+// and r = half the perpendicular extent. A vertex is on a CAP when its axis projection is
+// within r of either extreme (the semicircular ends occupy the last r of length). Of the
+// remaining (long-edge) vertices, the INNER edge is the side with more vertices submerged in
+// the art (a per-vertex majority, robust to a notch that locally exposes the inner edge);
+// keep that side, ordered along u, oriented P→Q.
+function _innerEdgeRun(pp, artPolys, inside, P, Q) {
+    var n = pp.length, i, dx, dy;
+    var cx = 0, cy = 0;
+    for (i = 0; i < n; i++) { cx += pp[i].x; cy += pp[i].y; }
+    cx /= n; cy /= n;
+    // Covariance → principal (long) axis u and perpendicular v.
+    var sxx = 0, syy = 0, sxy = 0;
+    for (i = 0; i < n; i++) {
+        dx = pp[i].x - cx; dy = pp[i].y - cy;
+        sxx += dx * dx; syy += dy * dy; sxy += dx * dy;
     }
-    return d;
+    var theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    var ux = Math.cos(theta), uy = Math.sin(theta);
+    var vx = -uy, vy = ux;
+    // Project every vertex: t along u, soff along v. Axis span + perpendicular half-extent r.
+    var t = [], soff = [], tmin = 1e15, tmax = -1e15, smin = 1e15, smax = -1e15, tt, ss;
+    for (i = 0; i < n; i++) {
+        dx = pp[i].x - cx; dy = pp[i].y - cy;
+        tt = dx * ux + dy * uy; ss = dx * vx + dy * vy;
+        t[i] = tt; soff[i] = ss;
+        if (tt < tmin) tmin = tt;
+        if (tt > tmax) tmax = tt;
+        if (ss < smin) smin = ss;
+        if (ss > smax) smax = ss;
+    }
+    var r = (smax - smin) / 2;
+    if (r <= 1e-6) return null;
+    // Too short to hold two caps plus a straight edge (near-circular) → caller chords it.
+    if ((tmax - tmin) <= 2 * r * 1.05) return null;
+    // Inner side = the long edge (non-cap vertices, split by sign of soff) with more of its
+    // vertices submerged in the art. Counting beats a single midpoint probe, which can land in
+    // a notch and read the wrong side. Caps excluded so they don't skew the tally.
+    var inPos = 0, inNeg = 0;
+    for (i = 0; i < n; i++) {
+        if (t[i] <= tmin + r || t[i] >= tmax - r) continue;   // skip caps
+        if (!inside[i]) continue;
+        if (soff[i] > 0) inPos++; else inNeg++;
+    }
+    if (inPos === inNeg) return null;     // can't tell which long edge is the inner one
+    var sign = inPos > inNeg ? 1 : -1;
+    // Inner-edge vertices: clear of both caps (axis projection > r from each end) AND on the
+    // inner side. Carry the axis coordinate so we can order along the edge. Also clip to the
+    // axial span between the two seat-end crossings P,Q — so a tilted/asymmetric seat can't
+    // include inner-edge vertices BEYOND a crossing (which would fold back as a spike).
+    var tP = (P.x - cx) * ux + (P.y - cy) * uy;
+    var tQ = (Q.x - cx) * ux + (Q.y - cy) * uy;
+    var loT = tP < tQ ? tP : tQ, hiT = tP < tQ ? tQ : tP;
+    var run = [];
+    for (i = 0; i < n; i++) {
+        if (t[i] <= tmin + r || t[i] >= tmax - r) continue;   // a cap vertex
+        if (soff[i] * sign <= 0) continue;                    // the outer long edge
+        if (t[i] < loT || t[i] > hiT) continue;               // beyond a seat-end crossing
+        run.push({ x: pp[i].x, y: pp[i].y, t: t[i] });
+    }
+    if (run.length < 1) return null;
+    run.sort(function (g, h) { return g.t - h.t; });
+    var out = [], k;
+    for (k = 0; k < run.length; k++) out.push({ x: run[k].x, y: run[k].y });
+    // Orient P → Q: reverse if the run starts nearer Q.
+    if (_dist2(out[0], P) > _dist2(out[0], Q)) out.reverse();
+    return out;
+}
+
+// Squared distance between two {x,y} points.
+function _dist2(a, b) {
+    var dx = a.x - b.x, dy = a.y - b.y;
+    return dx * dx + dy * dy;
 }
 
 // Even-odd point-in-polygons test across a sampled path's subpaths (holes subtract).
