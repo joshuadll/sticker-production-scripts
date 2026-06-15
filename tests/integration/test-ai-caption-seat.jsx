@@ -159,9 +159,28 @@ assertClose("below flat -> p == depth",
 // Missing midpoint probe -> null.
 assert("null Bm -> null", _aiMidProtrusion({x:0,y:0}, {x:1,y:0}, null, gBelow, 3), null);
 
-// NOTE: the inner-edge extraction + near-circular guard now live in _innerEdgeVerts, which
-// needs a real (densely-sampled) plate polygon — not a 4-corner rect — so it's exercised by
-// the in-app pipeline run, not here. (TODO: a dense-polygon unit test for _innerEdgeVerts.)
+// --- _innerEdgeVerts near-circular guard (HIGH-bug regression) -----------------
+// Needs a DENSELY-sampled plate (edge points, not a 4-corner rect — those all classify as
+// caps and collapse to the degenerate branch). gBelow = art ABOVE the pill, so the inner edge
+// faces +y. The guard is what stops a near-circular pill from seating a ~90deg-wrong baseline.
+testLog("[ai-seat-test] --- _innerEdgeVerts (near-circular guard) ---");
+
+// Wide pill (100x20, aspect 5): PCA axis reliable -> NOT kissOnly; radius = half height = 10;
+// real inner-edge verts found (so the conform rotation runs).
+var wideIe = _innerEdgeVerts(
+    [{x:0,y:0},{x:25,y:0},{x:50,y:0},{x:75,y:0},{x:100,y:0},
+     {x:100,y:20},{x:75,y:20},{x:50,y:20},{x:25,y:20},{x:0,y:20}], gBelow);
+assert("wide pill not kissOnly", wideIe.kissOnly, false);
+assertClose("wide pill radius = 10", wideIe.radius, 10);
+assert("wide pill has inner-edge verts", wideIe.verts.length >= 2, true);
+
+// Near-square pill (20x20, aspect 1): PCA long axis is noise -> guard MUST fire (kissOnly), so
+// the seat keeps the artist angle instead of flipping ~90deg. radius still = 10.
+var sqIe = _innerEdgeVerts(
+    [{x:0,y:0},{x:10,y:0},{x:20,y:0},{x:20,y:10},
+     {x:20,y:20},{x:10,y:20},{x:0,y:20},{x:0,y:10}], gBelow);
+assert("near-square pill kissOnly", sqIe.kissOnly, true);
+assertClose("near-square pill radius = 10", sqIe.radius, 10);
 
 // --- SUMMARY ------------------------------------------------------------------
 

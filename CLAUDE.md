@@ -19,7 +19,21 @@
 >   branch. v1 = strict 2-endpoint chord (robust fit + curvature deferred). `needsReview` now
 >   fires on overhang-too-wide / chord-tilt-clamp / missing-geometry (the old `seatBandPx`
 >   even-overlap check is GONE). See **`docs/caption-seating-redesign.md`**. LOCAL TODO: re-confirm
->   `seatRotationSign`, tune `seatShrinkFrac`/`captionBorderOverlapPx`, regen the PSAI golden.
+>   `seatRotationSign`, tune `seatShrinkFrac`/`captionBorderOverlapPx`. (PSAI Phase-1 golden
+>   regenerated 2026-06-15 to capture this seater's output.)
+> - ✅ **Caption seat MOVED to Illustrator — vector seat "Option B", validated + committed `252f0d7`
+>   (2026-06-15)**: `aiUtils.seatPlateToOutline` seats the plate against the TRACED cutline (the
+>   vector that becomes the cut), NOT the PS raster — so the overlap is real in the cut's own space
+>   (fixes flat/shallow detachment). Called at Step 6 (birth) + Step 8b (resize — which now
+>   scales-then-re-seats; `_overlapCentroid` removed). The PS `seatCaptionConform` stays as the
+>   ROUGH starting pose; the AI seat is authoritative. Algorithm = the original (inner-edge
+>   endpoints → chord rotation + 15% overhang shrink → r/2 convex-bulge guard → endpoint kiss to
+>   depth `d`) but on the REAL plate-edge polygon (`_innerEdgeVerts`), not a PCA-chord
+>   reconstruction — the chord float was the Šúľance arc-gap; an interim all-points fit caused a
+>   spurious St Elizabeth's 8° tilt (both fixed). `seatOverlapMm = 0.1`, `seatSampleSteps = 24`
+>   (both AI pipelines; do NOT raise `halfcutSeamSteps` — it overflows `setEntirePath`). Half-cut
+>   crash-proofed: seam decimated ≤400 pts + `setEntirePath`/zero-extent guards + Step 6 try/catch.
+>   P2 end-to-end on the Slovakia fixture: 22/22 peel tabs, unmatched=0, both SVGs.
 > - 🔁 **Caption-junction cut-line cleanup — REMOVED (reverted 2026-06-14)**: `cleanCaptionJunction()`
 >   and the `CONFIG.weldFilletRadiusPt` gate were removed; the export cutline is back to the raw
 >   `Unite(outline, plate)`, so the plate∩art junction may again show the boolean spike/sliver
