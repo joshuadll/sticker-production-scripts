@@ -117,7 +117,8 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (document:|=== AI_ExportFinal (start|done))"
+    grep -Ev "^\[pipeline\] (document:|=== AI_ExportFinal (start|done))" \
+        | grep '^\['
 }
 
 if [ ! -f "$EXPECTED" ]; then

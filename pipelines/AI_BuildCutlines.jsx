@@ -100,13 +100,15 @@ CONFIG.logPath = _root + "/pipelines/AI_BuildCutlines.log";
 function _runExportForNesting(doc, traceTuning) {
     log("[pipeline] --- Step 7A: Deepnest export ---");
     log("[pipeline] threshold: " + CONFIG.deepnestRectThreshold);
+    var filesFolder = null;
+    try { filesFolder = doc.fullName.parent.fsName; } catch (eFolder) {}
 
     var result = runDeepnestExport(doc);
 
     if (!result) {
-        scriptAlert("Step 7A failed — Cutlines layer not found.\n"
-            + "Make sure Step 6 has been run on this document.\n"
-            + "Log: " + CONFIG.logPath);
+        scriptAlert("❌ Step 7A failed — Cutlines layer not found.\n\n"
+            + "Make sure Step 6 has been run on this document.\n\n"
+            + "Send this to Josh:\n" + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
         return { ok: false, phase: "step7a", error: "Cutlines layer not found" };
     }
 
@@ -134,7 +136,7 @@ function _runExportForNesting(doc, traceTuning) {
             + "Cutlines may be looser than intended — see log.\n\n";
     }
 
-    scriptAlert("Done.\n\n" + tuneWarn
+    scriptAlert("✅ SVGs exported.\n\n" + tuneWarn
         + "  Regular   (" + result.regular   + " paths): " + (result.regularPath   || "—") + "\n"
         + "  Irregular (" + result.irregular + " paths): " + (result.irregularPath || "—") + "\n\n"
         + "Review both SVGs now open in Illustrator.\n"
@@ -145,10 +147,7 @@ function _runExportForNesting(doc, traceTuning) {
         + "NEXT — after nesting:\n"
         + "  1. Save each Deepnest result next to this file, named ending in\n"
         + "     \"_nested.svg\"  (e.g. " + baseHint + "_regular_nested.svg).\n"
-        + "  2. Bring the working .ai to the front and run AI_ImportNesting.jsx.\n\n"
-        + "Threshold used: " + CONFIG.deepnestRectThreshold
-        + "  (see log for per-path ratios to calibrate)\n\n"
-        + "Log: " + CONFIG.logPath);
+        + "  2. Bring the working .ai to the front and run AI_ImportNesting.jsx.");
 
     return {
         ok:           svgsOk,
@@ -204,7 +203,7 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
     var artistFolderFs = null;
     try { artistFolderFs = new File(elementsFilePath).parent.fsName; } catch (eF) {}
     function _fail(reason) {
-        var errLog = copyLogBeside(artistFolderFs, "Noteworthie_2_ERROR.log");
+        var errLog = copyLogBeside(artistFolderFs, "Noteworthie_ERROR.log");
         log("[ai-pipeline] FAIL | " + reason + " | log -> " + errLog);
         return _status({ ok: false, phase: "step6", error: reason, errorLog: errLog });
     }
@@ -243,7 +242,7 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
     if (result.unmatched > 0) {
         log("[ai-pipeline] HALT | " + result.unmatched
             + " unmatched path(s) — rename before export.");
-        var unmatchedLog = copyLogBeside(artistFolderFs, "Noteworthie_2_ERROR.log");
+        var unmatchedLog = copyLogBeside(artistFolderFs, "Noteworthie_ERROR.log");
         scriptAlert("Cut lines created — but " + result.unmatched
             + " path(s) could not be named automatically.\n\n"
             + "Rename them in the Cutlines layer (each name must match its element's display name exactly).\n\n"
@@ -273,6 +272,8 @@ function main() {
         }
 
         var doc = app.activeDocument;
+        var filesFolder = null;
+        try { filesFolder = doc.fullName.parent.fsName; } catch (eFolder) {}
 
         log("[pipeline] === AI_BuildCutlines (nesting export) start ===");
         log("[pipeline] dryRun: " + CONFIG.dryRun);
@@ -282,8 +283,9 @@ function main() {
 
     } catch (e) {
         log("[pipeline] FATAL | line " + e.line + ": " + e.message);
-        scriptAlert("AI_BuildCutlines failed.\nLine " + e.line + ": " + e.message
-            + "\nLog: " + CONFIG.logPath);
+        scriptAlert("❌ Couldn't export the SVGs.\n\n"
+            + "Reason (line " + e.line + "): " + e.message + "\n\n"
+            + "Send this to Josh:\n" + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
     }
 }
 

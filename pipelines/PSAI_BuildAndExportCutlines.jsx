@@ -543,9 +543,11 @@ function handOffToIllustrator(doc) {
 
     if (!silhPngPath || !elementsPath) {
         log("[pipeline] ERROR | export failed — BridgeTalk handoff aborted.");
-        scriptAlert("BridgeTalk handoff aborted: could not export silhouette PNG or elements sidecar.\n"
-            + "Check that the Elements group exists.\n"
-            + "Log: " + CONFIG.logPath);
+        var abortFolder = null;
+        try { abortFolder = doc.fullName.parent.fsName; } catch (eAb) {}
+        scriptAlert("❌ Couldn't export the silhouette / elements sidecar.\n\n"
+            + "Check that the Elements group exists.\n\n"
+            + "Send this to Josh:\n" + copyLogBeside(abortFolder, "Noteworthie_ERROR.log"));
         return;
     }
 
@@ -641,7 +643,7 @@ function main() {
             + " — rolled back. Caption T layers are still present and untouched.");
         var errLog3B = copyLogBeside(
             (function(){ try { return doc.fullName.parent.fsName; } catch (eF) { return null; } })(),
-            "Noteworthie_2_ERROR.log");
+            "Noteworthie_ERROR.log");
         scriptAlert("❌ Couldn't add the caption white (Step 3B).\n\n"
             + "Reason (line " + e.line + "): " + e.message + "\n\n"
             + "Nothing was changed — your caption layers are untouched. Re-run after fixing.\n\n"
@@ -670,7 +672,7 @@ function main() {
             + " — rolled back to post-grouping state.");
         var errLog5 = copyLogBeside(
             (function(){ try { return doc.fullName.parent.fsName; } catch (eF) { return null; } })(),
-            "Noteworthie_2_ERROR.log");
+            "Noteworthie_ERROR.log");
         scriptAlert("❌ Couldn't finalize the elements (Step 5).\n\n"
             + "Reason (line " + e.line + "): " + e.message + "\n\n"
             + "Rolled back to the grouped state.\n\n"
@@ -737,7 +739,7 @@ function main() {
     } else if (aiStatus && aiStatus.error) {
         // FAILURE — the specific reason + the log, dropped beside the artist's files.
         var errLog = aiStatus.errorLog
-            || copyLogBeside(docFolderFs, "Noteworthie_2_ERROR.log");
+            || copyLogBeside(docFolderFs, "Noteworthie_ERROR.log");
         msg = "❌ Couldn't finish the cut lines.\n\n"
             + "Reason: " + aiStatus.error + "\n\n"
             + "(Grouped " + grouped + " element(s) before this step.)\n\n"

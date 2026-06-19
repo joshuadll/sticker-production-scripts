@@ -83,6 +83,8 @@ function main() {
         return;
     }
     var doc = app.activeDocument;
+    var filesFolder = null;
+    try { filesFolder = doc.fullName.parent.fsName; } catch (eFolder) {}
 
     log("[pipeline] === AI_LayoutQA start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
@@ -95,8 +97,10 @@ function main() {
         qaResult = runOffsetPathQA(doc);
     } catch (e) {
         log("[pipeline] ERROR | spacing/margin QA line " + e.line + ": " + e.message);
-        scriptAlert("ERROR in Spacing + Margin QA.\nLine " + e.line + ": " + e.message
-            + "\n\nLog: " + CONFIG.logPath);
+        scriptAlert("❌ Couldn't run Spacing + Margin QA.\n\n"
+            + "Reason (line " + e.line + "): " + e.message + "\n\n"
+            + "Stuck? Send this to Josh:\n"
+            + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
         return;
     }
     log("[pipeline] spacing/margin complete | " + qaResult.checked + " checked, "
@@ -109,15 +113,18 @@ function main() {
         nqiResult = runNestingQA(doc);
     } catch (e) {
         log("[pipeline] ERROR | NQI line " + e.line + ": " + e.message);
-        scriptAlert("ERROR in Nesting Quality (NQI).\nLine " + e.line + ": " + e.message
-            + "\n\nLog: " + CONFIG.logPath);
+        scriptAlert("❌ Couldn't run Nesting Quality (NQI).\n\n"
+            + "Reason (line " + e.line + "): " + e.message + "\n\n"
+            + "Stuck? Send this to Josh:\n"
+            + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
         return;
     }
 
     if (!nqiResult) {
-        scriptAlert("NQI check failed — Cutlines layer not found.\n"
-            + "Ensure nested paths are on the \"" + CONFIG.cutlinesLayerName + "\" layer.\n"
-            + "Log: " + CONFIG.logPath);
+        scriptAlert("❌ NQI check failed — Cutlines layer not found.\n\n"
+            + "Ensure nested paths are on the \"" + CONFIG.cutlinesLayerName + "\" layer.\n\n"
+            + "Stuck? Send this to Josh:\n"
+            + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
         return;
     }
 
@@ -166,7 +173,6 @@ function main() {
         msg += "\nLayout looks good — continue with AI_ExportFinal.";
     }
 
-    msg += "\n\nLog: " + CONFIG.logPath;
     scriptAlert(msg);
 }
 

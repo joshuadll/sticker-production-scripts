@@ -212,7 +212,7 @@ function main() {
         log("[pipeline] ERROR | step 1 line " + e.line + ": " + e.message
             + " — rolled back to initial template state.");
         scriptAlert("ERROR in Step 1 (Combine).\nLine " + e.line + ": " + e.message
-            + "\n\nTemplate rolled back to its initial state.\nLog: " + CONFIG.logPath);
+            + "\n\nTemplate rolled back to its initial state.\n\nSend this to Josh:\n" + copyLogBeside(folder.fsName, "Noteworthie_ERROR.log"));
         return;
     }
     log("[pipeline] step 1 complete | " + combineResult.placed + " element(s) from "
@@ -231,7 +231,7 @@ function main() {
             + " — rolled back to post-combine state. All elements preserved.");
         scriptAlert("ERROR in Step 2 (Resize).\nLine " + e.line + ": " + e.message
             + "\n\nAll elements preserved. Resize rolled back to start of Step 2.\n"
-            + "Fix the issue and re-run.\nLog: " + CONFIG.logPath);
+            + "Fix the issue and re-run.\n\nSend this to Josh:\n" + copyLogBeside(folder.fsName, "Noteworthie_ERROR.log"));
         return;
     }
     log("[pipeline] step 2 complete | " + resizeResult.resized + " element(s) resized.");
@@ -249,7 +249,7 @@ function main() {
             + " — rolled back to post-resize state.");
         scriptAlert("ERROR in Step 3 (White edge).\nLine " + e.line + ": " + e.message
             + "\n\nRolled back to post-resize state.\n"
-            + "Ensure White edges.atn is loaded, then re-run.\nLog: " + CONFIG.logPath);
+            + "Ensure White edges.atn is loaded, then re-run.\n\nSend this to Josh:\n" + copyLogBeside(folder.fsName, "Noteworthie_ERROR.log"));
         return;
     }
     log("[pipeline] step 3 complete | " + whiteEdgeResult.processed + " element(s).");
@@ -267,7 +267,7 @@ function main() {
             + " — rolled back to post-white-edge state. White edges preserved.");
         scriptAlert("ERROR in Step 3A (Caption text).\nLine " + e.line + ": " + e.message
             + "\n\nWhite edges preserved. Rolled back to post-white-edge state.\n"
-            + "Fix the issue and re-run.\nLog: " + CONFIG.logPath);
+            + "Fix the issue and re-run.\n\nSend this to Josh:\n" + copyLogBeside(folder.fsName, "Noteworthie_ERROR.log"));
         return;
     }
     log("[pipeline] step 3A complete | " + captionResult.placed + " caption(s) placed.");
@@ -284,31 +284,29 @@ function main() {
     // ── Completion summary ─────────────────────────────────────────
     log("[pipeline] === PS_BuildElements done ===");
 
-    var msg = "Done.\n\n"
-        + "  Combined:    " + combineResult.placed + " element(s) from "
-        + combineResult.fileCount + " file(s).\n"
-        + "  Resized:     " + resizeResult.resized + " element(s).\n"
-        + "  White edge:  " + whiteEdgeResult.processed + " element(s).\n"
-        + "  Captions:    " + captionResult.placed + " T layer(s) placed.";
+    var msg = "✅ Elements built.\n\n"
+        + "  Combined " + combineResult.placed + " element(s) from "
+        + combineResult.fileCount + " file(s) → resized " + resizeResult.resized
+        + ", white-edged " + whiteEdgeResult.processed + ", "
+        + captionResult.placed + " caption(s) placed.";
 
     if (resizeResult.skipped.length > 0) {
-        msg += "\n\n  Resize skipped (" + resizeResult.skipped.length + "):";
+        msg += "\n\n⚠️ Resize skipped (" + resizeResult.skipped.length + "):";
         for (var s = 0; s < resizeResult.skipped.length; s++) {
-            msg += "\n    - " + resizeResult.skipped[s];
+            msg += "\n   • " + resizeResult.skipped[s];
         }
     }
 
     if (captionResult.skipped.length > 0) {
-        msg += "\n\n  Caption skipped (" + captionResult.skipped.length + "):";
+        msg += "\n\n⚠️ Caption skipped (" + captionResult.skipped.length + "):";
         for (var c = 0; c < captionResult.skipped.length; c++) {
-            msg += "\n    - " + captionResult.skipped[c];
+            msg += "\n   • " + captionResult.skipped[c];
         }
     }
 
-    msg += "\n\nReview and adjust caption positions."
-        + "\nWhen done, run PSAI_BuildAndExportCutlines to add white bases and proceed.\n\n"
-        + (savedPath ? "Saved: " + savedPath : "WARN: auto-save failed — save manually.")
-        + "\nLog: " + CONFIG.logPath;
+    msg += "\n\nReview and adjust the caption positions, then run Noteworthie 2."
+        + (savedPath ? "\nSaved: " + savedPath
+                     : "\n⚠️ Auto-save failed — save the file manually first.");
 
     scriptAlert(msg);
 }

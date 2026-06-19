@@ -67,6 +67,8 @@ function main() {
         return;
     }
     var doc = app.activeDocument;
+    var filesFolder = null;
+    try { filesFolder = doc.fullName.parent.fsName; } catch (eFolder) {}
 
     log("[pipeline] === AI_ExportFinal start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
@@ -81,7 +83,7 @@ function main() {
     } catch (e) {
         log("[pipeline] ERROR | spacing/margin guard line " + e.line + ": " + e.message);
         scriptAlert("ERROR in Spacing + Margin QA.\nLine " + e.line + ": " + e.message
-            + "\n\nLog: " + CONFIG.logPath);
+            + "\n\nSend this to Josh:\n" + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
         return;
     }
     log("[pipeline] spacing/margin guard complete | " + qaResult.checked + " path(s) checked, "
@@ -91,7 +93,7 @@ function main() {
         scriptAlert("Spacing/Margin QA: " + qaResult.flagged + " path(s) flagged for review.\n"
             + "Flagged paths are highlighted in red.\n"
             + "Fix them (or re-run AI_LayoutQA), then re-run this script.\n\n"
-            + "Log: " + CONFIG.logPath);
+            + "Details: " + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
         return;
     }
 
@@ -104,7 +106,7 @@ function main() {
     } catch (e) {
         log("[pipeline] ERROR | step 9a line " + e.line + ": " + e.message);
         scriptAlert("ERROR in Step 9A (Half-cut).\nLine " + e.line + ": " + e.message
-            + "\n\nLog: " + CONFIG.logPath);
+            + "\n\nSend this to Josh:\n" + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
         return;
     }
     log("[pipeline] step 9a complete | " + halfcutResult.placed + " half-cut(s) placed.");
@@ -121,7 +123,8 @@ function main() {
                 + ": " + halfcutResult.flags[hi].reason + "\n";
         }
         hcMsg += "\nThe caption plate must overlap the element art. Fix the seating in "
-            + "Photoshop, then re-run.\nNo final file was written.\n\nLog: " + CONFIG.logPath;
+            + "Photoshop, then re-run.\nNo final file was written.\n\nSend this to Josh:\n"
+            + copyLogBeside(filesFolder, "Noteworthie_ERROR.log");
         log("[pipeline] HALT | step 9a flagged " + halfcutResult.flagged + " element(s) — aborting before export.");
         scriptAlert(hcMsg);
         return;
@@ -136,7 +139,7 @@ function main() {
     } catch (e) {
         log("[pipeline] ERROR | step 10 line " + e.line + ": " + e.message);
         scriptAlert("ERROR in Step 10 (Asset Export).\nLine " + e.line + ": " + e.message
-            + "\n\nLog: " + CONFIG.logPath);
+            + "\n\nSend this to Josh:\n" + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
         return;
     }
     log("[pipeline] step 10 complete | " + assetResult.pngCount + " PNG(s) exported.");
@@ -150,7 +153,7 @@ function main() {
     } catch (e) {
         log("[pipeline] ERROR | step 11 line " + e.line + ": " + e.message);
         scriptAlert("ERROR in Step 11 (Final File).\nLine " + e.line + ": " + e.message
-            + "\n\nLog: " + CONFIG.logPath);
+            + "\n\nSend this to Josh:\n" + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
         return;
     }
     log("[pipeline] step 11 complete | " + finalResult.outputPath);
@@ -158,10 +161,9 @@ function main() {
     // ── Completion summary ─────────────────────────────────────────────────────
     log("[pipeline] === AI_ExportFinal done ===");
 
-    var summaryMsg = "Done.\n\n"
-        + "  QA:         " + qaResult.checked + " path(s) checked.\n"
-        + "  Half-cuts:  " + halfcutResult.placed + " placed.\n"
-        + "  PNGs:       " + assetResult.pngCount + " exported.\n"
+    var summaryMsg = "✅ Final file ready.\n\n"
+        + "  " + qaResult.checked + " path(s) checked · " + halfcutResult.placed
+        + " half-cut(s) · " + assetResult.pngCount + " PNG(s) exported.\n"
         + "  Final file: " + finalResult.outputPath + "\n";
     if (finalResult.layerCount !== 3) {
         summaryMsg += "  WARNING: final file has " + finalResult.layerCount
@@ -178,7 +180,6 @@ function main() {
         }
     }
 
-    summaryMsg += "\nLog: " + CONFIG.logPath;
     scriptAlert(summaryMsg);
 }
 

@@ -127,7 +127,8 @@ strip_variable_lines() {
     # Also drop the per-element [seat]/[halfcut] lines (absolute, pixel-level coordinates):
     # the seat/half-cut geometry is asserted by the dedicated unit tests, and the reset/atSpec
     # COUNTS are still checked by the "[step8b] done | reset=N" line below.
-    grep -Ev "^(\[pipeline\] (document:|=== AI_NormaliseCaptions (start|done))|\[seat\]|\[seatdbg\]|\[halfcut\])"
+    grep -Ev "^(\[pipeline\] (document:|=== AI_NormaliseCaptions (start|done))|\[seat\]|\[seatdbg\]|\[halfcut\])" \
+        | grep '^\['
 }
 
 if [ ! -f "$EXPECTED" ]; then
