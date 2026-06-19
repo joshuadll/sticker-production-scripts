@@ -106,13 +106,35 @@ function exportSilhouettePng(doc) {
     opts.PNG8        = false;
     opts.transparency = false;
     opts.interlaced   = false;
-    doc.exportDocument(new File(pngPath), ExportType.SAVEFORWEB, opts);
+    // Save-for-Web sanitises spaces/punctuation OUT of the output filename and silently
+    // NO-OPs over an existing file. A real SKU PSD is named with spaces (e.g.
+    // "SLOVAKIA TESTING.psd"), so writing straight to "<base>_silhouette.png" lands the
+    // PNG under a mangled name — and Step 6, looking for the exact spaced name, reports
+    // "silhouette PNG not found" and returns null (the opaque failure the artist hit).
+    // Mirror _exportTrimmedPng: export to a space-free temp file, then rename to the real
+    // (spaced/unicode) target. The returned pngPath is unchanged.
+    var outFile  = new File(pngPath);
+    var leafName = pngPath.substring(pngPath.lastIndexOf("/") + 1); // real name, spaces kept
+    var tmpFile  = new File(outFile.parent.fsName + "/__silhouette_tmp.png");
+    if (tmpFile.exists) tmpFile.remove();
+    doc.exportDocument(tmpFile, ExportType.SAVEFORWEB, opts);
+    if (tmpFile.exists) {
+        if (outFile.exists) outFile.remove();
+        tmpFile.rename(leafName);
+    }
 
     // Restore visibility, then drop the transient layer.
     for (i = 0; i < layers.length; i++) {
         layers[i].visible = visibilities[i];
     }
     silLayer.remove();
+
+    // Hard-fail loudly if the PNG didn't land: Save-for-Web can silently no-op, and a
+    // missing sidecar otherwise resurfaces downstream as the opaque "Step 6 returned null".
+    if (!outFile.exists) {
+        log("[pipeline] ERROR | silhouette PNG not written (Save-for-Web no-op?): " + pngPath);
+        return null;
+    }
 
     log("[pipeline] exported silhouette PNG (transient layer removed): " + pngPath);
     return pngPath;

@@ -46,18 +46,25 @@ FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 TEMPLATE_FIXTURE="$FIXTURE_DIR/elements-captioned-ungrouped.psd"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/psai-build-export-cutlines-expected.txt"
 
+# Deliberate SPACE in the fixture base name. Real SKU PSDs are named with spaces (e.g.
+# "SLOVAKIA TESTING.psd"), and Photoshop Save-for-Web sanitises spaces OUT of the output
+# filename — so the silhouette PNG lands under a mangled name and Step 6 reports it "not
+# found" (returns null). This name exercises that path; the SILH existence check below is
+# the regression guard. (exportSilhouettePng must temp-name + rename to survive it.)
+FIXTURE_BASE="${STEP} fixture"
+
 TEMP_SCRIPT_PS="/tmp/${STEP}-ps-test.jsx"
 TEMP_SCRIPT_AI="/tmp/${STEP}-ai-test.jsx"
-TEMP_FIXTURE="/tmp/${STEP}-fixture.psd"
+TEMP_FIXTURE="/tmp/${FIXTURE_BASE}.psd"
 LOG_PS="/tmp/PSAI_BuildAndExportCutlines.log"
 LOG_AI="/tmp/AI_BuildCutlines.log"
 
 # Sidecars PSAI writes next to TEMP_FIXTURE, and the AI-side outputs derived from them.
-SILH="/tmp/${STEP}-fixture_silhouette.png"
-ELEM="/tmp/${STEP}-fixture_elements.json"
-WORKING_AI="/tmp/${STEP}-fixture.ai"
-REGULAR_SVG="/tmp/${STEP}-fixture_regular.svg"
-IRREGULAR_SVG="/tmp/${STEP}-fixture_irregular.svg"
+SILH="/tmp/${FIXTURE_BASE}_silhouette.png"
+ELEM="/tmp/${FIXTURE_BASE}_elements.json"
+WORKING_AI="/tmp/${FIXTURE_BASE}.ai"
+REGULAR_SVG="/tmp/${FIXTURE_BASE}_regular.svg"
+IRREGULAR_SVG="/tmp/${FIXTURE_BASE}_irregular.svg"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
@@ -271,7 +278,13 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (document:|=== PSAI_BuildAndExportCutlines (start|done)|saved:)"
+    # Drop run-specific lines, then normalise the volatile /tmp fixture path (a test
+    # artifact, not production behaviour) to a placeholder so the golden is insensitive
+    # to the fixture base name — crucially including the deliberate SPACE in it. The
+    # separator class [ -] matches both the historical hyphen ("…-fixture") and the
+    # current space ("… fixture"), so the committed golden stays valid without a regen.
+    grep -Ev "^\[pipeline\] (document:|=== PSAI_BuildAndExportCutlines (start|done)|saved:)" \
+        | sed -E "s#/(private/)?tmp/${STEP}[ -]fixture#<FIXTURE>#g"
 }
 
 if [ ! -f "$EXPECTED" ]; then
