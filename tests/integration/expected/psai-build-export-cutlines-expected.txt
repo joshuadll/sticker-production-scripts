@@ -156,19 +156,11 @@ BridgeTalk skipped: CONFIG.aiPipelinePath is empty.
 Set CONFIG.aiPipelinePath to AI_BuildCutlines.jsx and re-run to auto-hand off.
 Log: /tmp/PSAI_BuildAndExportCutlines.log
 [pipeline] === PSAI_BuildAndExportCutlines done ===
-Done.
+⏳ Illustrator is finishing the cut lines.
 
-  Grouped:     26 element(s).
-  Art PNGs:    /private/tmp/psai-build-export-cutlines-fixture_elements
+Processed 26 element(s). Wait for both SVGs to open in
+Illustrator before running Deepnest, then run Noteworthie 3.
 
-Illustrator is running cut lines automatically.
-Wait for it to finish — it will alert you when SVGs are ready for Deepnest.
-
-After Deepnest: run AI_ImportNesting.jsx, selecting the Deepnest SVG(s)
-and the '_elements' folder shown above.
-
-Log: /tmp/PSAI_BuildAndExportCutlines.log
-
-⚠️ No caption beside these 2 element(s) — confirm intended:
-  - Slovakia Map
-  - Bratislava(text)
+⚠️ No caption beside these 2 element(s) — confirm that's intended:
+   • Slovakia Map
+   • Bratislava(text)

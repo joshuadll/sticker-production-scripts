@@ -18,7 +18,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     var elementsData = _readElementsFile(elementsFilePath);
     if (!elementsData) {
         log("[step6] ERROR | could not read elements file: " + elementsFilePath);
-        return null;
+        return { error: "couldn't read the elements sidecar (" + elementsFilePath + ")" };
     }
     log("[step6] loaded " + elementsData.elements.length + " element(s) from sidecar.");
 
@@ -30,7 +30,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     var pngFile = new File(silhPngPath);
     if (!pngFile.exists) {
         log("[step6] ERROR | silhouette PNG not found: " + silhPngPath);
-        return null;
+        return { error: "couldn't find the silhouette image (" + silhPngPath + ")" };
     }
 
     // ── 2. Ensure "Cutlines" layer above "Stickers" ───────────────────────────

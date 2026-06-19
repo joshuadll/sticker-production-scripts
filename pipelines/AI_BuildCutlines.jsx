@@ -197,19 +197,27 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
     var doc = buildWorkingDocument();
     log("[ai-pipeline] working document built: " + doc.name);
 
+    // Artist's job folder (where the sidecars live) — failure logs land HERE so they're
+    // easy to find, not in the hidden ~/Library path. _fail() drops the log beside the
+    // files and returns the status PS surfaces (errorLog → the PS dialog points the artist
+    // straight to it, and carries the SPECIFIC reason instead of a bare "returned null").
+    var artistFolderFs = null;
+    try { artistFolderFs = new File(elementsFilePath).parent.fsName; } catch (eF) {}
+    function _fail(reason) {
+        var errLog = copyLogBeside(artistFolderFs, "Noteworthie_2_ERROR.log");
+        log("[ai-pipeline] FAIL | " + reason + " | log -> " + errLog);
+        return _status({ ok: false, phase: "step6", error: reason, errorLog: errLog });
+    }
+
     var result;
     try {
         result = runCreateCutlines(doc, silhPngPath, elementsFilePath);
     } catch (e) {
-        log("[ai-pipeline] ERROR | step 6 line " + e.line + ": " + e.message);
-        scriptAlert("ERROR in Step 6 (Create Cutlines).\nLine " + e.line + ": " + e.message
-            + "\nLog: " + CONFIG.logPath);
-        return _status({ ok: false, phase: "step6", error: "line " + e.line + ": " + e.message });
+        return _fail("Step 6 error (line " + e.line + "): " + e.message);
     }
 
-    if (!result) {
-        log("[ai-pipeline] Step 6 returned null — aborted.");
-        return _status({ ok: false, phase: "step6", error: "Step 6 returned null" });
+    if (!result || result.error) {
+        return _fail(result && result.error ? result.error : "Step 6 produced no result");
     }
 
     log("[ai-pipeline] step 6 complete | named: " + result.named
@@ -235,15 +243,17 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
     if (result.unmatched > 0) {
         log("[ai-pipeline] HALT | " + result.unmatched
             + " unmatched path(s) — rename before export.");
+        var unmatchedLog = copyLogBeside(artistFolderFs, "Noteworthie_2_ERROR.log");
         scriptAlert("Cut lines created — but " + result.unmatched
             + " path(s) could not be named automatically.\n\n"
             + "Rename them in the Cutlines layer (each name must match its element's display name exactly).\n\n"
             + "When done, re-run this script directly (File → Scripts → Browse → AI_BuildCutlines.jsx)"
             + " to export SVGs for Deepnest.\n\n"
-            + "Log: " + CONFIG.logPath);
+            + "Details: " + unmatchedLog);
         return _status({ ok: false, phase: "step6", named: result.named,
                          unmatched: result.unmatched, traceTuning: result.traceTuning,
-                         error: result.unmatched + " unmatched path(s)" });
+                         errorLog: unmatchedLog,
+                         error: result.unmatched + " cut shape(s) couldn't be matched to an element" });
     }
 
     var exportResult = _runExportForNesting(doc, result.traceTuning);
