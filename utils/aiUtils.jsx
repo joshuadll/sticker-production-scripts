@@ -91,6 +91,26 @@ function scriptAlert(msg) {
     if (!CONFIG.suppressAlerts) alert(msg);
 }
 
+// Copies this run's log to `folderFsName` under `niceName` so a FAILURE's details land
+// right next to the artist's files (their job folder) instead of the hidden
+// ~/Library/Application Support path. flushLog() first so the buffered run is on disk.
+// Reads + rewrites (not File.copy) so spaced/unicode paths and UTF-8 element names survive.
+// Returns the beside-files path, or CONFIG.logPath if the copy can't be made.
+function copyLogBeside(folderFsName, niceName) {
+    try {
+        flushLog();
+        if (!folderFsName) return CONFIG.logPath;
+        var src = new File(CONFIG.logPath);
+        if (!src.exists) return CONFIG.logPath;
+        src.encoding = "UTF-8"; src.open("r"); var txt = src.read(); src.close();
+        var dest = new File(folderFsName + "/" + niceName);
+        dest.encoding = "UTF-8"; dest.lineFeed = "Unix";
+        if (!dest.open("w")) return CONFIG.logPath;
+        dest.write(txt); dest.close();
+        return dest.fsName;
+    } catch (e) { return CONFIG.logPath; }
+}
+
 // Per-phase wall-timer for profiling slow runs. `lap()` returns the ms elapsed
 // since the last lap (or since creation) and resets, so a phase is timed with one
 // call: `var t = _newPhaseTimer(); … phaseA(); var msA = t.lap(); phaseB(); …`.

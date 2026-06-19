@@ -50,6 +50,7 @@ function main() {
 
         log("[pipeline] === AI_ImportNesting start ===");
         log("[pipeline] dryRun: " + CONFIG.dryRun);
+        var filesFolder = null;   // job folder — set once the working doc resolves (below)
 
         // ── Resolve the working document ────────────────────────────────────
         // Pipeline 2 ends by re-opening the exported SVGs, so the ACTIVE document
@@ -60,10 +61,12 @@ function main() {
         var resolved = _resolveWorkingDoc();
         if (!resolved.doc) {
             log("[pipeline] cannot resolve working doc | " + resolved.error);
-            scriptAlert(resolved.error + "\n\nLog: " + CONFIG.logPath);
+            scriptAlert(resolved.error + "\n\nSend this to Josh:\n"
+                + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
             return;
         }
         var doc = resolved.doc;
+        try { filesFolder = doc.fullName.parent.fsName; } catch (eFolder) {}
         log("[pipeline] document: " + doc.name);
 
         // ── Select Deepnest SVG file(s) ────────────────────────────────────
@@ -97,7 +100,7 @@ function main() {
             scriptAlert("Couldn't find the elements sidecar ({name}_elements.json) next to your\n"
                 + "working file — it's needed to size the artwork. It's written by Pipeline 2\n"
                 + "beside the element art folder; make sure both sit next to the .ai.\n\n"
-                + "Log: " + CONFIG.logPath);
+                + "Send this to Josh:\n" + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
             return;
         }
         log("[pipeline] elements sidecar: " + elementsData.elements.length
@@ -108,16 +111,16 @@ function main() {
         var result = runNestingImport(doc, svgFiles, artFolder, elementsData);
 
         if (!result) {
-            scriptAlert("Import failed — Cutlines layer not found.\n"
-                + "Make sure Step 6 has been run on this document.\n"
-                + "Log: " + CONFIG.logPath);
+            scriptAlert("❌ Import failed — Cutlines layer not found.\n\n"
+                + "Make sure Step 6 has been run on this document.\n\n"
+                + "Send this to Josh:\n" + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
             return;
         }
 
         // ── Completion ─────────────────────────────────────────────────────
         log("[pipeline] === AI_ImportNesting done ===");
 
-        var msg = "Done.\n\n"
+        var msg = "✅ Nesting imported.\n\n"
             + "  Placed:     " + result.matched   + " element(s) at nested positions\n"
             + "  Unmatched:  " + result.unmatched  + " element(s) — see log\n"
             + "  Layout:     regular rotated -90° at artboard top-left;\n"
@@ -134,15 +137,15 @@ function main() {
 
         msg += "Review the cutline layout, then nest the elements. Run\n"
             + "AI_NormaliseCaptions during the resize loop and AI_LayoutQA to\n"
-            + "check spacing; run AI_ExportFinal when the layout is done.\n\n"
-            + "Log: " + CONFIG.logPath;
+            + "check spacing; run AI_ExportFinal when the layout is done.";
 
         scriptAlert(msg);
 
     } catch (e) {
         log("[pipeline] FATAL | line " + e.line + ": " + e.message);
-        scriptAlert("AI_ImportNesting failed.\nLine " + e.line + ": " + e.message
-            + "\nLog: " + CONFIG.logPath);
+        scriptAlert("❌ Couldn't import the nesting.\n\n"
+            + "Reason (line " + e.line + "): " + e.message + "\n\n"
+            + "Send this to Josh:\n" + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
     }
 }
 

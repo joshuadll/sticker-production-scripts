@@ -106,7 +106,8 @@ strip_variable_lines() {
     # Drop run-variable lines: pipeline banners + the advisory [timing] lines (wall
     # durations differ every run by design — they measure, they don't assert).
     grep -Ev "^\[pipeline\] (=== AI_LayoutQA (start|done)|document:)" \
-        | grep -Ev "^\[timing\] "
+        | grep -Ev "^\[timing\] " \
+        | grep '^\['
 }
 
 if [ ! -f "$EXPECTED" ]; then

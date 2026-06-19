@@ -284,6 +284,7 @@ strip_variable_lines() {
     # separator class [ -] matches both the historical hyphen ("…-fixture") and the
     # current space ("… fixture"), so the committed golden stays valid without a regen.
     grep -Ev "^\[pipeline\] (document:|=== PSAI_BuildAndExportCutlines (start|done)|saved:)" \
+        | grep '^\[' \
         | sed -E "s#/(private/)?tmp/${STEP}[ -]fixture#<FIXTURE>#g"
 }
 

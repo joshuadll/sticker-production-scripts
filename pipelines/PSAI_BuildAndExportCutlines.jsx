@@ -543,9 +543,11 @@ function handOffToIllustrator(doc) {
 
     if (!silhPngPath || !elementsPath) {
         log("[pipeline] ERROR | export failed — BridgeTalk handoff aborted.");
-        scriptAlert("BridgeTalk handoff aborted: could not export silhouette PNG or elements sidecar.\n"
-            + "Check that the Elements group exists.\n"
-            + "Log: " + CONFIG.logPath);
+        var abortFolder = null;
+        try { abortFolder = doc.fullName.parent.fsName; } catch (eAb) {}
+        scriptAlert("❌ Couldn't export the silhouette / elements sidecar.\n\n"
+            + "Check that the Elements group exists.\n\n"
+            + "Send this to Josh:\n" + copyLogBeside(abortFolder, "Noteworthie_ERROR.log"));
         return;
     }
 
@@ -639,9 +641,13 @@ function main() {
         doc.activeHistoryState = snapshotA;
         log("[pipeline] ERROR | step 3B line " + e.line + ": " + e.message
             + " — rolled back. Caption T layers are still present and untouched.");
-        scriptAlert("ERROR in Step 3B (Caption white).\nLine " + e.line + ": " + e.message
-            + "\n\nRolled back — caption T layers preserved.\n"
-            + "Fix the issue and re-run.\nLog: " + CONFIG.logPath);
+        var errLog3B = copyLogBeside(
+            (function(){ try { return doc.fullName.parent.fsName; } catch (eF) { return null; } })(),
+            "Noteworthie_ERROR.log");
+        scriptAlert("❌ Couldn't add the caption white (Step 3B).\n\n"
+            + "Reason (line " + e.line + "): " + e.message + "\n\n"
+            + "Nothing was changed — your caption layers are untouched. Re-run after fixing.\n\n"
+            + "Stuck? Send this file to Josh:\n" + errLog3B);
         return;
     }
     log("[pipeline] step 3B complete | " + captionWhiteResult.grouped + " element(s) grouped.");
@@ -664,8 +670,13 @@ function main() {
         doc.activeHistoryState = snapshotB;
         log("[pipeline] ERROR | step 5 line " + e.line + ": " + e.message
             + " — rolled back to post-grouping state.");
-        scriptAlert("ERROR in Step 5 (Finalize Elements).\nLine " + e.line + ": " + e.message
-            + "\n\nRolled back to post-grouping state. Log: " + CONFIG.logPath);
+        var errLog5 = copyLogBeside(
+            (function(){ try { return doc.fullName.parent.fsName; } catch (eF) { return null; } })(),
+            "Noteworthie_ERROR.log");
+        scriptAlert("❌ Couldn't finalize the elements (Step 5).\n\n"
+            + "Reason (line " + e.line + "): " + e.message + "\n\n"
+            + "Rolled back to the grouped state.\n\n"
+            + "Stuck? Send this file to Josh:\n" + errLog5);
         return;
     }
     log("[pipeline] step 5 complete | Elements finalized.");
@@ -711,53 +722,51 @@ function main() {
     // ── Completion summary ─────────────────────────────────────────
     log("[pipeline] === PSAI_BuildAndExportCutlines done ===");
 
-    // Report the Illustrator half's real outcome (from the BridgeTalk result) instead
-    // of optimistically saying "Done." aiStatus is null on dry-run or no/late response.
-    var cutlineLine;
+    // Artist-facing dialog: clean on success (just a count + the next action), detailed on
+    // failure (the specific reason + a log dropped right next to their files). aiStatus is
+    // null on dry-run or no/late BridgeTalk response (→ "still working").
+    var grouped = captionWhiteResult.grouped;
+    var docFolderFs = null;
+    try { docFolderFs = doc.fullName.parent.fsName; } catch (eFolder) {}
+    var msg;
+
     if (aiStatus && aiStatus.ok) {
-        cutlineLine = "Cut lines + SVGs done in Illustrator ("
-            + aiStatus.regular + " regular, " + aiStatus.irregular + " irregular).\n"
-            + "Both SVGs are open in Illustrator, ready for Deepnest.\n\n";
-    } else if (aiStatus) {
-        cutlineLine = "WARNING: the Illustrator half did NOT finish cleanly"
-            + (aiStatus.phase ? " (" + aiStatus.phase + ")" : "") + ":\n  "
-            + (aiStatus.error || "unknown error") + "\n"
-            + "Check Illustrator and the log before continuing.\n\n";
+        // SUCCESS — action-only, with a one-line count. No log path (nothing to debug).
+        msg = "✅ Cut lines ready.\n\n"
+            + "  Processed " + grouped + " element(s) → "
+            + aiStatus.regular + " regular, " + aiStatus.irregular + " irregular cut line(s).\n\n"
+            + "Both SVGs are open in Illustrator — run Deepnest on them, then run Noteworthie 3.";
+    } else if (aiStatus && aiStatus.error) {
+        // FAILURE — the specific reason + the log, dropped beside the artist's files.
+        var errLog = aiStatus.errorLog
+            || copyLogBeside(docFolderFs, "Noteworthie_ERROR.log");
+        msg = "❌ Couldn't finish the cut lines.\n\n"
+            + "Reason: " + aiStatus.error + "\n\n"
+            + "(Grouped " + grouped + " element(s) before this step.)\n\n"
+            + "Stuck? Send this file to Josh:\n" + errLog;
     } else {
-        cutlineLine = "Illustrator is running cut lines automatically.\n"
-            + "Wait for it to finish — it will alert you when SVGs are ready for Deepnest.\n\n";
+        // PENDING — Illustrator hasn't reported back yet. Nothing wrong; no log path.
+        msg = "⏳ Illustrator is finishing the cut lines.\n\n"
+            + "Processed " + grouped + " element(s). Wait for both SVGs to open in\n"
+            + "Illustrator before running Deepnest, then run Noteworthie 3.";
     }
 
-    // Surface an Illustrator-side trace-tuning no-op (from the AI status) in the PS alert.
-    var tuneWarn = "";
+    // Real, artist-relevant warnings — kept on every outcome, clearly secondary.
     if (aiStatus && aiStatus.traceTuning && aiStatus.traceTuning.requested > 0
             && aiStatus.traceTuning.failed && aiStatus.traceTuning.failed.length > 0) {
-        tuneWarn = "WARNING — trace tuning: only " + aiStatus.traceTuning.applied + "/"
-            + aiStatus.traceTuning.requested + " knob(s) took effect — cutlines may be looser"
-            + " than intended (not honored: " + aiStatus.traceTuning.failed.join(", ") + "). See log.\n\n";
+        msg += "\n\n⚠️ Cut lines may be looser than intended (trace tuning didn't fully apply).";
     }
-
-    var msg = "Done.\n\n"
-        + "  Grouped:     " + captionWhiteResult.grouped + " element(s).\n"
-        + "  Art PNGs:    " + (elemArtFolder ? elemArtFolder : "skipped") + "\n\n"
-        + cutlineLine
-        + tuneWarn
-        + "After Deepnest: run AI_ImportNesting.jsx, selecting the Deepnest SVG(s)\n"
-        + "and the '_elements' folder shown above.\n\n"
-        + "Log: " + CONFIG.logPath;
-
-    if (captionWhiteResult.skipped.length > 0) {
-        msg += "\n\nGrouping skipped (" + captionWhiteResult.skipped.length + "):";
-        for (var s = 0; s < captionWhiteResult.skipped.length; s++) {
-            msg += "\n  - " + captionWhiteResult.skipped[s];
-        }
-    }
-
     if (captionWhiteResult.captionLess && captionWhiteResult.captionLess.length > 0) {
         msg += "\n\n⚠️ No caption beside these " + captionWhiteResult.captionLess.length
-             + " element(s) — confirm intended:";
+             + " element(s) — confirm that's intended:";
         for (var c = 0; c < captionWhiteResult.captionLess.length; c++) {
-            msg += "\n  - " + captionWhiteResult.captionLess[c];
+            msg += "\n   • " + captionWhiteResult.captionLess[c];
+        }
+    }
+    if (captionWhiteResult.skipped.length > 0) {
+        msg += "\n\n⚠️ Couldn't group " + captionWhiteResult.skipped.length + " element(s):";
+        for (var s = 0; s < captionWhiteResult.skipped.length; s++) {
+            msg += "\n   • " + captionWhiteResult.skipped[s];
         }
     }
 

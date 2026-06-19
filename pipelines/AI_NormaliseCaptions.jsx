@@ -65,6 +65,8 @@ function main() {
         return;
     }
     var doc = app.activeDocument;
+    var filesFolder = null;
+    try { filesFolder = doc.fullName.parent.fsName; } catch (eFolder) {}
 
     log("[pipeline] === AI_NormaliseCaptions start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
@@ -75,8 +77,10 @@ function main() {
         result = runCaptionNormalise(doc);
     } catch (e) {
         log("[pipeline] ERROR | caption normalise line " + e.line + ": " + e.message);
-        scriptAlert("ERROR in caption normalisation.\nLine " + e.line + ": " + e.message
-            + "\n\nLog: " + CONFIG.logPath);
+        scriptAlert("❌ Couldn't normalise the captions.\n\n"
+            + "Reason (line " + e.line + "): " + e.message + "\n\n"
+            + "Stuck? Send this to Josh:\n"
+            + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
         return;
     }
 
@@ -84,13 +88,11 @@ function main() {
         + result.atSpec + " already at spec, " + result.skipped + " skipped.");
     log("[pipeline] === AI_NormaliseCaptions done ===");
 
-    scriptAlert("Caption normalisation done.\n\n"
-        + "  Reset to spec:  " + result.reset + " caption(s).\n"
-        + "  Already at spec: " + result.atSpec + " caption(s).\n"
-        + "  Skipped:        " + result.skipped + " (stamps / uncaptioned).\n\n"
+    scriptAlert("✅ Captions normalised.\n\n"
+        + "  " + result.reset + " reset to spec, " + result.atSpec
+        + " already on spec, " + result.skipped + " skipped (stamps / uncaptioned).\n\n"
         + "Re-run after each manual resize pass. When nesting is final, make pencil\n"
-        + "refinements, then run AI_ExportFinal.\n\n"
-        + "Log: " + CONFIG.logPath);
+        + "refinements, then run AI_ExportFinal.");
 }
 
 main();

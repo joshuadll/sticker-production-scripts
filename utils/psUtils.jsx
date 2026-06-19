@@ -135,6 +135,25 @@ function scriptAlert(msg) {
     if (!CONFIG.suppressAlerts) alert(msg);
 }
 
+// Copies this run's log to `folderFsName` under `niceName` so a FAILURE's details land
+// right next to the artist's files (their job folder) instead of the hidden
+// ~/Library/Application Support path. Reads + rewrites (not File.copy) so spaced/unicode
+// paths and UTF-8 element names survive. Returns the beside-files path, or CONFIG.logPath
+// if the copy can't be made (caller still has a usable path to show).
+function copyLogBeside(folderFsName, niceName) {
+    try {
+        if (!folderFsName) return CONFIG.logPath;
+        var src = new File(CONFIG.logPath);
+        if (!src.exists) return CONFIG.logPath;
+        src.encoding = "UTF-8"; src.open("r"); var txt = src.read(); src.close();
+        var dest = new File(folderFsName + "/" + niceName);
+        dest.encoding = "UTF-8"; dest.lineFeed = "Unix";
+        if (!dest.open("w")) return CONFIG.logPath;
+        dest.write(txt); dest.close();
+        return dest.fsName;
+    } catch (e) { return CONFIG.logPath; }
+}
+
 // Returns true if doc matches expected template dimensions.
 function isValidTemplate(doc) {
     return Math.round(doc.width.as("cm")) === CONFIG.templateWidthCm;

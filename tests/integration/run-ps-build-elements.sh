@@ -126,7 +126,10 @@ fi
 # Add further exclusions here if new variable lines are introduced.
 
 strip_variable_lines() {
-    grep -Ev "^\[pipeline\] (template:|source folder:|=== PS_BuildElements (start|done))"
+    # Keep only [prefixed] structural log lines — drop freeform alert/dialog copy so the
+    # golden isn't coupled to artist-facing message wording (counts live in [step] lines).
+    grep -Ev "^\[pipeline\] (template:|source folder:|=== PS_BuildElements (start|done))" \
+        | grep '^\['
 }
 
 if [ ! -f "$EXPECTED" ]; then
