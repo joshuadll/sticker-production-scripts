@@ -1,7 +1,11 @@
 [pipeline] === AI_NormaliseCaptions start ===
 [pipeline] dryRun: false
 [pipeline] document: resize-elements.ai
+[seat] Bratislava Castle | rotated -3.7deg to endpoint chord.
+[seat] Bratislava Castle | seated rot=-3.7deg move=1.4pt depth=0.3pt
 [step9] created halfcut layer: Halfcut
+[halfcut] Bratislava Castle | pts=27 end0=(441.3,646.5) endN=(503.2,643.2) straight
+[buffer] Bratislava Castle | band 0..+1mm
 [step8b] reset to spec | Bratislava Castle (WC, x0.714)
 [step8b] at spec | Spiš Castle (WC)
 [step8b] at spec | St. Martin's Cathedral (WC)
@@ -13,26 +17,42 @@
 [step8b] at spec | Carpathian Wooden Churches (WC)
 [step8b] at spec | Slovak Paradise National Park (WC)
 [step8b] at spec | Old Town Hall (Bratislava) (WC)
+[seat] Pirohy | rotated -5.7deg to endpoint chord.
+[seat] Pirohy | seated rot=-5.7deg move=3.9pt depth=0.3pt
+[halfcut] Pirohy | pts=28 end0=(212,-5.2) endN=(187.5,-18.6) straight
+[buffer] Pirohy | band 0..+1mm
 [step8b] reset to spec | Pirohy (WC, x1.429)
+[seat] Orava Castle | rotated -2.4deg to endpoint chord.
+[seat] Orava Castle | seated rot=-2.4deg move=-0.5pt depth=0.3pt
+[halfcut] Orava Castle | pts=28 end0=(520.9,384) endN=(471.3,387.2) curved
+[buffer] Orava Castle | band 0..+1mm
 [step8b] reset to spec | Orava Castle (WC, x0.667)
 [step8b] at spec | Bryndzové halušky (WC)
 [step8b] at spec | Michael's Gate (WC)
 [step8b] at spec | Čumil Statue (WC)
+[seat] Tram | rotated -1.3deg to endpoint chord.
+[seat] Tram | seated rot=-1.3deg move=1.1pt depth=0.3pt
+[halfcut] Tram | pts=25 end0=(280.8,-30.7) endN=(283.7,-55.5) straight
+[buffer] Tram | band 0..+1mm
 [step8b] reset to spec | Tram (WC, x0.769)
 [step8b] at spec | Kraslice (WC)
+[seat] Kroje | rotated -0.3deg to endpoint chord.
+[seat] Kroje | seated rot=-0.3deg move=-3.2pt depth=0.3pt
+[halfcut] Kroje | pts=699 end0=(108.5,93.6) endN=(94.3,74.7) curved
+[buffer] Kroje | band 0..+1mm
 [step8b] reset to spec | Kroje (WC, x1.667)
 [step8b] at spec | Šúľance s Makom (WC)
+[seat] Fujara | rotated -1.0deg to endpoint chord.
+[seat] Fujara | seated rot=-1deg move=-3.1pt depth=0.3pt
+[halfcut] Fujara | pts=47 end0=(150.9,150.8) endN=(167.1,129.9) curved
+[buffer] Fujara | band 0..+1mm
 [step8b] reset to spec | Fujara (WC, x1.538)
 [step8b] done | reset=6 atSpec=15 skipped=0
 [pipeline] caption normalise complete | 6 reset to spec, 15 already at spec, 0 skipped.
 [pipeline] === AI_NormaliseCaptions done ===
-Caption normalisation done.
+✅ Captions normalised.
 
-  Reset to spec:  6 caption(s).
-  Already at spec: 15 caption(s).
-  Skipped:        0 (stamps / uncaptioned).
+  6 reset to spec, 15 already on spec, 0 skipped (stamps / uncaptioned).
 
 Re-run after each manual resize pass. When nesting is final, make pencil
 refinements, then run AI_ExportFinal.
-
-Log: /private/tmp/AI_NormaliseCaptions.log
