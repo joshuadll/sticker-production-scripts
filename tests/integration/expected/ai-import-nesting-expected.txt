@@ -4,105 +4,94 @@
 [step-nest] art sizing: factor=0.24000 pt/px (psdWidth=4961, sourceDPI=300)
 [step-nest] found 26 cutline(s) in working file.
 [step-nest] --- processing regular SVG: import-nesting_regular_nested.svg ---
-[step-nest] read 15 part(s) from import-nesting_regular_nested.svg
-[step-nest] found 15 nested part(s) in import-nesting_regular_nested.svg
-[step-nest] ART-FIT | Carpathian Wooden Churches art=128x118 outline=128x117 dW=0 dH=0
-[step-nest] caption placed | Carpathian Wooden Churches
-[step-nest] VERIFY | Carpathian Wooden Churches rot=90 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | Devín Castle art=139x112 outline=139x111 dW=0 dH=1
-[step-nest] caption placed | Devín Castle
-[step-nest] VERIFY | Devín Castle rot=-89 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | St. Martin's Cathedral art=157x130 outline=157x129 dW=0 dH=0
-[step-nest] caption placed | St. Martin's Cathedral
-[step-nest] VERIFY | St. Martin's Cathedral rot=-87 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | St Elizabeth's Cathedral (Dóm Svätej Alzbety) art=157x114 outline=157x114 dW=0 dH=0
-[step-nest] caption placed | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
-[step-nest] VERIFY | St Elizabeth's Cathedral (Dóm Svätej Alzbety) rot=180 bboxΔ=(0,1)  ok
-[step-nest] ART-FIT | Slovak Paradise National Park art=139x105 outline=139x105 dW=1 dH=0
-[step-nest] caption placed | Slovak Paradise National Park
-[step-nest] VERIFY | Slovak Paradise National Park rot=1 bboxΔ=(1,0)  ok
-[step-nest] ART-FIT | Čumil Statue art=128x95 outline=128x94 dW=1 dH=1
-[step-nest] caption placed | Čumil Statue
-[step-nest] VERIFY | Čumil Statue rot=-90 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | Michael's Gate art=99x139 outline=98x139 dW=1 dH=0
-[step-nest] caption placed | Michael's Gate
-[step-nest] VERIFY | Michael's Gate rot=-91 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | UFO Observation Deck, Bridge SNP art=118x91 outline=117x91 dW=0 dH=0
-[step-nest] VERIFY | UFO Observation Deck, Bridge SNP rot=-87 bboxΔ=(0,1)  ok
-[step-nest] ART-FIT | Štrbské Pleso art=139x116 outline=139x116 dW=0 dH=0
-[step-nest] caption placed | Štrbské Pleso
-[step-nest] VERIFY | Štrbské Pleso rot=-84 bboxΔ=(1,1)  ok
-[step-nest] ART-FIT | Bratislava Castle art=175x145 outline=175x144 dW=0 dH=1
-[step-nest] caption placed | Bratislava Castle
-[step-nest] VERIFY | Bratislava Castle rot=90 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | Bojnice Castle art=157x115 outline=156x114 dW=1 dH=1
-[step-nest] caption placed | Bojnice Castle
-[step-nest] VERIFY | Bojnice Castle rot=-90 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | Spiš Castle art=175x130 outline=175x129 dW=0 dH=0
-[step-nest] caption placed | Spiš Castle
-[step-nest] VERIFY | Spiš Castle rot=91 bboxΔ=(1,1)  ok
-[step-nest] ART-FIT | Old Town Hall (Bratislava) art=139x100 outline=139x99 dW=0 dH=1
-[step-nest] caption placed | Old Town Hall (Bratislava)
-[step-nest] VERIFY | Old Town Hall (Bratislava) rot=-90 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | Orava Castle art=139x96 outline=139x96 dW=0 dH=0
-[step-nest] caption placed | Orava Castle
-[step-nest] VERIFY | Orava Castle rot=-92 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | The Blue Church - Church of St. Elizabeth art=157x115 outline=157x114 dW=0 dH=1
+[step-nest] read 16 part(s) from import-nesting_regular_nested.svg
+[step-nest] found 16 nested part(s) in import-nesting_regular_nested.svg
+[step-nest] ART-FIT | The Blue Church - Church of St. Elizabeth art=147x108 outline=147x108 dW=0 dH=0
 [step-nest] caption placed | The Blue Church - Church of St. Elizabeth
-[step-nest] VERIFY | The Blue Church - Church of St. Elizabeth rot=-90 bboxΔ=(0,0)  ok
-[step-nest] group-rotated 15 pair(s) by -90°
-[step-nest] group-rot-check | pre 606x534 -> post 534x606  ok
-[step-nest] regular group placed | bottom y=207
+[step-nest] VERIFY | The Blue Church - Church of St. Elizabeth rot=180 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Michael's Gate art=104x147 outline=104x147 dW=0 dH=0
+[step-nest] caption placed | Michael's Gate
+[step-nest] VERIFY | Michael's Gate rot=-90 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Štrbské Pleso art=147x123 outline=147x123 dW=0 dH=0
+[step-nest] caption placed | Štrbské Pleso
+[step-nest] VERIFY | Štrbské Pleso rot=0 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | St. Martin's Cathedral art=147x121 outline=147x121 dW=0 dH=0
+[step-nest] caption placed | St. Martin's Cathedral
+[step-nest] VERIFY | St. Martin's Cathedral rot=-90 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Bratislava(text) art=118x24 outline=117x24 dW=0 dH=0
+[step-nest] VERIFY | Bratislava(text) rot=180 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | UFO Observation Deck, Bridge SNP art=108x83 outline=108x83 dW=0 dH=0
+[step-nest] VERIFY | UFO Observation Deck, Bridge SNP rot=180 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Orava Castle art=147x102 outline=147x102 dW=0 dH=0
+[step-nest] caption placed | Orava Castle
+[step-nest] VERIFY | Orava Castle rot=0 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Old Town Hall (Bratislava) art=147x104 outline=147x104 dW=0 dH=0
+[step-nest] caption placed | Old Town Hall (Bratislava)
+[step-nest] VERIFY | Old Town Hall (Bratislava) rot=0 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Slovak Paradise National Park art=147x110 outline=147x110 dW=0 dH=0
+[step-nest] caption placed | Slovak Paradise National Park
+[step-nest] VERIFY | Slovak Paradise National Park rot=90 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Spiš Castle art=147x110 outline=147x110 dW=0 dH=0
+[step-nest] caption placed | Spiš Castle
+[step-nest] VERIFY | Spiš Castle rot=180 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Čumil Statue art=118x88 outline=118x88 dW=0 dH=0
+[step-nest] caption placed | Čumil Statue
+[step-nest] VERIFY | Čumil Statue rot=90 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Carpathian Wooden Churches art=119x109 outline=119x109 dW=0 dH=0
+[step-nest] caption placed | Carpathian Wooden Churches
+[step-nest] VERIFY | Carpathian Wooden Churches rot=90 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Bratislava Castle art=147x122 outline=147x122 dW=0 dH=1
+[step-nest] caption placed | Bratislava Castle
+[step-nest] VERIFY | Bratislava Castle rot=0 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Devín Castle art=147x118 outline=147x117 dW=0 dH=0
+[step-nest] caption placed | Devín Castle
+[step-nest] VERIFY | Devín Castle rot=0 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Bojnice Castle art=148x108 outline=148x108 dW=0 dH=0
+[step-nest] caption placed | Bojnice Castle
+[step-nest] VERIFY | Bojnice Castle rot=180 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | St Elizabeth's Cathedral (Dóm Svätej Alzbety) art=147x107 outline=147x107 dW=0 dH=0
+[step-nest] caption placed | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
+[step-nest] VERIFY | St Elizabeth's Cathedral (Dóm Svätej Alzbety) rot=180 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] group-rotated 16 pair(s) by -90°
+[step-nest] group-rot-check | pre 567x527 -> post 527x567  ok
+[step-nest] regular group placed | bottom y=246
 [step-nest] --- processing irregular SVG: import-nesting_irregular_nested.svg ---
-[step-nest] read 11 part(s) from import-nesting_irregular_nested.svg
-[step-nest] found 11 nested part(s) in import-nesting_irregular_nested.svg
-[step-nest] ART-FIT | Tram art=146x104 outline=146x104 dW=0 dH=0
-[step-nest] caption placed | Tram
-[step-nest] VERIFY | Tram rot=-172 bboxΔ=(0,1)  ok
-[step-nest] ART-FIT | Slovakia Map art=146x79 outline=147x79 dW=0 dH=0
-[step-nest] VERIFY | Slovakia Map rot=-100 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | National Flower art=118x85 outline=117x84 dW=0 dH=0
-[step-nest] VERIFY | National Flower rot=54 bboxΔ=(1,1)  ok
-[step-nest] ART-FIT | Fujara art=49x128 outline=49x128 dW=1 dH=0
-[step-nest] caption placed | Fujara
-[step-nest] VERIFY | Fujara rot=-135 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | Kroje art=94x128 outline=94x128 dW=0 dH=0
-[step-nest] caption placed | Kroje
-[step-nest] VERIFY | Kroje rot=143 bboxΔ=(2,3)  ok
-[step-nest] ART-FIT | National Animal - Tatra chamois art=128x126 outline=129x125 dW=0 dH=1
-[step-nest] VERIFY | National Animal - Tatra chamois rot=-180 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | Pirohy art=136x120 outline=135x119 dW=1 dH=0
-[step-nest] caption placed | Pirohy
-[step-nest] VERIFY | Pirohy rot=124 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | Šúľance s Makom art=136x75 outline=135x75 dW=0 dH=0
+[step-nest] read 10 part(s) from import-nesting_irregular_nested.svg
+[step-nest] found 10 nested part(s) in import-nesting_irregular_nested.svg
+[step-nest] ART-FIT | Šúľance s Makom art=125x70 outline=126x70 dW=0 dH=0
 [step-nest] caption placed | Šúľance s Makom
-[step-nest] VERIFY | Šúľance s Makom rot=135 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | Bryndzové halušky art=136x110 outline=135x109 dW=1 dH=1
-[step-nest] caption placed | Bryndzové halušky
-[step-nest] VERIFY | Bryndzové halušky rot=2 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | Bratislava(text) art=128x35 outline=128x35 dW=0 dH=0
-[step-nest] VERIFY | Bratislava(text) rot=56 bboxΔ=(0,0)  ok
-[step-nest] ART-FIT | Kraslice art=128x96 outline=128x96 dW=0 dH=0
+[step-nest] VERIFY | Šúľance s Makom rot=34 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | National Animal - Tatra chamois art=118x116 outline=118x116 dW=0 dH=0
+[step-nest] caption placed | National Animal - Tatra chamois
+[step-nest] VERIFY | National Animal - Tatra chamois rot=11 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Fujara art=46x118 outline=46x118 dW=0 dH=0
+[step-nest] caption placed | Fujara
+[step-nest] VERIFY | Fujara rot=-67 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Kraslice art=118x89 outline=118x89 dW=0 dH=0
 [step-nest] caption placed | Kraslice
-[step-nest] VERIFY | Kraslice rot=-160 bboxΔ=(1,1)  ok
-[step-nest] irregular best rotation: 90° (outside approx 93027 pt²)
-[step-nest] group-rotated 11 pair(s) by 90°
-[step-nest] irregular group placed | rotation=90° | top y=201
+[step-nest] VERIFY | Kraslice rot=101 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | National Flower art=107x77 outline=107x76 dW=0 dH=0
+[step-nest] VERIFY | National Flower rot=-146 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Pirohy art=126x111 outline=126x111 dW=0 dH=0
+[step-nest] caption placed | Pirohy
+[step-nest] VERIFY | Pirohy rot=0 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Bryndzové halušky art=125x102 outline=125x101 dW=0 dH=0
+[step-nest] caption placed | Bryndzové halušky
+[step-nest] VERIFY | Bryndzové halušky rot=68 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Slovakia Map art=136x73 outline=136x73 dW=0 dH=0
+[step-nest] caption placed | Slovakia Map
+[step-nest] VERIFY | Slovakia Map rot=68 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Kroje art=86x119 outline=86x118 dW=0 dH=0
+[step-nest] caption placed | Kroje
+[step-nest] VERIFY | Kroje rot=124 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] ART-FIT | Tram art=136x96 outline=136x96 dW=0 dH=0
+[step-nest] caption placed | Tram
+[step-nest] VERIFY | Tram rot=45 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] irregular best rotation: 90° (outside approx 74221 pt²)
+[step-nest] group-rotated 10 pair(s) by 90°
+[step-nest] irregular group placed | rotation=90° | top y=240
 [step-nest] irregular contour-fit | nested up 8pt to close the gap to 2mm.
-[step9] created halfcut layer: Halfcut
-[step-nest] half-cut sync | 21 GC/WC element(s) re-synced to nested pose
-[step-nest] art-layer-check | on Stickers: 47 / placed: 47 (art 26 + caption 21)  ok
-[step-nest] result | matched: 26 | unmatched: 0 | art placed: 26 | caption placed: 21
-Done.
-
-  Placed:     26 element(s) at nested positions
-  Unmatched:  0 element(s) — see log
-  Layout:     regular rotated -90° at artboard top-left;
-              irregular auto-rotated below with 2 mm gap
-  Art placed: 26 PNG(s) in Stickers layer
-  Captions:   21 caption PNG(s) placed (decoupled)
-
-Review the cutline layout, then nest the elements. Run
-AI_NormaliseCaptions during the resize loop and AI_LayoutQA to
-check spacing; run AI_ExportFinal when the layout is done.
-
+[step-nest] half-cut sync | 23 GC/WC element(s) re-synced to nested pose
+[step-nest] overlap-check | 0 overlapping cut-line pair(s)  ok
+[step-nest] art-layer-check | on Stickers: 49 / placed: 49 (art 26 + caption 23)  ok
+[step-nest] result | matched: 26 | unmatched: 0 | art placed: 26 | caption placed: 23
