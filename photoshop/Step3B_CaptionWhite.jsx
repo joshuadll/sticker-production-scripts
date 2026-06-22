@@ -377,9 +377,12 @@ function createWhiteFromText(doc, textLayer) {
         // so when we detect a second line, override the fit to a flat spine at the
         // block centre. Genuine single-line arcs (e.g. food captions) keep their
         // curve — their pill follows the text and matches the round art beneath.
-        if (_isMultiLineText(doc, textLayer)) {
+        if (_isMultiLineText(textLayer)) {
             fit = { spine: _straightSpine(bnds[0], bnds[2], (bnds[1] + bnds[3]) / 2),
                     straight: true };
+            // Log signal so a live run shows the override firing (the content read is
+            // DOM-bound; only the line-count logic is unit tested).
+            log("[step3B] caption | multi-line → straight spine | " + textLayer.name);
         }
 
         // Pen height = full text height. For straight text that's the bounding
@@ -773,38 +776,43 @@ function _translateSpine(spine, tx, ty) {
     return out;
 }
 
-// Detects whether the caption is stacked on two (or more) lines, using a single
-// cheap probe: a thin horizontal band across the centre of the text's bounding box.
-// A single line has its ink (x-height) right at that vertical centre → band inked.
-// Two lines have the inter-line GAP at the centre → band empty. The band spans the
-// central 50% of the width so a word-space can't masquerade as an empty line.
-// Returns true when the centre band holds no ink (i.e. a gap between stacked lines).
-function _isMultiLineText(doc, textLayer) {
-    var b = layerBoundsPx(textLayer);
-    var w = b[2] - b[0], h = b[3] - b[1];
-    if (w <= 0 || h <= 0) return false;
-
-    var cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
-    var halfW  = w * 0.25;   // central 50% of width
-    var halfBand = h * 0.05; // thin ±5%-height band at the vertical centre
-
-    // loadLayerTransparency switches the active layer to textLayer; restore it
-    // afterwards so the caller's target layer (the White pill) stays active for Fill.
-    var prevActive = doc.activeLayer;
-    loadLayerTransparency(textLayer);
-    var inked = true;
-    try {
-        doc.selection.select(
-            [[cx - halfW, cy - halfBand], [cx + halfW, cy - halfBand],
-             [cx + halfW, cy + halfBand], [cx - halfW, cy + halfBand]],
-            SelectionType.INTERSECT, 0, false);
-        doc.selection.bounds; // throws if the intersection is empty
-    } catch (e) {
-        inked = false; // no ink at the vertical centre → gap between lines
+// Counts the non-empty text lines in a caption's content string. Captions are POINT
+// text (Step3A: contents set, no text-box width), so every visual line is a hard break
+// (\r) in textItem.contents — \n / \r\n are tolerated too. Pure (string → int); unit
+// tested in tests/integration/test-caption-linecount.jsx.
+function _countCaptionLines(contents) {
+    if (!contents) return 0;
+    var parts = String(contents).split(/[\r\n]+/), n = 0, i;
+    for (i = 0; i < parts.length; i++) {
+        if (parts[i].replace(/^\s+|\s+$/g, "").length > 0) n++;
     }
-    try { doc.selection.deselect(); } catch (e2) {}
-    try { doc.activeLayer = prevActive; } catch (e3) {}
-    return !inked;
+    return n;
+}
+
+// Reads a text layer's content string, or null if the layer isn't readable as text.
+// The only PS-bound piece of the multi-line check — validated in-app, not unit tested.
+function _textContents(textLayer) {
+    if (!textLayer) return null;
+    try { if (textLayer.kind !== LayerKind.TEXT) return null; } catch (eKind) { return null; }
+    try { return textLayer.textItem.contents; } catch (e) { return null; }
+}
+
+// Detects whether the caption is stacked on two (or more) lines by reading the line
+// count straight from the text content — the authoritative source. Captions are POINT
+// text, so a second line is always a hard break in textItem.contents (e.g. a translation
+// parenthetical: "Name\r(translation)").
+//
+// The OLD check probed a thin ±5%-height band at the bounding-box vertical centre for
+// ink, assuming the inter-line gap sits at that centre. It doesn't when the two lines
+// have unequal vertical extents — line 1 with no descenders, line 2 with parentheses /
+// accents / descenders make the bbox bottom-heavy, pushing its centre off the gap and
+// onto line-2 ink. The probe then read "single line", the straight-spine override below
+// never fired, and a straight two-line caption (e.g. St Elizabeth's Cathedral) got a
+// CURVED pill. Reading the content sidesteps all of that — and, unlike an ink scan, it
+// can never misread a genuine single ARCED line (a food caption) as multi-line, so those
+// keep their curve.
+function _isMultiLineText(textLayer) {
+    return _countCaptionLines(_textContents(textLayer)) >= 2;
 }
 
 // Samples the text's vertical centre across vertical slices. Returns
