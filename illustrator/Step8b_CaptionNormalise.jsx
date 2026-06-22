@@ -155,6 +155,11 @@ function runCaptionNormalise(doc) {
         var hcRes = syncHalfcut(doc, group, { polyCache: polyCache });
         if (!hcRes.ok) log("[step8b] half-cut SKIP | " + group.name + " — " + hcRes.reason);
 
+        // Refresh the spacing-buffer halo — the re-Unite above reshaped the cutline, so a
+        // halo cloned from the old cutline is now stale. Idempotent (clears its own prior).
+        var sbRes = syncSpacingBuffer(doc, group, {});
+        if (!sbRes.ok) log("[step8b] spacing-buffer SKIP | " + group.name + " — " + sbRes.reason);
+
         log("[step8b] reset to spec | " + group.name + " (" + styleCode
             + ", x" + unscale.toFixed(3) + ")");
         reset++;

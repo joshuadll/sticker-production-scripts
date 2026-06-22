@@ -193,6 +193,27 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
     FARTHEST-APART plate∩art crossings; drops only the outer "grab" edge, so notches stay
     bridged and a cap-wrap seam is kept; short spans allowed; returns null = not seated
     → error, no flat-cut fallback),
+  syncSpacingBuffer (per-element live 2mm keep-out halo; a CHILD of the cutline group named
+    "{name} buffer" = the cutline duplicated, then rendered as a thin magenta/violet Multiply BAND
+    (NOT a fill — a fill tinted the whole sticker pink; the band sits just OUTSIDE the cut so the
+    art's true colours show) via a STROKE of width H + a LIVE Adobe Offset Path effect of +H/2,
+    H = HALF the min spacing → band spans the cut line to +H. Magenta is the green Color Block's
+    complement so it reads there (a cyan just muddies in). Drag-time aid for the 2mm rule: two
+    pieces' halos meeting = exactly 2mm, OVERLAPPING halos darken = under spec — Illustrator has
+    no live collision test, the darkening IS the signal. Rides the nest transform + the artist's
+    manual move/scale because it's in the group; stays a true 1mm under resize ONLY with "Scale
+    Strokes & Effects" OFF (set defensively each call). Built at Step 7B, refreshed at Step 8b
+    after each re-Unite. Covers GC/WC AND stamps: a stamp is a bare path with no group to host the
+    halo, so Step 7B first wraps each stamp in a GroupItem (wrapStampsInGroups, note "ST|0" → Step
+    9A still skips its half-cut; stamps hide the peel tab manually per the playbook), then builds
+    the halo. The stamp grouping is a WORKING-PHASE aid only — unwrapStampGroups restores bare-path
+    stamps at export, so Step 10/11 and the shipped file are byte-for-byte unchanged. Advisory only
+    — the export gate stays Step 8c spacing/margin QA. Isolated from every consumer: Step 8c/9A/
+    nesting read findGroupMember (cutline member, not group bounds), StepQA excludes " buffer" by
+    name, parent-guards keep it out of layer-level group/path iterators. NOT yet PS/AI-validated),
+  wrapStampsInGroups / unwrapStampGroups (working-phase wrap of bare stamp cutlines into "ST|0"
+    groups so they can host a spacing halo; unwrapped back to bare paths before export),
+  removeAllSpacingBuffers (drops all "{name} buffer" halos from the Cutlines groups before export),
   buildWorkingDocument (builds A4/CMYK doc + Margin/Stickers/Grid/Color Block layers, no template),
   marginRect (shared safe-area rect: documented 190×267mm working area),
   log, scriptAlert, findLayer, findPathInLayer

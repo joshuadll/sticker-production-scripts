@@ -91,7 +91,38 @@
 [step-nest] group-rotated 10 pair(s) by 90°
 [step-nest] irregular group placed | rotation=90° | top y=240
 [step-nest] irregular contour-fit | nested up 8pt to close the gap to 2mm.
+[buffer] wrapped stamp for halo | Bratislava(text)
+[buffer] wrapped stamp for halo | National Flower
+[buffer] wrapped stamp for halo | UFO Observation Deck, Bridge SNP
+[step-nest] wrapped 3 stamp(s) in groups for halo
+[buffer] UFO Observation Deck, Bridge SNP | band 0..+1mm
+[buffer] National Flower | band 0..+1mm
+[buffer] Bratislava(text) | band 0..+1mm
+[buffer] Bratislava Castle | band 0..+1mm
+[buffer] Štrbské Pleso | band 0..+1mm
+[buffer] Devín Castle | band 0..+1mm
+[buffer] St. Martin's Cathedral | band 0..+1mm
+[buffer] Slovak Paradise National Park | band 0..+1mm
+[buffer] Spiš Castle | band 0..+1mm
+[buffer] Bojnice Castle | band 0..+1mm
+[buffer] The Blue Church - Church of St. Elizabeth | band 0..+1mm
+[buffer] Old Town Hall (Bratislava) | band 0..+1mm
+[buffer] St Elizabeth's Cathedral (Dóm Svätej Alzbety) | band 0..+1mm
+[buffer] Orava Castle | band 0..+1mm
+[buffer] Michael's Gate | band 0..+1mm
+[buffer] Carpathian Wooden Churches | band 0..+1mm
+[buffer] Pirohy | band 0..+1mm
+[buffer] Bryndzové halušky | band 0..+1mm
+[buffer] Čumil Statue | band 0..+1mm
+[buffer] Tram | band 0..+1mm
+[buffer] Kraslice | band 0..+1mm
+[buffer] Kroje | band 0..+1mm
+[buffer] National Animal - Tatra chamois | band 0..+1mm
+[buffer] Šúľance s Makom | band 0..+1mm
+[buffer] Slovakia Map | band 0..+1mm
+[buffer] Fujara | band 0..+1mm
 [step-nest] half-cut sync | 23 GC/WC element(s) re-synced to nested pose
+[step-nest] spacing-buffer | 26 keep-out halo(s) built (GC/WC + stamps)
 [step-nest] overlap-check | 0 overlapping cut-line pair(s)  ok
 [step-nest] art-layer-check | on Stickers: 49 / placed: 49 (art 26 + caption 23)  ok
 [step-nest] result | matched: 26 | unmatched: 0 | art placed: 26 | caption placed: 23

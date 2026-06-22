@@ -47,6 +47,12 @@ var CONFIG = {
     halfcutExtendMm:   1.0,
     halfcutSeamSteps:  16,
 
+    // ── Spacing buffer (live keep-out band; shared aiUtils.syncSpacingBuffer) ──
+    // Refreshed here after each re-Unite reshapes the cutline. See AI_ImportNesting. Uses
+    // spacingThresholdMm (same knob + value as the QA gate) so the band and the gate never drift.
+    spacingThresholdMm:   2,     // minimum element spacing (mm); band reaches out half of this
+    spacingBufferOpacity: 60,    // %; Multiply blend so overlapping bands darken (thin band, no art tint)
+
     // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,
 

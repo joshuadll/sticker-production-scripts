@@ -23,6 +23,14 @@ var CONFIG = {
     halfcutExtendMm:   1.0,
     halfcutSeamSteps:  16,
 
+    // ── Spacing buffer (live keep-out band; shared aiUtils.syncSpacingBuffer) ──
+    // Drag-time aid for the min-spacing rule: each cutline gets a band reaching OUT by half the
+    // rule, so overlapping bands == under spec. Built here (rides the nest transform + manual
+    // drags), refreshed by Step 8b, stripped before export. The band uses spacingThresholdMm
+    // (same knob + value as AI_LayoutQA / AI_ExportFinal) so the aid and the QA gate never drift.
+    spacingThresholdMm:   2,     // minimum element spacing (mm); band reaches out half of this
+    spacingBufferOpacity: 60,    // %; Multiply blend so overlapping bands darken (thin band, no art tint)
+
     // ── Art sizing ───────────────────────────────────────────────────────────
     // Source PSD resolution. Placed artwork is sized by the PSD→AI factor
     // (pt/px = 72/sourceDPI) so it lands at the element's true physical size
