@@ -49,7 +49,9 @@ function runResize(doc) {
             // Step 2B later expands each side by CONFIG.whiteEdgePx, growing the
             // longest edge by 2×whiteEdgePx. Resize the art smaller by that amount
             // so the final white-edged element lands on the category target.
-            var edgePx = (CONFIG.whiteEdgePx !== undefined) ? CONFIG.whiteEdgePx : 0;
+            // Stamps (ST) don't get white edge — resize to the full target directly.
+            var edgePx = (CONFIG.whiteEdgePx !== undefined && parsed.styleCode !== "ST")
+                ? CONFIG.whiteEdgePx : 0;
             var artTargetPx = targetPx - 2 * edgePx;
             if (artTargetPx < 1) {
                 log("[step2] SKIP | \"" + layer.name + "\" — target " + targetPx
@@ -65,8 +67,12 @@ function runResize(doc) {
                 continue;
             }
 
-            log("[step2] resized | " + layer.name + " -> art " + artTargetPx
-                + "px (final " + targetPx + "px incl. " + (2 * edgePx) + "px white edge)");
+            if (edgePx > 0) {
+                log("[step2] resized | " + layer.name + " -> art " + artTargetPx
+                    + "px (final " + targetPx + "px incl. " + (2 * edgePx) + "px white edge)");
+            } else {
+                log("[step2] resized | " + layer.name + " -> art " + artTargetPx + "px");
+            }
             resized++;
         }
 

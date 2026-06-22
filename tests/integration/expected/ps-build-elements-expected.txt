@@ -89,10 +89,10 @@
 [step2] resized | Orava Castle [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
 [step2] resized | Bojnice Castle [WC-LM] -> art 575px (final 615px incl. 40px white edge)
 [step2] resized | Old Town Hall (Bratislava) [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
-[step2] resized | UFO Observation Deck, Bridge SNP [ST] -> art 410px (final 450px incl. 40px white edge)
+[step2] resized | UFO Observation Deck, Bridge SNP [ST] -> art 450px
 [step2] resized | St. Martin's Cathedral [WC-LM] -> art 575px (final 615px incl. 40px white edge)
 [step2] resized | Slovakia Map [WC-MP] -> art 530px (final 570px incl. 40px white edge)
-[step2] resized | National Flower [ST] -> art 410px (final 450px incl. 40px white edge)
+[step2] resized | National Flower [ST] -> art 450px
 [step2] resized | Štrbské Pleso [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
 [step2] resized | Bratislava Castle [WC-LM+] -> art 650px (final 690px incl. 40px white edge)
 [step2] resized | Spiš Castle [WC-LM+] -> art 650px (final 690px incl. 40px white edge)
@@ -146,17 +146,17 @@
 [step2B] white edge | Orava Castle [WC-LM-]
 [step2B] white edge | Bojnice Castle [WC-LM]
 [step2B] white edge | Old Town Hall (Bratislava) [WC-LM-]
-[step2B] white edge | UFO Observation Deck, Bridge SNP [ST]
+[step2B] SKIP | "UFO Observation Deck, Bridge SNP [ST]" — stamp element, no white edge.
 [step2B] white edge | St. Martin's Cathedral [WC-LM]
 [step2B] white edge | Slovakia Map [WC-MP]
-[step2B] white edge | National Flower [ST]
+[step2B] SKIP | "National Flower [ST]" — stamp element, no white edge.
 [step2B] white edge | Štrbské Pleso [WC-LM-]
 [step2B] white edge | Bratislava Castle [WC-LM+]
 [step2B] white edge | Spiš Castle [WC-LM+]
 [step2B] white edge | Slovak Paradise National Park [WC-LM-]
 [step2B] white edge | Devín Castle [WC-LM-]
 [step2B] SKIP | "Background" — no [STYLE-CAT] code.
-[pipeline] step 3 complete | 26 element(s).
+[pipeline] step 3 complete | 24 element(s).
 [pipeline] --- Step 3A: Caption text ---
 [step3A] placed | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
@@ -193,13 +193,11 @@
 [step3A] placed | Old Town Hall (Bratislava) [WC-LM-]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
 [step3A] SKIP | "UFO Observation Deck, Bridge SNP [ST]" — style ST does not need a caption.
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
 [step3A] placed | St. Martin's Cathedral [WC-LM]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
 [step3A] placed | Slovakia Map [WC-MP]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
 [step3A] SKIP | "National Flower [ST]" — style ST does not need a caption.
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
 [step3A] placed | Štrbské Pleso [WC-LM-]
 [step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
 [step3A] placed | Bratislava Castle [WC-LM+]

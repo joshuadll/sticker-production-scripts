@@ -48,6 +48,12 @@ function runWhiteEdge(doc) {
                 continue;
             }
 
+            if (parsed.styleCode === "ST") {
+                log("[step2B] SKIP | \"" + name + "\" — stamp element, no white edge.");
+                skipped.push(name + " (stamp)");
+                continue;
+            }
+
             if (CONFIG.dryRun) {
                 log("[step2B] [DRY RUN] would add white edge | " + name);
                 processed++;
