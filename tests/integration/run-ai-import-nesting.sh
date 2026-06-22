@@ -4,20 +4,21 @@
 # Deepnest output SVGs, asserting every cutline matched (unmatched=0) and artwork
 # placed. Matching is area-only and runs headless via auto-discovery (suppressAlerts).
 #
-# FIXTURES REQUIRED (all next to each other, named by the {base} convention so the
-# pipeline's auto-discovery finds them — see _findNestedSvgs / _findElementsFolder):
-#   tests/integration/fixtures/import-nesting.ai
+# FIXTURE (committed — the real Slovakia SKU, the recurring rotation/overlap regression
+# case). Lives in its own folder, named by the {base} convention so the pipeline's
+# auto-discovery finds the siblings next to the .ai (see _findNestedSvgs/_findElementsFolder):
+#   tests/integration/fixtures/import-nesting/import-nesting.ai
 #       Working .ai right after Step 6 (Cutlines layer populated, Sticker layer present).
-#   tests/integration/fixtures/import-nesting_regular_nested.svg
-#   tests/integration/fixtures/import-nesting_irregular_nested.svg
-#       Real Deepnest output (the nested layouts). One or both may be present.
-#   tests/integration/fixtures/import-nesting_elements/
-#       Per-element PNGs (the {base}_elements folder PSAI exports), names matching
-#       the cutline display names (spaces preserved).
-#
-# Create them from a real run: run-psai-build-export-cutlines.sh produces the .ai +
-# {base}_elements; nest its two SVGs in Deepnest and save the outputs as the
-# _regular_nested.svg / _irregular_nested.svg names above.
+#   tests/integration/fixtures/import-nesting/import-nesting_regular_nested.svg
+#   tests/integration/fixtures/import-nesting/import-nesting_irregular_nested.svg
+#       Real Deepnest output (the nested layouts).
+#   tests/integration/fixtures/import-nesting/import-nesting_elements/
+#       Per-element art + caption PNGs, names matching the cutline display names.
+#   tests/integration/fixtures/import-nesting/import-nesting_elements.json
+#       PSAI sidecar (psdWidth → absolute art-sizing factor).
+# These are force-tracked via a .gitignore exception (the global *.ai / fixtures/* rules
+# would otherwise skip them). Regenerate from a real run: run-psai-build-export-cutlines.sh
+# produces the .ai + _elements; nest its two SVGs in Deepnest, save as the *_nested.svg names.
 
 set -euo pipefail
 
@@ -26,7 +27,7 @@ APP="Adobe Illustrator"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_ImportNesting.jsx"
-FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
+FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures/import-nesting"
 AI_FIXTURE="$FIXTURE_DIR/import-nesting.ai"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
@@ -147,6 +148,20 @@ else
         echo "FAIL [$STEP]: $WRONG element(s) placed at the wrong rotation:"
         grep "ROTATION WRONG" "$LOG"
         FAIL=1
+    fi
+
+    # Overlap correctness (the bug this guards): no two finished cut lines may intersect.
+    # The bbox VERIFY above is blind to a few-degree rotation of a near-square shape, so a
+    # placement/rotation error can pass VERIFY yet still cross a neighbour. _nestDetectOverlaps
+    # logs "*** CUTLINE OVERLAP ***" per intersecting pair + an "overlap-check | N" summary.
+    if grep -q "\[step-nest\] overlap-check" "$LOG"; then
+        if grep -q "CUTLINE OVERLAP" "$LOG"; then
+            echo "FAIL [$STEP]: finished cut lines overlap:"
+            grep "CUTLINE OVERLAP" "$LOG"
+            FAIL=1
+        else
+            echo "PASS [$STEP]: no cut-line overlaps."
+        fi
     fi
 
     # Art-layer correctness: artwork must land on the Stickers layer, not Cutlines.

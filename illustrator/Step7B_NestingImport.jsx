@@ -201,6 +201,21 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         log("[step-nest] half-cut sync | " + hcSynced + " GC/WC element(s) re-synced to nested pose");
     }
 
+    // ── 5c. Real overlap guard ────────────────────────────────────────────────────
+    // The check the bbox VERIFY is structurally blind to: do any two finished cut lines
+    // actually intersect? A placement/rotation error shows up here even when each element's
+    // own bbox looks right. Logged as a signal (not a hard abort — the export gate Step 8c
+    // already blocks spacing/overlap); the import test asserts overlaps=0.
+    if (!CONFIG.dryRun) {
+        var ovPairs = _nestDetectOverlaps(cutlinesLayer);
+        var op;
+        for (op = 0; op < ovPairs.length; op++) {
+            log("[step-nest] *** CUTLINE OVERLAP *** " + ovPairs[op][0] + "  <->  " + ovPairs[op][1]);
+        }
+        log("[step-nest] overlap-check | " + ovPairs.length + " overlapping cut-line pair(s)"
+            + (ovPairs.length === 0 ? "  ok" : "  *** OVERLAP ***"));
+    }
+
     // ── 6. Summary ───────────────────────────────────────────────────────────────
     // Verify art actually landed on the Stickers layer (not Cutlines): doc.placedItems
     // .add() ignores the active layer after the cutline passes, so a regression here is
@@ -281,8 +296,11 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
             var dW   = Math.abs(Math.abs(cgb2[2] - cgb2[0]) - Math.abs(svgItem.bounds[2] - svgItem.bounds[0]));
             var dH   = Math.abs(Math.abs(cgb2[1] - cgb2[3]) - Math.abs(svgItem.bounds[1] - svgItem.bounds[3]));
             var bad  = (dW > 5 || dH > 5);
+            var fitRms = (svgItem._fitResidual !== undefined)
+                ? (Math.round(svgItem._fitResidual * 10) / 10) : "na";
             log("[step-nest] VERIFY | " + cutlineItem.name
                 + " rot=" + Math.round(rotation)
+                + " fitRMS=" + fitRms
                 + " bboxΔ=(" + Math.round(dW) + "," + Math.round(dH) + ")"
                 + (bad ? "  *** ROTATION WRONG ***" : "  ok"));
         }
@@ -691,13 +709,18 @@ function _nestCollectParts(node) {
 function _nestPartRecord(part) {
     var gb   = part.geometricBounds;
     var area = _nestSumPathArea(part);
+    var lp   = _nestLargestPath(part);
 
     return {
         name:   part.name || "",
         center: boundsCenter(gb),
         bounds: gb,
         area:   area,
-        feat:   _nestPathOrientationFeature(_nestLargestPath(part))
+        feat:   _nestPathOrientationFeature(lp),
+        // Baked contour of the part's outer edge, sampled NOW (the SVG doc is closed right
+        // after collection). Used by _nestComputeRotation for full-contour registration —
+        // the whole outline, not one ambiguous corner.
+        poly:   lp ? _nestContourPoints(lp, 6) : []
     };
 }
 
@@ -837,6 +860,133 @@ function _nestAssignByArea(parts, cutlineMap) {
     return result;
 }
 
+// ── Full-contour rigid registration (replaces the farthest-corner angle guess) ──────
+// The old _nestComputeRotation reduced each shape to a single (centroid→farthest-corner)
+// vector. For near-square rounded rectangles the four corners are near-equidistant, so the
+// chosen "farthest" corner flips a few degrees under Deepnest's path re-emission — landing
+// the angle 4–8° off (e.g. St Martin's −85° vs Deepnest's −90°), which swings a corner into
+// the neighbour. The bbox `VERIFY` can't see it (a few-degree tilt of a square has the same
+// bbox). These helpers instead align the WHOLE outline, so the recovered angle matches
+// Deepnest's `rotate()` to <1° regardless of symmetry.
+
+// Flatten an item's sampled contour polygons (outer + any holes) into one point array.
+function _nestContourPoints(item, stepsPerSeg) {
+    var polys = samplePathToPolygons(item, stepsPerSeg), out = [], i, j;
+    for (i = 0; i < polys.length; i++)
+        for (j = 0; j < polys[i].length; j++) out.push(polys[i][j]);
+    return out;
+}
+
+// Even-stride downsample to at most `cap` points (keeps the registration cheap).
+function _nestDownsample(pts, cap) {
+    if (pts.length <= cap) return pts;
+    var out = [], stride = pts.length / cap, i;
+    for (i = 0; i < cap; i++) out.push(pts[Math.floor(i * stride)]);
+    return out;
+}
+
+function _nestMeanPt(pts) {
+    var sx = 0, sy = 0, i;
+    for (i = 0; i < pts.length; i++) { sx += pts[i].x; sy += pts[i].y; }
+    return { x: sx / pts.length, y: sy / pts.length };
+}
+
+// Mean squared nearest-point distance from posed set A to contour B (the fit error).
+function _nestFitErr(A, B) {
+    var i, j, sum = 0, best, dx, dy, d;
+    for (i = 0; i < A.length; i++) {
+        best = Infinity;
+        for (j = 0; j < B.length; j++) {
+            dx = A[i].x - B[j].x; dy = A[i].y - B[j].y; d = dx * dx + dy * dy;
+            if (d < best) best = d;
+        }
+        sum += best;
+    }
+    return sum / A.length;
+}
+
+// Recover the rotation (deg, +CCW) mapping the cutline contour onto the Deepnest part
+// contour by MINIMISING contour-fit error over a full 360° scan (coarse 5° → fine 0.25°).
+// Uses the whole outline, so near-square shapes can't alias. `featSeed` (the coarse
+// centroid→farthest angle) only breaks a 0-vs-180 near-tie on near-symmetric outlines.
+// Returns { angle, residual } — residual = RMS point error (pt); large ⇒ caller flags.
+function _nestContourFitAngle(cutlinePts, partPts, featSeed) {
+    var A0 = _nestDownsample(cutlinePts, 56);
+    var B  = _nestDownsample(partPts, 56);
+    var Oc = _nestMeanPt(A0), Op = _nestMeanPt(B);
+    var Ac = [], i;
+    for (i = 0; i < A0.length; i++) Ac.push({ x: A0[i].x - Oc.x, y: A0[i].y - Oc.y });
+
+    function fitAt(deg) {
+        var r = deg * Math.PI / 180, c = Math.cos(r), s = Math.sin(r), P = [], k;
+        for (k = 0; k < Ac.length; k++)
+            P.push({ x: c * Ac[k].x - s * Ac[k].y + Op.x,
+                     y: s * Ac[k].x + c * Ac[k].y + Op.y });
+        return _nestFitErr(P, B);
+    }
+
+    var best = 0, bestE = Infinity, a, e;
+    for (a = 0; a < 360; a += 5)              { e = fitAt(a); if (e < bestE) { bestE = e; best = a; } }
+    var c0 = best;
+    for (a = c0 - 5; a <= c0 + 5; a += 0.25)  { e = fitAt(a); if (e < bestE) { bestE = e; best = a; } }
+
+    // 0-vs-180 tiebreak: if the opposite pose fits within 10%, pick the one nearer the
+    // unique-corner feature seed (which carries the gross orientation/handedness).
+    var oppE = fitAt(best + 180);
+    if (oppE < bestE * 1.10 && typeof featSeed === "number") {
+        function adist(x, y) { var d = ((x - y) % 360 + 540) % 360 - 180; return d < 0 ? -d : d; }
+        if (adist(best + 180, featSeed) < adist(best, featSeed)) { best = best + 180; bestE = oppE; }
+    }
+
+    while (best > 180)   best -= 360;
+    while (best <= -180) best += 360;
+    return { angle: best, residual: Math.sqrt(bestE) };
+}
+
+// Coarse, decimated contours for the overlap touch-test (keeps polygonsOverlap cheap on
+// dense traced cut lines): sample at 2 steps/seg, then even-stride down to ≤80 pts each.
+function _nestCoarseContours(item) {
+    var polys = samplePathToPolygons(item, 2), out = [], i;
+    for (i = 0; i < polys.length; i++) {
+        if (polys[i].length >= 3) out.push(_nestDownsample(polys[i], 80));
+    }
+    return out;
+}
+
+// Detects overlapping cut-line pairs among the Cutlines layer's direct children — the
+// real geometric check the bbox `VERIFY` is blind to. bbox-gated, then exact polygon
+// overlap. Returns [[nameA, nameB], …].
+function _nestDetectOverlaps(cutlinesLayer) {
+    var items = [], names = [], i, it, vis;
+    function add(node) { vis = _nestCutlineVisible(node); if (vis) { items.push(vis); names.push(node.name); } }
+    for (i = 0; i < cutlinesLayer.groupItems.length; i++) {
+        it = cutlinesLayer.groupItems[i]; if (it.parent === cutlinesLayer && it.name) add(it);
+    }
+    for (i = 0; i < cutlinesLayer.pathItems.length; i++) {
+        it = cutlinesLayer.pathItems[i]; if (it.parent === cutlinesLayer && it.name) add(it);
+    }
+    for (i = 0; i < cutlinesLayer.compoundPathItems.length; i++) {
+        it = cutlinesLayer.compoundPathItems[i]; if (it.parent === cutlinesLayer && it.name) add(it);
+    }
+    var n = items.length, gb = [], polys = [], a, b;
+    for (a = 0; a < n; a++) { gb.push(items[a].geometricBounds); polys.push(null); }
+    var out = [];
+    for (a = 0; a < n; a++) {
+        for (b = a + 1; b < n; b++) {
+            // bbox gate (AI y-up: [l,t,r,b], t>b) — skip clearly-disjoint pairs.
+            if (gb[a][2] < gb[b][0] || gb[b][2] < gb[a][0]) continue;
+            if (gb[a][3] > gb[b][1] || gb[b][3] > gb[a][1]) continue;
+            // Coarse sample (2 steps/seg) + decimate ≤80 pts/contour: this is a touch
+            // test on already-bbox-adjacent stickers, so a few-pt contour resolution is
+            // plenty, and it keeps the O(n·m) overlap test from exploding on dense traces.
+            if (polys[a] === null) polys[a] = _nestCoarseContours(items[a]);
+            if (polys[b] === null) polys[b] = _nestCoarseContours(items[b]);
+            if (polygonsOverlap(polys[a], polys[b])) out.push([names[a], names[b]]);
+        }
+    }
+    return out;
+}
+
 // Computes the rotation angle (degrees, + = CCW) that Deepnest applied to the part
 // relative to the matched cutline.
 //
@@ -865,23 +1015,33 @@ function _nestComputeRotation(svgItem, cutlineItem) {
     var clFeat = _nestPathOrientationFeature(clPath);
     var svFeat = svgItem.feat;
 
+    // Coarse feature angle — seeds the 0/180 tiebreak, and is the legacy fallback.
+    var seed = null;
     if (clFeat && svFeat && clFeat.len >= 2 && svFeat.len >= 2) {
-        var clVec = { x: clFeat.farthest.x - clFeat.centroid.x,
-                      y: clFeat.farthest.y - clFeat.centroid.y };
-        var svVec = { x: svFeat.farthest.x - svFeat.centroid.x,
-                      y: svFeat.farthest.y - svFeat.centroid.y };
-
-        var clAngle = Math.atan2(clVec.y, clVec.x) * 180 / Math.PI;
-        var svAngle = Math.atan2(svVec.y, svVec.x) * 180 / Math.PI;
-        var rot = svAngle - clAngle;
-        while (rot >  180) rot -= 360;
-        while (rot < -180) rot += 360;
-
-        // Refine against the SVG part's true bbox dimensions.
-        return _nestRefineRotation(clPath, rot, svgItem.bounds);
+        var clAngle = Math.atan2(clFeat.farthest.y - clFeat.centroid.y,
+                                 clFeat.farthest.x - clFeat.centroid.x) * 180 / Math.PI;
+        var svAngle = Math.atan2(svFeat.farthest.y - svFeat.centroid.y,
+                                 svFeat.farthest.x - svFeat.centroid.x) * 180 / Math.PI;
+        seed = svAngle - clAngle;
+        while (seed >  180) seed -= 360;
+        while (seed < -180) seed += 360;
     }
 
-    // ── Fallback: bbox swap (detects 90° flip) ───────────────────────────────────
+    // PRIMARY: full-contour registration against the baked Deepnest part. Immune to the
+    // ambiguous-farthest-corner drift on near-square shapes (the overlap bug).
+    if (clPath && svgItem.poly && svgItem.poly.length >= 8) {
+        var cutPts = _nestContourPoints(clPath, 6);
+        if (cutPts.length >= 8) {
+            var fit = _nestContourFitAngle(cutPts, svgItem.poly, seed);
+            svgItem._fitResidual = fit.residual;   // surfaced by the VERIFY line
+            return fit.angle;
+        }
+    }
+
+    // FALLBACK 1: coarse feature + bbox-dim refine (degenerate/empty contour only).
+    if (seed !== null) return _nestRefineRotation(clPath, seed, svgItem.bounds);
+
+    // ── Fallback 2: bbox swap (detects 90° flip) ───────────────────────────────────
     var cgb   = cutlineItem.geometricBounds;
     var origW = Math.abs(cgb[2] - cgb[0]);
     var origH = Math.abs(cgb[1] - cgb[3]);
