@@ -1219,10 +1219,11 @@ function syncHalfcut(doc, group, opts) {
 // export by removeAllSpacingBuffers (AI_ExportFinal + Step 11). Step 8c is unaffected — it
 // reads only the named cutline member (findGroupMember), never the buffer.
 
-// Half of the minimum element spacing, in mm (the per-piece share of the 2mm rule).
+// Half of the minimum element spacing, in mm (the per-piece share of the 2mm rule). Reads the
+// SAME knob the QA gate uses (CONFIG.spacingThresholdMm) so the visual band and the export gate
+// can never disagree about what "2mm" is — a single source of truth. Defaults to 2mm / 2.
 function _spacingBufferOffsetMm() {
-    if (CONFIG.spacingBufferMm != null) return CONFIG.spacingBufferMm;
-    var minMm = (CONFIG.minSpacingMm != null) ? CONFIG.minSpacingMm : 2;
+    var minMm = (CONFIG.spacingThresholdMm != null) ? CONFIG.spacingThresholdMm : 2;
     return minMm / 2;
 }
 
@@ -1248,8 +1249,9 @@ function _removeSpacingBufferFor(group) {
     return doomed.length;
 }
 
-// (Re)builds ONE element's spacing-buffer halo from its CURRENT cutline. Idempotent.
-// GC/WC only. Returns { ok, reason }.
+// (Re)builds ONE element's spacing-buffer band from its CURRENT cutline. Idempotent.
+// GC/WC captioned groups AND wrapped stamps (note "ST|0"); other notes skip. Returns
+// { ok, reason }.
 function syncSpacingBuffer(doc, group, opts) {
     opts = opts || {};
     if (!group || group.typename !== "GroupItem") {

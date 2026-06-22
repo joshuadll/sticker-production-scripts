@@ -23,11 +23,12 @@ var CONFIG = {
     halfcutExtendMm:   1.0,
     halfcutSeamSteps:  16,
 
-    // ── Spacing buffer (live 2mm keep-out halo; shared aiUtils.syncSpacingBuffer) ──
-    // Drag-time aid for the 2mm min-spacing rule: each GC/WC cutline gets a translucent
-    // halo offset OUTWARD by half the rule, so overlapping halos == under spec. Built here
-    // (rides the nest transform + manual drags), refreshed by Step 8b, stripped before export.
-    spacingBufferMm:      1.0,   // half of the 2mm minimum spacing (per-piece share)
+    // ── Spacing buffer (live keep-out band; shared aiUtils.syncSpacingBuffer) ──
+    // Drag-time aid for the min-spacing rule: each cutline gets a band reaching OUT by half the
+    // rule, so overlapping bands == under spec. Built here (rides the nest transform + manual
+    // drags), refreshed by Step 8b, stripped before export. The band uses spacingThresholdMm
+    // (same knob + value as AI_LayoutQA / AI_ExportFinal) so the aid and the QA gate never drift.
+    spacingThresholdMm:   2,     // minimum element spacing (mm); band reaches out half of this
     spacingBufferOpacity: 60,    // %; Multiply blend so overlapping bands darken (thin band, no art tint)
 
     // ── Art sizing ───────────────────────────────────────────────────────────
