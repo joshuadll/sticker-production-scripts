@@ -264,19 +264,74 @@ function _drawFlagOverlay(qaLayer, records, spacingMarks, marginRect) {
 }
 
 // Draws an inward-pointing amber arrow in the margin gutter for each safe-area edge
-// the record crosses. Positioned at the element's mid-extent along that edge, offset
-// gutterPt into the gutter, pointing toward the safe area. Returns arrows drawn.
+// the record crosses. Positioned at the OVERHANG — the mid-extent of the contour
+// points that actually sit outside that edge (from record.polys, the same sampled
+// geometry the sliver fill clips), offset gutterPt into the gutter, pointing toward
+// the safe area. So the arrow lands on the part that's really over the line, not the
+// bounding-box centre (which floats in empty gutter when the overhang is a localized
+// corner/tab). Falls back to the bbox centre — and logs it — only when no sampled
+// point is outside (a degenerate bbox-only crossing); stamps, whose polys IS the
+// bbox, naturally resolve to the bbox centre. Returns arrows drawn.
 function _drawMarginArrows(qaLayer, record, mR, amber, arrowPt, gutterPt) {
     var bb = record.bounds;                 // [l, t, r, b] (AI y-up)
     var cxMid = (bb[0] + bb[2]) / 2;
     var cyMid = (bb[1] + bb[3]) / 2;
-    var e = record.marginEdges, n = 0;
+    var polys = record.polys || [];
+    var e = record.marginEdges, n = 0, a;
 
-    if (e.left)   { qaDrawArrow(qaLayer, mR[0] - gutterPt, cyMid,  1,  0, arrowPt, amber, 100); n++; }
-    if (e.right)  { qaDrawArrow(qaLayer, mR[2] + gutterPt, cyMid, -1,  0, arrowPt, amber, 100); n++; }
-    if (e.top)    { qaDrawArrow(qaLayer, cxMid, mR[1] + gutterPt,  0, -1, arrowPt, amber, 100); n++; }
-    if (e.bottom) { qaDrawArrow(qaLayer, cxMid, mR[3] - gutterPt,  0,  1, arrowPt, amber, 100); n++; }
+    if (e.left) {
+        a = _overhangMid(polys, "x", mR[0], false, "y");
+        a = _arrowAnchor(a, cyMid, record.name, "left");
+        qaDrawArrow(qaLayer, mR[0] - gutterPt, a,  1,  0, arrowPt, amber, 100); n++;
+    }
+    if (e.right) {
+        a = _overhangMid(polys, "x", mR[2], true, "y");
+        a = _arrowAnchor(a, cyMid, record.name, "right");
+        qaDrawArrow(qaLayer, mR[2] + gutterPt, a, -1,  0, arrowPt, amber, 100); n++;
+    }
+    if (e.top) {
+        a = _overhangMid(polys, "y", mR[1], true, "x");
+        a = _arrowAnchor(a, cxMid, record.name, "top");
+        qaDrawArrow(qaLayer, a, mR[1] + gutterPt,  0, -1, arrowPt, amber, 100); n++;
+    }
+    if (e.bottom) {
+        a = _overhangMid(polys, "y", mR[3], false, "x");
+        a = _arrowAnchor(a, cxMid, record.name, "bottom");
+        qaDrawArrow(qaLayer, a, mR[3] - gutterPt,  0,  1, arrowPt, amber, 100); n++;
+    }
     return n;
+}
+
+// Resolves the arrow's along-edge anchor: the overhang midpoint when one was found,
+// else the bbox-centre fallback (and a log signal, since a bbox-only crossing means
+// the contour never actually pokes past — worth a diagnostic note for review).
+function _arrowAnchor(overhangMid, bboxMid, name, edge) {
+    if (overhangMid !== null) return overhangMid;
+    log("[step8c] margin arrow | bbox-centre fallback (no contour point outside) | "
+        + (name || "(unnamed)") + " | " + edge);
+    return bboxMid;
+}
+
+// Along-edge coordinate of the MIDPOINT of the contour points that sit outside one
+// safe-area edge. axis "x"/"y" + value = the safe line; keepGreater = the outside is
+// the greater side (matches _fillMarginOverhang's clip signs, so the arrow agrees
+// with the sliver). alongKey = which coordinate to return the extent-midpoint of
+// (the edge's tangent axis: vertical edge -> "y", horizontal edge -> "x"). Returns
+// null when no point is outside (degenerate bbox-only crossing).
+function _overhangMid(polys, axis, value, keepGreater, alongKey) {
+    var lo = null, hi = null, p, k, pt, v, a, out;
+    for (p = 0; p < polys.length; p++) {
+        for (k = 0; k < polys[p].length; k++) {
+            pt = polys[p][k];
+            v  = (axis === "x") ? pt.x : pt.y;
+            out = keepGreater ? (v > value) : (v < value);
+            if (!out) continue;
+            a = (alongKey === "x") ? pt.x : pt.y;
+            if (lo === null || a < lo) lo = a;
+            if (hi === null || a > hi) hi = a;
+        }
+    }
+    return (lo === null) ? null : (lo + hi) / 2;
 }
 
 // Fills the overhang of one margin violator: for each safe-area edge the record
