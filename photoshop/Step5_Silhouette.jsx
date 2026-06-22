@@ -107,22 +107,37 @@ function createSilhouetteLayer(doc) {
 // Hides caption sub-layers (TEXT, "White" pill, "Caption plate") inside every
 // element group so the loaded group transparency excludes them. Returns the list
 // of layers it actually hid (only those that were visible), for restoration.
+// Only hides TEXT layers when the group has a real Step-3B caption structure
+// (White pill or Caption plate present) — art-text inside an element group
+// must remain visible in the art export and silhouette.
 function hideCaptionSublayers(elementsGroup) {
     var hidden = [];
     var g;
     for (g = 0; g < elementsGroup.layerSets.length; g++) {
         var grp = elementsGroup.layerSets[g];
 
-        var a;
+        // Determine whether this group has a real caption structure before
+        // deciding to hide its TEXT layer(s).
+        var hasCaption = false;
+        var a, s;
+        for (a = 0; a < grp.artLayers.length; a++) {
+            if (grp.artLayers[a].name === "White") { hasCaption = true; break; }
+        }
+        if (!hasCaption) {
+            for (s = 0; s < grp.layerSets.length; s++) {
+                if (grp.layerSets[s].name === "Caption plate") { hasCaption = true; break; }
+            }
+        }
+
         for (a = 0; a < grp.artLayers.length; a++) {
             var al = grp.artLayers[a];
-            if ((al.kind === LayerKind.TEXT || al.name === "White") && al.visible) {
+            var isCapText = hasCaption && al.kind === LayerKind.TEXT;
+            if ((isCapText || al.name === "White") && al.visible) {
                 al.visible = false;
                 hidden.push(al);
             }
         }
 
-        var s;
         for (s = 0; s < grp.layerSets.length; s++) {
             var ls = grp.layerSets[s];
             if (ls.name === "Caption plate" && ls.visible) {

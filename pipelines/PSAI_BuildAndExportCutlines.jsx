@@ -151,6 +151,10 @@ function captionInfo(grp) {
     var lines = 1;
     var found = false;
     var whiteLeft = null, whiteTop = null;   // White pill's own bounds (spine re-anchor)
+    // TEXT layers are deferred: a bare art-text inside the element group is
+    // indistinguishable from the caption T layer by kind alone. Only "White" and
+    // "Caption plate" (created exclusively by Step 3B) confirm a real caption exists.
+    var pendingTexts = [];
 
     function absorb(layer) {
         var b = layer.bounds;
@@ -163,31 +167,38 @@ function captionInfo(grp) {
         return [l, t, r, bo];
     }
 
-    var a;
+    var a, s, ti;
     for (a = 0; a < grp.artLayers.length; a++) {
         var al = grp.artLayers[a];
         if (al.kind === LayerKind.TEXT) {
-            absorb(al);
-            var contents = "";
-            try { contents = al.textItem.contents; } catch (e) { contents = ""; }
-            if (contents) {
-                var parts = contents.split(/[\r\n]+/);
-                if (parts.length > lines) lines = parts.length;
-            }
+            pendingTexts.push(al);   // absorb only after caption structure is confirmed
         } else if (al.name === "White") {
             var wb = absorb(al);
             whiteLeft = wb[0]; whiteTop = wb[1];
         }
     }
 
-    var s;
     for (s = 0; s < grp.layerSets.length; s++) {
         if (grp.layerSets[s].name === "Caption plate") {
             absorb(grp.layerSets[s]);
         }
     }
 
+    // TEXT alone is not proof of a caption — only White pill or Caption plate (both
+    // created by Step 3B) are. An art-text layer inside the element group would
+    // otherwise be mistaken for a caption and exported to AI as one.
     if (!found) return null;
+
+    for (ti = 0; ti < pendingTexts.length; ti++) {
+        absorb(pendingTexts[ti]);
+        var contents = "";
+        try { contents = pendingTexts[ti].textItem.contents; } catch (e) { contents = ""; }
+        if (contents) {
+            var parts = contents.split(/[\r\n]+/);
+            if (parts.length > lines) lines = parts.length;
+        }
+    }
+
     return {
         lines:  lines,
         left:   Math.round(left),
@@ -359,16 +370,16 @@ function hideNonCaptionSublayers(elementsGroup) {
     return hidden;
 }
 
-// True if the element group contains any caption sub-layer (regardless of
-// visibility). Stamps / uncaptioned elements return false and are skipped by the
-// caption-only pass (they would otherwise export an empty PNG).
+// True if the element group contains a real Step-3B caption structure (regardless of
+// visibility). Checks for "White" pill or "Caption plate" only — a bare art-text layer
+// inside an element group must not be treated as a caption.
 function groupHasCaption(grp) {
     var a, s;
     for (a = 0; a < grp.artLayers.length; a++) {
-        if (_isCaptionSublayer(grp.artLayers[a])) return true;
+        if (grp.artLayers[a].name === "White") return true;
     }
     for (s = 0; s < grp.layerSets.length; s++) {
-        if (_isCaptionSublayer(grp.layerSets[s])) return true;
+        if (grp.layerSets[s].name === "Caption plate") return true;
     }
     return false;
 }
