@@ -181,6 +181,13 @@ function runNestingQA(doc) {
 // Walking pageItems recursively collects the leaf paths by TYPE, so grouping,
 // naming, and the hidden outline/plate sub-paths are all irrelevant: occupancy
 // is a union, and hidden components are geometric subsets of the fused contour.
+// True if the item is a spacing-buffer halo (named "{element} buffer"). Defined here so
+// _qa_collectPaths can drop it before it reaches the occupancy grid.
+function _qa_isSpacingBuffer(item) {
+    var n = item.name;
+    return !!(n && n.length >= 7 && n.substring(n.length - 7) === " buffer");
+}
+
 function _qa_collectPaths(container) {
     var result = [];
     var i, j, inner;
@@ -201,6 +208,12 @@ function _qa_collectPaths(container) {
     var items = container.pageItems;
     var t;
     for (i = 0; i < items.length; i++) {
+        // Skip spacing-buffer halos (aiUtils.syncSpacingBuffer) — they live INSIDE the cutline
+        // groups but are a transient drag-time aid, offset outward past the real cut. Counting
+        // them would inflate occupancy and erase real pockets. Matched by the " buffer" suffix;
+        // a buffer cloned from a group cutline is itself a named GroupItem, so skipping it here
+        // also skips its (unnamed) descendants.
+        if (_qa_isSpacingBuffer(items[i])) continue;
         t = items[i].typename;
         if (t === "PathItem" || t === "CompoundPathItem") {
             result.push(items[i]);

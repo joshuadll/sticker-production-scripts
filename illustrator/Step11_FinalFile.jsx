@@ -31,6 +31,10 @@ function runFinalFile(doc) {
     // After saveAs, app.activeDocument is now the final file.
     var fd = app.activeDocument;
 
+    // Safety net: drop any spacing-buffer halos that slipped through (AI_ExportFinal strips
+    // them up front, but a direct runFinalFile call would not) — they must never print.
+    try { removeAllSpacingBuffers(fd); } catch (eBuf) {}
+
     // Standardise halfcut layer name.
     var halfcutLayer = _s11FindHalfcutLayer(fd);
     if (halfcutLayer) {

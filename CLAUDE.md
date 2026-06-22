@@ -193,6 +193,19 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
     FARTHEST-APART plate∩art crossings; drops only the outer "grab" edge, so notches stay
     bridged and a cap-wrap seam is kept; short spans allowed; returns null = not seated
     → error, no flat-cut fallback),
+  syncSpacingBuffer (per-element live 2mm keep-out halo; a CHILD of the cutline group named
+    "{name} buffer" = the cutline duplicated, translucent-cyan Multiply fill, + a LIVE Adobe
+    Offset Path effect of HALF the min spacing outward. Drag-time aid for the 2mm rule: two
+    pieces' halos meeting = exactly 2mm, OVERLAPPING halos darken = under spec — Illustrator has
+    no live collision test, the darkening IS the signal. Rides the nest transform + the artist's
+    manual move/scale because it's in the group; stays a true 1mm under resize ONLY with "Scale
+    Strokes & Effects" OFF (set defensively each call). Built at Step 7B, refreshed at Step 8b
+    after each re-Unite, GC/WC only — same gate as the half-cut; stamps skip. Advisory only — the
+    export gate stays Step 8c spacing/margin QA. Isolated from every consumer: Step 8c/9A/nesting
+    read findGroupMember (cutline member, not group bounds), StepQA excludes " buffer" by name,
+    parent-guards keep it out of layer-level group/path iterators. removeAllSpacingBuffers strips
+    every halo before export — called at AI_ExportFinal entry + Step 11. NOT yet PS/AI-validated),
+  removeAllSpacingBuffers (drops all "{name} buffer" halos from the Cutlines groups before export),
   buildWorkingDocument (builds A4/CMYK doc + Margin/Stickers/Grid/Color Block layers, no template),
   marginRect (shared safe-area rect: documented 190×267mm working area),
   log, scriptAlert, findLayer, findPathInLayer

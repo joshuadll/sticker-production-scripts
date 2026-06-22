@@ -23,6 +23,13 @@ var CONFIG = {
     halfcutExtendMm:   1.0,
     halfcutSeamSteps:  16,
 
+    // ── Spacing buffer (live 2mm keep-out halo; shared aiUtils.syncSpacingBuffer) ──
+    // Drag-time aid for the 2mm min-spacing rule: each GC/WC cutline gets a translucent
+    // halo offset OUTWARD by half the rule, so overlapping halos == under spec. Built here
+    // (rides the nest transform + manual drags), refreshed by Step 8b, stripped before export.
+    spacingBufferMm:      1.0,   // half of the 2mm minimum spacing (per-piece share)
+    spacingBufferOpacity: 35,    // %; Multiply blend so two overlapping halos darken
+
     // ── Art sizing ───────────────────────────────────────────────────────────
     // Source PSD resolution. Placed artwork is sized by the PSD→AI factor
     // (pt/px = 72/sourceDPI) so it lands at the element's true physical size

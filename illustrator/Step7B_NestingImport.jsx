@@ -185,7 +185,7 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     // The half-cut tracks the caption seam; nesting only rotated/translated each cutline
     // group, so re-derive it on the new pose (idempotent — clears its own prior output).
     if (!CONFIG.dryRun) {
-        var hcSynced = 0, gi, gItem, gNote;
+        var hcSynced = 0, sbSynced = 0, gi, gItem, gNote;
         for (gi = 0; gi < cutlinesLayer.groupItems.length; gi++) {
             gItem = cutlinesLayer.groupItems[gi];
             if (gItem.parent !== cutlinesLayer) continue;
@@ -197,8 +197,15 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
             if (hcRes.ok) hcSynced++;
             else log("[step-nest] half-cut SKIP | " + gItem.name + " — " + hcRes.reason
                 + " (peel tab missing; AI_ExportFinal will hard-error until the seat is fixed)");
+            // Spacing-buffer halo (live drag-time 2mm keep-out aid). Built here so it rides the
+            // nested pose + the artist's manual repositioning; refreshed by Step 8b; stripped
+            // before export. Advisory, so a failure only logs — it never blocks the import.
+            var sbRes = syncSpacingBuffer(doc, gItem, {});
+            if (sbRes.ok) sbSynced++;
+            else log("[step-nest] spacing-buffer SKIP | " + gItem.name + " — " + sbRes.reason);
         }
         log("[step-nest] half-cut sync | " + hcSynced + " GC/WC element(s) re-synced to nested pose");
+        log("[step-nest] spacing-buffer | " + sbSynced + " GC/WC keep-out halo(s) built");
     }
 
     // ── 5c. Real overlap guard ────────────────────────────────────────────────────

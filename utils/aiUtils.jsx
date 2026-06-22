@@ -1195,6 +1195,136 @@ function syncHalfcut(doc, group, opts) {
     return { ok: true, curved: curved };
 }
 
+// ─── SPACING BUFFER (live 2mm keep-out halo; Step 7B birth + Step 8b refresh) ─────
+// A drag-time visual aid for the 2mm minimum-spacing rule. Each GC/WC cutline gets a
+// translucent "keep-out" halo offset OUTWARD by HALF the min spacing — so two pieces'
+// halos meeting == exactly the min gap, and OVERLAPPING halos == under spec. The halo is
+// a child of the cutline GroupItem, so it rides the rigid nest transform (Step 7B) AND any
+// manual move/scale the artist applies to the selected cutline group — no re-run needed to
+// follow a drag (the half-cut, on its own layer, does NOT track a raw drag; this does).
+// Drawn with a MULTIPLY blend so two overlapping halos visibly DARKEN in the danger band —
+// Illustrator has no live collision test, so the darkening IS the signal. The authoritative
+// spacing pass stays Step 8c / AI_LayoutQA (the red flags); this is only an early warning.
+//
+// WHY a LIVE Offset Path effect (not a baked outline): the +half-spacing is an EFFECT
+// parameter, so with "Scale Strokes & Effects" OFF the halo stays a true 1mm even after the
+// artist resizes the piece (the 2mm rule is absolute, not relative to piece size). A baked
+// ring would scale with the art and drift off-spec. syncSpacingBuffer sets that preference
+// off defensively on every call.
+//
+// Idempotent: clears this element's prior "{name} buffer" first (re-run loops: Step 7B on
+// re-import, Step 8b repeatedly). GC/WC only (gated on the cutline note), matching the
+// half-cut; stamps / uncaptioned skip. Buffers are children of the Cutlines groups, so they
+// are EXCLUDED by name (" buffer") from StepQA's occupancy collector and STRIPPED before
+// export by removeAllSpacingBuffers (AI_ExportFinal + Step 11). Step 8c is unaffected — it
+// reads only the named cutline member (findGroupMember), never the buffer.
+
+// Half of the minimum element spacing, in mm (the per-piece share of the 2mm rule).
+function _spacingBufferOffsetMm() {
+    if (CONFIG.spacingBufferMm != null) return CONFIG.spacingBufferMm;
+    var minMm = (CONFIG.minSpacingMm != null) ? CONFIG.minSpacingMm : 2;
+    return minMm / 2;
+}
+
+// The halo fill colour — a distinct cyan, separate from the red spacing flags / amber
+// margin overhang carried on the Layout QA layer.
+function _spacingBufferCmyk() {
+    var c = new CMYKColor();
+    c.cyan = 55; c.magenta = 0; c.yellow = 18; c.black = 0;
+    return c;
+}
+
+// Sets fill (no stroke) on item and, for compound/group items, every descendant path —
+// .fillColor on a CompoundPathItem/GroupItem does not reliably propagate (mirrors
+// strokeRecursive). Clears any inherited stroke so the halo reads as a solid tint.
+function _fillRecursive(item, colorObj) {
+    var t = item.typename, i;
+    if (t === "PathItem") {
+        item.stroked = false; item.filled = true; item.fillColor = colorObj;
+        return;
+    }
+    var kids = null;
+    if (t === "CompoundPathItem") kids = item.pathItems;
+    else if (t === "GroupItem")   kids = item.pageItems;
+    if (kids) {
+        for (i = 0; i < kids.length; i++) _fillRecursive(kids[i], colorObj);
+    } else {
+        try { item.stroked = false; item.filled = true; item.fillColor = colorObj; } catch (e) {}
+    }
+}
+
+// Removes any existing spacing-buffer item(s) for one group (named "{name} buffer").
+// Snapshots refs first — the live pageItems collection re-indexes on remove. Returns count.
+function _removeSpacingBufferFor(group) {
+    var want = group.name + " buffer";
+    var doomed = [], i;
+    for (i = 0; i < group.pageItems.length; i++) {
+        if (group.pageItems[i].name === want) doomed.push(group.pageItems[i]);
+    }
+    for (i = 0; i < doomed.length; i++) { try { doomed[i].remove(); } catch (e) {} }
+    return doomed.length;
+}
+
+// (Re)builds ONE element's spacing-buffer halo from its CURRENT cutline. Idempotent.
+// GC/WC only. Returns { ok, reason }.
+function syncSpacingBuffer(doc, group, opts) {
+    opts = opts || {};
+    if (!group || group.typename !== "GroupItem") {
+        return { ok: false, reason: "stamp / non-group (no buffer)" };
+    }
+    var note = parseNote(group.note);
+    if (!note || (note.styleCode !== "GC" && note.styleCode !== "WC")) {
+        return { ok: false, reason: "not GC/WC" };
+    }
+    var cutline = findGroupMember(group, "");
+    if (!cutline) return { ok: false, reason: "cutline not found in group" };
+
+    _removeSpacingBufferFor(group);
+
+    // Keep the halo a true fixed offset under manual resize: the +offset is a live-effect
+    // parameter, so it only stays constant when effects are NOT scaled with the art.
+    try { app.preferences.setBooleanPreference("scaleLineWidth", false); } catch (ePref) {}
+
+    var dup = cutline.duplicate(group, ElementPlacement.PLACEATEND);   // behind the cutline stroke
+    dup.name = group.name + " buffer";
+    try { dup.note = ""; } catch (eNote) {}   // don't let group iterators treat the halo as a cutline
+    _fillRecursive(dup, _spacingBufferCmyk());
+
+    // Live Offset Path effect, +half-spacing outward, round joins for a clean halo.
+    var ofstPt = mmToPoints(_spacingBufferOffsetMm());
+    var xml = '<LiveEffect name="Adobe Offset Path"><Dict data="R mlim 4 R ofst '
+        + ofstPt + ' I jntp 1 "/></LiveEffect>';
+    try {
+        dup.applyEffect(xml);
+    } catch (eFx) {
+        try { dup.remove(); } catch (e2) {}
+        return { ok: false, reason: "Offset Path effect rejected (" + eFx.message + ")" };
+    }
+
+    try { dup.blendingMode = BlendModes.MULTIPLY; } catch (eBm) {}
+    var op = (CONFIG.spacingBufferOpacity != null) ? CONFIG.spacingBufferOpacity : 35;
+    try { dup.opacity = op; } catch (eOp) {}
+
+    log("[buffer] " + group.name + " | halo +" + _spacingBufferOffsetMm() + "mm");
+    return { ok: true };
+}
+
+// Strips every spacing-buffer halo from the Cutlines layer (call before export — Step 10
+// clips/exports and Step 11 ships, neither should see the working-phase halo). Idempotent.
+// Returns the number removed.
+function removeAllSpacingBuffers(doc) {
+    var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
+    if (!cutLayer) return 0;
+    var removed = 0, gi, g;
+    for (gi = 0; gi < cutLayer.groupItems.length; gi++) {
+        g = cutLayer.groupItems[gi];
+        if (g.parent !== cutLayer) continue;
+        removed += _removeSpacingBufferFor(g);
+    }
+    if (removed > 0) log("[buffer] stripped " + removed + " spacing buffer(s) before export.");
+    return removed;
+}
+
 // Rounds to 0.1 for compact log coordinates.
 function _r1(x) { return Math.round(x * 10) / 10; }
 

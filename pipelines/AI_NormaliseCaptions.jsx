@@ -47,6 +47,11 @@ var CONFIG = {
     halfcutExtendMm:   1.0,
     halfcutSeamSteps:  16,
 
+    // ── Spacing buffer (live 2mm keep-out halo; shared aiUtils.syncSpacingBuffer) ──
+    // Refreshed here after each re-Unite reshapes the cutline. See AI_ImportNesting.
+    spacingBufferMm:      1.0,   // half of the 2mm minimum spacing (per-piece share)
+    spacingBufferOpacity: 35,    // %; Multiply blend so two overlapping halos darken
+
     // For automated testing only — suppresses alert() dialogs for headless runs.
     suppressAlerts: false,
 
