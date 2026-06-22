@@ -10,7 +10,11 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 curl -fsSL "$REPO_ZIP" -o "$TMP_DIR/scripts.zip"
 unzip -q "$TMP_DIR/scripts.zip" -d "$TMP_DIR"
-rsync -a --delete "$TMP_DIR/sticker-production-scripts-main/" "$INSTALL_DIR/"
+rsync -a --delete \
+    --exclude='tests/' \
+    --exclude='docs/' \
+    --exclude='installer/' \
+    "$TMP_DIR/sticker-production-scripts-main/" "$INSTALL_DIR/"
 
 # Write last-synced timestamp
 echo "$(date '+%Y-%m-%d %H:%M')" > "$SUPPORT_DIR/last-synced.txt"
