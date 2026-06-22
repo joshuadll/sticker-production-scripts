@@ -194,9 +194,11 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
     bridged and a cap-wrap seam is kept; short spans allowed; returns null = not seated
     → error, no flat-cut fallback),
   syncSpacingBuffer (per-element live 2mm keep-out halo; a CHILD of the cutline group named
-    "{name} buffer" = the cutline duplicated, translucent magenta/violet Multiply fill (the
-    complement of the green Color Block so it reads there — a cyan just muddies in), + a LIVE Adobe
-    Offset Path effect of HALF the min spacing outward. Drag-time aid for the 2mm rule: two
+    "{name} buffer" = the cutline duplicated, then rendered as a thin magenta/violet Multiply BAND
+    (NOT a fill — a fill tinted the whole sticker pink; the band sits just OUTSIDE the cut so the
+    art's true colours show) via a STROKE of width H + a LIVE Adobe Offset Path effect of +H/2,
+    H = HALF the min spacing → band spans the cut line to +H. Magenta is the green Color Block's
+    complement so it reads there (a cyan just muddies in). Drag-time aid for the 2mm rule: two
     pieces' halos meeting = exactly 2mm, OVERLAPPING halos darken = under spec — Illustrator has
     no live collision test, the darkening IS the signal. Rides the nest transform + the artist's
     manual move/scale because it's in the group; stays a true 1mm under resize ONLY with "Scale

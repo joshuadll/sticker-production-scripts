@@ -95,32 +95,32 @@
 [buffer] wrapped stamp for halo | National Flower
 [buffer] wrapped stamp for halo | UFO Observation Deck, Bridge SNP
 [step-nest] wrapped 3 stamp(s) in groups for halo
-[buffer] UFO Observation Deck, Bridge SNP | halo +1mm
-[buffer] National Flower | halo +1mm
-[buffer] Bratislava(text) | halo +1mm
-[buffer] Bratislava Castle | halo +1mm
-[buffer] Štrbské Pleso | halo +1mm
-[buffer] Devín Castle | halo +1mm
-[buffer] St. Martin's Cathedral | halo +1mm
-[buffer] Slovak Paradise National Park | halo +1mm
-[buffer] Spiš Castle | halo +1mm
-[buffer] Bojnice Castle | halo +1mm
-[buffer] The Blue Church - Church of St. Elizabeth | halo +1mm
-[buffer] Old Town Hall (Bratislava) | halo +1mm
-[buffer] St Elizabeth's Cathedral (Dóm Svätej Alzbety) | halo +1mm
-[buffer] Orava Castle | halo +1mm
-[buffer] Michael's Gate | halo +1mm
-[buffer] Carpathian Wooden Churches | halo +1mm
-[buffer] Pirohy | halo +1mm
-[buffer] Bryndzové halušky | halo +1mm
-[buffer] Čumil Statue | halo +1mm
-[buffer] Tram | halo +1mm
-[buffer] Kraslice | halo +1mm
-[buffer] Kroje | halo +1mm
-[buffer] National Animal - Tatra chamois | halo +1mm
-[buffer] Šúľance s Makom | halo +1mm
-[buffer] Slovakia Map | halo +1mm
-[buffer] Fujara | halo +1mm
+[buffer] UFO Observation Deck, Bridge SNP | band 0..+1mm
+[buffer] National Flower | band 0..+1mm
+[buffer] Bratislava(text) | band 0..+1mm
+[buffer] Bratislava Castle | band 0..+1mm
+[buffer] Štrbské Pleso | band 0..+1mm
+[buffer] Devín Castle | band 0..+1mm
+[buffer] St. Martin's Cathedral | band 0..+1mm
+[buffer] Slovak Paradise National Park | band 0..+1mm
+[buffer] Spiš Castle | band 0..+1mm
+[buffer] Bojnice Castle | band 0..+1mm
+[buffer] The Blue Church - Church of St. Elizabeth | band 0..+1mm
+[buffer] Old Town Hall (Bratislava) | band 0..+1mm
+[buffer] St Elizabeth's Cathedral (Dóm Svätej Alzbety) | band 0..+1mm
+[buffer] Orava Castle | band 0..+1mm
+[buffer] Michael's Gate | band 0..+1mm
+[buffer] Carpathian Wooden Churches | band 0..+1mm
+[buffer] Pirohy | band 0..+1mm
+[buffer] Bryndzové halušky | band 0..+1mm
+[buffer] Čumil Statue | band 0..+1mm
+[buffer] Tram | band 0..+1mm
+[buffer] Kraslice | band 0..+1mm
+[buffer] Kroje | band 0..+1mm
+[buffer] National Animal - Tatra chamois | band 0..+1mm
+[buffer] Šúľance s Makom | band 0..+1mm
+[buffer] Slovakia Map | band 0..+1mm
+[buffer] Fujara | band 0..+1mm
 [step-nest] half-cut sync | 23 GC/WC element(s) re-synced to nested pose
 [step-nest] spacing-buffer | 26 keep-out halo(s) built (GC/WC + stamps)
 [step-nest] overlap-check | 0 overlapping cut-line pair(s)  ok

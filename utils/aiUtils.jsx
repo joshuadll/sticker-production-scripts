@@ -1236,25 +1236,6 @@ function _spacingBufferCmyk() {
     return c;
 }
 
-// Sets fill (no stroke) on item and, for compound/group items, every descendant path —
-// .fillColor on a CompoundPathItem/GroupItem does not reliably propagate (mirrors
-// strokeRecursive). Clears any inherited stroke so the halo reads as a solid tint.
-function _fillRecursive(item, colorObj) {
-    var t = item.typename, i;
-    if (t === "PathItem") {
-        item.stroked = false; item.filled = true; item.fillColor = colorObj;
-        return;
-    }
-    var kids = null;
-    if (t === "CompoundPathItem") kids = item.pathItems;
-    else if (t === "GroupItem")   kids = item.pageItems;
-    if (kids) {
-        for (i = 0; i < kids.length; i++) _fillRecursive(kids[i], colorObj);
-    } else {
-        try { item.stroked = false; item.filled = true; item.fillColor = colorObj; } catch (e) {}
-    }
-}
-
 // Removes any existing spacing-buffer item(s) for one group (named "{name} buffer").
 // Snapshots refs first — the live pageItems collection re-indexes on remove. Returns count.
 function _removeSpacingBufferFor(group) {
@@ -1290,10 +1271,17 @@ function syncSpacingBuffer(doc, group, opts) {
     var dup = cutline.duplicate(group, ElementPlacement.PLACEATEND);   // behind the cutline stroke
     dup.name = group.name + " buffer";
     try { dup.note = ""; } catch (eNote) {}   // don't let group iterators treat the halo as a cutline
-    _fillRecursive(dup, _spacingBufferCmyk());
 
-    // Live Offset Path effect, +half-spacing outward, round joins for a clean halo.
-    var ofstPt = mmToPoints(_spacingBufferOffsetMm());
+    // Render the keep-out as a thin BAND just outside the cut, NOT a filled shape — a fill tinted
+    // the whole sticker (the art showed through pink). H = the per-piece keep-out (half the min
+    // spacing). Offsetting the path +H/2 and stroking it H wide (centred, fill cleared) lays a band
+    // from the cut line out to +H: the art INTERIOR is never covered, so its true colours show, and
+    // two pieces' bands still meet at the 2mm gap + overlap-darken when closer. scaleLineWidth off
+    // (set above) keeps BOTH the offset and the stroke a true physical size under resize.
+    var H = _spacingBufferOffsetMm();
+    strokeRecursive(dup, mmToPoints(H), _spacingBufferCmyk());   // stroked band; clears fill
+
+    var ofstPt = mmToPoints(H / 2);
     var xml = '<LiveEffect name="Adobe Offset Path"><Dict data="R mlim 4 R ofst '
         + ofstPt + ' I jntp 1 "/></LiveEffect>';
     try {
@@ -1304,10 +1292,10 @@ function syncSpacingBuffer(doc, group, opts) {
     }
 
     try { dup.blendingMode = BlendModes.MULTIPLY; } catch (eBm) {}
-    var op = (CONFIG.spacingBufferOpacity != null) ? CONFIG.spacingBufferOpacity : 45;
+    var op = (CONFIG.spacingBufferOpacity != null) ? CONFIG.spacingBufferOpacity : 60;
     try { dup.opacity = op; } catch (eOp) {}
 
-    log("[buffer] " + group.name + " | halo +" + _spacingBufferOffsetMm() + "mm");
+    log("[buffer] " + group.name + " | band 0..+" + H + "mm");
     return { ok: true };
 }
 
