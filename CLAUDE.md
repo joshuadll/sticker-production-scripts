@@ -200,11 +200,16 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
     no live collision test, the darkening IS the signal. Rides the nest transform + the artist's
     manual move/scale because it's in the group; stays a true 1mm under resize ONLY with "Scale
     Strokes & Effects" OFF (set defensively each call). Built at Step 7B, refreshed at Step 8b
-    after each re-Unite, GC/WC only — same gate as the half-cut; stamps skip. Advisory only — the
-    export gate stays Step 8c spacing/margin QA. Isolated from every consumer: Step 8c/9A/nesting
-    read findGroupMember (cutline member, not group bounds), StepQA excludes " buffer" by name,
-    parent-guards keep it out of layer-level group/path iterators. removeAllSpacingBuffers strips
-    every halo before export — called at AI_ExportFinal entry + Step 11. NOT yet PS/AI-validated),
+    after each re-Unite. Covers GC/WC AND stamps: a stamp is a bare path with no group to host the
+    halo, so Step 7B first wraps each stamp in a GroupItem (wrapStampsInGroups, note "ST|0" → Step
+    9A still skips its half-cut; stamps hide the peel tab manually per the playbook), then builds
+    the halo. The stamp grouping is a WORKING-PHASE aid only — unwrapStampGroups restores bare-path
+    stamps at export, so Step 10/11 and the shipped file are byte-for-byte unchanged. Advisory only
+    — the export gate stays Step 8c spacing/margin QA. Isolated from every consumer: Step 8c/9A/
+    nesting read findGroupMember (cutline member, not group bounds), StepQA excludes " buffer" by
+    name, parent-guards keep it out of layer-level group/path iterators. NOT yet PS/AI-validated),
+  wrapStampsInGroups / unwrapStampGroups (working-phase wrap of bare stamp cutlines into "ST|0"
+    groups so they can host a spacing halo; unwrapped back to bare paths before export),
   removeAllSpacingBuffers (drops all "{name} buffer" halos from the Cutlines groups before export),
   buildWorkingDocument (builds A4/CMYK doc + Margin/Stickers/Grid/Color Block layers, no template),
   marginRect (shared safe-area rect: documented 190×267mm working area),

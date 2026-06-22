@@ -77,6 +77,11 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         }
     }
 
+    // Re-run safety: strip any prior spacing-buffer halos BEFORE the cutline math runs, so a
+    // stale halo (offset outward past the cut) can never skew matching, placement, or the overlap
+    // guard. They are rebuilt at the end of this step on the final nested pose.
+    if (!CONFIG.dryRun) { try { removeAllSpacingBuffers(doc); } catch (eBuf) {} }
+
     // ── 2. Build cutline map {displayName: pageItem} ──────────────────────────────
     var cutlineMap = _nestBuildCutlineMap(cutlinesLayer);
     var totalCutlines = 0;
@@ -185,27 +190,39 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     // The half-cut tracks the caption seam; nesting only rotated/translated each cutline
     // group, so re-derive it on the new pose (idempotent — clears its own prior output).
     if (!CONFIG.dryRun) {
+        // Wrap bare stamp cutlines in groups first, so they too can host a halo that rides the
+        // drag (a stamp's cut line is a first-class cutline in Illustrator — same 2mm rule). The
+        // half-cut still skips them (note "ST|0"); only the spacing buffer covers stamps.
+        var stampsWrapped = wrapStampsInGroups(cutlinesLayer);
+        if (stampsWrapped > 0) log("[step-nest] wrapped " + stampsWrapped + " stamp(s) in groups for halo");
+
         var hcSynced = 0, sbSynced = 0, gi, gItem, gNote;
         for (gi = 0; gi < cutlinesLayer.groupItems.length; gi++) {
             gItem = cutlinesLayer.groupItems[gi];
             if (gItem.parent !== cutlinesLayer) continue;
             gNote = parseNote(gItem.note);
-            if (!gNote || (gNote.styleCode !== "GC" && gNote.styleCode !== "WC")) continue;
-            // syncHalfcut clears the prior tab BEFORE re-deriving, so a re-sync that fails to
-            // re-seat leaves NO half-cut — name the element rather than silently undercount.
-            var hcRes = syncHalfcut(doc, gItem, {});
-            if (hcRes.ok) hcSynced++;
-            else log("[step-nest] half-cut SKIP | " + gItem.name + " — " + hcRes.reason
-                + " (peel tab missing; AI_ExportFinal will hard-error until the seat is fixed)");
-            // Spacing-buffer halo (live drag-time 2mm keep-out aid). Built here so it rides the
-            // nested pose + the artist's manual repositioning; refreshed by Step 8b; stripped
-            // before export. Advisory, so a failure only logs — it never blocks the import.
+            if (!gNote) continue;
+            var isCaptioned = (gNote.styleCode === "GC" || gNote.styleCode === "WC");
+            var isStamp     = (gNote.styleCode === "ST");
+            if (!isCaptioned && !isStamp) continue;
+            // Half-cut: GC/WC only. syncHalfcut clears the prior tab BEFORE re-deriving, so a
+            // re-sync that fails to re-seat leaves NO half-cut — name the element rather than
+            // silently undercount.
+            if (isCaptioned) {
+                var hcRes = syncHalfcut(doc, gItem, {});
+                if (hcRes.ok) hcSynced++;
+                else log("[step-nest] half-cut SKIP | " + gItem.name + " — " + hcRes.reason
+                    + " (peel tab missing; AI_ExportFinal will hard-error until the seat is fixed)");
+            }
+            // Spacing-buffer halo (live drag-time 2mm keep-out aid) — GC/WC AND stamps. Built here
+            // so it rides the nested pose + the artist's manual repositioning; refreshed by Step 8b;
+            // stripped before export. Advisory, so a failure only logs — it never blocks the import.
             var sbRes = syncSpacingBuffer(doc, gItem, {});
             if (sbRes.ok) sbSynced++;
             else log("[step-nest] spacing-buffer SKIP | " + gItem.name + " — " + sbRes.reason);
         }
         log("[step-nest] half-cut sync | " + hcSynced + " GC/WC element(s) re-synced to nested pose");
-        log("[step-nest] spacing-buffer | " + sbSynced + " GC/WC keep-out halo(s) built");
+        log("[step-nest] spacing-buffer | " + sbSynced + " keep-out halo(s) built (GC/WC + stamps)");
     }
 
     // ── 5c. Real overlap guard ────────────────────────────────────────────────────
@@ -614,6 +631,7 @@ function _nestBuildCutlineMap(cutlinesLayer) {
 
     for (i = 0; i < cutlinesLayer.groupItems.length; i++) {
         item = cutlinesLayer.groupItems[i];
+        if (item.parent !== cutlinesLayer) continue;   // direct children only (groupItems recurses)
         if (item.name) map[item.name] = item;
     }
 

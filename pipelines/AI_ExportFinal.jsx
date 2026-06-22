@@ -74,9 +74,12 @@ function main() {
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
-    // Strip the working-phase spacing-buffer halos before any export step runs (Step 10 clips
-    // per-element art, Step 11 ships the file) — they're a drag-time aid, never production geom.
-    if (!CONFIG.dryRun) { try { removeAllSpacingBuffers(doc); } catch (eBuf) {} }
+    // Tear down the working-phase spacing aids before any export step runs (Step 10 clips
+    // per-element art, Step 11 ships the file): drop the halos, then unwrap the stamp groups
+    // back to bare paths so the deliverable matches the pre-feature structure exactly.
+    if (!CONFIG.dryRun) {
+        try { removeAllSpacingBuffers(doc); unwrapStampGroups(doc); } catch (eBuf) {}
+    }
 
     // ── Spacing + Margin QA guard (shared idempotent check; see AI_LayoutQA) ────
     log("[pipeline] --- Spacing + Margin QA guard ---");

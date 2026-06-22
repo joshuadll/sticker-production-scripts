@@ -1273,8 +1273,8 @@ function syncSpacingBuffer(doc, group, opts) {
         return { ok: false, reason: "stamp / non-group (no buffer)" };
     }
     var note = parseNote(group.note);
-    if (!note || (note.styleCode !== "GC" && note.styleCode !== "WC")) {
-        return { ok: false, reason: "not GC/WC" };
+    if (!note || (note.styleCode !== "GC" && note.styleCode !== "WC" && note.styleCode !== "ST")) {
+        return { ok: false, reason: "not GC/WC/ST" };
     }
     var cutline = findGroupMember(group, "");
     if (!cutline) return { ok: false, reason: "cutline not found in group" };
@@ -1309,6 +1309,40 @@ function syncSpacingBuffer(doc, group, opts) {
     return { ok: true };
 }
 
+// Wraps each bare stamp cutline — a PathItem/CompoundPathItem named "[Display Name]" sitting
+// DIRECTLY on the Cutlines layer — into a GroupItem so it can host a spacing-buffer halo that
+// rides the drag. Stamps have no caption plate (no Unite), so Step 6 leaves them ungrouped; the
+// pipeline's own convention is "any direct-child bare path on Cutlines == a stamp" (see
+// _nestBuildCutlineMap). The wrapper uses the SAME {name}==cutline-member structure as a captioned
+// element, with note "ST|0" → Step 9A skips its half-cut (stamps hide the peel tab manually, per
+// the playbook) while syncSpacingBuffer still finds it. Idempotent: an already-wrapped stamp is no
+// longer a direct child, so it is left alone. Returns the number wrapped.
+function wrapStampsInGroups(cutlinesLayer) {
+    // Snapshot direct-child bare paths first — adding a group + moving items into it re-indexes
+    // the live pathItems/compoundPathItems collections mid-loop.
+    var bare = [], i, it;
+    for (i = 0; i < cutlinesLayer.pathItems.length; i++) {
+        it = cutlinesLayer.pathItems[i];
+        if (it.parent === cutlinesLayer && it.name) bare.push(it);
+    }
+    for (i = 0; i < cutlinesLayer.compoundPathItems.length; i++) {
+        it = cutlinesLayer.compoundPathItems[i];
+        if (it.parent === cutlinesLayer && it.name) bare.push(it);
+    }
+    var wrapped = 0, p, grp;
+    for (i = 0; i < bare.length; i++) {
+        p = bare[i];
+        grp = cutlinesLayer.groupItems.add();
+        grp.name = p.name;
+        grp.note = "ST|0";
+        p.move(grp, ElementPlacement.PLACEATBEGINNING);
+        // p keeps name === grp.name, so findGroupMember(grp, "") returns it (the cutline member).
+        wrapped++;
+        log("[buffer] wrapped stamp for halo | " + grp.name);
+    }
+    return wrapped;
+}
+
 // Strips every spacing-buffer halo from the Cutlines layer (call before export — Step 10
 // clips/exports and Step 11 ships, neither should see the working-phase halo). Idempotent.
 // Returns the number removed.
@@ -1323,6 +1357,33 @@ function removeAllSpacingBuffers(doc) {
     }
     if (removed > 0) log("[buffer] stripped " + removed + " spacing buffer(s) before export.");
     return removed;
+}
+
+// Reverses wrapStampsInGroups: for each top-level "ST|0" group, moves its cutline member back
+// onto the Cutlines layer as a bare path and removes the now-empty wrapper — restoring the EXACT
+// pre-halo stamp structure before export, so Step 10 / Step 11 and the shipped file see stamps
+// exactly as they did before this feature (the grouping is a working-phase aid only, never a
+// deliverable change). Call AFTER removeAllSpacingBuffers so only the cutline remains. Idempotent.
+// Returns the number unwrapped.
+function unwrapStampGroups(doc) {
+    var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
+    if (!cutLayer) return 0;
+    var groups = [], i, g, note;
+    for (i = 0; i < cutLayer.groupItems.length; i++) {
+        g = cutLayer.groupItems[i];
+        if (g.parent !== cutLayer) continue;
+        note = parseNote(g.note);
+        if (note && note.styleCode === "ST") groups.push(g);
+    }
+    var unwrapped = 0, member;
+    for (i = 0; i < groups.length; i++) {
+        g = groups[i];
+        member = findGroupMember(g, "");
+        if (member) { member.move(cutLayer, ElementPlacement.PLACEATEND); unwrapped++; }
+        try { g.remove(); } catch (e) {}
+    }
+    if (unwrapped > 0) log("[buffer] unwrapped " + unwrapped + " stamp group(s) for export.");
+    return unwrapped;
 }
 
 // Rounds to 0.1 for compact log coordinates.
