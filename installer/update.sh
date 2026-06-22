@@ -9,7 +9,7 @@ TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 curl -fsSL "$REPO_ZIP" -o "$TMP_DIR/scripts.zip"
-unzip -q "$TMP_DIR/scripts.zip" -d "$TMP_DIR"
+ditto -xk "$TMP_DIR/scripts.zip" "$TMP_DIR"
 rsync -a --delete \
     --exclude='tests/' \
     --exclude='docs/' \
