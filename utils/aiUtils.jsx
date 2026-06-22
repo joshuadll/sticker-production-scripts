@@ -1226,11 +1226,13 @@ function _spacingBufferOffsetMm() {
     return minMm / 2;
 }
 
-// The halo fill colour — a distinct cyan, separate from the red spacing flags / amber
-// margin overhang carried on the Layout QA layer.
+// The halo fill colour — a vivid magenta/violet, the COMPLEMENT of the green Color Block
+// background so it reads strongly there (a cyan/teal just muddies into the green under
+// Multiply). The slight cyan component pushes it toward violet so it's clearly NOT the pure
+// red of the spacing flags / amber of the margin overhang on the Layout QA layer.
 function _spacingBufferCmyk() {
     var c = new CMYKColor();
-    c.cyan = 55; c.magenta = 0; c.yellow = 18; c.black = 0;
+    c.cyan = 30; c.magenta = 90; c.yellow = 0; c.black = 0;
     return c;
 }
 
@@ -1302,7 +1304,7 @@ function syncSpacingBuffer(doc, group, opts) {
     }
 
     try { dup.blendingMode = BlendModes.MULTIPLY; } catch (eBm) {}
-    var op = (CONFIG.spacingBufferOpacity != null) ? CONFIG.spacingBufferOpacity : 35;
+    var op = (CONFIG.spacingBufferOpacity != null) ? CONFIG.spacingBufferOpacity : 45;
     try { dup.opacity = op; } catch (eOp) {}
 
     log("[buffer] " + group.name + " | halo +" + _spacingBufferOffsetMm() + "mm");

@@ -28,7 +28,7 @@ var CONFIG = {
     // halo offset OUTWARD by half the rule, so overlapping halos == under spec. Built here
     // (rides the nest transform + manual drags), refreshed by Step 8b, stripped before export.
     spacingBufferMm:      1.0,   // half of the 2mm minimum spacing (per-piece share)
-    spacingBufferOpacity: 35,    // %; Multiply blend so two overlapping halos darken
+    spacingBufferOpacity: 45,    // %; Multiply blend so two overlapping halos darken
 
     // ── Art sizing ───────────────────────────────────────────────────────────
     // Source PSD resolution. Placed artwork is sized by the PSD→AI factor
