@@ -42,7 +42,19 @@ var CONFIG = {
     // Max area ratio for accepting a match when names don't agree.
     // 1.1 = within 10% area difference. Raise only if elements are extremely
     // similar in size. Lower to force more exact area agreement.
-    areaMatchTolerance: 1.1
+    areaMatchTolerance: 1.1,
+
+    // ── Overlap guard (opt-in) ────────────────────────────────────────────────
+    // After placement, optionally sweep ALL pairs of nested cut lines for real
+    // geometric intersection (Step7B phase 5c). On a packed sheet this all-pairs
+    // polygon test is ~65% of the import's wall time (measured), yet it is only a
+    // SIGNAL — the export gate (Step 8c spacing QA) already fails any file with two
+    // cut lines under 2mm (an overlap reads as ~0mm), so nothing overlapping can ship
+    // regardless. Its real worth is catching a rotation-recovery REGRESSION, which is
+    // a code concern (the integration test asserts overlaps=0), not an artist concern
+    // — the artist hand-nests right after import. So: OFF for the interactive run
+    // (fast), ON for the headless test (run-ai-import-nesting.sh sets this true).
+    verifyOverlaps: false
 };
 
 var _root = $.fileName

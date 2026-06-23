@@ -67,7 +67,12 @@ fi
 
 rm -f "$LOG" "$TEMP_SCRIPT"
 
+# verifyOverlaps: true keeps the all-pairs overlap sweep ON for the test — it is the
+# rotation-recovery regression guard the assertions below depend on (overlaps=0). It is
+# OFF in the shipped CONFIG (interactive artist run skips it for speed; Step 8c gates
+# overlap at export). So the test must re-enable it, exactly like suppressAlerts.
 perl -pe 's|suppressAlerts:\s*false|suppressAlerts: true|;
+          s|verifyOverlaps:\s*false|verifyOverlaps: true|;
           s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
           s|CONFIG\.logPath\s*=\s*_root[^;]+;|CONFIG.logPath = "'"$LOG"'";|;' \
     "$SCRIPT" > "$TEMP_SCRIPT"
