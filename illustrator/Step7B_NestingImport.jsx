@@ -225,12 +225,19 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         log("[step-nest] spacing-buffer | " + sbSynced + " keep-out halo(s) built (GC/WC + stamps)");
     }
 
-    // ── 5c. Real overlap guard ────────────────────────────────────────────────────
+    // ── 5c. Real overlap guard (opt-in) ───────────────────────────────────────────
     // The check the bbox VERIFY is structurally blind to: do any two finished cut lines
     // actually intersect? A placement/rotation error shows up here even when each element's
-    // own bbox looks right. Logged as a signal (not a hard abort — the export gate Step 8c
-    // already blocks spacing/overlap); the import test asserts overlaps=0.
-    if (!CONFIG.dryRun) {
+    // own bbox looks right. It is an all-pairs polygon-intersection sweep over the nested
+    // cut lines — and on a packed sheet it is the dominant cost of the whole import
+    // (~65% of wall time, measured). It is also only a SIGNAL, not a gate: the real export
+    // gate (Step 8c spacing QA) already fails any file where two cut lines are under 2mm,
+    // and an overlap reads there as ~0mm — so nothing overlapping can ever ship even with
+    // this skipped. Its lasting value is as a ROTATION-REGRESSION guard, which matters for
+    // the automated test, not the artist (who hand-nests immediately after import anyway).
+    // So it is OFF by default for the interactive artist run and ON for the headless test
+    // (the runner sets CONFIG.verifyOverlaps = true). See AI_ImportNesting CONFIG.
+    if (!CONFIG.dryRun && CONFIG.verifyOverlaps) {
         var ovPairs = _nestDetectOverlaps(cutlinesLayer);
         var op;
         for (op = 0; op < ovPairs.length; op++) {
@@ -238,6 +245,9 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         }
         log("[step-nest] overlap-check | " + ovPairs.length + " overlapping cut-line pair(s)"
             + (ovPairs.length === 0 ? "  ok" : "  *** OVERLAP ***"));
+    } else if (!CONFIG.dryRun) {
+        log("[step-nest] overlap-check | skipped (verifyOverlaps off) — Step 8c spacing QA "
+            + "gates overlap at export");
     }
 
     // ── 6. Summary ───────────────────────────────────────────────────────────────
