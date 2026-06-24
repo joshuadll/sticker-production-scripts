@@ -625,6 +625,27 @@ function _capIsMultiLine(textFrame) {
     } catch (e) { return false; }
 }
 
+// Elongates a GC-LM caption-plate ARTWORK group by scaling only its center piece (C); the L/R
+// end caps keep their size; R slides to abut the stretched C. AI port of PS elongateCaptionPlate
+// (horizontal only -> y-up vs y-down is irrelevant). Children must be named "L", "C", "R".
+// Returns true on success; false (caller logs "use as-is") if L/C/R missing or degenerate.
+function elongateCaptionPlateAI(plateGroup, targetWidthPt) {
+    var L = null, C = null, R = null, i, ch;
+    for (i = 0; i < plateGroup.pageItems.length; i++) {
+        ch = plateGroup.pageItems[i];
+        if (ch.name === "L") L = ch; else if (ch.name === "C") C = ch; else if (ch.name === "R") R = ch;
+    }
+    if (!L || !C || !R) return false;
+    function w(it) { var b = it.geometricBounds; return b[2] - b[0]; }
+    var lW = w(L), rW = w(R), cW = w(C);
+    var cTarget = targetWidthPt - lW - rW;
+    if (cTarget <= 0 || cW <= 0) return false;
+    C.resize(cTarget / cW * 100, 100,            // horizontal only, anchored at the left edge
+        true, true, true, true, 100, Transformation.LEFT);
+    R.translate(C.geometricBounds[2] - R.geometricBounds[0], 0);
+    return true;
+}
+
 // Derives the fused cutline = boolean union of element_outline and plate.
 // Duplicates both inputs so the originals survive as separable components.
 // Returns the resulting item (PathItem, CompoundPathItem, or wrapping GroupItem).
