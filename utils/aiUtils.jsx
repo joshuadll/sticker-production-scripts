@@ -538,6 +538,50 @@ function _capSolve3(a11, a12, a13, a21, a22, a23, a31, a32, a33, b1, b2, b3) {
     return [Dx / D, Dy / D, Dz / D];
 }
 
+// ─── CAPTION TEXT SAMPLER (AI vector analog of PS _sampleTextSpine) ───
+// Outlines a COPY of the text and samples its filled vertical extent in columns of width
+// sliceMm. Returns { pts:[{x,y}…] (column centres = spine), heights:[Number…],
+// bounds:[l,t,r,b] } in AI points (y-up), or null if there is no ink.
+function _capSampleTextOutline(textFrame, sliceMm) {
+    var dup = textFrame.duplicate();
+    var outlined = dup.createOutline();          // GroupItem of glyph outlines (replaces dup)
+    var polys = samplePathToPolygons(outlined, 16);
+    var gb = outlined.geometricBounds;           // [l, t, r, b]  (t > b, y-up)
+    try { outlined.remove(); } catch (e) {}
+    if (!polys || polys.length === 0) return null;
+
+    var L = gb[0], T = gb[1], R = gb[2], B = gb[3];
+    if (R - L <= 0 || T - B <= 0) return null;
+    var step = mmToPoints(sliceMm), pts = [], heights = [], x;
+    for (x = L + step / 2; x < R; x += step) {
+        var span = _capColumnSpan(polys, x);     // {lo, hi} filled y-range at this x, or null
+        if (!span) continue;
+        pts.push({ x: x, y: (span.lo + span.hi) / 2 });
+        heights.push(span.hi - span.lo);
+    }
+    if (pts.length === 0) return null;
+    return { pts: pts, heights: heights, bounds: [L, T, R, B] };
+}
+
+// Filled vertical span of a polygon set at vertical line x: the min and max y over all
+// crossings of the line x with the polygons' edges. Returns {lo, hi} or null.
+function _capColumnSpan(polys, x) {
+    var lo = null, hi = null, p, k, A, Bp, ys;
+    for (p = 0; p < polys.length; p++) {
+        var poly = polys[p];
+        for (k = 0; k < poly.length; k++) {
+            A = poly[k]; Bp = poly[(k + 1) % poly.length];
+            if ((A.x <= x && Bp.x > x) || (Bp.x <= x && A.x > x)) {   // edge straddles x
+                ys = A.y + (Bp.y - A.y) * ((x - A.x) / (Bp.x - A.x));
+                if (lo === null || ys < lo) lo = ys;
+                if (hi === null || ys > hi) hi = ys;
+            }
+        }
+    }
+    if (lo === null) return null;
+    return { lo: lo, hi: hi };
+}
+
 // Derives the fused cutline = boolean union of element_outline and plate.
 // Duplicates both inputs so the originals survive as separable components.
 // Returns the resulting item (PathItem, CompoundPathItem, or wrapping GroupItem).
