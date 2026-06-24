@@ -34,6 +34,7 @@ var SPIKE = {
 function main() {
     var _uil = app.userInteractionLevel;
     app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;   // no blocking dialogs (headless)
+    $.global.__trace = "";
     var inF = new Folder(SPIKE.inFolder);
     var doc = app.documents.add();
     var layer = doc.layers[0];
@@ -55,7 +56,8 @@ function main() {
     }
     app.redraw();
     app.userInteractionLevel = _uil;
-    $.global.__msg = "caption build: " + built + " case(s)\n" + logLines.join("\n");
+    $.global.__msg = "caption build: " + built + " case(s)\n" + logLines.join("\n")
+        + "\nTRACE:\n" + ($.global.__trace || "");
     alert($.global.__msg);
 }
 
@@ -68,10 +70,20 @@ function buildCase(doc, layer, silFile, c, ox, oy, cell) {
     placed.position = [ox, oy];
     var pi = placed.trace();
     pi.tracing.tracingOptions.loadFromPreset("Silhouettes");
+    try { pi.tracing.tracingOptions.ignoreWhite = true; } catch (e) {}   // drop the white background (black-on-white input)
     app.redraw();
     var tg = pi.tracing.expandTracing();
+    var _kids = [];
+    (function collect(it) {
+        var t = it.typename;
+        if (t === "PathItem" || t === "CompoundPathItem") {
+            var b = it.geometricBounds;
+            _kids.push(t + ":" + Math.round(Math.abs((b[2] - b[0]) * (b[1] - b[3]))));
+        } else if (t === "GroupItem") { for (var i = 0; i < it.pageItems.length; i++) collect(it.pageItems[i]); }
+    })(tg);
     var outline = _largestPathOf(tg);
     if (!outline) return "no outline";
+    $.global.__trace = (($.global.__trace) || "") + c.file + " traced[" + _kids.join(",") + "] placed=" + layer.placedItems.length + "\n";
     // remove any non-outline leftovers from the traced group so only the outline remains
     _keepOnly(tg, outline);
 
