@@ -254,20 +254,17 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     // Verify art actually landed on the Stickers layer (not Cutlines): doc.placedItems
     // .add() ignores the active layer after the cutline passes, so a regression here is
     // silent unless asserted. The test gates on this line.
-    // Stickers now carries both art and caption PNGs, so the expected count is the
-    // sum of the two. A mismatch means an item landed on the wrong layer (e.g. the
-    // locked Cutlines layer) — a silent regression unless asserted.
+    // Only the per-element ART PNG lands on Stickers now — the native caption rides its
+    // cutline group (not Stickers). A mismatch means an item landed on the wrong layer
+    // (e.g. the locked Cutlines layer) — a silent regression unless asserted.
     var placedOnStickers = stickersLayer ? stickersLayer.placedItems.length : 0;
-    var expectedOnStickers = totalArtPlaced + totalCaptionPlaced;
     log("[step-nest] art-layer-check | on Stickers: " + placedOnStickers
-        + " / placed: " + expectedOnStickers
-        + " (art " + totalArtPlaced + " + caption " + totalCaptionPlaced + ")"
-        + (placedOnStickers === expectedOnStickers ? "  ok" : "  *** ITEM ON WRONG LAYER ***"));
+        + " / placed: " + totalArtPlaced
+        + (placedOnStickers === totalArtPlaced ? "  ok" : "  *** ITEM ON WRONG LAYER ***"));
 
     log("[step-nest] result | matched: " + totalMatched
         + " | unmatched: " + totalUnmatched
-        + " | art placed: " + totalArtPlaced
-        + " | caption placed: " + totalCaptionPlaced);
+        + " | art placed: " + totalArtPlaced);
 
     return { matched: totalMatched, unmatched: totalUnmatched,
              artPlaced: totalArtPlaced, captionPlaced: totalCaptionPlaced };
