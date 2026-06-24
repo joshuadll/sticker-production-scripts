@@ -101,6 +101,15 @@ They ride every nest / normalise transform automatically as part of the group, s
 
 This removes the separate-PNG placement/binding path entirely.
 
+**Print representation (resolved 2026-06-24):** the cut group is the **single rigid printed-and-cut
+unit**. Its **white pill stays VISIBLE** (it IS the printed white background behind the text — not
+just a hidden cut-shaper), and the text + GC plate are visible members. So the printed caption = the
+cut group's visible members (pill + text + plate); `assembleElementGroup`'s "hide the plate" behavior
+is **not applied to native captions**. Because these live in the **Cutlines** group rather than the
+Stickers layer, **Step 10 must be taught to include each cut group's visible caption members in that
+element's export** (see §5) — they are already shaped/positioned, so they're *added* to the export
+region, not clipped (only the art PNG clips to the cut).
+
 ## 4. Handoff slim & Photoshop changes
 
 - **Sidecar `_elements.json`:** the **caption payload dies completely**. Keep only `displayName`,
@@ -130,25 +139,39 @@ This removes the separate-PNG placement/binding path entirely.
   spec height, parks it behind the text**, and adds it as a ride-along + bundle member. Then run the
   existing Step 7A Deepnest export.
 - **Step 8b normalise (`Step8b_CaptionNormalise.jsx`):** unified for both styles (no PNG-matrix path).
-  Derive the scale factor from the **current caption size vs the canonical 8 pt spec** (the pill radius
-  is deterministic = text height/2 + pad) → unscale text + pill (+ rescale the GC plate to the new pill
-  width) → re-seat (`seatPlateToOutline`) → re-Unite (`deriveCutline`). Stateless.
+  The caption members now live **inside the cut group** (not as a Stickers PNG), so it stops using
+  `_findCaption` (Stickers PNG) and instead reads the group's `" plate"` (visible pill) + `" caption
+  text"` (+ `" caption plate"` raster for GC) members. Derive the scale factor from the **current pill
+  height vs the note-stamped spec pill height** (`h<pt>`, written by `buildCaption` §6): `unscale =
+  specPillH / curPillH`, idempotent guard `|unscale−1| < 0.005`. Then scale the caption members about
+  the pill centre → re-seat (`seatPlateToOutline`) → re-Unite (`reuniteCutline`).
 - **Step 7B (`Step7B_NestingImport.jsx`):** the caption-PNG placement + pair-binding is **removed** for
   both styles (text + plate ride the cutline group, §3). Art-PNG placement + the rigid {cut, art}
   transform are unchanged.
-- **Step 10 export (`Step10_AssetExport.jsx`):** native text + (GC) the placed plate raster render
-  directly; no caption-PNG compositing. Outline the text on export if required for print safety.
+- **Step 10 export (`Step10_AssetExport.jsx`):** for each element, gather its cut group's **visible
+  caption members** (white pill + text + GC plate) into that element's clip/export alongside the
+  Stickers art PNG. They're already shaped and positioned in the cut's space, so they are *added* to
+  the per-element export region (the art still clips to the cut). No caption-PNG compositing. Outline
+  the text on export if required for print safety. (This is real Step-10 rework — DOM-bound, validated
+  in-app.)
 
 ## 6. Small new builder code (in `aiUtils`)
 
 The validated builder handles the white pill and the *vector* plate (`elongateCaptionPlateAI`). The
 chosen **raster plate** needs one small addition:
 
-- A raster-plate path in `buildCaption` (`opts.plateRaster` = the plate PNG `File`, or a pre-placed
-  item): place it, **scale to the caption (pill) width at the plate's spec height** (width-driven;
-  height held at spec so the bar thickness is consistent — caps may distort under non-uniform scale,
-  accepted as cosmetic + tunable), set it behind the text, and include it in the rigid ride-along +
-  the assembled bundle. `elongateCaptionPlateAI` is left in place but unused.
+- A raster-plate path in `buildCaption` (`opts.plateRasterFile` = the plate PNG `File`): place it,
+  **scale to the caption (pill) width at the plate's spec height** (width-driven; height held at spec
+  so the bar thickness is consistent — caps may distort under non-uniform scale, accepted as cosmetic
+  + tunable), set it behind the text, and include it as a **visible** ride-along + bundle member.
+  `elongateCaptionPlateAI` is left in place but unused.
+- `buildCaption` must, for native captions, **keep the pill VISIBLE** (white-filled printed
+  background, per §3) instead of letting `assembleElementGroup` hide it, and **add the seated text
+  frame to the assembled group** as a member named `"<name> caption text"` (today `buildCaption`
+  leaves the text frame as a seated sibling; `assembleElementGroup` only bundles outline/plate/cut).
+- `buildCaption` **stamps the spec pill height** into `group.note` for Step 8b's scale-ref (§5):
+  note = `"<style>|<lines>|h<pillHeightPt>"` (+ `"|R"` when the seat flags review). Step 8b reads
+  `h<pt>` to recover the artist's scale factor.
 
 No other builder changes — `buildCaptionPill`, the spine sampler, seat/unite/half-cut are reused.
 
