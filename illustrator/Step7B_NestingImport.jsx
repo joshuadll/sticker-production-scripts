@@ -306,18 +306,15 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
         // no rotation, so the alignment is exact (no angle to get wrong). The pair is
         // then moved to the nest pose together by _nestApplyPairTransform.
         artItem = null;
-        captionItem = null;
         if (stickersLayer && artFolder) {
             artItem = _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFactor);
             if (artItem) artPlaced++;
-            // Caption is a separate placed object (decoupled from the art raster) so it
-            // can stay at absolute spec when the artist resizes the art later. It rides
-            // the same rigid nest transform as the cut/art via the pair below.
-            captionItem = _nestPlaceCaptionUpright(doc, stickersLayer, artFolder, cutlineItem, artFactor);
-            if (captionItem) captionPlaced++;
+            // The native caption (white pill + text + GC plate) is a MEMBER of the cutline
+            // group now, so it rides every nest transform automatically with the cut — no
+            // separate placement/binding needed (Pipeline 2 built it into the group).
         }
 
-        _nestApplyPairTransform(cutlineItem, artItem, captionItem, rotation, svgItem.center);
+        _nestApplyPairTransform(cutlineItem, artItem, rotation, svgItem.center);
 
         // ── Objective correctness check ──────────────────────────────────────────
         // The cutline and the SVG part are the SAME polygon (Deepnest only rotated +
@@ -339,7 +336,9 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
                 + (bad ? "  *** ROTATION WRONG ***" : "  ok"));
         }
 
-        pairs.push({ cut: cutlineItem, art: artItem, caption: captionItem });
+        // caption: null — the native caption rides `cut` (it's a group member), so the
+        // cluster-layout transforms (_nestRotatePairs/_nestTranslatePairs) move it via `cut`.
+        pairs.push({ cut: cutlineItem, art: artItem, caption: null });
         // Remove from the shared map so the next SVG's pass can't reassign this cutline.
         delete cutlineMap[cutlineItem.name];
 
@@ -458,22 +457,23 @@ function _nestTranslatePairs(pairs, dx, dy) {
 // centre). Using the cutline centre as the pivot for BOTH keeps the art rigidly locked
 // even when it is registered to the cutline by its element (not co-centred) — rotating
 // each about its own centre would then spin them about different points and desync.
-function _nestApplyPairTransform(cut, art, caption, rotation, target) {
+function _nestApplyPairTransform(cut, art, rotation, target) {
     if (CONFIG.dryRun) return;
 
+    // `cut` is the cutline GROUP — transforming it moves its members (outline, pill, text,
+    // GC plate raster, cut path) rigidly, so the native caption rides along automatically.
+    // Only the art PNG (a separate Stickers item) needs its own transform.
     if (Math.abs(rotation) > 0.01) {
         var ctr = boundsCenter(cut.geometricBounds);
         var m = _nestPivotMatrix(rotation, ctr.x, ctr.y);
         cut.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
-        if (art)     art.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
-        if (caption) caption.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
+        if (art) art.transform(m, true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
     }
 
     var oc = boundsCenter(cut.geometricBounds); // cutline centre after rotation
     var dx = target.x - oc.x, dy = target.y - oc.y;
     cut.translate(dx, dy);
-    if (art)     art.translate(dx, dy);
-    if (caption) caption.translate(dx, dy);
+    if (art) art.translate(dx, dy);
 }
 
 // Axis-aligned bounding box of bbox [l, t, r, b] after rotating angleDeg degrees
