@@ -625,6 +625,30 @@ function _capIsMultiLine(textFrame) {
     } catch (e) { return false; }
 }
 
+// Caption note = "{style}|{lines}|h{pillHeightPt}" (+ "|R" when the seat flagged review).
+// pillHeightPt is the SPEC pill height stamped at build, so Step 8b can recover the artist's
+// nest-scale factor (current pill height / this). Tokens after [1] are order-independent.
+function _capNoteFormat(styleCode, lines, pillHeightPt, review) {
+    return styleCode + "|" + lines + "|h" + Math.round(pillHeightPt) + (review ? "|R" : "");
+}
+
+// Parses a caption note. Back-compatible with legacy "{style}|{lines}" and "{style}|{lines}|R".
+function _capNoteParse(note) {
+    var out = { styleCode: null, lines: 1, pillHeightPt: null, review: false };
+    if (!note) return out;
+    var t = String(note).split("|"), i;
+    out.styleCode = t[0];
+    if (t.length > 1 && t[1].length) out.lines = parseInt(t[1], 10) || 1;
+    for (i = 2; i < t.length; i++) {
+        if (t[i] === "R") out.review = true;
+        else if (t[i].charAt(0) === "h") {
+            var h = parseFloat(t[i].substring(1));
+            if (!isNaN(h)) out.pillHeightPt = h;
+        }
+    }
+    return out;
+}
+
 // Elongates a GC-LM caption-plate ARTWORK group by scaling only its center piece (C); the L/R
 // end caps keep their size; R slides to abut the stretched C. AI port of PS elongateCaptionPlate
 // (horizontal only -> y-up vs y-down is irrelevant). Children must be named "L", "C", "R".
@@ -646,42 +670,88 @@ function elongateCaptionPlateAI(plateGroup, targetWidthPt) {
     return true;
 }
 
-// Full native-caption build for one element: pill around the (artist-shaped) text -> (GC plate) ->
-// seat the rigid caption unit INTO the white-edge outline -> unite into the cut -> bundle -> half-cut.
-// `outline` = the traced white-edged element path (the contour that becomes the cut). `doc` is needed
-// for the half-cut layer. opts: { name, styleCode, plateGroup, plateWidthPadMm, strokePt }.
-// Returns { ok, group, needsReview, halfcut, reason }; ok:false leaves inputs untouched.
+// Full native-caption build for one element: pill around the (artist-shaped) text -> (GC plate
+// raster) -> seat the rigid caption unit INTO the white-edge outline -> unite into the cut -> bundle
+// -> half-cut. The PRINTED caption RIDES the cut group: the white pill stays VISIBLE (printed
+// background), and the text (+ GC plate raster) become named, visible members. `outline` = the
+// traced white-edged element path (the contour that becomes the cut). `doc` is needed for the
+// half-cut layer. opts: { name, styleCode, strokePt, plateRasterFile, plateHeightMm, plateWidthPadMm }.
+// Returns { ok, group, needsReview, moved, halfcut, reason }; ok:false leaves inputs untouched.
 function buildCaption(doc, layer, textFrame, outline, opts) {
     opts = opts || {};
-    var name = opts.name || String(textFrame.contents || "(caption)");
-    var built = buildCaptionPill(layer, textFrame, opts);
-    var pill = built.pill;
+    var name      = opts.name || String(textFrame.contents || "(caption)");
+    var styleCode = opts.styleCode || "WC";
+    var built     = buildCaptionPill(layer, textFrame, opts);
+    var pill      = built.pill;
 
-    // Ride-along printed items (text, + GC plate) move rigidly with the pill during the seat.
-    var rideItem = textFrame;
-    if (opts.plateGroup) {
-        var padMm = opts.plateWidthPadMm != null ? opts.plateWidthPadMm : 1.69;
-        elongateCaptionPlateAI(opts.plateGroup, built.radius * 2 + mmToPoints(padMm) * 2);
-        var capGroup = layer.groupItems.add();
-        textFrame.move(capGroup, ElementPlacement.PLACEATEND);
-        opts.plateGroup.move(capGroup, ElementPlacement.PLACEATEND);
-        rideItem = capGroup;
+    // Ride-along printed items move rigidly with the pill during the seat. The GC decorative
+    // plate (a raster) is placed BEHIND the text and rides too.
+    var plateRaster = null;
+    if (opts.plateRasterFile) {
+        plateRaster = _placeCaptionPlateRaster(layer, pill, opts.plateRasterFile,
+            (opts.plateHeightMm != null ? opts.plateHeightMm : 4.0),
+            (opts.plateWidthPadMm != null ? opts.plateWidthPadMm : 1.69));
     }
+
+    var rideGroup = layer.groupItems.add();
+    textFrame.move(rideGroup, ElementPlacement.PLACEATEND);
+    if (plateRaster) plateRaster.move(rideGroup, ElementPlacement.PLACEATEND);
+    var rideItem = rideGroup;
 
     // Seat into the white-edge outline (authoritative). The overlap IS the attachment.
     var seat = seatPlateToOutline(name, outline, pill, rideItem, { polyCache: {} });
-    if (!seat.ok) return { ok: false, needsReview: !!seat.needsReview, reason: seat.reason };
+    if (!seat.ok) {
+        // Un-nest the ride items so a failed seat leaves clean inputs.
+        try { textFrame.move(layer, ElementPlacement.PLACEATEND); } catch (e1) {}
+        try { if (plateRaster) plateRaster.move(layer, ElementPlacement.PLACEATEND); } catch (e2) {}
+        try { rideGroup.remove(); } catch (e3) {}
+        return { ok: false, needsReview: !!seat.needsReview, reason: seat.reason };
+    }
 
-    // Unite outline + pill into the fused cut; bundle the separable members; tag the note.
+    // Unite outline + pill into the fused cut; bundle the separable members.
     var cut = deriveCutline(outline, pill);
     strokeRecursive(cut, (opts.strokePt != null ? opts.strokePt : 0.25), blackCmyk());
     var group = assembleElementGroup(layer, name, outline, pill, cut);
-    group.note = (opts.styleCode || "WC") + "|" + (_capIsMultiLine(textFrame) ? 2 : 1);
+
+    // PRINTED caption rides the cut group: pill stays VISIBLE (white background), and the text
+    // (+ GC plate raster) become named, visible members. assembleElementGroup hid the plate
+    // (cut-shaper convention) — re-show it for native captions.
+    var plateM = findGroupMember(group, " plate");
+    if (plateM) plateM.hidden = false;
+
+    var i, kids = [];
+    for (i = 0; i < rideGroup.pageItems.length; i++) kids.push(rideGroup.pageItems[i]);
+    for (i = 0; i < kids.length; i++) kids[i].move(group, ElementPlacement.PLACEATBEGINNING);
+    try { rideGroup.remove(); } catch (eR) {}
+    textFrame.name = name + " caption text";
+    if (plateRaster) plateRaster.name = name + " caption plate";
+
+    var lines = _capIsMultiLine(textFrame) ? 2 : 1;
+    var pillH = plateM ? (plateM.geometricBounds[1] - plateM.geometricBounds[3]) : 0;
+    group.note = _capNoteFormat(styleCode, lines, pillH, !!seat.needsReview);
 
     // Derive the half-cut from the submerged pill arc.
     var hc = syncHalfcut(doc, group, { polyCache: {} });
     return { ok: true, group: group, needsReview: !!seat.needsReview, moved: seat.moved,
              halfcut: !!(hc && hc.ok), reason: hc ? hc.reason : null };
+}
+
+// Places a GC decorative plate raster behind the caption, scaled to span the pill width (+ pad
+// each side) at a fixed spec bar height. Width-driven; non-uniform, so the L/R caps may distort
+// slightly — accepted as cosmetic + tunable (plateHeightMm / plateWidthPadMm). The plate is
+// PRINTED-INK only; it does NOT enter deriveCutline (the cut stays outline+pill).
+function _placeCaptionPlateRaster(layer, pill, plateFile, heightMm, widthPadMm) {
+    var pb = pill.geometricBounds;                 // [l,t,r,b] y-up
+    var targetW = (pb[2] - pb[0]) + mmToPoints(widthPadMm) * 2;
+    var targetH = mmToPoints(heightMm);
+    var placed = layer.placedItems.add();
+    placed.file = plateFile;
+    placed.resize((targetW / placed.width) * 100, (targetH / placed.height) * 100);
+    // Centre on the pill.
+    var pcx = (pb[0] + pb[2]) / 2, pcy = (pb[1] + pb[3]) / 2;
+    placed.translate(pcx - (placed.position[0] + placed.width / 2),
+                     pcy - (placed.position[1] - placed.height / 2));
+    return placed;
 }
 
 // Derives the fused cutline = boolean union of element_outline and plate.

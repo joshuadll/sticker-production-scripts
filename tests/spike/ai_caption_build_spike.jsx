@@ -123,6 +123,11 @@ function buildCase(doc, layer, silFile, c, ox, oy, cell) {
                 + " pillBot=" + Math.round(plM.geometricBounds[3])
                 + " cutSubpaths=" + subN + " moved=" + (res.moved != null ? Math.round(res.moved) : "?");
         }
+        // Native-print upgrades (Task 1): text is a member, pill is VISIBLE, note carries h<pt>.
+        var txtM = findGroupMember(res.group, " caption text");
+        var pillVis = plM ? (!plM.hidden) : false;
+        dbg += " | textMember=" + (txtM ? "yes" : "NO") + " pillVisible=" + pillVis
+             + " note=" + res.group.note;
     }
     return "ok=" + res.ok + " review=" + res.needsReview
          + " halfcut=" + res.halfcut + (res.reason ? (" (" + res.reason + ")") : "") + dbg;
