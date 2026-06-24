@@ -625,25 +625,27 @@ function _capIsMultiLine(textFrame) {
     } catch (e) { return false; }
 }
 
-// Caption note = "{style}|{lines}|h{pillHeightPt}" (+ "|R" when the seat flagged review).
-// pillHeightPt is the SPEC pill height stamped at build, so Step 8b can recover the artist's
-// nest-scale factor (current pill height / this). Tokens after [1] are order-independent.
-function _capNoteFormat(styleCode, lines, pillHeightPt, review) {
-    return styleCode + "|" + lines + "|h" + Math.round(pillHeightPt) + (review ? "|R" : "");
+// Caption note = "{style}|{lines}|a{pillAreaPt2}" (+ "|R" when the seat flagged review).
+// pillArea is the SPEC pill area stamped at build. Step 8b recovers the artist's uniform
+// nest-scale factor as sqrt(specArea / currentArea) — AREA is rotation-invariant, so the
+// seat's tilt doesn't corrupt the reference the way a bounding-box height would. Tokens
+// after [1] are order-independent.
+function _capNoteFormat(styleCode, lines, pillArea, review) {
+    return styleCode + "|" + lines + "|a" + Math.round(pillArea) + (review ? "|R" : "");
 }
 
 // Parses a caption note. Back-compatible with legacy "{style}|{lines}" and "{style}|{lines}|R".
 function _capNoteParse(note) {
-    var out = { styleCode: null, lines: 1, pillHeightPt: null, review: false };
+    var out = { styleCode: null, lines: 1, pillArea: null, review: false };
     if (!note) return out;
     var t = String(note).split("|"), i;
     out.styleCode = t[0];
     if (t.length > 1 && t[1].length) out.lines = parseInt(t[1], 10) || 1;
     for (i = 2; i < t.length; i++) {
         if (t[i] === "R") out.review = true;
-        else if (t[i].charAt(0) === "h") {
-            var h = parseFloat(t[i].substring(1));
-            if (!isNaN(h)) out.pillHeightPt = h;
+        else if (t[i].charAt(0) === "a") {
+            var a = parseFloat(t[i].substring(1));
+            if (!isNaN(a)) out.pillArea = a;
         }
     }
     return out;
@@ -727,8 +729,9 @@ function buildCaption(doc, layer, textFrame, outline, opts) {
     if (plateRaster) plateRaster.name = name + " caption plate";
 
     var lines = _capIsMultiLine(textFrame) ? 2 : 1;
-    var pillH = plateM ? (plateM.geometricBounds[1] - plateM.geometricBounds[3]) : 0;
-    group.note = _capNoteFormat(styleCode, lines, pillH, !!seat.needsReview);
+    var pillArea = 0;
+    try { pillArea = Math.abs(pill.area); } catch (ePA) {}   // rotation-invariant scale reference
+    group.note = _capNoteFormat(styleCode, lines, pillArea, !!seat.needsReview);
 
     // Derive the half-cut from the submerged pill arc.
     var hc = syncHalfcut(doc, group, { polyCache: {} });

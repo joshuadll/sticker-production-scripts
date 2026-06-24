@@ -9,11 +9,17 @@
 // repeatedly inside the manual nest loop (resize → normalise → resize → …), like the
 // Layout QA pass. It is idempotent: an already-spec element is left untouched.
 //
+// The native caption (white pill + text + optional GC plate raster) lives INSIDE the cut
+// group and scales with the element when the artist nest-scales it. buildCaption stamps the
+// SPEC pill AREA into the note ("style|lines|a<pt²>"); the scale reference is that vs the
+// current pill area — no Stickers caption PNG / matrix scale. AREA is rotation-invariant, so
+// the seat's tilt doesn't corrupt it (a bbox height would drift with tilt and never settle).
+//
 // Per captioned group (matched by name; survives the artist's moves/rotations):
-//   unscale = (72 / sourceDPI) / caption-matrix-scale     // undo the artist's scaling
-//   1. RESIZE — scale BOTH the plate and the caption PNG to absolute spec about the plate
-//      CENTRE (a common pivot under uniform scale keeps them aligned; placement is fixed
-//      up next). Works for GC pills and WC curved capsules alike.
+//   unscale = sqrt(spec-pill-area / current-pill-area)     // undo the artist's scaling
+//   1. RESIZE — scale the caption members (pill + text + GC plate raster) to absolute spec
+//      about the PILL CENTRE (a common pivot under uniform scale keeps them aligned;
+//      placement is fixed up next). Works for GC pills and WC curved capsules alike.
 //   2. RE-SEAT — re-place the spec plate + caption against the TRACED OUTLINE (the vector
 //      that becomes the cut) via the shared aiUtils.seatPlateToOutline: inner-edge endpoints
 //      → rotate to the outline chord → kiss to a small submerged depth, with overhang /
@@ -29,8 +35,8 @@
 // ⚠ This RE-DERIVES the cutline (re-Unite of outline+plate). Run it during the nest
 // loop, BEFORE manual pencil refinements to the fused cutline.
 //
-// Style comes from group.note ("styleCode|lines", Step 6). Missing note → skip + warn.
-// ST/uncaptioned (no plate) skip. Missing caption PNG (the scale reference) → skip.
+// Style + spec pill height come from group.note ("styleCode|lines|h<pt>", buildCaption).
+// Missing note / non-WC-GC style / missing member / no spec height → skip + warn.
 //
 // Returns: { reset, atSpec, skipped }
 //   reset   = captions that were off-spec and brought back
@@ -45,15 +51,6 @@ function runCaptionNormalise(doc) {
         return { reset: 0, atSpec: 0, skipped: 0 };
     }
 
-    var stickersLayer = findLayer(doc, CONFIG.stickersLayerName);
-    if (!stickersLayer) {
-        log("[step8b] ERROR | Stickers layer not found: " + CONFIG.stickersLayerName
-            + " — caption PNGs carry the spec scale reference; cannot normalise.");
-        return { reset: 0, atSpec: 0, skipped: 0 };
-    }
-
-    var specFactor = 72.0 / CONFIG.sourceDPI;       // a caption at spec sits at this matrix-scale
-
     // Snapshot top-level GroupItems — re-Unite replaces a member mid-loop.
     var groups = [], i;
     for (i = 0; i < cutlinesLayer.groupItems.length; i++) {
@@ -65,88 +62,102 @@ function runCaptionNormalise(doc) {
     var reset = 0, atSpec = 0, skipped = 0;
 
     for (i = 0; i < groups.length; i++) {
-        var group = groups[i];
-        var note  = group.note;
+        var group  = groups[i];
+        var parsed = _capNoteParse(group.note);
 
-        if (!note) {
+        if (!parsed.styleCode) {
             log("[step8b] SKIP | no caption metadata (note) | " + group.name);
             skipped++;
             continue;
         }
-        var styleCode = note.split("|")[0];
+        if (parsed.styleCode !== "WC" && parsed.styleCode !== "GC") {
+            log("[step8b] SKIP | " + group.name + " — not a caption (" + parsed.styleCode + ").");
+            skipped++;
+            continue;
+        }
 
-        var plate   = findGroupMember(group, " plate");
+        // Native caption members live INSIDE the cut group (not a Stickers PNG): the visible
+        // white pill (" plate"), the printed text (" caption text"), and the GC decorative
+        // raster (" caption plate", optional).
         var outline = findGroupMember(group, " outline");
-        var caption = _findCaption(stickersLayer, group.name);
-
-        if (!plate) {
-            log("[step8b] SKIP | " + group.name + " — no caption plate (ST/uncaptioned).");
+        var pill    = findGroupMember(group, " plate");
+        var text    = findGroupMember(group, " caption text");
+        var plateR  = findGroupMember(group, " caption plate");
+        if (!outline || !pill || !text) {
+            log("[step8b] SKIP | " + group.name + " — missing member (outline/pill/text).");
             skipped++;
             continue;
         }
-        if (!outline) {
-            log("[step8b] SKIP | " + group.name + " — missing outline component (no art to seat against).");
-            skipped++;
-            continue;
-        }
-        if (!caption) {
-            log("[step8b] SKIP | " + group.name + " — caption PNG not found on Stickers layer.");
+        if (parsed.pillArea == null) {
+            log("[step8b] SKIP | " + group.name + " — note has no spec pill area (rebuild via Pipeline 2).");
             skipped++;
             continue;
         }
 
-        var curScale = _matrixScale(caption);
-        if (curScale <= 0) {
-            log("[step8b] SKIP | " + group.name + " — degenerate caption scale.");
+        // Scale reference = SPEC pill area (stamped in the note by buildCaption) vs the current
+        // pill area. AREA is rotation-invariant, so the seat's tilt doesn't corrupt it (a
+        // bounding-box height would drift with tilt and never settle). unscale = sqrt(ratio)
+        // because area scales as the square of the linear (uniform) nest scale.
+        var curArea = 0;
+        try { curArea = Math.abs(pill.area); } catch (eA) {}
+        if (curArea <= 0) {
+            log("[step8b] SKIP | " + group.name + " — degenerate pill area.");
             skipped++;
             continue;
         }
-        var unscale = specFactor / curScale;
+        var unscale = Math.sqrt(parsed.pillArea / curArea);
 
         if (Math.abs(unscale - 1.0) < 0.005) {       // already at spec — idempotent no-op
-            log("[step8b] at spec | " + group.name + " (" + styleCode + ")");
+            log("[step8b] at spec | " + group.name + " (" + parsed.styleCode + ")");
             atSpec++;
             continue;
         }
 
         if (CONFIG.dryRun) {
             log("[step8b] [DRY RUN] would reset to spec (x" + unscale.toFixed(3) + ") | "
-                + group.name + " (" + styleCode + ")");
+                + group.name + " (" + parsed.styleCode + ")");
             continue;
         }
 
-        // SIZE first: scale plate + caption back to absolute spec about the plate CENTRE
-        // (always defined, no contact-centroid needed). A common pivot under a uniform
-        // scale preserves the plate↔caption arrangement; placement is fixed up next.
-        // GC and WC alike: a canonical-height GC plate scaled by unscale lands back at its
-        // canonical height under Model B, so no GC-specific absolute-height reset is needed.
-        var pivot = boundsCenter(plate.geometricBounds);
-        _scaleAboutPoint(plate,   unscale, pivot);
-        _scaleAboutPoint(caption, unscale, pivot);
+        // SIZE first: scale the caption members back to spec about the PILL CENTRE. A common
+        // pivot under a uniform scale preserves the text↔pill↔plate arrangement; placement is
+        // fixed up next.
+        var pivot = boundsCenter(pill.geometricBounds);
+        _scaleAboutPoint(pill,  unscale, pivot);
+        _scaleAboutPoint(text,  unscale, pivot);
+        if (plateR) _scaleAboutPoint(plateR, unscale, pivot);
 
-        // PLACEMENT next: re-seat the spec plate + caption against the TRACED outline (the
-        // same vector that becomes the cut). This replaces the old "scale about the plate∩art
-        // contact to preserve the PS seat" trick (and its no-overlap skip): the seat — overlap
-        // depth + tilt — is now re-established here, in the cut's own space, so resize and
-        // seating are decoupled. See aiUtils.seatPlateToOutline / docs/caption-seating-redesign.md.
-        //
-        // Per-element polygon cache shared by the seat and the half-cut, so the never-mutated
-        // outline is sampled once and the plate once per pose (step-keyed → output unchanged).
-        // See aiUtils._sampleCached.
+        // PLACEMENT next: re-seat the spec pill + ride-along printed items against the TRACED
+        // outline (the cut's own vector), so the overlap that survives the Unite is set here.
+        // The text (+ GC plate raster) must ride the seat's rotate+translate — group them so
+        // seatPlateToOutline moves them rigidly with the pill, then un-nest back into the group.
+        var rideItem = text;
+        var rideGroup = null;
+        if (plateR) {
+            rideGroup = group.groupItems.add();
+            text.move(rideGroup, ElementPlacement.PLACEATEND);
+            plateR.move(rideGroup, ElementPlacement.PLACEATEND);
+            rideItem = rideGroup;
+        }
         var polyCache = {};
-        var seat = seatPlateToOutline(group.name, outline, plate, caption, { polyCache: polyCache });
+        var seat = seatPlateToOutline(group.name, outline, pill, rideItem, { polyCache: polyCache });
+        if (rideGroup) {
+            text.move(group, ElementPlacement.PLACEATBEGINNING);
+            plateR.move(group, ElementPlacement.PLACEATBEGINNING);
+            try { rideGroup.remove(); } catch (eRG) {}
+        }
         if (!seat.ok) {
             log("[step8b] seat | " + group.name + " NOT seated (" + seat.reason
                 + ") — re-Unite + half-cut will surface it.");
         }
         // The AI seat is authoritative here; carry its review flag onto the cutline note so
-        // Step 8c / AI_LayoutQA badges it (Step 6's note only knew the PS pre-seat's flag).
+        // Step 8c / AI_LayoutQA badges it.
         if (seat.needsReview && group.note && String(group.note).indexOf("|R") < 0) {
             group.note = group.note + "|R";
         }
 
-        // Re-derive the fused cutline from the seated spec plate + (artist-scaled) outline.
-        reuniteCutline(group, outline, plate, CONFIG.cutlineStrokePt);
+        // Re-derive the fused cutline from the seated spec pill + (artist-scaled) outline.
+        reuniteCutline(group, outline, pill, CONFIG.cutlineStrokePt);
 
         // Re-sync the half-cut to the rescaled seam (idempotent). Only the reset path
         // reaches here — atSpec groups 'continue' above, so no redundant work. syncHalfcut
@@ -160,7 +171,7 @@ function runCaptionNormalise(doc) {
         var sbRes = syncSpacingBuffer(doc, group, {});
         if (!sbRes.ok) log("[step8b] spacing-buffer SKIP | " + group.name + " — " + sbRes.reason);
 
-        log("[step8b] reset to spec | " + group.name + " (" + styleCode
+        log("[step8b] reset to spec | " + group.name + " (" + parsed.styleCode
             + ", x" + unscale.toFixed(3) + ")");
         reset++;
     }
