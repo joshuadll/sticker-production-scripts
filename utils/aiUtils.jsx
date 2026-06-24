@@ -481,6 +481,63 @@ function _capUnit(x, y) {
     return [x / len, y / len];
 }
 
+// ─── CAPTION SPINE FIT (ported from PS Step3B — pure geometry, node-testable) ───
+// Least-squares quadratic through sampled centre points; snaps to a straight 2-point spine
+// when the fit stays within snapTolPt of flat. Returns { spine:[{x,y}…], straight:Bool }.
+// Coordinate-agnostic (fits y as a function of x), so it is identical in PS y-down and AI y-up.
+function _capQuadFitSpine(pts, x0, x1, snapTolPt) {
+    var n = pts.length, i;
+    var xm = 0, ym = 0;
+    for (i = 0; i < n; i++) { xm += pts[i].x; ym += pts[i].y; }
+    xm /= n; ym /= n;
+    var S0 = n, S1 = 0, S2 = 0, S3 = 0, S4 = 0, Ty = 0, Txy = 0, Tx2y = 0;
+    for (i = 0; i < n; i++) {
+        var dx = pts[i].x - xm, y = pts[i].y, dx2 = dx * dx;
+        S1 += dx; S2 += dx2; S3 += dx2 * dx; S4 += dx2 * dx2;
+        Ty += y; Txy += dx * y; Tx2y += dx2 * y;
+    }
+    var a = 0, b = 0, c = ym;
+    var sol = _capSolve3(S4, S3, S2, S3, S2, S1, S2, S1, S0, Tx2y, Txy, Ty);
+    if (sol) { a = sol[0]; b = sol[1]; c = sol[2]; }
+    function yAt(px) { var d = px - xm; return a * d * d + b * d + c; }
+    var flat = ym, maxDev = 0, probes = 16, p;
+    for (p = 0; p <= probes; p++) {
+        var px = x0 + (x1 - x0) * (p / probes);
+        var dev = Math.abs(yAt(px) - flat);
+        if (dev > maxDev) maxDev = dev;
+    }
+    if (maxDev <= snapTolPt) return { spine: _capStraightSpine(x0, x1, flat), straight: true };
+    var out = [], M = 40;
+    for (p = 0; p <= M; p++) { var sx = x0 + (x1 - x0) * (p / M); out.push({ x: sx, y: yAt(sx) }); }
+    return { spine: out, straight: false };
+}
+
+// Two-point horizontal spine at height y over [x0, x1].
+function _capStraightSpine(x0, x1, y) { return [{ x: x0, y: y }, { x: x1, y: y }]; }
+
+// p-quantile (0..1) of a numeric array (need not be sorted).
+function _capPercentile(arr, p) {
+    var a = arr.slice(0);
+    a.sort(function (x, y) { return x - y; });
+    var idx = Math.floor(p * (a.length - 1));
+    if (idx < 0) idx = 0;
+    if (idx > a.length - 1) idx = a.length - 1;
+    return a[idx];
+}
+
+// Solves a 3x3 linear system by Cramer's rule. Returns [x,y,z] or null if singular.
+function _capSolve3(a11, a12, a13, a21, a22, a23, a31, a32, a33, b1, b2, b3) {
+    function det3(m11, m12, m13, m21, m22, m23, m31, m32, m33) {
+        return m11 * (m22 * m33 - m23 * m32) - m12 * (m21 * m33 - m23 * m31) + m13 * (m21 * m32 - m22 * m31);
+    }
+    var D = det3(a11, a12, a13, a21, a22, a23, a31, a32, a33);
+    if (Math.abs(D) < 1e-9) return null;
+    var Dx = det3(b1, a12, a13, b2, a22, a23, b3, a32, a33);
+    var Dy = det3(a11, b1, a13, a21, b2, a23, a31, b3, a33);
+    var Dz = det3(a11, a12, b1, a21, a22, b2, a31, a32, b3);
+    return [Dx / D, Dy / D, Dz / D];
+}
+
 // Derives the fused cutline = boolean union of element_outline and plate.
 // Duplicates both inputs so the originals survive as separable components.
 // Returns the resulting item (PathItem, CompoundPathItem, or wrapping GroupItem).
