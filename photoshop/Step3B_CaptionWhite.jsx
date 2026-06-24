@@ -61,143 +61,61 @@ function _stashCaptionSeat(displayName, seat) {
     };
 }
 
+// NATIVE-CAPTION FLOW: grouping ONLY. Captions are no longer authored in Photoshop — they are
+// placed + built natively in Illustrator (Step 6 / Pipeline 2). So every element (WC/GC/ST) is
+// grouped the same simple way (SO + White Base_Cutline → a per-element LayerSet inside
+// "Elements"), with NO caption layers. The GC "Caption plate" artwork is left at top level for
+// Step5b to export as a PNG (AI places + scales it behind the native text). The legacy
+// caption-authoring helpers below (groupStandard/groupWithPlate/createWhiteFromText/
+// seatCaptionConform/elongateCaptionPlate/…) are now dead and removed in the cleanup task.
 function runCaptionWhite(doc) {
     var origUnits = app.preferences.rulerUnits;
     app.preferences.rulerUnits = Units.PIXELS;
 
-    var grouped     = 0;
-    var skipped     = [];
-    var captionLess = [];  // needs-caption elements that resolved to NO caption nearby
-    var gcLmCount   = 0;   // track how many GC-LM elements used the caption plate
+    var grouped = 0;
+    var skipped = [];
 
     try {
-        // Create the Elements wrapper group first so element sub-groups are built
-        // directly inside it. This avoids PS 2026's restriction on moving or
-        // duplicating LayerSets into another LayerSet.
+        // Create the Elements wrapper group first so element sub-groups are built directly
+        // inside it (PS 2026 restricts moving/duplicating a LayerSet into another LayerSet).
         var elementsGroup = findLayerByName(doc, "Elements");
         if (!elementsGroup) {
             elementsGroup = doc.layerSets.add();
             elementsGroup.name = "Elements";
         }
 
-        // Collect layer references upfront to avoid index-shift during grouping.
-        // Iterate in REVERSE (bottom-to-top) so each sub-group added to the top
-        // of elementsGroup naturally lands in the correct z-order.
-        var layerRefs = [];
-        for (var i = 0; i < doc.layers.length; i++) {
-            layerRefs.push(doc.layers[i]);
-        }
+        // Snapshot refs upfront (grouping removes layers from doc.layers). Reverse order
+        // (bottom-to-top) so each sub-group added to the top of Elements keeps its z-order.
+        var layerRefs = [], i;
+        for (i = 0; i < doc.layers.length; i++) layerRefs.push(doc.layers[i]);
 
-        // Decide every caption→element binding ONCE, while all layers are still
-        // top-level (grouping below removes them from doc.layers). Indexed by element
-        // .id in the loop. Doing it up front — not per element — is what makes the
-        // assignment independent of grouping order. See buildCaptionAssignment.
-        var captionAssign = buildCaptionAssignment(doc, CONFIG.captionMaxGapFrac);
-
-        for (var i = layerRefs.length - 1; i >= 0; i--) {
+        for (i = layerRefs.length - 1; i >= 0; i--) {
             var soLayer = layerRefs[i];
             var name    = soLayer.name;
-
-            if (name === "Caption plate") continue;
-            if (name === "Elements")      continue;
+            if (name === "Caption plate" || name === "Elements") continue;
 
             var parsed = parseLayerName(name);
             if (!parsed) continue;
 
-            // ── Stamps ([ST]): group SO + White Base_Cutline only, no caption ──
-            if (parsed.styleCode === "ST") {
-                if (CONFIG.dryRun) {
-                    log("[step3B] [DRY RUN] would group stamp | " + name);
-                    grouped++;
-                    continue;
-                }
-                try {
-                    groupNoCaption(doc, elementsGroup, soLayer, name);
-                    log("[step3B] grouped stamp | " + name);
-                    grouped++;
-                } catch (e) {
-                    log("[step3B] ERROR | \"" + name + "\" line " + e.line + ": " + e.message);
-                    skipped.push(name + " (error: " + e.message + ")");
-                }
-                continue;
-            }
-
-            if (!needsCaption(parsed)) continue;
-
-            // Look up this element's caption from the document-wide assignment decided
-            // above (name fast-path + global positional). A miss means the element
-            // genuinely has no caption — the artist shortened/moved one and it still
-            // binds, but a truly uncaptioned element stays unbound.
-            var match     = captionAssign[soLayer.id];
-            var textLayer = match ? match.caption : null;
-            if (!textLayer) {
-                // No caption beside this element — group without caption.
-                captionLess.push(parsed.displayName);
-                if (CONFIG.dryRun) {
-                    log("[step3B] [DRY RUN] would group (no caption) | " + name);
-                    grouped++;
-                    continue;
-                }
-                try {
-                    groupNoCaption(doc, elementsGroup, soLayer, name);
-                    log("[step3B] grouped (no caption) | " + name);
-                    grouped++;
-                } catch (e) {
-                    log("[step3B] ERROR | \"" + name + "\" line " + e.line + ": " + e.message);
-                    skipped.push(name + " (error: " + e.message + ")");
-                }
-                continue;
-            }
-
-            var isPlate = isCaptionPlate(parsed);
-
             if (CONFIG.dryRun) {
-                var treatment = isPlate ? "plate" : "standard";
-                log("[step3B] [DRY RUN] would group | " + name
-                    + " (" + treatment + ") — T layer: \"" + textLayer.name + "\"");
+                log("[step3B] [DRY RUN] would group | " + name);
                 grouped++;
                 continue;
             }
-
             try {
-                if (isPlate) {
-                    groupWithPlate(doc, elementsGroup, soLayer, textLayer, name);
-                    gcLmCount++;
-                } else {
-                    groupStandard(doc, elementsGroup, soLayer, textLayer, name);
-                }
-                log("[step3B] grouped | " + name + " — caption: \"" + textLayer.name
-                    + "\" (by " + match.by + ", gap=" + Math.round(match.gap || 0) + "px)");
+                groupNoCaption(doc, elementsGroup, soLayer, name);
+                log("[step3B] grouped | " + name);
                 grouped++;
             } catch (e) {
                 log("[step3B] ERROR | \"" + name + "\" line " + e.line + ": " + e.message);
                 skipped.push(name + " (error: " + e.message + ")");
             }
         }
-
-        // Loud, reviewable summary: every needs-caption element that ended up WITHOUT
-        // a caption. Genuinely uncaptioned elements (e.g. a map/text element) belong
-        // here too — the point is the artist sees the list and confirms it's intended,
-        // rather than a caption silently vanishing (the shortened-caption bug).
-        if (captionLess.length > 0) {
-            log("[step3B] caption-less summary | " + captionLess.length
-                + " element(s) with NO caption — confirm intended: " + captionLess.join(", "));
-        }
-
-        // Remove the original Caption plate layer once all GC-LM elements are done.
-        if (!CONFIG.dryRun && gcLmCount > 0) {
-            var capPlate = findLayerByName(doc, "Caption plate");
-            if (capPlate) {
-                capPlate.remove();
-                log("[step3B] removed original Caption plate layer (distributed into groups).");
-            }
-        }
-
     } finally {
         app.preferences.rulerUnits = origUnits;
     }
 
-    return { grouped: grouped, skipped: skipped, captionLess: captionLess };
+    return { grouped: grouped, skipped: skipped, captionLess: [] };
 }
 
 // ─── STAMP PATH ───────────────────────────────────────────────────────────────
