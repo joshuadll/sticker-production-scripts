@@ -1,7 +1,16 @@
 # Illustrator-native pipeline rewrite — Slice 1: Structural spine + ingest
 
+> ⚠️ **SUPERSEDED 2026-06-24 (same day, after the de-risk spike).** The spike
+> (`docs/superpowers/plans/2026-06-24-spine-recipe-derisk-spike.md`) showed the structural spine is
+> **reusable as-is** — keep the white edge in Photoshop (raster expand) + AI trace (the existing
+> Step 2B / Step 6); moving the white edge to an AI vector offset hit edge cases that raster
+> dilation solves for free (26/26 clean). So this is **not** a rewrite of the spine, and the AI
+> "ingest does the white-edge offset" design below does **not** apply. The real work is an
+> **incremental native-captions change** on the current pipeline. This doc is kept for the de-risk
+> record only; a separate "native captions" design supersedes it.
+
 **Date:** 2026-06-24
-**Status:** Design — pending review. Implementation NOT started.
+**Status:** SUPERSEDED — de-risk record only. Do not implement from this doc.
 **Related memory:** `illustrator_rewrite` (the pivot + de-risked trace/edge recipe),
 `illustrator_rewrite_transfer` (PS→AI fidelity map, magic-number→mm table, relational rules).
 

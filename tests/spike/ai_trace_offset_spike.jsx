@@ -65,26 +65,22 @@ function buildOne(doc, layer, silFile, ox, oy, cell) {
     if (CONFIG.traceCornerFidelity !== null) to.cornerFidelity = CONFIG.traceCornerFidelity;
     if (CONFIG.traceNoiseFidelity  !== null) to.noiseFidelity  = CONFIG.traceNoiseFidelity;
     app.redraw();                                  // trace is async — force it
-    var tg = pi.tracing.expandTracing();           // GroupItem of paths, replaces the PluginItem
-
-    deselectAll(doc);
-    tg.selected = true;
-    app.executeMenuCommand("ungroup");
-
-    var paths = collectSelected(doc), outline = pickOutline(paths);
-    if (!outline) return;
+    var tg = pi.tracing.expandTracing();           // GroupItem of paths = the outline (all parts)
 
     // -- 2. White-edge offset -> bake to geometry --------------------------------
-    var cut = outline.duplicate();
+    // Offset the WHOLE traced group, not a single path, so multi-part elements
+    // (wordmarks, maps with islands) all get a cut — not just their largest piece.
+    var cut = tg.duplicate();
     applyOffset(doc, cut, CONFIG.whiteEdgeMm);
     cut = app.selection[0];
     if (CONFIG.bleedMm > 0) { applyOffset(doc, cut, CONFIG.bleedMm); cut = app.selection[0]; }
 
-    // -- 3. Style for inspection: outline = light fill, cut = black stroke, no fill --
-    outline.filled = true; outline.stroked = false;
-    outline.fillColor = _grey(85);
-    strokeRecursive(cut, 0.5, blackCmyk());
-    cut.filled = false;
+    // -- 3. Style for inspection: outline = light grey fill, cut = black stroke ---
+    applyToPathTree(tg, function (p) {
+        p.filled = true; p.stroked = false;
+        try { p.fillColor = _grey(85); } catch (e) {}
+    });
+    strokeRecursive(cut, 0.5, blackCmyk());         // strokeRecursive also clears fill
 }
 
 // Applies one live Offset Path (round joins) and bakes it with expandStyle. The baked
@@ -96,30 +92,6 @@ function applyOffset(doc, item, mm) {
     deselectAll(doc);
     item.selected = true;
     app.executeMenuCommand("expandStyle");
-}
-
-// Largest-area item = the element outline. Black-on-transparent traces with NO canvas
-// frame, so no frame-drop is needed; if a frame ever appears, add an area-drop here.
-function pickOutline(paths) {
-    var best = null, bestA = -1, i;
-    for (i = 0; i < paths.length; i++) {
-        var b = paths[i].geometricBounds;          // [l,t,r,b]
-        var a = Math.abs((b[2] - b[0]) * (b[1] - b[3]));
-        if (a > bestA) { bestA = a; best = paths[i]; }
-    }
-    return best;
-}
-
-// The just-traced shapes are the current selection after ungroup (NOT the whole layer —
-// prior cells' outlines/cuts also live there). Accept paths and compound paths.
-function collectSelected(doc) {
-    var out = [], i, s = app.selection;
-    if (!s) return out;
-    for (i = 0; i < s.length; i++) {
-        var t = s[i].typename;
-        if (t === "PathItem" || t === "CompoundPathItem") out.push(s[i]);
-    }
-    return out;
 }
 
 function deselectAll(doc) {
