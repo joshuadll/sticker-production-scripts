@@ -107,9 +107,9 @@ Unchanged — no caption, no white edge, no half-cut, throughout.
 
 ## 9. Open / to confirm
 
-- ✏️ **GC-LM decorative "Caption plate"** (the L/C/R bar): is it carried into AI as artwork and
-  elongated natively (port `elongateCaptionPlate`), or already baked into the element art? Decides
-  whether that elongate logic is ported or dropped.
+- **GC-LM decorative "Caption plate"** (the L/C/R bar): **RESOLVED (2026-06-24)** — carried into
+  Illustrator as **artwork** and elongated natively → **port `elongateCaptionPlate`** (stretch the
+  center piece, fixed L/R caps).
 - The AI spine-sampler's column-coverage method (§5 step 2) — the one piece to build + validate.
 - The native-text scale reference for normalise (§7).
 
