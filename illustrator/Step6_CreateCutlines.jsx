@@ -170,19 +170,18 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             continue;
         }
 
-        if (matched.styleCode === "ST") {
+        if (matched.styleCode === "WC" || matched.styleCode === "GC") {
+            // Native caption: name the outline + place review text. The PILL/PLATE/cut are built in
+            // Pipeline 2 (AI_BuildAndExportCutlines) after the artist reviews the text. The sidecar
+            // no longer carries a caption object — caption presence is decided by styleCode.
             setStrokeStyle(path, CONFIG.cutlineStrokePt, blackCmyk());
-            path.name = matched.displayName;
-            log("[step6] named | " + path.name);
-            named++;
-        } else if (matched.caption) {
-            // element_outline (path) gets hidden inside _buildSeparableCutline;
-            // strokeRecursive there handles the cutline stroke.
-            _buildSeparableCutline(doc, cutlinesLayer, matched, path,
-                pngLeft, pngTop, pngWidth, pngHeight, elementsData);
-            log("[step6] named | " + matched.displayName);
+            path.name = matched.displayName + " outline";
+            _placeCaptionText(cutlinesLayer, matched.displayName, path,
+                CONFIG.captionFont, CONFIG.captionSizePt, CONFIG.captionTracking, CONFIG.captionTextGapMm);
+            log("[step6] caption text | " + matched.displayName);
             named++;
         } else {
+            // ST and any uncaptioned element: bare named cutline path.
             setStrokeStyle(path, CONFIG.cutlineStrokePt, blackCmyk());
             path.name = matched.displayName;
             log("[step6] named | " + path.name);
@@ -333,6 +332,27 @@ function _findMatchingElement(center, data, pngLeft, pngTop, pngWidth, pngHeight
         }
     }
     return null;
+}
+
+// Places a native caption text frame (the printed ink, vector) below an element's traced outline
+// as the artist's review pose. Names it "{displayName} caption text" so Pipeline 2
+// (AI_BuildAndExportCutlines) can re-find it. Kalam 8pt / tracking -20 / centred / black.
+// try/catch each characterAttributes set — a stale attribute throws -609 (see gotchas memory).
+function _placeCaptionText(layer, displayName, outline, font, sizePt, tracking, gapMm) {
+    var tf = layer.textFrames.add();
+    tf.contents = displayName;
+    try { tf.textRange.characterAttributes.size     = sizePt; } catch (e1) {}
+    try { tf.textRange.characterAttributes.textFont = app.textFonts.getByName(font); } catch (e2) {}
+    try { tf.textRange.characterAttributes.tracking = tracking; } catch (e3) {}
+    try { tf.textRange.characterAttributes.fillColor = blackCmyk(); } catch (e4) {}
+    try { tf.textRange.paragraphAttributes.justification = Justification.CENTER; } catch (e5) {}
+
+    var ob = outline.geometricBounds;                 // [l,t,r,b] y-up
+    var ecx = (ob[0] + ob[2]) / 2;
+    var tb = tf.geometricBounds, tcx = (tb[0] + tb[2]) / 2;
+    tf.translate(ecx - tcx, (ob[3] - mmToPoints(gapMm)) - tb[1]);   // centre just below the element
+    tf.name = displayName + " caption text";
+    return tf;
 }
 
 // Separable mode: builds the per-element bundle from a traced element-only

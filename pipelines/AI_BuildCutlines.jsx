@@ -23,6 +23,12 @@ var CONFIG = {
     cutlinesLayerName:   "Cutlines",
     stickersLayerName:   "Sticker",
 
+    // ── Caption text (native authoring, placed at Step 6 for artist review) ──
+    captionFont:      "Kalam-Regular",
+    captionSizePt:    8,
+    captionTracking:  -20,
+    captionTextGapMm: 3.0,   // text top sits this far below the element outline bottom (review pose)
+
     // ── Half-cut (shared aiUtils helpers) ────────────────────────────────────
     // The half-cut is drawn at birth here and re-synced by Steps 7B/8b/9A so it
     // always tracks the caption seam.
@@ -255,11 +261,17 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
                          error: result.unmatched + " cut shape(s) couldn't be matched to an element" });
     }
 
-    var exportResult = _runExportForNesting(doc, result.traceTuning);
-    exportResult.named = result.named;
-    exportResult.unmatched = result.unmatched;
-    exportResult.traceTuning = result.traceTuning;   // so PSAI's completion alert can warn on a no-op
-    return _status(exportResult);
+    // Pipeline 1 ends here: cut traced + native caption text placed. The artist reviews/reshapes
+    // the captions in Illustrator, then runs Pipeline 2 (AI_BuildAndExportCutlines) to build the
+    // pills + cut + half-cut and export for Deepnest. (Deepnest export moved to Pipeline 2.)
+    if (!CONFIG.suppressAlerts) {
+        scriptAlert("✅ Cut traced + captions placed.\n\n"
+            + "Processed " + result.named + " element(s).\n\n"
+            + "Review/reshape the caption text in Illustrator (move, shorten, curve to follow the art),\n"
+            + "then run Pipeline 2 (Build and Export Cutlines).");
+    }
+    return _status({ ok: true, phase: "step6", named: result.named,
+                     unmatched: result.unmatched, traceTuning: result.traceTuning });
 }
 
 // ─── MAIN: direct run after fixing unmatched paths ───────────────────────────
