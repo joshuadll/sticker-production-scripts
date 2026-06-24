@@ -582,6 +582,49 @@ function _capColumnSpan(polys, x) {
     return { lo: lo, hi: hi };
 }
 
+// Builds the white caption pill around a native (artist-shaped) text frame: sample the text
+// centreline -> fit/snap a spine -> radius from text height + pad -> sweep a capsule. One path
+// for straight, multi-line, and curved text (no type branch), matching PS createWhiteFromText.
+// Returns { pill:PathItem (white, unstroked), spine:[{x,y}…], radius:Number }.
+function buildCaptionPill(layer, textFrame, opts) {
+    opts = opts || {};
+    var sliceMm = opts.sliceMm != null ? opts.sliceMm : 1.0;
+    var padPt   = mmToPoints(opts.padMm  != null ? opts.padMm  : 1.69);
+    var snapPt  = mmToPoints(opts.snapMm != null ? opts.snapMm : 0.5);
+    var pctile  = opts.pctile != null ? opts.pctile : 0.9;
+
+    var s = _capSampleTextOutline(textFrame, sliceMm);
+    var bb = s ? s.bounds : textFrame.geometricBounds;   // [l,t,r,b] y-up
+    var boxH = bb[1] - bb[3];
+
+    var spine, radius;
+    if (!s || s.pts.length < 3) {                        // degenerate -> bbox stadium
+        radius = boxH / 2 + padPt / 2;
+        spine  = _capStraightSpine(bb[0], bb[2], (bb[1] + bb[3]) / 2);
+    } else {
+        var fit = _capQuadFitSpine(s.pts, bb[0], bb[2], snapPt);
+        if (_capIsMultiLine(textFrame)) {               // multi-line -> flat tall stadium
+            fit = { spine: _capStraightSpine(bb[0], bb[2], (bb[1] + bb[3]) / 2), straight: true };
+        }
+        var penH = fit.straight ? boxH : _capPercentile(s.heights, pctile);
+        radius = penH / 2 + padPt / 2;
+        spine  = fit.spine;
+    }
+    var pill = buildCapsuleFromSpine(layer, spine, radius);   // existing helper
+    pill.filled = true; pill.fillColor = whiteCmyk();
+    pill.stroked = false;
+    return { pill: pill, spine: spine, radius: radius };
+}
+
+// Multi-line if the caption has >= 2 non-empty lines (point text -> a line per hard return).
+function _capIsMultiLine(textFrame) {
+    try {
+        var s = String(textFrame.contents).split(/[\r\n]+/), n = 0, i;
+        for (i = 0; i < s.length; i++) if (s[i].replace(/^\s+|\s+$/g, "").length > 0) n++;
+        return n >= 2;
+    } catch (e) { return false; }
+}
+
 // Derives the fused cutline = boolean union of element_outline and plate.
 // Duplicates both inputs so the originals survive as separable components.
 // Returns the resulting item (PathItem, CompoundPathItem, or wrapping GroupItem).
