@@ -37,27 +37,52 @@ styles.
 `elongateCaptionPlateAI`. We use a single scaled raster this round; the vector path is a possible
 future refinement (the function stays in `aiUtils` but is unused by the wiring).
 
-## 2. Pipeline sequence — caption authoring + review move to Illustrator
+## 2. Pipeline sequence — same two pipelines from the artist's view
 
-The printed caption changes from a **rasterized PNG** (rendered in Photoshop, placed at nest) to
-**native vector text** in Illustrator. Two consequences drive the re-sequencing:
+**The artist still runs exactly two pipelines, same names, same order.** The only externally visible
+change is that **Pipeline 1 now ends in Illustrator** (it BridgeTalks across and leaves the artist
+there with caption text placed for review), and **Pipeline 2 is launched from Illustrator** (where the
+artist already is). The printed caption changes from a rasterized PNG to native vector text, so the
+review must happen in Illustrator — which is why the BridgeTalk moves earlier (from old Pipeline 2
+into Pipeline 1). Because the pill is part of the fused cut that Deepnest nests, each caption must be
+placed, reviewed, and pilled before nesting — so the pill build + Deepnest export sit in Pipeline 2.
 
-1. The artist's caption-review checkpoint moves **Photoshop → Illustrator** (for both styles).
-2. The pill is part of the fused cut and Deepnest nests that cut, so each caption must be
-   **placed, reviewed, and pilled before nesting** — moving the Deepnest export to *after* the build.
+**Pipeline 1 — "Build Elements"** (launched from Photoshop):
+- **PS:** combine → resize → white edge → silhouette → export (per-element **art** PNGs for all; **one
+  plate PNG** for a GC SKU; **slim sidecar** — no caption payload).
+- **BridgeTalk → Illustrator:** build working doc → trace silhouette → art-only cut, match to element
+  → **place native caption text (= element name)** below each captioned element, as a member of its
+  cutline group.
+- **Ends in Illustrator.** The artist reviews/reshapes the caption text (and sees the white edge in the
+  traced cut), then runs Pipeline 2.
+- *Change vs today:* Pipeline 1 absorbs the silhouette + export + BridgeTalk (old Pipeline 2's PS tail)
+  and the AI trace; caption-text authoring moves from PS (old Step 3A) to AI; the old between-pipelines
+  caption-review stop becomes the end-of-Pipeline-1 stop, in Illustrator. The artist no longer reviews
+  the white edge in a separate PS stop — it's visible in the traced cut at the Illustrator review (a
+  bad edge means re-run Pipeline 1, as today a bad resize did).
 
-| Pipeline | Current | New (all-native) |
-|---|---|---|
-| **PS_BuildElements** | combine → resize → white edge → caption text (3A) → STOP "review captions" | combine → resize → white edge → STOP. (Step 3A removed; the inter-pipeline stop **persists** but its purpose shifts to "review the white edge / resize, then run Noteworthie 2" — no caption review in PS.) |
-| **PSAI** | caption white (3B) → silhouette (5) → export art + caption PNGs → BridgeTalk → AI **Step 6 (rebuild caption) + 7A (Deepnest export)** → STOP | silhouette (5) → export per-element **art** PNGs (all) + **one plate PNG for a GC SKU** → BridgeTalk → AI: **trace cut (art-only) + place native point text (= name) for every captioned element** → **STOP "reshape/reposition captions in Illustrator, then run the caption-build pipeline"**. (Step 3B caption work removed.) |
-| **(new) AI caption build** | — | per captioned element: `buildCaption` (white pill → seat → unite → half-cut; **GC also places + scales the plate raster**) → **then 7A Deepnest export** → STOP "run Deepnest". Re-runnable. |
+**Pipeline 2 — "Build and Export Cutlines"** (launched from Illustrator):
+- For each captioned element: `buildCaption` (white pill → seat into the traced cut → unite → bundle →
+  half-cut; **GC also places + scales the plate raster** behind the text).
+- Step 7A Deepnest export.
+- **Ends** with "run Deepnest" (downstream unchanged).
+- *Change vs today:* runs in Illustrator instead of starting from Photoshop; builds native pills
+  instead of rebuilding from the sidecar.
 
 Notes:
-- **No pills are built at Step 6** anymore (WC or GC). Step 6 produces the art-only traced cut and
-  places the native text; all pills/plates are built by the caption-build pipeline after review.
-- **Deepnest export (7A)** runs at the end of the caption-build pipeline, once every pill is united.
-- The **unmatched-trace STOP** in current `AI_BuildCutlines` (Step 6 can't name a traced path) is
-  unchanged.
+- **No pills are built during the trace** (WC or GC). Pipeline 1's AI half produces the art-only traced
+  cut + the native text; all pills/plates are built by Pipeline 2 after the review.
+- **Deepnest export (7A)** runs at the end of Pipeline 2, once every pill is united.
+- The **unmatched-trace STOP** (a traced path can't be named to an element) stays available as a direct
+  re-run of Pipeline 1's Illustrator-side trace/place step — it does not re-run the Photoshop half.
+
+### File / launch restructure (implementation note, detailed in the plan)
+- `PS_BuildElements.jsx` (Pipeline 1) absorbs silhouette + export + BridgeTalk; loses Step 3A.
+- The BridgeTalk target (today `AI_BuildCutlines.jsx`) changes job to **trace + place native text**
+  (drops the caption rebuild + the 7A export); stays directly re-runnable for the unmatched case.
+- `PSAI_BuildAndExportCutlines.jsx` (Pipeline 2) becomes an **Illustrator-launched** pipeline that runs
+  `buildCaption` per element + 7A; its Photoshop tail (3B/silhouette/export/BridgeTalk) is gone.
+- Installer: Pipeline 2's `File > Scripts` entry moves to Illustrator (it's now an AI script).
 
 ## 3. Where printed caption items live + nest binding
 
@@ -81,8 +106,9 @@ This removes the separate-PNG placement/binding path entirely.
 - **Sidecar `_elements.json`:** the **caption payload dies completely**. Keep only `displayName`,
   `styleCode`, and element bounds (`left/top/right/bottom`) per element, plus the doc dimensions.
   Drop the `caption` object and the WC-only `spine`/`radius` for all elements. `styleCode` alone tells
-  AI which elements get a caption (WC/GC) and which also get a plate (GC). Delete `WC_CAPTION_SPINES`,
-  `CAPTION_SEAT`, and `captionSpine()` from `PSAI_BuildAndExportCutlines.jsx`.
+  AI which elements get a caption (WC/GC) and which also get a plate (GC). Delete the
+  `WC_CAPTION_SPINES` / `CAPTION_SEAT` stashes (Step 3B) and the `captionSpine()` re-anchor (the sidecar
+  writer) wherever they land after the Pipeline-1 restructure.
 - **PS Step 3A:** removed (no caption text in PS).
 - **PS Step 3B:** caption authoring removed (no white pill, no plate elongation, no caption grouping).
   Step 5's element-group finalize stays.
@@ -96,7 +122,7 @@ This removes the separate-PNG placement/binding path entirely.
   for every **captioned** element place **native point text** below its outline (Kalam-Regular 8 pt,
   tracking −20, centered, black, content = `displayName`), named `"<displayName> caption text"` and
   added as a member of that element's cutline group. **No pill, no plate, no rebuild branch here.**
-- **New caption-build pipeline:** for each captioned element, call
+- **Pipeline 2 (Build and Export Cutlines):** for each captioned element, call
   `buildCaption(doc, layer, textFrame, outline, opts)` with the reviewed text frame + the element's
   traced outline. `buildCaption` does white pill → seat → unite → bundle → half-cut and tags
   `group.note = "<style>|<lines>"`. For **GC**, `opts` carries the plate raster: `buildCaption` (via a
