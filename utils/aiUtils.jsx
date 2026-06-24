@@ -646,6 +646,44 @@ function elongateCaptionPlateAI(plateGroup, targetWidthPt) {
     return true;
 }
 
+// Full native-caption build for one element: pill around the (artist-shaped) text -> (GC plate) ->
+// seat the rigid caption unit INTO the white-edge outline -> unite into the cut -> bundle -> half-cut.
+// `outline` = the traced white-edged element path (the contour that becomes the cut). `doc` is needed
+// for the half-cut layer. opts: { name, styleCode, plateGroup, plateWidthPadMm, strokePt }.
+// Returns { ok, group, needsReview, halfcut, reason }; ok:false leaves inputs untouched.
+function buildCaption(doc, layer, textFrame, outline, opts) {
+    opts = opts || {};
+    var name = opts.name || String(textFrame.contents || "(caption)");
+    var built = buildCaptionPill(layer, textFrame, opts);
+    var pill = built.pill;
+
+    // Ride-along printed items (text, + GC plate) move rigidly with the pill during the seat.
+    var rideItem = textFrame;
+    if (opts.plateGroup) {
+        var padMm = opts.plateWidthPadMm != null ? opts.plateWidthPadMm : 1.69;
+        elongateCaptionPlateAI(opts.plateGroup, built.radius * 2 + mmToPoints(padMm) * 2);
+        var capGroup = layer.groupItems.add();
+        textFrame.move(capGroup, ElementPlacement.PLACEATEND);
+        opts.plateGroup.move(capGroup, ElementPlacement.PLACEATEND);
+        rideItem = capGroup;
+    }
+
+    // Seat into the white-edge outline (authoritative). The overlap IS the attachment.
+    var seat = seatPlateToOutline(name, outline, pill, rideItem, { polyCache: {} });
+    if (!seat.ok) return { ok: false, needsReview: !!seat.needsReview, reason: seat.reason };
+
+    // Unite outline + pill into the fused cut; bundle the separable members; tag the note.
+    var cut = deriveCutline(outline, pill);
+    strokeRecursive(cut, (opts.strokePt != null ? opts.strokePt : 0.25), blackCmyk());
+    var group = assembleElementGroup(layer, name, outline, pill, cut);
+    group.note = (opts.styleCode || "WC") + "|" + (_capIsMultiLine(textFrame) ? 2 : 1);
+
+    // Derive the half-cut from the submerged pill arc.
+    var hc = syncHalfcut(doc, group, { polyCache: {} });
+    return { ok: true, group: group, needsReview: !!seat.needsReview, moved: seat.moved,
+             halfcut: !!(hc && hc.ok), reason: hc ? hc.reason : null };
+}
+
 // Derives the fused cutline = boolean union of element_outline and plate.
 // Duplicates both inputs so the originals survive as separable components.
 // Returns the resulting item (PathItem, CompoundPathItem, or wrapping GroupItem).
