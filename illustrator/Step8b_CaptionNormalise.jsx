@@ -180,23 +180,6 @@ function runCaptionNormalise(doc) {
     return { reset: reset, atSpec: atSpec, skipped: skipped };
 }
 
-// The placed caption PNG named "{displayName} caption" on the Stickers layer (Step 7B).
-function _findCaption(stickersLayer, displayName) {
-    var want = displayName + " caption";
-    for (var i = 0; i < stickersLayer.placedItems.length; i++) {
-        if (stickersLayer.placedItems[i].name === want) return stickersLayer.placedItems[i];
-    }
-    return null;
-}
-
-// Scale magnitude of a placed item relative to its native pixels — rotation-invariant
-// (sqrt(a²+b²) of the placement matrix). A freshly-placed PNG is 1.0; Step 7B resized
-// it to specFactor, the artist scaled it further.
-function _matrixScale(placedItem) {
-    var m = placedItem.matrix;
-    return Math.sqrt(m.mValueA * m.mValueA + m.mValueB * m.mValueB);
-}
-
 // Uniform-scale a page item by `factor` about an arbitrary document-space point P.
 // factor 1.0 → no-op. Builds the scale-about-P affine and applies it in document
 // coordinates so plate (path) and caption (placed) transform identically about P.

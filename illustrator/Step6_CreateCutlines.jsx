@@ -293,15 +293,6 @@ function _readElementsFile(filePath) {
     return data;
 }
 
-// Transforms a single PSD pixel point to AI document points (AI y increases
-// upward). Point twin of _psBoundsToAi.
-function _psPointToAi(px, py, data, pngLeft, pngTop, pngWidth, pngHeight) {
-    return {
-        x: pngLeft + (px / data.psdWidth)  * pngWidth,
-        y: pngTop  - (py / data.psdHeight) * pngHeight
-    };
-}
-
 // Transforms PSD pixel bounds (left, top, right, bottom) to AI document points
 // using the placed PNG's position and dimensions. Returns geometricBounds order
 // [aiLeft, aiTop, aiRight, aiBottom] (AI y increases upward).
@@ -354,83 +345,3 @@ function _placeCaptionText(layer, displayName, outline, font, sizePt, tracking, 
     tf.name = displayName + " caption text";
     return tf;
 }
-
-// Separable mode: builds the per-element bundle from a traced element-only
-// outline. Creates the parametric plate at the caption's AI bounds, derives the
-// fused cutline via boolean union, strokes it, and groups outline+plate+cutline.
-// element.caption must be present (caller checks). See aiUtils.jsx seams and
-// docs/caption-separability-architecture.md.
-function _buildSeparableCutline(doc, layer, element, elementOutline,
-        pngLeft, pngTop, pngWidth, pngHeight, data) {
-
-    doc.activeLayer = layer;
-    var cap = element.caption;
-
-    // WC captions carry the real fitted spine + radius (from PS) → rebuild the
-    // actual curved/tilted capsule so the cutline follows the caption. GC keeps the
-    // axis-aligned parametric pill (its plate is a straight rect + gouache template,
-    // not a text-spine capsule).
-    var plate;
-    if (element.styleCode === "WC") {
-        var aiSpine = [], j;
-        for (j = 0; j < cap.spine.length; j++) {
-            aiSpine.push(_psPointToAi(cap.spine[j].x, cap.spine[j].y,
-                data, pngLeft, pngTop, pngWidth, pngHeight));
-        }
-        var aiRadius = (cap.radius / data.psdWidth) * pngWidth;
-        plate = buildCapsuleFromSpine(layer, aiSpine, aiRadius);
-        log("[step6] caption capsule | " + element.displayName
-            + " (spine " + aiSpine.length + "pts, r=" + Math.round(aiRadius) + "pt)");
-    } else {
-        var aiBounds = _psBoundsToAi(cap.left, cap.top, cap.right, cap.bottom,
-                           data, pngLeft, pngTop, pngWidth, pngHeight);
-        plate = buildPlate(layer, aiBounds);
-    }
-
-    // Authoritatively seat the plate against the TRACED outline (the same vector that
-    // becomes the cut) before the Unite, so the overlap is real in the cut's own space —
-    // this is what fixes the flat/shallow-seat detachment that the PS raster seat can't
-    // guarantee (Image Trace cuts ~1-3px inside the raster edge it was seated against).
-    // The caption PNG isn't placed until Step 7B, so only the plate moves here; Step 8b
-    // re-seats plate + caption together after a rescale. See aiUtils.seatPlateToOutline.
-    //
-    // One polygon cache per element pass, shared by the seat and the half-cut (both sample the
-    // same traced outline/plate). It lets the never-mutated outline be sampled once and the plate
-    // once per pose; the cache is step-keyed, so the seat (seatSampleSteps) and half-cut
-    // (halfcutSeamSteps) densities never alias and output is unchanged. See aiUtils._sampleCached.
-    var polyCache = {};
-    var seat = seatPlateToOutline(element.displayName, elementOutline, plate, null, { polyCache: polyCache });
-    if (!seat.ok) {
-        log("[step6] seat | " + element.displayName + " NOT seated (" + seat.reason
-            + ") — the half-cut will hard-error at export until the caption is fixed.");
-    }
-
-    var cutline = deriveCutline(elementOutline, plate);
-
-    strokeRecursive(cutline, CONFIG.cutlineStrokePt, blackCmyk());
-    var grp = assembleElementGroup(layer, element.displayName, elementOutline, plate, cutline);
-
-    // Stash caption spec for Step 8b (Caption Normalisation), which has no sidecar.
-    // Format: "{styleCode}|{capLines}" (+ "|R" when the seat was flagged for review) —
-    // e.g. "GC|2" or "WC|1|R". Step 8c/AI_LayoutQA surfaces the review marker. The flag is
-    // OR'd from BOTH the PS rough-pose seat (cap.needsReview, via the sidecar) AND the
-    // authoritative AI vector seat (seat.needsReview) — the AI seat measures the real cut
-    // geometry, so its review judgement (overhang / tilt-clamp / residual convex bulge)
-    // must reach the badge too, not just the PS pre-seat's.
-    grp.note = element.styleCode + "|" + cap.lines
-        + ((cap.needsReview || (seat && seat.needsReview)) ? "|R" : "");
-
-    // Draw the half-cut at birth so it's visible from the first cutline review and
-    // tracks the caption through nesting/normalise (each step re-syncs it). GC/WC only.
-    // Never let one element's half-cut abort the whole Step 6 — a genuinely unseated caption
-    // is surfaced as a hard error at AI_ExportFinal, not by crashing cutline creation.
-    try {
-        var hcRes = syncHalfcut(doc, grp, { polyCache: polyCache });
-        if (hcRes && !hcRes.ok) {
-            log("[step6] half-cut SKIP | " + element.displayName + " — " + hcRes.reason);
-        }
-    } catch (eHc) {
-        log("[step6] half-cut ERROR | " + element.displayName + " (line " + eHc.line + "): " + eHc.message);
-    }
-}
-

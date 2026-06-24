@@ -61,9 +61,8 @@ if [ -n "$PS_APP" ]; then
     sudo mkdir -p "$PS_SCRIPTS"
     # Clear any prior Noteworthie entries (old launcher, setup scripts, renamed steps)
     sudo find "$PS_SCRIPTS" -maxdepth 1 -name "Noteworthie*.jsx" -delete 2>/dev/null
-    install_entry "$PS_SCRIPTS" "photoshop" "Noteworthie 1 - Build Elements"          "PS_BuildElements.jsx"
-    install_entry "$PS_SCRIPTS" "photoshop" "Noteworthie 2 - Build & Export Cutlines" "PSAI_BuildAndExportCutlines.jsx"
-    echo "  ✓ Photoshop   — 2 scripts"
+    install_entry "$PS_SCRIPTS" "photoshop" "Noteworthie 1 - Build Elements" "PS_BuildElements.jsx"
+    echo "  ✓ Photoshop   — 1 script"
 else
     echo "  ✗ Photoshop not found — skipped"
 fi
@@ -75,11 +74,12 @@ if [ -n "$AI_APP" ]; then
     fi
     sudo mkdir -p "$AI_SCRIPTS"
     sudo find "$AI_SCRIPTS" -maxdepth 1 -name "Noteworthie*.jsx" -delete 2>/dev/null
+    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 2 - Build & Export Cutlines" "AI_BuildAndExportCutlines.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 3 - Import Nesting"  "AI_ImportNesting.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 4 - Export Final"    "AI_ExportFinal.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 5 - Layout QA"       "AI_LayoutQA.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 6 - Normalise Captions" "AI_NormaliseCaptions.jsx"
-    echo "  ✓ Illustrator — 4 scripts"
+    echo "  ✓ Illustrator — 5 scripts"
 else
     echo "  ✗ Illustrator not found — skipped"
 fi

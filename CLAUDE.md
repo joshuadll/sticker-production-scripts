@@ -1,5 +1,24 @@
 # Sticker Production Scripts — Claude Code Context
 
+> **⭐ NATIVE-CAPTION REWRITE LANDED (branch `feature/illustrator-native-rewrite`, 2026-06-25).**
+> Captions are now authored **natively in Illustrator**, not reproduced from a Photoshop sidecar.
+> The two-pipeline artist workflow is preserved, but restructured:
+> - **Pipeline 1 — "Build Elements"** (`PS_BuildElements.jsx`, Photoshop): combine → resize → white
+>   edge → group (Step 3B slimmed to grouping-only) → finalize (Step 5) → export **slim sidecar**
+>   (no caption payload — `styleCode` alone decides caption/plate) + per-element **art** PNGs + GC
+>   **plate PNG** (`Step5b_ExportHandoff.jsx`) → **BridgeTalk** → Illustrator traces the cut + places
+>   **native caption text** (Step 6). Ends in Illustrator for the artist's caption review.
+> - **Pipeline 2 — "Build & Export Cutlines"** (`AI_BuildAndExportCutlines.jsx`, **Illustrator**):
+>   `aiUtils.buildCaption` per WC/GC element (white **visible** pill → seat → unite → half-cut; GC
+>   places a scaled plate raster) → Deepnest export (Step 7A).
+> - The caption (pill + text + GC plate) is a **member of the cutline group**, so it rides nesting
+>   automatically (Step 7B no longer places a caption PNG) and is gathered into the per-element
+>   export by Step 10. Step 8b normalises it via the spec **pill area** stamped in `group.note`
+>   (`"<style>|<lines>|a<pt²>"`). **PS Step 3A + PSAI_BuildAndExportCutlines.jsx are deleted.**
+> - Authoritative spec/plan: `docs/superpowers/specs/2026-06-24-native-captions-wiring-design.md`,
+>   `docs/superpowers/plans/2026-06-24-native-captions-wiring.md`. **The caption/PSAI details in the
+>   sections below are PRE-REWRITE and partly stale — trust this banner + the design doc for captions.**
+>
 > **In-app validation status** (branch `claude/step-9a-walkthrough-je9ipa`, run 2026-06-13):
 > - ✅ **PS rotation sign** — confirmed correct (`CONFIG.seatRotationSign = 1`): captions tilt
 >   to follow the border as one rigid unit (text+pill+plate), no shear; flat borders ≈ unchanged.
