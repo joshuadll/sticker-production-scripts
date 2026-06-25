@@ -5,11 +5,17 @@
 // ─── REGEX ────────────────────────────────────────────────────────────────────
 
 // Same naming convention as Photoshop — element names are consistent across apps.
+// Keep this regex identical to psUtils.jsx NAME_REGEX.
 // Matches "Horseshoe Bend [WC-LM]"  → captures (Horseshoe Bend)(WC)(LM)(undefined)
 // Matches "Eiffel Tower [WC-LM+]"   → captures (Eiffel Tower)(WC)(LM)(+)
 // Matches "Small Snack [WC-FD-]"    → captures (Small Snack)(WC)(FD)(-)
 // Matches "Orlando Stamp [ST]"      → captures (Orlando Stamp)(ST)(undefined)(undefined)
-var NAME_REGEX = /^(.+)\s\[([A-Z]+)(?:-([A-Z]+)([+-])?)?\]$/;
+// Matches "Big Stamp [ST+]"         → captures (Big Stamp)(ST)(undefined)(+)
+// Matches "Tiny Stamp [ST-]"        → captures (Tiny Stamp)(ST)(undefined)(-)
+// The size hint is OUTSIDE the catCode group so it can follow a category-less
+// style code (stamps); without this an "[ST+]" typo would parse to null and the
+// stamp would be silently dropped from the cutline/export pipeline.
+var NAME_REGEX = /^(.+)\s\[([A-Z]+)(?:-([A-Z]+))?([+-])?\]$/;
 
 // ─── PURE HELPERS ─────────────────────────────────────────────────────────────
 
