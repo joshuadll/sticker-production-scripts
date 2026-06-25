@@ -1,19 +1,24 @@
 #!/bin/bash
-# Runs all step integration tests and prints a pass/fail summary.
-# Usage: bash tests/integration/run-all.sh
-#        npm test
+# Runs all tests and prints a pass/fail summary.
+# Usage: bash tests/integration/run-all.sh   (or: npm test)
+#
+# Discovery:
+#   unit/run-*.sh        -- util/algorithm tests (run first; catch shared-helper bugs)
+#   <pipeline>/run.sh    -- one per pipeline (ps-build-elements, ai-*)
+# The orphaned tests/integration/run-*.sh at the root (e.g. run-ps-build-elements-captions.sh,
+# which tests the deleted Step 3A) are intentionally NOT discovered.
 
 PASS=0
 FAIL=0
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Unit tests first — these catch shared utility bugs before running integration tests.
-for runner in "$DIR"/run-test*.sh; do
-    bash "$runner" && PASS=$((PASS+1)) || FAIL=$((FAIL+1))
+# Unit tests first.
+for runner in "$DIR"/unit/run-*.sh; do
+    [ -f "$runner" ] && { bash "$runner" && PASS=$((PASS+1)) || FAIL=$((FAIL+1)); }
 done
 
-# Integration tests (require fixture files and a running Adobe app).
-for runner in "$DIR"/run-ps-*.sh "$DIR"/run-psai-*.sh "$DIR"/run-ai-*.sh; do
+# Per-pipeline integration tests (require fixtures + a running Adobe app).
+for runner in "$DIR"/*/run.sh; do
     [ -f "$runner" ] && { bash "$runner" && PASS=$((PASS+1)) || FAIL=$((FAIL+1)); }
 done
 
