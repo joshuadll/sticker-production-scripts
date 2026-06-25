@@ -157,70 +157,79 @@
 [step2B] white edge | Devín Castle [WC-LM-]
 [step2B] SKIP | "Background" — no [STYLE-CAT] code.
 [pipeline] step 3 complete | 24 element(s).
-[pipeline] --- Step 3A: Caption text ---
-[step3A] placed | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Carpathian Wooden Churches [WC-IC]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | National Animal - Tatra chamois [WC-IC]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Tram [WC-TR]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Fujara [WC-IC]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Kroje [WC-IC]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Kraslice [WC-IC]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Bryndzové halušky [WC-FD]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Pirohy [WC-FD]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Šúľance s Makom [WC-FD]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Bratislava(text) [WC-IC]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Čumil Statue [WC-IC]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | The Blue Church - Church of St. Elizabeth [WC-LM]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Michael's Gate [WC-LM-]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Orava Castle [WC-LM-]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Bojnice Castle [WC-LM]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Old Town Hall (Bratislava) [WC-LM-]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] SKIP | "UFO Observation Deck, Bridge SNP [ST]" — style ST does not need a caption.
-[step3A] placed | St. Martin's Cathedral [WC-LM]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Slovakia Map [WC-MP]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] SKIP | "National Flower [ST]" — style ST does not need a caption.
-[step3A] placed | Štrbské Pleso [WC-LM-]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Bratislava Castle [WC-LM+]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Spiš Castle [WC-LM+]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Slovak Paradise National Park [WC-LM-]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] placed | Devín Castle [WC-LM-]
-[step3A] SKIP | "White Base_Cutline" — no [STYLE-CAT] code.
-[step3A] SKIP | "Background" — no [STYLE-CAT] code.
-[pipeline] step 3A complete | 24 caption(s) placed.
-[pipeline] saved | /Users/joshuadelallana/sticker-production-scripts/tests/integration/fixtures/source-psds/source-psds.psd
+[pipeline] --- Step 3B: Group elements ---
+[step3B] grouped | Devín Castle [WC-LM-]
+[step3B] grouped | Slovak Paradise National Park [WC-LM-]
+[step3B] grouped | Spiš Castle [WC-LM+]
+[step3B] grouped | Bratislava Castle [WC-LM+]
+[step3B] grouped | Štrbské Pleso [WC-LM-]
+[step3B] WARN | "National Flower [ST]" — no White Base_Cutline found below SO. Ensure Step 2B (white edge) ran before this step.
+[step3B] grouped | National Flower [ST]
+[step3B] grouped | Slovakia Map [WC-MP]
+[step3B] grouped | St. Martin's Cathedral [WC-LM]
+[step3B] WARN | "UFO Observation Deck, Bridge SNP [ST]" — no White Base_Cutline found below SO. Ensure Step 2B (white edge) ran before this step.
+[step3B] grouped | UFO Observation Deck, Bridge SNP [ST]
+[step3B] grouped | Old Town Hall (Bratislava) [WC-LM-]
+[step3B] grouped | Bojnice Castle [WC-LM]
+[step3B] grouped | Orava Castle [WC-LM-]
+[step3B] grouped | Michael's Gate [WC-LM-]
+[step3B] grouped | The Blue Church - Church of St. Elizabeth [WC-LM]
+[step3B] grouped | Čumil Statue [WC-IC]
+[step3B] grouped | Bratislava(text) [WC-IC]
+[step3B] grouped | Šúľance s Makom [WC-FD]
+[step3B] grouped | Pirohy [WC-FD]
+[step3B] grouped | Bryndzové halušky [WC-FD]
+[step3B] grouped | Kraslice [WC-IC]
+[step3B] grouped | Kroje [WC-IC]
+[step3B] grouped | Fujara [WC-IC]
+[step3B] grouped | Tram [WC-TR]
+[step3B] grouped | National Animal - Tatra chamois [WC-IC]
+[step3B] grouped | Carpathian Wooden Churches [WC-IC]
+[step3B] grouped | St Elizabeth's Cathedral (Dóm Svätej Alzbety) [WC-LM]
+[pipeline] step 3B complete | 26 element(s) grouped.
+[pipeline] --- Step 5: Finalize Elements group ---
+[step5] Elements group finalized.
+[pipeline] step 5 complete | Elements finalized.
+[pipeline] saved | /Users/joshuadelallana/sticker-production-scripts/tests/integration/ps-build-elements/fixtures/source-psds/source-psds.psd
+[step5b] element PNG: St Elizabeth's Cathedral (Dóm Svätej Alzbety)
+[step5b] element PNG: Carpathian Wooden Churches
+[step5b] element PNG: National Animal - Tatra chamois
+[step5b] element PNG: Tram
+[step5b] element PNG: Fujara
+[step5b] element PNG: Kroje
+[step5b] element PNG: Kraslice
+[step5b] element PNG: Bryndzové halušky
+[step5b] element PNG: Pirohy
+[step5b] element PNG: Šúľance s Makom
+[step5b] element PNG: Bratislava(text)
+[step5b] element PNG: Čumil Statue
+[step5b] element PNG: The Blue Church - Church of St. Elizabeth
+[step5b] element PNG: Michael's Gate
+[step5b] element PNG: Orava Castle
+[step5b] element PNG: Bojnice Castle
+[step5b] element PNG: Old Town Hall (Bratislava)
+[step5b] element PNG: UFO Observation Deck, Bridge SNP
+[step5b] element PNG: St. Martin's Cathedral
+[step5b] element PNG: Slovakia Map
+[step5b] element PNG: National Flower
+[step5b] element PNG: Štrbské Pleso
+[step5b] element PNG: Bratislava Castle
+[step5b] element PNG: Spiš Castle
+[step5b] element PNG: Slovak Paradise National Park
+[step5b] element PNG: Devín Castle
+[step5b] element PNGs: 26 art file(s) → /Users/joshuadelallana/sticker-production-scripts/tests/integration/ps-build-elements/fixtures/source-psds/source-psds_elements
+[step5b] no Caption plate layer — WC-only SKU, skipping plate PNG.
+[pipeline] --- BridgeTalk handoff → Illustrator (trace cut + place caption text) ---
+[step5] hid 0 caption sub-layer(s).
+[step5] transient Silhouette built.
+[step5b] exported silhouette PNG (transient layer removed): /Users/joshuadelallana/sticker-production-scripts/tests/integration/ps-build-elements/fixtures/source-psds/source-psds_silhouette.png
+[step5b] wrote elements sidecar: /Users/joshuadelallana/sticker-production-scripts/tests/integration/ps-build-elements/fixtures/source-psds/source-psds_elements.json (26 element(s))
+[pipeline] WARN: aiPipelinePath not set — sidecars written, skipping BridgeTalk.
 [pipeline] === PS_BuildElements done ===
-Done.
+⏳ Illustrator is tracing the cut + placing captions.
 
-  Combined:    26 element(s) from 3 file(s).
-  Resized:     26 element(s).
-  White edge:  26 element(s).
-  Captions:    24 T layer(s) placed.
+  Combined 26 element(s) from 3 file(s) → resized 26, white-edged 24, grouped 26.
 
-Review and adjust caption positions.
-When done, run PSAI_BuildAndExportCutlines to add white bases and proceed.
+When it finishes, review the captions there, then run Pipeline 2 (Build and Export Cutlines).
 
-Saved: /Users/joshuadelallana/sticker-production-scripts/tests/integration/fixtures/source-psds/source-psds.psd
-Log: /private/tmp/PS_BuildElements.log
+Saved: /Users/joshuadelallana/sticker-production-scripts/tests/integration/ps-build-elements/fixtures/source-psds/source-psds.psd
