@@ -25,8 +25,8 @@ var CONFIG = {
     logPath:        Folder.desktop.fsName + "/test-caption-linecount.log"
 };
 
-#include "../../utils/psUtils.jsx"
-#include "../../photoshop/Step3B_CaptionWhite.jsx"
+#include "../../../utils/psUtils.jsx"
+#include "../../../photoshop/Step3B_CaptionWhite.jsx"
 
 // --- TEST HARNESS -------------------------------------------------------------
 

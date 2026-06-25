@@ -1,7 +1,7 @@
 // tests/integration/test-caption-note.js
 // Pure string helpers — node-compatible (ES3). Eval the two _capNote* sources from aiUtils.
 var fs = require('fs');
-var src = fs.readFileSync(__dirname + '/../../utils/aiUtils.jsx', 'utf8');
+var src = fs.readFileSync(__dirname + '/../../../utils/aiUtils.jsx', 'utf8');
 eval(src.match(/function _capNoteFormat[\s\S]*?\n}\n/)[0]);
 eval(src.match(/function _capNoteParse[\s\S]*?\n}\n/)[0]);
 

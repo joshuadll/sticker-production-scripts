@@ -21,8 +21,8 @@ var CONFIG = {
     whiteCurvedHeightPctile: 0.9
 };
 
-#include "../../utils/psUtils.jsx"
-#include "../../photoshop/Step3B_CaptionWhite.jsx"
+#include "../../../utils/psUtils.jsx"
+#include "../../../photoshop/Step3B_CaptionWhite.jsx"
 
 // --- TEST HARNESS -------------------------------------------------------------
 
@@ -81,7 +81,7 @@ function collectTextLayers(container, out) {
 
 // --- RUN ----------------------------------------------------------------------
 
-var fixturePath = new File($.fileName).parent.fsName + "/fixtures/elements-captioned-ungrouped.psd";
+var fixturePath = new File($.fileName).parent.parent.fsName + "/fixtures/elements-captioned-ungrouped.psd";
 var doc = null;
 try {
     var fx = new File(fixturePath);

@@ -8,7 +8,7 @@
 # No golden file: the JSX asserts the invariant and writes [halfcut-test] PASS|/FAIL| lines.
 # A regression that pushes endpoints off the cut line trips a FAIL line.
 #
-# FIXTURE: tests/integration/fixtures/import-nesting.ai (shared with run-ai-import-nesting.sh).
+# FIXTURE: tests/integration/unit/fixtures/import-nesting.ai (a local-only copy; the ai-import-nesting pipeline test has its own under ai-import-nesting/fixtures/).
 set -euo pipefail
 
 STEP="ai-halfcut-alignment"

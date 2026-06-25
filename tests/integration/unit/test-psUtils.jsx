@@ -35,7 +35,7 @@ var CONFIG = {
     }
 };
 
-#include "../../utils/psUtils.jsx"
+#include "../../../utils/psUtils.jsx"
 
 // ─── TEST HARNESS ─────────────────────────────────────────────────────────────
 

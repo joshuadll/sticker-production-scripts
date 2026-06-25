@@ -12,7 +12,7 @@
 //
 // The runner opens tests/integration/fixtures/import-nesting.ai before evaluating this file.
 #target illustrator
-#include "../../utils/aiUtils.jsx"
+#include "../../../utils/aiUtils.jsx"
 
 var CONFIG = {
     logPath:           "~/Desktop/test-halfcut-alignment.log",

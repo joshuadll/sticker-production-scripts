@@ -22,7 +22,7 @@ var CONFIG = {
     logPath:        Folder.desktop.fsName + "/test-ai-caption-seat.log"
 };
 
-#include "../../utils/aiUtils.jsx"
+#include "../../../utils/aiUtils.jsx"
 
 // --- TEST HARNESS -------------------------------------------------------------
 

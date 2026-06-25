@@ -4,7 +4,7 @@
 // aiUtils.jsx and eval them into scope (dependencies first). Column-0 closing brace (\n})
 // ends each match, so nested/indented braces don't terminate it early.
 var fs = require('fs');
-var src = fs.readFileSync(__dirname + '/../../utils/aiUtils.jsx', 'utf8');
+var src = fs.readFileSync(__dirname + '/../../../utils/aiUtils.jsx', 'utf8');
 
 function extract(name) {
     var re = new RegExp('function ' + name + '[\\s\\S]*?\\n}');
