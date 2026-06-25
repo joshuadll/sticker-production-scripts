@@ -26,8 +26,10 @@ tests/integration/ps-build-elements/fixtures/source-psds/*_irregular.svg
 # Exception: the committed import-nesting golden-test fixture — the recurring
 # rotation/overlap regression case (Slovakia SKU). Tracked despite the global *.ai
 # and the fixtures/* ignores above, so the test runs anywhere from a clean checkout.
-!tests/integration/fixtures/import-nesting/
-!tests/integration/fixtures/import-nesting/**
+# Negated via ** so it stays tracked wherever the per-pipeline reorg places the
+# import-nesting/ dir (e.g. tests/integration/ai-import-nesting/fixtures/import-nesting/).
+!tests/integration/**/import-nesting/
+!tests/integration/**/import-nesting/**
 
 # Golden-mismatch scratch output (written by test runners on a diff; copy over the
 # real golden to accept — never committed).

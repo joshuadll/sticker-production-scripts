@@ -3,7 +3,7 @@
 # Runs against a nested-and-normalised cutlines fixture.
 #
 # FIXTURE REQUIRED:
-#   tests/integration/fixtures/step8c-cutlines.ai
+#   tests/integration/ai-export-final/fixtures/step8c-cutlines.ai
 #     A post-nesting .ai (cutlines imported + captions normalised) — the state
 #     the artist hands off after the manual nest loop. Set up manually.
 #
@@ -13,18 +13,18 @@
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
 #   2. Verify the log looks correct (checked > 0, flagged > 0, no ERROR)
-#   3. Commit: cp "$LOG" tests/integration/expected/ai-export-final-expected.txt
+#   3. Commit: cp "$LOG" tests/integration/ai-export-final/expected.txt
 
 set -euo pipefail
 
 STEP="ai-export-final"
 APP="Adobe Illustrator"
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_ExportFinal.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 AI_FIXTURE="$FIXTURE_DIR/step8c-cutlines.ai"
-EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ai-export-final-expected.txt"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 TEMP_FIXTURE="/tmp/${STEP}-fixture.ai"

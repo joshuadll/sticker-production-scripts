@@ -7,14 +7,14 @@
 # FIXTURE (committed — the real Slovakia SKU, the recurring rotation/overlap regression
 # case). Lives in its own folder, named by the {base} convention so the pipeline's
 # auto-discovery finds the siblings next to the .ai (see _findNestedSvgs/_findElementsFolder):
-#   tests/integration/fixtures/import-nesting/import-nesting.ai
+#   tests/integration/ai-import-nesting/fixtures/import-nesting/import-nesting.ai
 #       Working .ai right after Step 6 (Cutlines layer populated, Sticker layer present).
-#   tests/integration/fixtures/import-nesting/import-nesting_regular_nested.svg
-#   tests/integration/fixtures/import-nesting/import-nesting_irregular_nested.svg
+#   tests/integration/ai-import-nesting/fixtures/import-nesting/import-nesting_regular_nested.svg
+#   tests/integration/ai-import-nesting/fixtures/import-nesting/import-nesting_irregular_nested.svg
 #       Real Deepnest output (the nested layouts).
-#   tests/integration/fixtures/import-nesting/import-nesting_elements/
+#   tests/integration/ai-import-nesting/fixtures/import-nesting/import-nesting_elements/
 #       Per-element art + caption PNGs, names matching the cutline display names.
-#   tests/integration/fixtures/import-nesting/import-nesting_elements.json
+#   tests/integration/ai-import-nesting/fixtures/import-nesting/import-nesting_elements.json
 #       PSAI sidecar (psdWidth → absolute art-sizing factor).
 # These are force-tracked via a .gitignore exception (the global *.ai / fixtures/* rules
 # would otherwise skip them). Regenerate from a real run: run-psai-build-export-cutlines.sh
@@ -25,14 +25,14 @@ set -euo pipefail
 STEP="ai-import-nesting"
 APP="Adobe Illustrator"
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_ImportNesting.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures/import-nesting"
 AI_FIXTURE="$FIXTURE_DIR/import-nesting.ai"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/AI_ImportNesting.log"
-EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ai-import-nesting-expected.txt"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected.txt"
 
 # Golden normaliser: drop the machine-specific / volatile lines (absolute fixture
 # paths + start/done banners). Everything kept is deterministic given the fixed

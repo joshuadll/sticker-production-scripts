@@ -6,24 +6,24 @@
 #   • Nesting Quality — [stepQA] NQI= / paths: / grid:
 #
 # FIXTURE REQUIRED (local-only — *.ai is gitignored, so it never leaves your Mac):
-#   tests/integration/fixtures/quality-check.ai
+#   tests/integration/ai-layout-qa/fixtures/quality-check.ai
 #     A working .ai file that has been through Steps 6 + Deepnest import —
 #     must have a "Cutlines" layer with nested PathItems/CompoundPathItems.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
 #   2. Verify the log shows the spacing/margin counts AND the NQI score/pockets
-#   3. Commit: cp "$LOG" tests/integration/expected/ai-layout-qa-expected.txt
+#   3. Commit: cp "$LOG" tests/integration/ai-layout-qa/expected.txt
 
 set -euo pipefail
 
 STEP="ai-layout-qa"
 APP="Adobe Illustrator"
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_LayoutQA.jsx"
-FIXTURE_AI="$REPO_ROOT/tests/integration/fixtures/quality-check.ai"
-EXPECTED="$REPO_ROOT/tests/integration/expected/ai-layout-qa-expected.txt"
+FIXTURE_AI="$(cd "$(dirname "$0")" && pwd)/fixtures/quality-check.ai"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/AI_LayoutQA.log"

@@ -3,7 +3,7 @@
 # the former Step 8b — now its own re-runnable pipeline for the manual nest loop).
 #
 # FIXTURE REQUIRED:
-#   tests/integration/fixtures/resize-elements.ai
+#   tests/integration/ai-normalise-captions/fixtures/resize-elements.ai
 #     A nested working doc (Slovakia SKU) with well-formed Cutlines groups (note +
 #     outline/plate) and the decoupled caption PNGs placed on the Sticker layer at
 #     varied off-spec scales — i.e. the post-manual-resize state this pipeline corrects.
@@ -20,18 +20,18 @@
 #   1. Run this script (SKIP diff if no golden file yet)
 #   2. Verify the log looks correct (reset > 0, no errors)
 #   3. Commit: cp /tmp/normalise-captions-run1.log \
-#               tests/integration/expected/ai-normalise-captions-expected.txt
+#               tests/integration/ai-normalise-captions/expected.txt
 
 set -euo pipefail
 
 STEP="ai-normalise-captions"
 APP="Adobe Illustrator"
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIPT="$REPO_ROOT/pipelines/AI_NormaliseCaptions.jsx"
 FIXTURE_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 AI_FIXTURE="$FIXTURE_DIR/resize-elements.ai"
-EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected/ai-normalise-captions-expected.txt"
+EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
 LOG="/tmp/AI_NormaliseCaptions.log"
@@ -42,7 +42,7 @@ RUN2="/tmp/normalise-captions-run2.log"
 
 if [ ! -f "$AI_FIXTURE" ]; then
     echo "SKIP [$STEP]: fixture not found: $AI_FIXTURE"
-    echo "  Expected the committed resize-elements.ai fixture in tests/integration/fixtures/."
+    echo "  Expected the committed resize-elements.ai fixture in tests/integration/ai-normalise-captions/fixtures/."
     exit 0
 fi
 
