@@ -179,7 +179,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             var capTf = _placeCaptionText(cutlinesLayer, matched.displayName, path,
                 CONFIG.captionFont, CONFIG.captionSizePt, CONFIG.captionTracking, CONFIG.captionTextGapMm);
             log("[step6] caption text | " + matched.displayName);
-            if (matched.styleCode === "WC" && CONFIG.captionWarpEnabled) {
+            if (capTf && matched.styleCode === "WC" && CONFIG.captionWarpEnabled) {
                 var warpRes = warpTextToBaseArc(capTf, path, {
                     minBowMm:     CONFIG.captionWarpMinBowMm,
                     maxResidFrac: CONFIG.captionWarpMaxResidFrac,
