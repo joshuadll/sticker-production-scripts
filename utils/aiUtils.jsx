@@ -603,7 +603,18 @@ function _capSolve3(a11, a12, a13, a21, a22, a23, a31, a32, a33, b1, b2, b3) {
 // in AI points (y-up), or null if there is no ink.
 function _capSampleTextOutline(textFrame, sliceMm) {
     var dup = textFrame.duplicate();
-    var outlined = dup.createOutline();          // GroupItem of glyph outlines (replaces dup)
+    // Bake any live appearance (e.g. a Step-6 Arc warp) into geometry so the sampled baseline
+    // reflects the warp. expandStyle is a no-op for a plain frame, which then still needs
+    // createOutline; a warped frame expands to a group of warped paths we can sample directly.
+    var outlined;
+    try {
+        app.selection = [dup];
+        app.executeMenuCommand("expandStyle");
+        var ex = (app.selection && app.selection.length) ? app.selection[0] : dup;
+        outlined = (ex.typename === "TextFrame") ? ex.createOutline() : ex;
+    } catch (eEx) {
+        outlined = dup.createOutline();
+    }
     var polys = samplePathToPolygons(outlined, 16);
     var gb = outlined.geometricBounds;           // [l, t, r, b]  (t > b, y-up)
     try { outlined.remove(); } catch (e) {}
@@ -740,16 +751,16 @@ function buildCaptionPill(layer, textFrame, opts) {
     }
 
     var spine, radius;
-    if (!s || s.base.length < 3 || _capIsMultiLine(textFrame)) {   // degenerate / multi-line -> flat
+    if (!s || s.base.length < 3) {                 // degenerate -> flat
         var fp0 = flatPill(); spine = fp0.spine; radius = fp0.radius;
     } else {
         var fit = _capRobustBaselineFit(s.base, bb[0], bb[2], snapPt, minCols);
-        if (fit.straight) {
+        if (fit.straight) {                        // straight (single OR multi-line) -> flat bbox stadium
             var fp = flatPill(); spine = fp.spine; radius = fp.radius;
         } else {
-            // Curved: the centreline is the baseline lifted by half the line height (parallel
-            // under warp). Line height = a high percentile of per-band heights (one line, not the
-            // arc-inflated bbox). radius covers that line + pad.
+            // Genuinely curved (single OR multi-line): the centreline is the bottom-of-ink baseline
+            // lifted by half the body height (parallel under warp). For multi-line, the band sampler
+            // reports the full two-line vertical span, so halfBody covers both lines + pad.
             var halfBody = _capPercentile(s.heights, pctile) / 2;
             radius = halfBody + padPt / 2;
             spine = [];
