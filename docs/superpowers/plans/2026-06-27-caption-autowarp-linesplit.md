@@ -670,6 +670,10 @@ If the warped curvature is too strong/weak vs. the base, adjust `CONFIG.captionW
 
 Run `AI_BuildAndExportCutlines` on the same doc. Confirm: WC pill follows the warped baseline for single- AND two-line captions; a flat two-line caption still gets a flat pill; the seat + half-cut succeed (no "unseated caption" hard error).
 
+**Watch (from final whole-branch review):** `_capSampleTextOutline` now does `app.selection = [dup]` before `expandStyle` (aiUtils ~611), on the per-element Pipeline-2 path. The codebase warns that `app.selection = null` deadlocks on a heavy doc (`deriveCutline`), and that pattern clears/selects per-item (`item.selected = true/false`) instead. The non-null array assignment is a different operation and select-then-`expandStyle` mirrors `deriveCutline`, so this is expected to be fine — but explicitly confirm a full ~27-element SKU does NOT hang at the pill-build step. If it stalls, switch `_capSampleTextOutline` to the per-item `.selected = true` form (clear selection first to isolate `dup`).
+
+**Calibration telemetry tip:** flat-rejection reasons already embed the deciding number (`base ~flat (bow …)`, `base not arc-like (resid …)`, `radius out of range …`, `arc not centred`); the warped case logs only the radius. If a base that should warp is being rejected (or vice-versa), temporarily extend `warpTextToBaseArc`'s warped `reason` (or add a Step-6 log line) to surface `bow`/`resid`/`radius` together so you can see which gate is governing before turning `captionWarpBendCalib`.
+
 - [ ] **Step 6: Regenerate any shifted goldens**
 
 If the new behavior changes a committed golden (e.g. the Pipeline-1/Pipeline-2 integration `expected.txt`), regenerate per `docs/testing.md`, **review each diff**, and commit.
