@@ -766,6 +766,43 @@ function buildCaptionPill(layer, textFrame, opts) {
     return { pill: pill, spine: spine, radius: radius };
 }
 
+// Warps a caption text frame to follow its element's curved base — but ONLY when the base is a
+// confidently smooth, symmetric arc (see _capBaseArcFit). Measures the outline's bottom profile
+// over the TEXT's x-span, fits, and on a pass applies a LIVE Arc warp via applyEffect (editable;
+// the Pipeline-2 pill sampler bakes it for measurement). DOM-only, guarded — degrades to flat
+// (warped:false) on any failure. Returns { warped:Bool, bend:Number, reason:String }.
+function warpTextToBaseArc(textFrame, outline, opts) {
+    opts = opts || {};
+    var steps = opts.sampleSteps != null ? opts.sampleSteps : 16;
+    var tb = textFrame.geometricBounds;            // [l,t,r,b] y-up
+    var x0 = tb[0], x1 = tb[2], textH = tb[1] - tb[3];
+    if (x1 - x0 <= 0) return { warped: false, bend: 0, reason: "empty text bounds" };
+
+    var polys;
+    try { polys = samplePathToPolygons(outline, steps); }
+    catch (e) { return { warped: false, bend: 0, reason: "sample failed (" + e.message + ")" }; }
+
+    var stepPt = (x1 - x0) / 48;                    // ~48 columns across the text span
+    var profile = _capBottomProfile(polys, x0, x1, stepPt);
+    var dec = _capBaseArcFit(profile, x0, x1, {
+        minBowPt:   mmToPoints(opts.minBowMm     != null ? opts.minBowMm     : 0.5),
+        maxResidPt: (opts.maxResidFrac != null ? opts.maxResidFrac : 0.5) * textH,
+        minRadPt:   mmToPoints(opts.minRadMm     != null ? opts.minRadMm     : 10),
+        maxRadPt:   mmToPoints(opts.maxRadMm     != null ? opts.maxRadMm     : 500),
+        gapPt:      mmToPoints(opts.gapMm        != null ? opts.gapMm        : 3.0),
+        calib:      opts.calib   != null ? opts.calib   : 1.0,
+        maxBend:    opts.maxBend != null ? opts.maxBend : 0.6
+    });
+    if (!dec.warp) return { warped: false, bend: 0, reason: dec.reason };
+
+    // Adobe Warp live effect: style 1 = Arc, horizontal orientation, bend in -1..1.
+    var xml = '<LiveEffect name="Adobe Warp"><Dict data="I styleVer 1 R bend '
+        + dec.bend + ' I horizontal 1 R distortV 0 R distortH 0 I rotate 0 I style 1 "/></LiveEffect>';
+    try { textFrame.applyEffect(xml); }
+    catch (e2) { return { warped: false, bend: 0, reason: "warp effect rejected (" + e2.message + ")" }; }
+    return { warped: true, bend: dec.bend, reason: "warped r=" + Math.round(dec.radius) + "pt" };
+}
+
 // Multi-line if the caption has >= 2 non-empty lines (point text -> a line per hard return).
 function _capIsMultiLine(textFrame) {
     try {

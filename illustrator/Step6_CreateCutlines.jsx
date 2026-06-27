@@ -176,9 +176,23 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             // no longer carries a caption object — caption presence is decided by styleCode.
             setStrokeStyle(path, CONFIG.cutlineStrokePt, blackCmyk());
             path.name = matched.displayName + " outline";
-            _placeCaptionText(cutlinesLayer, matched.displayName, path,
+            var capTf = _placeCaptionText(cutlinesLayer, matched.displayName, path,
                 CONFIG.captionFont, CONFIG.captionSizePt, CONFIG.captionTracking, CONFIG.captionTextGapMm);
             log("[step6] caption text | " + matched.displayName);
+            if (matched.styleCode === "WC" && CONFIG.captionWarpEnabled) {
+                var warpRes = warpTextToBaseArc(capTf, path, {
+                    minBowMm:     CONFIG.captionWarpMinBowMm,
+                    maxResidFrac: CONFIG.captionWarpMaxResidFrac,
+                    minRadMm:     CONFIG.captionWarpRadiusRangeMm[0],
+                    maxRadMm:     CONFIG.captionWarpRadiusRangeMm[1],
+                    gapMm:        CONFIG.captionTextGapMm,
+                    calib:        CONFIG.captionWarpBendCalib,
+                    maxBend:      CONFIG.captionWarpMaxBend
+                });
+                log("[step6] caption warp | " + matched.displayName + " -> "
+                    + (warpRes.warped ? ("bend " + warpRes.bend.toFixed(3) + " (" + warpRes.reason + ")")
+                                      : ("flat (" + warpRes.reason + ")")));
+            }
             named++;
         } else {
             // ST and any uncaptioned element: bare named cutline path.
