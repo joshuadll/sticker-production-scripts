@@ -31,6 +31,13 @@ tests/integration/ps-build-elements/fixtures/source-psds/*_irregular.svg
 !tests/integration/**/import-nesting/
 !tests/integration/**/import-nesting/**
 
+# Exception: the committed Pipeline 2 (ai-build-and-export-cutlines) test fixture — the
+# post-Step-6 working .ai (traced cut + native caption text, Slovakia SKU) that Pipeline 2
+# consumes as its starting file. Tracked despite the global *.ai so the test runs anywhere
+# from a clean checkout. (The sibling traced-cutlines_elements.json sidecar is not ignored
+# in this dir, so it's tracked normally.)
+!tests/integration/ai-build-and-export-cutlines/fixtures/traced-cutlines.ai
+
 # Golden-mismatch scratch output (written by test runners on a diff; copy over the
 # real golden to accept — never committed).
 tests/integration/expected/*.new
