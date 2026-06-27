@@ -657,6 +657,65 @@ function _capColumnSpan(polys, x) {
     return { lo: lo, hi: hi };
 }
 
+// Bottom-edge profile of a sampled outline (polys from samplePathToPolygons) over [x0,x1]:
+// per column the LOWEST crossing y (lower envelope). Returns [{x,y}…] (y-up: lower = smaller y);
+// columns with no ink are skipped. Pure geometry (reuses _capColumnSpan) — node-testable.
+function _capBottomProfile(polys, x0, x1, stepPt) {
+    var out = [], x, step = (stepPt > 0 ? stepPt : 1);
+    for (x = x0; x <= x1 + 1e-6; x += step) {
+        var sp = _capColumnSpan(polys, x);
+        if (sp) out.push({ x: x, y: sp.lo });
+    }
+    return out;
+}
+
+// Decides whether a caption under this base should warp, and by how much. CONSERVATIVE: returns
+// warp:false on anything wavy/ambiguous (default flat — artist warps by hand). Reuses
+// _capRobustBaselineFit (robust quadratic + chord bow) then applies three gates:
+//   A goodness-of-fit: residual RMS over ALL profile pts <= maxResidPt (wavy => high resid => flat)
+//   B chord-bow deadband: bow >= minBowPt (flat-on-average base => ~0 bow => flat)
+//   C sane geometry: radius in [minRadPt,maxRadPt] AND arc vertex near centre (symmetry)
+// radius ~ 1/(2|a|) from y=a(x-xm)^2+...; bend sign from sign(a) (a>0 = valley = smile, the
+// round-base case for a bottom edge in y-up). bend = clamp(calib * span/(radius+gapPt), maxBend).
+// Pure geometry — node-testable. Returns {warp,bend,radius,bow,resid,reason}.
+function _capBaseArcFit(profilePts, x0, x1, opts) {
+    opts = opts || {};
+    var minCols    = opts.minCols    != null ? opts.minCols    : 8;
+    var minBowPt   = opts.minBowPt   != null ? opts.minBowPt   : 1.42;
+    var maxResidPt = opts.maxResidPt != null ? opts.maxResidPt : 1.42;
+    var minRadPt   = opts.minRadPt   != null ? opts.minRadPt   : 28;
+    var maxRadPt   = opts.maxRadPt   != null ? opts.maxRadPt   : 1417;
+    var gapPt      = opts.gapPt      != null ? opts.gapPt      : 0;
+    var calib      = opts.calib      != null ? opts.calib      : 1.0;
+    var maxBend    = opts.maxBend    != null ? opts.maxBend    : 0.6;
+    function none(reason) { return { warp: false, bend: 0, radius: 0, bow: 0, resid: 0, reason: reason }; }
+    if (!profilePts || profilePts.length < minCols) return none("too few columns");
+
+    var fit = _capRobustBaselineFit(profilePts, x0, x1, minBowPt, minCols);
+    var i, se = 0, n = profilePts.length;
+    for (i = 0; i < n; i++) { var dy = profilePts[i].y - _capYAt(fit.fit, profilePts[i].x); se += dy * dy; }
+    var resid = Math.sqrt(se / n);
+    if (resid > maxResidPt) return none("base not arc-like (resid " + resid.toFixed(2) + ")");
+    if (fit.bow < minBowPt) return none("base ~flat (bow " + fit.bow.toFixed(2) + ")");
+
+    var a = fit.fit.a;
+    if (a === 0) return none("no curvature");
+    var radius = 1 / (2 * Math.abs(a));
+    if (radius < minRadPt || radius > maxRadPt) return none("radius out of range (" + Math.round(radius) + "pt)");
+    // The fit is y = a*(x-xm)^2 + b*(x-xm) + c, so its vertex is at xm - b/(2a) — NOT xm (which
+    // is just the mean-x the quadratic is centred on). A true round base is symmetric: vertex near
+    // the span centre. An off-centre lump fails here even though it fit an arc elsewhere.
+    var xv = fit.fit.xm - fit.fit.b / (2 * a);
+    var cx = (x0 + x1) / 2, halfSpan = (x1 - x0) / 2;
+    if (halfSpan <= 0 || Math.abs(xv - cx) > 0.5 * halfSpan) return none("arc not centred");
+
+    var span = x1 - x0;
+    var bend = calib * (span / (radius + gapPt));
+    if (bend > maxBend) bend = maxBend;
+    if (a < 0) bend = -bend;   // a<0 = hill (cap-down); a>0 = valley (smile)
+    return { warp: true, bend: bend, radius: radius, bow: fit.bow, resid: resid, reason: "warp" };
+}
+
 // Builds the white caption pill around a native (artist-shaped) text frame: sample the text
 // BASELINE -> robust-fit + snap -> radius from text height + pad -> sweep a capsule. One path
 // for straight, multi-line, and curved text (no type branch). For straight/multi-line text it
