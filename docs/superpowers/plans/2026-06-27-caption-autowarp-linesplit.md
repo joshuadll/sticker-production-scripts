@@ -151,13 +151,10 @@ function extract(name) {
     if (!m) throw new Error('could not extract ' + name + ' from aiUtils.jsx');
     return m[0];
 }
-eval(extract('_capSolve3'));
-eval(extract('_capPercentile'));
-eval(extract('_capYAt'));
+// Task 2 extracts only what _capBottomProfile needs. Task 3 appends more extracts
+// (_capSolve3, _capYAt, _capRobustBaselineFit, _capBaseArcFit) directly below these.
 eval(extract('_capColumnSpan'));
-eval(extract('_capRobustBaselineFit'));
 eval(extract('_capBottomProfile'));
-eval(extract('_capBaseArcFit'));
 
 var fails = 0;
 function check(cond, msg) { if (!cond) { console.log('FAIL: ' + msg); fails++; } }
@@ -245,7 +242,16 @@ git commit -m "feat(captions): _capBottomProfile — lower-envelope sampler for 
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `tests/integration/unit/test-caption-warpfit.js`, immediately **before** the final `console.log(...)`/`process.exit(...)` lines:
+First, add the dependency extracts `_capBaseArcFit` needs. In `tests/integration/unit/test-caption-warpfit.js`, immediately **after** the existing `eval(extract('_capBottomProfile'));` line, insert (dependency order):
+
+```javascript
+eval(extract('_capSolve3'));
+eval(extract('_capYAt'));
+eval(extract('_capRobustBaselineFit'));
+eval(extract('_capBaseArcFit'));
+```
+
+Then append the gate tests immediately **before** the final `console.log(...)`/`process.exit(...)` lines:
 
 ```javascript
 // ── _capBaseArcFit gates. Span 0..120 (61 cols @ step 2), y-up. ──
