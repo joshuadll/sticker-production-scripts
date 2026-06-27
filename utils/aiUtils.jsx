@@ -557,6 +557,20 @@ function _capRobustBaselineFit(pts, x0, x1, snapTolPt, minCols) {
 // Two-point horizontal spine at height y over [x0, x1].
 function _capStraightSpine(x0, x1, y) { return [{ x: x0, y: y }, { x: x1, y: y }]; }
 
+// Splits a caption display name into stacked lines on "|": "A | B" -> ["A","B"]. Trims each
+// segment and drops empties; a name with no "|" returns a single-element array. The cutline
+// group name and the text-frame name keep the FULL string — only the visible text uses these.
+function _capSplitLines(displayName) {
+    var whole = String(displayName == null ? "" : displayName);
+    var raw = whole.split("|"), out = [], i, s;
+    for (i = 0; i < raw.length; i++) {
+        s = raw[i].replace(/^\s+|\s+$/g, "");
+        if (s.length > 0) out.push(s);
+    }
+    if (out.length === 0) out.push(whole.replace(/^\s+|\s+$/g, ""));
+    return out;
+}
+
 // p-quantile (0..1) of a numeric array (need not be sorted).
 function _capPercentile(arr, p) {
     var a = arr.slice(0);
