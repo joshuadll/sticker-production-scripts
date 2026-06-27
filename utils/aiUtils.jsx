@@ -487,35 +487,71 @@ function _capUnit(x, y) {
     return [x / len, y / len];
 }
 
-// ─── CAPTION SPINE FIT (ported from PS Step3B — pure geometry, node-testable) ───
-// Least-squares quadratic through sampled centre points; snaps to a straight 2-point spine
-// when the fit stays within snapTolPt of flat. Returns { spine:[{x,y}…], straight:Bool }.
-// Coordinate-agnostic (fits y as a function of x), so it is identical in PS y-down and AI y-up.
-function _capQuadFitSpine(pts, x0, x1, snapTolPt) {
-    var n = pts.length, i;
-    var xm = 0, ym = 0;
-    for (i = 0; i < n; i++) { xm += pts[i].x; ym += pts[i].y; }
-    xm /= n; ym /= n;
-    var S0 = n, S1 = 0, S2 = 0, S3 = 0, S4 = 0, Ty = 0, Txy = 0, Tx2y = 0;
-    for (i = 0; i < n; i++) {
-        var dx = pts[i].x - xm, y = pts[i].y, dx2 = dx * dx;
-        S1 += dx; S2 += dx2; S3 += dx2 * dx; S4 += dx2 * dx2;
-        Ty += y; Txy += dx * y; Tx2y += dx2 * y;
+// ─── CAPTION SPINE FIT (baseline-based — pure geometry, node-testable) ───
+// The pill spine is derived from the text BASELINE (per-column bottom-of-ink), NOT the ink
+// midpoint. The midpoint moves with glyph height (caps vs x-height vs ascenders) and isolated
+// marks, so it spuriously bows/tilts under straight text; the baseline is glyph-height-invariant
+// — every on-baseline glyph sits on it — so straight text fits flat regardless of the letters.
+// Under a warp the baseline and the centreline are parallel arcs (same curvature), so curvature
+// measured on the clean baseline transfers to the centreline. (Replaces the old midpoint
+// _capQuadFitSpine, which the new crisp-vector pill exposed as under-robust — see
+// docs/superpowers/specs/2026-06-27-caption-pill-baseline-spine-design.md.)
+
+// y of a fitted quadratic { a, b, c, xm } at px. Coordinate-agnostic (PS y-down / AI y-up).
+function _capYAt(fit, px) { var d = px - fit.xm; return fit.a * d * d + fit.b * d + fit.c; }
+
+// Robust least-squares quadratic through baseline-candidate points (per-column bottom-of-ink).
+// Rejects descenders (sit below the baseline) and floating marks — apostrophes, dots, accents
+// (sit above) — via a median/MAD inlier test, 2 iterations. Decides straight vs curved from the
+// inlier fit's deviation from its endpoint CHORD (pure curvature, tilt removed). pts: [{x,y}].
+// Returns { straight:Bool, bow:Number, nIn:Number, fit:{a,b,c,xm} }.
+// straight when there are fewer than minCols inliers (too sparse to trust a curve) OR the
+// chord-bow stays within snapTolPt.
+function _capRobustBaselineFit(pts, x0, x1, snapTolPt, minCols) {
+    if (!pts || pts.length < 3) {
+        return { straight: true, bow: 0, nIn: pts ? pts.length : 0, fit: { a: 0, b: 0, c: 0, xm: 0 } };
     }
-    var a = 0, b = 0, c = ym;
-    var sol = _capSolve3(S4, S3, S2, S3, S2, S1, S2, S1, S0, Tx2y, Txy, Ty);
-    if (sol) { a = sol[0]; b = sol[1]; c = sol[2]; }
-    function yAt(px) { var d = px - xm; return a * d * d + b * d + c; }
-    var flat = ym, maxDev = 0, probes = 16, p;
-    for (p = 0; p <= probes; p++) {
-        var px = x0 + (x1 - x0) * (p / probes);
-        var dev = Math.abs(yAt(px) - flat);
-        if (dev > maxDev) maxDev = dev;
+    function fitQuad(ps) {
+        var n = ps.length, i, xm = 0;
+        for (i = 0; i < n; i++) xm += ps[i].x; xm /= n;
+        var S0 = n, S1 = 0, S2 = 0, S3 = 0, S4 = 0, Ty = 0, Txy = 0, Tx2y = 0;
+        for (i = 0; i < n; i++) {
+            var dx = ps[i].x - xm, y = ps[i].y, dx2 = dx * dx;
+            S1 += dx; S2 += dx2; S3 += dx2 * dx; S4 += dx2 * dx2;
+            Ty += y; Txy += dx * y; Tx2y += dx2 * y;
+        }
+        var a = 0, b = 0, c = Ty / n;
+        var sol = _capSolve3(S4, S3, S2, S3, S2, S1, S2, S1, S0, Tx2y, Txy, Ty);
+        if (sol) { a = sol[0]; b = sol[1]; c = sol[2]; }
+        return { a: a, b: b, c: c, xm: xm };
     }
-    if (maxDev <= snapTolPt) return { spine: _capStraightSpine(x0, x1, flat), straight: true };
-    var out = [], M = 40;
-    for (p = 0; p <= M; p++) { var sx = x0 + (x1 - x0) * (p / M); out.push({ x: sx, y: yAt(sx) }); }
-    return { spine: out, straight: false };
+    function median(arr) {
+        var a = arr.slice(0).sort(function (p, q) { return p - q; }), n = a.length;
+        if (!n) return 0;
+        return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2;
+    }
+    var inl = pts, f = fitQuad(inl), iter, i;
+    for (iter = 0; iter < 2; iter++) {
+        var res = [];
+        for (i = 0; i < pts.length; i++) res.push(pts[i].y - _capYAt(f, pts[i].x));
+        var med = median(res), ad = [];
+        for (i = 0; i < res.length; i++) ad.push(Math.abs(res[i] - med));
+        var mad = median(ad); if (mad < 0.5) mad = 0.5;   // floor: don't over-reject a clean baseline
+        var keep = [];
+        for (i = 0; i < pts.length; i++) if (Math.abs(res[i] - med) <= 2.5 * mad) keep.push(pts[i]);
+        if (keep.length < minCols) break;                  // too few inliers to refine — stop
+        inl = keep; f = fitQuad(inl);
+    }
+    // Pure curvature = max deviation of the inlier fit from the chord through its endpoints.
+    var y0 = _capYAt(f, x0), y1 = _capYAt(f, x1), bow = 0, p;
+    for (p = 0; p <= 24; p++) {
+        var px = x0 + (x1 - x0) * (p / 24);
+        var ch = (x1 === x0) ? y0 : y0 + (y1 - y0) * ((px - x0) / (x1 - x0));
+        var dv = Math.abs(_capYAt(f, px) - ch);
+        if (dv > bow) bow = dv;
+    }
+    var straight = (inl.length < minCols) || (bow <= snapTolPt);
+    return { straight: straight, bow: bow, nIn: inl.length, fit: f };
 }
 
 // Two-point horizontal spine at height y over [x0, x1].
@@ -545,9 +581,12 @@ function _capSolve3(a11, a12, a13, a21, a22, a23, a31, a32, a33, b1, b2, b3) {
 }
 
 // ─── CAPTION TEXT SAMPLER (AI vector analog of PS _sampleTextSpine) ───
-// Outlines a COPY of the text and samples its filled vertical extent in columns of width
-// sliceMm. Returns { pts:[{x,y}…] (column centres = spine), heights:[Number…],
-// bounds:[l,t,r,b] } in AI points (y-up), or null if there is no ink.
+// Outlines a COPY of the text and samples it in 1mm-wide BANDS (matching PS _sampleTextSpine,
+// which reads the bounding-span of all ink in a slice — the AI port had regressed this to a
+// single scan line, which over-reacts to isolated marks and gaps). Per band it records the
+// bottom-of-ink (baseline candidate) and the ink height. Returns
+//   { base:[{x,y}…] (band centre x, bottom-of-ink y), heights:[Number…], bounds:[l,t,r,b] }
+// in AI points (y-up), or null if there is no ink.
 function _capSampleTextOutline(textFrame, sliceMm) {
     var dup = textFrame.duplicate();
     var outlined = dup.createOutline();          // GroupItem of glyph outlines (replaces dup)
@@ -558,15 +597,31 @@ function _capSampleTextOutline(textFrame, sliceMm) {
 
     var L = gb[0], T = gb[1], R = gb[2], B = gb[3];
     if (R - L <= 0 || T - B <= 0) return null;
-    var step = mmToPoints(sliceMm), pts = [], heights = [], x;
-    for (x = L + step / 2; x < R; x += step) {
-        var span = _capColumnSpan(polys, x);     // {lo, hi} filled y-range at this x, or null
+    var step = mmToPoints(sliceMm), base = [], heights = [], x;
+    for (x = L; x < R; x += step) {
+        var bx1 = (x + step < R) ? x + step : R;
+        var span = _capBandSpan(polys, x, bx1, 8); // {lo, hi} = span of all ink in the band, or null
         if (!span) continue;
-        pts.push({ x: x, y: (span.lo + span.hi) / 2 });
+        base.push({ x: (x + bx1) / 2, y: span.lo }); // bottom-of-ink = baseline candidate
         heights.push(span.hi - span.lo);
     }
-    if (pts.length === 0) return null;
-    return { pts: pts, heights: heights, bounds: [L, T, R, B] };
+    if (base.length === 0) return null;
+    return { base: base, heights: heights, bounds: [L, T, R, B] };
+}
+
+// Filled vertical span of a polygon set over a BAND [x0, x1]: union of the per-scanline spans
+// at sub+1 sample columns across the band (PS reads the band's pixel bounding box). {lo,hi} or null.
+function _capBandSpan(polys, x0, x1, sub) {
+    var lo = null, hi = null, j, n = (sub > 0 ? sub : 1);
+    for (j = 0; j <= n; j++) {
+        var x = (x1 === x0) ? x0 : x0 + (x1 - x0) * (j / n);
+        var sp = _capColumnSpan(polys, x);
+        if (!sp) continue;
+        if (lo === null || sp.lo < lo) lo = sp.lo;
+        if (hi === null || sp.hi > hi) hi = sp.hi;
+    }
+    if (lo === null) return null;
+    return { lo: lo, hi: hi };
 }
 
 // Filled vertical span of a polygon set at vertical line x: the min and max y over all
@@ -589,32 +644,48 @@ function _capColumnSpan(polys, x) {
 }
 
 // Builds the white caption pill around a native (artist-shaped) text frame: sample the text
-// centreline -> fit/snap a spine -> radius from text height + pad -> sweep a capsule. One path
-// for straight, multi-line, and curved text (no type branch), matching PS createWhiteFromText.
-// Returns { pill:PathItem (white, unstroked), spine:[{x,y}…], radius:Number }.
+// BASELINE -> robust-fit + snap -> radius from text height + pad -> sweep a capsule. One path
+// for straight, multi-line, and curved text (no type branch). For straight/multi-line text it
+// is the proven flat bbox stadium; the baseline-derived curved spine runs only for genuinely
+// warped text. Returns { pill:PathItem (white, unstroked), spine:[{x,y}…], radius:Number }.
 function buildCaptionPill(layer, textFrame, opts) {
     opts = opts || {};
     var sliceMm = opts.sliceMm != null ? opts.sliceMm : 1.0;
     var padPt   = mmToPoints(opts.padMm  != null ? opts.padMm  : 1.69);
-    var snapPt  = mmToPoints(opts.snapMm != null ? opts.snapMm : 0.5);
-    var pctile  = opts.pctile != null ? opts.pctile : 0.9;
+    var snapPt  = mmToPoints(opts.snapMm != null ? opts.snapMm : 0.6);
+    var pctile  = opts.pctile  != null ? opts.pctile  : 0.9;
+    var minCols = opts.minCols != null ? opts.minCols : 8;
 
     var s = _capSampleTextOutline(textFrame, sliceMm);
     var bb = s ? s.bounds : textFrame.geometricBounds;   // [l,t,r,b] y-up
     var boxH = bb[1] - bb[3];
 
+    // The flat bbox stadium: proven straight pill — covers the full text box (incl. descenders).
+    function flatPill() {
+        return { spine: _capStraightSpine(bb[0], bb[2], (bb[1] + bb[3]) / 2),
+                 radius: boxH / 2 + padPt / 2 };
+    }
+
     var spine, radius;
-    if (!s || s.pts.length < 3) {                        // degenerate -> bbox stadium
-        radius = boxH / 2 + padPt / 2;
-        spine  = _capStraightSpine(bb[0], bb[2], (bb[1] + bb[3]) / 2);
+    if (!s || s.base.length < 3 || _capIsMultiLine(textFrame)) {   // degenerate / multi-line -> flat
+        var fp0 = flatPill(); spine = fp0.spine; radius = fp0.radius;
     } else {
-        var fit = _capQuadFitSpine(s.pts, bb[0], bb[2], snapPt);
-        if (_capIsMultiLine(textFrame)) {               // multi-line -> flat tall stadium
-            fit = { spine: _capStraightSpine(bb[0], bb[2], (bb[1] + bb[3]) / 2), straight: true };
+        var fit = _capRobustBaselineFit(s.base, bb[0], bb[2], snapPt, minCols);
+        if (fit.straight) {
+            var fp = flatPill(); spine = fp.spine; radius = fp.radius;
+        } else {
+            // Curved: the centreline is the baseline lifted by half the line height (parallel
+            // under warp). Line height = a high percentile of per-band heights (one line, not the
+            // arc-inflated bbox). radius covers that line + pad.
+            var halfBody = _capPercentile(s.heights, pctile) / 2;
+            radius = halfBody + padPt / 2;
+            spine = [];
+            var M = 40, p;
+            for (p = 0; p <= M; p++) {
+                var sx = bb[0] + (bb[2] - bb[0]) * (p / M);
+                spine.push({ x: sx, y: _capYAt(fit.fit, sx) + halfBody });
+            }
         }
-        var penH = fit.straight ? boxH : _capPercentile(s.heights, pctile);
-        radius = penH / 2 + padPt / 2;
-        spine  = fit.spine;
     }
     var pill = buildCapsuleFromSpine(layer, spine, radius);   // existing helper
     pill.filled = true; pill.fillColor = whiteCmyk();
