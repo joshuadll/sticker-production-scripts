@@ -331,7 +331,8 @@ function _findMatchingElement(center, data, pngLeft, pngTop, pngWidth, pngHeight
 // try/catch each characterAttributes set — a stale attribute throws -609 (see gotchas memory).
 function _placeCaptionText(layer, displayName, outline, font, sizePt, tracking, gapMm) {
     var tf = layer.textFrames.add();
-    tf.contents = displayName;
+    var _lines = _capSplitLines(displayName);   // split on "|" -> stacked lines (aiUtils)
+    tf.contents = _lines.join("\r");
     try { tf.textRange.characterAttributes.size     = sizePt; } catch (e1) {}
     try { tf.textRange.characterAttributes.textFont = app.textFonts.getByName(font); } catch (e2) {}
     try { tf.textRange.characterAttributes.tracking = tracking; } catch (e3) {}
