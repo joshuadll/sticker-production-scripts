@@ -178,7 +178,8 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             path.name = matched.displayName + " outline";
             var capTf = _placeCaptionText(cutlinesLayer, matched.displayName, path,
                 CONFIG.captionFont, CONFIG.captionSizePt, CONFIG.captionTracking, CONFIG.captionTextGapMm);
-            log("[step6] caption text | " + matched.displayName);
+            var capLineCount = _capSplitLines(matched.displayName).length;   // "A | B" -> 2 stacked lines
+            log("[step6] caption text | " + matched.displayName + " (" + capLineCount + " line(s))");
             if (capTf && matched.styleCode === "WC" && CONFIG.captionWarpEnabled) {
                 var warpRes = warpTextToBaseArc(capTf, path, {
                     minBowMm:          CONFIG.captionWarpMinBowMm,

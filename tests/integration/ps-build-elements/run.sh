@@ -164,8 +164,11 @@ fi
 # test covers the decision geometry on synthetic data; this asserts the split end-to-end. If the
 # fixture art changes, update these two lists. (Pirohy = short caption on a big circle, Kraslice =
 # small egg-bottom — the two the size-relative rule fixed; castles are the flat control.)
-WARP_EXPECT=("Pirohy" "Kraslice" "Bryndzové halušky" "Šúľance s Makom" "National Animal - Tatra chamois")
-FLAT_EXPECT=("Bratislava Castle" "Devín Castle" "Spiš Castle")
+# Note: "Tatra chamois" stays FLAT — the warp samples the base edge across the CAPTION's x-span,
+# so the short caption only sees a near-flat central slice (R/elW ~4.4). The art is round elsewhere;
+# the decision is correctly relative to where the (short) caption connects.
+WARP_EXPECT=("Pirohy" "Kraslice" "Bryndzové halušky" "Šúľance s Makom")
+FLAT_EXPECT=("Bratislava Castle" "Devín Castle" "Spiš Castle" "Tatra chamois")
 WARP_OK=1
 for el in "${WARP_EXPECT[@]}"; do
     grep -qF "caption warp | $el -> bend" "$LOG_AI" || { echo "  FAIL: expected '$el' to WARP"; WARP_OK=0; }
@@ -177,6 +180,23 @@ if [ "$WARP_OK" -eq 1 ]; then
     echo "  PASS: auto-warp split correct (${#WARP_EXPECT[@]} round warp, ${#FLAT_EXPECT[@]} flat stay flat)."
 else
     grep "caption warp |" "$LOG_AI" || true; FAIL=1
+fi
+
+# "|" line-split — Step 6 splits the display name on "|" into stacked caption lines (the frame
+# NAME keeps the full string for matching). Assert the split end-to-end on the real fixture, not
+# just in the node unit test: the two piped names land on 2 lines, a plain name stays on 1.
+# (The "(N line(s))" suffix is emitted by Step 6's caption-text log.) Update if the fixture names change.
+SPLIT_OK=1
+grep -qF 'caption text | St Elizabeth'"'"'s Cathedral | (Dóm Svätej Alzbety) (2 line(s))' "$LOG_AI" \
+    || { echo "  FAIL: 'St Elizabeth's Cathedral | (Dóm Svätej Alzbety)' did not split into 2 lines"; SPLIT_OK=0; }
+grep -qF 'caption text | The Blue Church | Church of St. Elizabeth (2 line(s))' "$LOG_AI" \
+    || { echo "  FAIL: 'The Blue Church | Church of St. Elizabeth' did not split into 2 lines"; SPLIT_OK=0; }
+grep -qF 'caption text | Tatra chamois (1 line(s))' "$LOG_AI" \
+    || { echo "  FAIL: 'Tatra chamois' (no pipe) was not a single line"; SPLIT_OK=0; }
+if [ "$SPLIT_OK" -eq 1 ]; then
+    echo "  PASS: \"|\" line-split correct (2 piped names -> 2 lines, plain name -> 1 line)."
+else
+    grep "caption text |" "$LOG_AI" || true; FAIL=1
 fi
 if [ "$FAIL" -ne 0 ]; then echo "  AI log:"; cat "$LOG_AI"; exit 1; fi
 
