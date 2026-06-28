@@ -32,13 +32,15 @@ var CONFIG = {
     // ── Caption auto-warp (Step 6, WC only) — warp text to a curved art base ──
     // Conservative: warps ONLY a confidently smooth, symmetric, arc-like base; wavy/ambiguous
     // bases stay flat (artist warps by hand). See aiUtils._capBaseArcFit / warpTextToBaseArc.
-    captionWarpEnabled:       true,
-    captionWarpMinBowMm:      0.5,        // Gate B: min chord bow of the base trend to bother warping
-    captionWarpMaxResidFrac:  0.5,        // Gate A: max fit residual RMS as a fraction of text height
-    captionWarpRadiusRangeMm: [10, 500],  // Gate C: plausible fitted base radius [min, max]
-    captionWarpMaxBend:       0.6,        // clamp on the applied Arc-warp bend fraction (-1..1)
-    captionWarpBendCalib:     1.0,        // ⚠ KEY KNOB: bend = calib * span/(radius+gap). Tune on a
-                                          //     real round SKU so the text curvature matches the base.
+    captionWarpEnabled:        true,
+    captionWarpMaxResidFrac:   0.5,       // arc-like gate: max fit residual RMS as a fraction of text height
+    captionWarpMinBowMm:       0.5,       // clear-dip backup: edge dips >= this across the caption -> round
+    captionWarpTightRadiusFactor: 1.0,    // ⚠ ROUNDNESS: warp when the curve's circle radius <= factor ×
+                                          //     element width (size-relative, scale-free). 1.0 = "circle no
+                                          //     bigger than the sticker". Round bases here ≤0.75×, flat ≥1.5×.
+    captionWarpMaxBend:        0.6,       // clamp on the applied Arc-warp bend fraction (-1..1)
+    captionWarpBendCalib:      1.0,       // bend magnitude scale: 1.0 = caption radius matches the base
+                                          //     (concentric); <1.0 = gentler. Tune on a real round SKU.
 
     // ── Half-cut (shared aiUtils helpers) ────────────────────────────────────
     // The half-cut is drawn at birth here and re-synced by Steps 7B/8b/9A so it

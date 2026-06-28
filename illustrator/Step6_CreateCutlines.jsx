@@ -181,13 +181,12 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             log("[step6] caption text | " + matched.displayName);
             if (capTf && matched.styleCode === "WC" && CONFIG.captionWarpEnabled) {
                 var warpRes = warpTextToBaseArc(capTf, path, {
-                    minBowMm:     CONFIG.captionWarpMinBowMm,
-                    maxResidFrac: CONFIG.captionWarpMaxResidFrac,
-                    minRadMm:     CONFIG.captionWarpRadiusRangeMm[0],
-                    maxRadMm:     CONFIG.captionWarpRadiusRangeMm[1],
-                    gapMm:        CONFIG.captionTextGapMm,
-                    calib:        CONFIG.captionWarpBendCalib,
-                    maxBend:      CONFIG.captionWarpMaxBend
+                    minBowMm:          CONFIG.captionWarpMinBowMm,
+                    maxResidFrac:      CONFIG.captionWarpMaxResidFrac,
+                    tightRadiusFactor: CONFIG.captionWarpTightRadiusFactor,
+                    gapMm:             CONFIG.captionTextGapMm,
+                    calib:             CONFIG.captionWarpBendCalib,
+                    maxBend:           CONFIG.captionWarpMaxBend
                 });
                 log("[step6] caption warp | " + matched.displayName + " -> "
                     + (warpRes.warped ? ("bend " + warpRes.bend.toFixed(3) + " (" + warpRes.reason + ")")
