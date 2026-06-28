@@ -89,9 +89,13 @@ Multi-wave bottoms, central notches, and asymmetric lumps all fall through to fl
 
 ### Applying the warp
 
-- Apply a **live Arc Warp** to the text frame via `applyEffect` with a
-  `<LiveEffect name="Adobe Warp">` XML string (Arc style, horizontal orientation, `bend` derived
-  from the measured curvature). Live = the artist can still tune it in Effect → Warp Options.
+- Apply a **live Arc Warp** to the text frame via `applyEffect`. **The effect is
+  `<LiveEffect name="Adobe Deform">`** (Effect → Warp), NOT `"Adobe Warp"` — `applyEffect` silently
+  ignores an unrecognised name, so the wrong name renders nothing. Dict: `Arc = DeformStyle 1`,
+  `DeformValue` = the bend fraction (negated: Illustrator's Arc bends a *positive* value into an arch,
+  and a round/convex base needs a ∪-valley), `Rotate 0` = horizontal. Live = the artist can still tune
+  it in Effect → Warp Options. (Implemented + Illustrator-validated `a039cdd`, 2026-06-28; a no-op guard
+  checks the visible bounds actually grew after `applyEffect`.)
 - **Pill sampler change:** `_capSampleTextOutline` currently does `duplicate()` → `createOutline()`
   on the flat geometry. Add an appearance-expand (`expandStyle`) on the throwaway duplicate
   **before** outlining, so the warped baseline is actually captured. Contained, single-spot change;
