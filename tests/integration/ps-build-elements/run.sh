@@ -159,6 +159,25 @@ if grep -q "working document saved:" "$LOG_AI" && [ -f "$WORKING_AI" ]; then
 else
     echo "FAIL [$STEP]: working .ai not saved ($WORKING_AI)."; FAIL=1
 fi
+# Auto-warp (Illustrator-side behaviour) — size-relative roundness applied to the REAL traced
+# fixture: round bases warp ("-> bend"), flat-bottomed buildings stay flat ("-> flat"). The node
+# test covers the decision geometry on synthetic data; this asserts the split end-to-end. If the
+# fixture art changes, update these two lists. (Pirohy = short caption on a big circle, Kraslice =
+# small egg-bottom — the two the size-relative rule fixed; castles are the flat control.)
+WARP_EXPECT=("Pirohy" "Kraslice" "Bryndzové halušky" "Šúľance s Makom" "National Animal - Tatra chamois")
+FLAT_EXPECT=("Bratislava Castle" "Devín Castle" "Spiš Castle")
+WARP_OK=1
+for el in "${WARP_EXPECT[@]}"; do
+    grep -qF "caption warp | $el -> bend" "$LOG_AI" || { echo "  FAIL: expected '$el' to WARP"; WARP_OK=0; }
+done
+for el in "${FLAT_EXPECT[@]}"; do
+    grep -qF "caption warp | $el -> flat" "$LOG_AI" || { echo "  FAIL: expected '$el' to stay FLAT"; WARP_OK=0; }
+done
+if [ "$WARP_OK" -eq 1 ]; then
+    echo "  PASS: auto-warp split correct (${#WARP_EXPECT[@]} round warp, ${#FLAT_EXPECT[@]} flat stay flat)."
+else
+    grep "caption warp |" "$LOG_AI" || true; FAIL=1
+fi
 if [ "$FAIL" -ne 0 ]; then echo "  AI log:"; cat "$LOG_AI"; exit 1; fi
 
 # === PHASE 1 golden diff (PS log) ============================================
