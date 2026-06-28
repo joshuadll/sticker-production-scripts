@@ -184,7 +184,6 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
                     minBowMm:          CONFIG.captionWarpMinBowMm,
                     maxResidFrac:      CONFIG.captionWarpMaxResidFrac,
                     tightRadiusFactor: CONFIG.captionWarpTightRadiusFactor,
-                    gapMm:             CONFIG.captionTextGapMm,
                     calib:             CONFIG.captionWarpBendCalib,
                     maxBend:           CONFIG.captionWarpMaxBend
                 });

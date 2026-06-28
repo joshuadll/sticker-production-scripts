@@ -811,16 +811,17 @@ function warpTextToBaseArc(textFrame, outline, opts) {
     });
     if (!dec.warp) return { warped: false, bend: 0, reason: dec.reason };
 
-    // The caption must arc to MATCH the base edge it seats against (concentric) — same radius as the
-    // base where it connects, so the curves mate. Illustrator's Arc obeys R = W / (2*sin(pi*B/2))
-    // (measured, <1.5% error), so the bend for a target radius R_text is B = (2/pi)*asin(W/(2*R_text)).
-    // W = the text width = the connection span the base radius was measured over; R_text = base radius
-    // + gap. calib scales it (1.0 = match the base exactly; <1 = gentler). This REPLACES the old
-    // bend = calib*span/radius heuristic, which over-warped by ~pi.
+    // The caption arcs to the SAME radius as the base edge where it connects — an exact curvature
+    // match (no offset). Illustrator's Arc obeys R = W / (2*sin(pi*B/2)) (measured, <1.5% error), so
+    // the bend for a target radius R_text is B = (2/pi)*asin(W/(2*R_text)). W = the text width = the
+    // connection span the base radius was measured over; R_text = the base radius itself. calib scales
+    // it (1.0 = match exactly; <1 = gentler). (An earlier version added the placement gap to R_text,
+    // making tight bases too gentle; dropped — the placement gap is temporary and unrelated to the
+    // seated mate.)
     var W = x1 - x0;
     var calib   = opts.calib   != null ? opts.calib   : 1.0;
     var maxBend = opts.maxBend != null ? opts.maxBend : 0.6;
-    var rTextPt = dec.radius + mmToPoints(opts.gapMm != null ? opts.gapMm : 3.0);
+    var rTextPt = dec.radius;
     var sinArg  = (rTextPt > 0) ? (W / (2 * rTextPt)) : 1;
     if (sinArg > 1) sinArg = 1;                        // can't bend past a semicircle
     var mag = (2 / Math.PI) * Math.asin(sinArg) * calib;
@@ -848,8 +849,7 @@ function warpTextToBaseArc(textFrame, outline, opts) {
     if (dH < 0.1 && Math.abs(dW) < 0.1) {
         return { warped: false, bend: 0, reason: "warp applied but did not render (effect no-op)" };
     }
-    return { warped: true, bend: deformValue, reason: "warped baseR=" + Math.round(dec.radius)
-             + "pt textR=" + Math.round(rTextPt) + "pt" };
+    return { warped: true, bend: deformValue, reason: "warped R=" + Math.round(dec.radius) + "pt" };
 }
 
 // Multi-line if the caption has >= 2 non-empty lines (point text -> a line per hard return).
