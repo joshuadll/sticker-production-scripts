@@ -806,27 +806,45 @@ function warpTextToBaseArc(textFrame, outline, opts) {
     });
     if (!dec.warp) return { warped: false, bend: 0, reason: dec.reason };
 
-    // Effect > Warp is the live effect "Adobe Deform" (NOT "Adobe Warp" — applyEffect silently
-    // ignores an unknown name, which made the whole warp a no-op). Arc = DeformStyle 1; DeformValue
-    // is the bend fraction (-1..1, |0.6| = 60%); Rotate 0 = horizontal; DeformHoriz/Vert 0.
+    // The caption must arc to MATCH the base edge it seats against (concentric) — same radius as the
+    // base where it connects, so the curves mate. Illustrator's Arc obeys R = W / (2*sin(pi*B/2))
+    // (measured, <1.5% error), so the bend for a target radius R_text is B = (2/pi)*asin(W/(2*R_text)).
+    // W = the text width = the connection span the base radius was measured over; R_text = base radius
+    // + gap. calib scales it (1.0 = match the base exactly; <1 = gentler). This REPLACES the old
+    // bend = calib*span/radius heuristic, which over-warped by ~pi.
+    var W = x1 - x0;
+    var calib   = opts.calib   != null ? opts.calib   : 1.0;
+    var maxBend = opts.maxBend != null ? opts.maxBend : 0.6;
+    var rTextPt = dec.radius + mmToPoints(opts.gapMm != null ? opts.gapMm : 3.0);
+    var sinArg  = (rTextPt > 0) ? (W / (2 * rTextPt)) : 1;
+    if (sinArg > 1) sinArg = 1;                        // can't bend past a semicircle
+    var mag = (2 / Math.PI) * Math.asin(sinArg) * calib;
+    if (mag > maxBend) mag = maxBend;
+    // "Adobe Deform" = Effect > Warp (NOT "Adobe Warp" — applyEffect silently ignores an unknown
+    // name, which once made the whole warp a no-op). Arc = DeformStyle 1; Rotate 0 = horizontal.
     // Sign: Illustrator's Arc bends a POSITIVE value into an arch (middle up); a round/convex base
-    // (dec.bend>0 here, = a U-valley bottom edge) needs the caption to be a U, so NEGATE dec.bend.
-    var deformValue = -dec.bend;
+    // (dec.bend>=0, a U-valley bottom edge) needs a U, so DeformValue is NEGATIVE for a valley base.
+    var deformValue = (dec.bend >= 0) ? -mag : mag;
     var xml = '<LiveEffect name="Adobe Deform"><Dict data="S DisplayString Warp:Arc I DeformStyle 1'
         + ' B Rotate 0 R DeformValue ' + deformValue + ' R DeformHoriz 0 R DeformVert 0 "/></LiveEffect>';
+    // Defense-in-depth: applyEffect silently no-ops on an unrecognised effect name/dict (this is
+    // exactly how the wrong "Adobe Warp" name passed once with zero visible bend). Compare the SAME
+    // measure (visibleBounds = ink) before vs after: a real Arc warp lifts the ends (taller) and
+    // pulls them inward (narrower). If neither moved, the effect did not render. (Comparing
+    // visibleBounds to geometricBounds is WRONG — for text the ink box and the type box differ.)
+    try { app.redraw(); } catch (eR0) {}
+    var pre = textFrame.visibleBounds;             // [l,t,r,b] y-up — ink box before the warp
+    var preH = pre[1] - pre[3], preW = pre[2] - pre[0];
     try { textFrame.applyEffect(xml); }
     catch (e2) { return { warped: false, bend: 0, reason: "warp effect rejected (" + e2.message + ")" }; }
-
-    // Defense-in-depth: applyEffect silently no-ops on an unrecognised effect name/dict (this is
-    // exactly how the wrong "Adobe Warp" name passed once with zero visible bend). A real Arc warp
-    // grows the visible bounds beyond the (unchanged) glyph geometry; if nothing grew, the effect
-    // did not render — surface it as not-warped rather than reporting a phantom success.
-    var vb = textFrame.visibleBounds, gb2 = textFrame.geometricBounds;   // [l,t,r,b] y-up
-    var grew = (vb[1] - vb[3]) - (gb2[1] - gb2[3]);
-    if (grew < 0.1) {
+    try { app.redraw(); } catch (eR1) {}           // render the live effect so visibleBounds is current
+    var post = textFrame.visibleBounds;
+    var dH = (post[1] - post[3]) - preH, dW = preW - (post[2] - post[0]);
+    if (dH < 0.1 && Math.abs(dW) < 0.1) {
         return { warped: false, bend: 0, reason: "warp applied but did not render (effect no-op)" };
     }
-    return { warped: true, bend: dec.bend, reason: "warped r=" + Math.round(dec.radius) + "pt" };
+    return { warped: true, bend: deformValue, reason: "warped baseR=" + Math.round(dec.radius)
+             + "pt textR=" + Math.round(rTextPt) + "pt" };
 }
 
 // Multi-line if the caption has >= 2 non-empty lines (point text -> a line per hard return).
