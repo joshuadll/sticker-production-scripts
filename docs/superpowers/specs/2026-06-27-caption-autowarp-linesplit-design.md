@@ -123,6 +123,21 @@ both — see commit `c749558`.)
   fit is genuinely curved uses the curved-spine branch even with ≥2 lines. The band sampler
   already reports the full two-line vertical span, so `radius = percentile(full-span heights)/2 +
   pad` and `spine = baseline + halfBody` extend naturally; only the gating changes.
+  - **Bottom-line baseline (FIXED 2026-06-28).** The straight/curved decision must read only the
+    BOTTOM line's baseline, not the full-width bottom-of-ink envelope: when the bottom line is
+    NARROWER than the block (e.g. `St Elizabeth's Cathedral | (Dóm Svätej Alzbety)`), the envelope
+    jumps up to the upper line at the edge columns the bottom line doesn't cover, faking a ∪ curve
+    that built a wrongly **curved** pill on a flat-based building. `_capBottomLineBaseline` (in
+    `buildCaptionPill`) splits the baseline-y values at their largest gap (the inter-line break)
+    and keeps the low group; single-line text is untouched. This is what `buildCaptionPill` now
+    keys off — NOT whether a warp effect is applied (`visibleBounds ≠ geometricBounds`), which is
+    fragile to the artist's manual warp tuning in caption review. The sampled baseline already
+    bakes whatever warp the artist left (Step-6 Arc, tuned, or removed), so a genuinely warped
+    caption — single OR multi-line — still reads curved. A very gentle auto-warp (e.g. *Pirohy*: a
+    short caption on a large-radius round base → ~0.18mm of sag) stays straight by design: that
+    deflection is below the text-sampling noise floor (a flat short caption like *Tram* samples
+    noisier), so it is indistinguishable from flat and not worth chasing; if the artist wants it
+    visibly curved they bend it more in review and the builder follows.
 
 ### Bend ↔ radius calibration — SOLVED
 

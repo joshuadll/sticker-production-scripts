@@ -554,6 +554,36 @@ function _capRobustBaselineFit(pts, x0, x1, snapTolPt, minCols) {
     return { straight: straight, bow: bow, nIn: inl.length, fit: f };
 }
 
+// For a MULTI-LINE caption, keep only the bottom line's baseline points. The per-column
+// bottom-of-ink (the baseline proxy) jumps UP to an upper line wherever the bottom line is
+// narrower and doesn't cover that column, so the full-width envelope of a flat-but-narrow-bottom
+// caption (e.g. "St Elizabeth's Cathedral | (Dóm Svätej Alzbety)") fakes a ∪ curve and the pill
+// is wrongly built curved. We split the baseline-y values at their single largest gap (the
+// inter-line break ≈ the leading, far bigger than within-line column noise) and return the LOW
+// group (y-up: the bottom line sits at smaller y). Guards keep it conservative — only when the
+// caller says the caption is multi-line, only when a real break exists, and only if the bottom
+// group is big enough to trust; otherwise the input is returned untouched (single-line is never
+// reshaped, and a lone descender can't split a one-line caption). Pure geometry — node-testable.
+// lineBreakPt = the minimum baseline-y gap that counts as a line break (pt). The caption font
+// is fixed (Kalam 8pt, leading ≈ 9.6pt); a real break measures ≈5–7pt of bottom-of-ink separation
+// after descenders, well above the <1pt within-line column noise, so 3pt cleanly separates them.
+function _capBottomLineBaseline(base, isMultiLine) {
+    var lineBreakPt = 3.0;
+    if (!isMultiLine || !base || base.length < 6) return base;
+    var ys = [], i;
+    for (i = 0; i < base.length; i++) ys.push(base[i].y);
+    ys.sort(function (p, q) { return p - q; });
+    var maxGap = 0, splitY = ys[0];
+    for (i = 1; i < ys.length; i++) {
+        var g = ys[i] - ys[i - 1];
+        if (g > maxGap) { maxGap = g; splitY = (ys[i] + ys[i - 1]) / 2; }
+    }
+    if (maxGap < lineBreakPt) return base;              // no real line break -> leave untouched
+    var low = [];
+    for (i = 0; i < base.length; i++) if (base[i].y < splitY) low.push(base[i]);
+    return (low.length >= 4) ? low : base;              // bottom cluster too small to trust
+}
+
 // Two-point horizontal spine at height y over [x0, x1].
 function _capStraightSpine(x0, x1, y) { return [{ x: x0, y: y }, { x: x1, y: y }]; }
 
@@ -760,7 +790,13 @@ function buildCaptionPill(layer, textFrame, opts) {
     if (!s || s.base.length < 3) {                 // degenerate -> flat
         var fp0 = flatPill(); spine = fp0.spine; radius = fp0.radius;
     } else {
-        var fit = _capRobustBaselineFit(s.base, bb[0], bb[2], snapPt, minCols);
+        // For a multi-line caption keep only the BOTTOM line's baseline, then judge straight/curved
+        // over its own x-extent: a narrower bottom line otherwise lets the upper line's baseline
+        // (picked up at the edge columns it doesn't cover) fake a ∪ curve and build a wrongly curved
+        // pill. Single-line text passes through untouched. See _capBottomLineBaseline.
+        var baseF = _capBottomLineBaseline(s.base, _capIsMultiLine(textFrame));
+        var fx0 = baseF[0].x, fx1 = baseF[baseF.length - 1].x;
+        var fit = _capRobustBaselineFit(baseF, fx0, fx1, snapPt, minCols);
         if (fit.straight) {                        // straight (single OR multi-line) -> flat bbox stadium
             var fp = flatPill(); spine = fp.spine; radius = fp.radius;
         } else {

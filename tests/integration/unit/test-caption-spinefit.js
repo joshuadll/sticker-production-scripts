@@ -25,6 +25,7 @@ eval(extract('_capYAt'));
 eval(extract('_capColumnSpan'));
 eval(extract('_capBandSpan'));
 eval(extract('_capRobustBaselineFit'));
+eval(extract('_capBottomLineBaseline'));
 
 function approx(a, b, t) { return Math.abs(a - b) <= t; }
 var fails = 0;
@@ -86,6 +87,54 @@ var MIN  = 8;
           'band inside square should span 10..20, got ' + JSON.stringify(s));
     var out = _capBandSpan([square], 20, 25, 8);   // band right of the square
     check(out === null, 'band outside the geometry should be null, got ' + JSON.stringify(out));
+})();
+
+// ── 6. Multi-line, narrow bottom line → full envelope fakes a curve; bottom-line filter is flat ──
+// Models a "A | B" caption whose bottom line (B) is narrower than the top (A): the per-column
+// bottom-of-ink jumps UP to the top line's baseline at the edge columns the bottom line doesn't
+// cover, so the full-width envelope reads as a ∪ valley. _capBottomLineBaseline must keep only the
+// bottom line, which is flat. (This is the St Elizabeth's bug: a flat 2-line caption seen as curved.)
+(function () {
+    var base = [], i;
+    for (i = 0; i <= 80; i++) {
+        // bottom line covers x in [20,60]; outside it only the top line (higher baseline) shows
+        var y = (i >= 20 && i <= 60) ? 100 : 112;
+        base.push({ x: i, y: y });
+    }
+    var full = _capRobustBaselineFit(base, 0, 80, SNAP, MIN);
+    check(full.straight === false, 'pre-fix: full envelope of narrow-bottom 2-line should read curved');
+
+    var bottom = _capBottomLineBaseline(base, true);
+    check(bottom.length < base.length, 'bottom-line filter should drop the upper-line edge columns');
+    var ex0 = bottom[0].x, ex1 = bottom[bottom.length - 1].x;
+    var r = _capRobustBaselineFit(bottom, ex0, ex1, SNAP, MIN);
+    check(r.straight === true, 'bottom-line of a flat 2-line caption should be straight (bow=' + (r.bow||0).toFixed(2) + ')');
+})();
+
+// ── 7. Multi-line that is GENUINELY warped → bottom line still reads curved (don't over-flatten) ──
+(function () {
+    var base = [], i;
+    for (i = 0; i <= 80; i++) {
+        var arc = 100 + 0.05 * (i - 40) * (i - 40);          // bottom line bows
+        var y = (i >= 20 && i <= 60) ? arc : (arc + 12);     // top line 12pt above, same bow
+        base.push({ x: i, y: y });
+    }
+    var bottom = _capBottomLineBaseline(base, true);
+    var ex0 = bottom[0].x, ex1 = bottom[bottom.length - 1].x;
+    var r = _capRobustBaselineFit(bottom, ex0, ex1, SNAP, MIN);
+    check(r.straight === false, 'a truly warped 2-line caption must stay curved after bottom-line filter');
+})();
+
+// ── 8. Single-line text passes through untouched (no clustering when not multi-line) ──
+(function () {
+    var base = [], i;
+    for (i = 0; i <= 14; i++) base.push({ x: i, y: 100 });
+    base[5].y = 90;   // a descender — must NOT be treated as a separate "line"
+    var same = _capBottomLineBaseline(base, false);
+    check(same.length === base.length, 'single-line (isMultiLine=false) must pass through unchanged');
+    // and even if mislabeled multi-line, a lone descender cluster is too small to trust → unchanged
+    var safe = _capBottomLineBaseline(base, true);
+    check(safe.length === base.length, 'a single stray descender must not split a one-line caption');
 })();
 
 // ── Helper sanity (unchanged) ──

@@ -1,19 +1,17 @@
 [ai-pipeline] === AI_BuildAndExportCutlines start ===
-[seat] St Elizabeth's Cathedral (Dóm Svätej Alzbety) | overhang rescued by 15% shrink.
-[seat] St Elizabeth's Cathedral (Dóm Svätej Alzbety) | midpoint bulge 4.1pt > limit 3.4pt after shrink — flagged.
-[seat] St Elizabeth's Cathedral (Dóm Svätej Alzbety) | rotated -0.4deg to endpoint chord.
-[seat] St Elizabeth's Cathedral (Dóm Svätej Alzbety) | seated rot=-0.4deg move=11.2pt depth=0.3pt (needsReview)
+[seat] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | rotated 0.7deg to endpoint chord.
+[seat] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | seated rot=0.7deg move=7.2pt depth=0.3pt
 [step9] created halfcut layer: Halfcut
-[halfcut] St Elizabeth's Cathedral (Dóm Svätej Alzbety) | pts=37 end0=(0.7,-373.2) endN=(137.3,-374.8) straight
-[ai-pipeline] caption built | St Elizabeth's Cathedral (Dóm Svätej Alzbety) halfcut=true REVIEW
+[halfcut] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | pts=31 end0=(27.7,-380.5) endN=(113.9,-379.3) straight
+[ai-pipeline] caption built | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) halfcut=true
 [seat] Carpathian Wooden Churches | rotated -0.3deg to endpoint chord.
 [seat] Carpathian Wooden Churches | seated rot=-0.3deg move=9pt depth=0.3pt
 [halfcut] Carpathian Wooden Churches | pts=28 end0=(-223.8,-378.5) endN=(-124.2,-379) straight
 [ai-pipeline] caption built | Carpathian Wooden Churches halfcut=true
-[seat] National Animal - Tatra chamois | rotated -0.2deg to endpoint chord.
-[seat] National Animal - Tatra chamois | seated rot=-0.2deg move=9.6pt depth=0.3pt
-[halfcut] National Animal - Tatra chamois | pts=37 end0=(503.7,-137) endN=(616.1,-137.2) straight
-[ai-pipeline] caption built | National Animal - Tatra chamois halfcut=true
+[seat] Tatra chamois | rotated -0.1deg to endpoint chord.
+[seat] Tatra chamois | seated rot=-0.1deg move=7.1pt depth=0.3pt
+[halfcut] Tatra chamois | pts=37 end0=(533.2,-140.7) endN=(587,-140.7) straight
+[ai-pipeline] caption built | Tatra chamois halfcut=true
 [seat] Tram | rotated -0.9deg to endpoint chord.
 [seat] Tram | seated rot=-0.9deg move=8.5pt depth=0.3pt
 [halfcut] Tram | pts=31 end0=(302.8,-130.2) endN=(327.5,-130.7) straight
@@ -27,26 +25,26 @@
 [halfcut] Kroje | pts=30 end0=(-186.5,-139.2) endN=(-160.8,-140.2) curved
 [ai-pipeline] caption built | Kroje halfcut=true
 [seat] Kraslice | midpoint bulge relieved by 15% shrink.
-[seat] Kraslice | rotated 4.4deg to endpoint chord.
-[seat] Kraslice | seated rot=4.4deg move=8pt depth=0.3pt
-[halfcut] Kraslice | pts=32 end0=(546.5,119) endN=(571.9,121.8) straight
+[seat] Kraslice | rotated 3.9deg to endpoint chord.
+[seat] Kraslice | seated rot=3.9deg move=9.6pt depth=0.3pt
+[halfcut] Kraslice | pts=602 end0=(542.4,121.3) endN=(571.8,121.7) curved
 [ai-pipeline] caption built | Kraslice halfcut=true
 [seat] Bryndzové halušky | midpoint bulge relieved by 15% shrink.
-[seat] Bryndzové halušky | midpoint bulge 4.1pt > limit 3.3pt after shrink — flagged.
-[seat] Bryndzové halušky | rotated -0.8deg to endpoint chord.
-[seat] Bryndzové halušky | seated rot=-0.8deg move=11.2pt depth=0.3pt (needsReview)
-[halfcut] Bryndzové halušky | pts=20 end0=(284.8,115.9) endN=(342.1,114.8) straight
-[ai-pipeline] caption built | Bryndzové halušky halfcut=true REVIEW
-[seat] Pirohy | rotated 2.2deg to endpoint chord.
-[seat] Pirohy | seated rot=2.2deg move=7.2pt depth=0.3pt
-[halfcut] Pirohy | pts=33 end0=(57.1,106.6) endN=(84.3,107.7) straight
+[seat] Bryndzové halušky | rotated 1.2deg to endpoint chord.
+[seat] Bryndzové halušky | seated rot=1.2deg move=12.1pt depth=0.3pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
+[halfcut] Bryndzové halušky | pts=563 end0=(289.6,114) endN=(345.3,115.9) curved
+[ai-pipeline] caption built | Bryndzové halušky halfcut=true
+[seat] Pirohy | rotated 2.1deg to endpoint chord.
+[seat] Pirohy | seated rot=2.1deg move=7.7pt depth=0.3pt
+[halfcut] Pirohy | pts=35 end0=(56.5,106.6) endN=(84.6,107.8) straight
 [ai-pipeline] caption built | Pirohy halfcut=true
 [seat] Šúľance s Makom | midpoint bulge relieved by 15% shrink.
-[seat] Šúľance s Makom | midpoint bulge 4pt > limit 3.1pt after shrink — flagged.
-[seat] Šúľance s Makom | rotated -0.1deg to endpoint chord.
-[seat] Šúľance s Makom | seated rot=-0.1deg move=10.2pt depth=0.3pt (needsReview)
-[halfcut] Šúľance s Makom | pts=23 end0=(-204.1,131.6) endN=(-145.8,131.4) straight
-[ai-pipeline] caption built | Šúľance s Makom halfcut=true REVIEW
+[seat] Šúľance s Makom | rotated 0.8deg to endpoint chord.
+[seat] Šúľance s Makom | seated rot=0.8deg move=12.7pt depth=0.3pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
+[halfcut] Šúľance s Makom | pts=614 end0=(-203.6,131.5) endN=(-141,133) curved
+[ai-pipeline] caption built | Šúľance s Makom halfcut=true
 [seat] Bratislava(text) | rotated -0.1deg to endpoint chord.
 [seat] Bratislava(text) | seated rot=-0.1deg move=6.9pt depth=0.3pt
 [halfcut] Bratislava(text) | pts=31 end0=(530,394.6) endN=(589.7,394.4) straight
@@ -55,11 +53,10 @@
 [seat] Čumil Statue | seated rot=-2.9deg move=9.6pt depth=0.3pt
 [halfcut] Čumil Statue | pts=48 end0=(289,365.2) endN=(340.3,362.9) curved
 [ai-pipeline] caption built | Čumil Statue halfcut=true
-[seat] The Blue Church - Church of St. Elizabeth | midpoint bulge relieved by 15% shrink.
-[seat] The Blue Church - Church of St. Elizabeth | rotated -2.2deg to endpoint chord.
-[seat] The Blue Church - Church of St. Elizabeth | seated rot=-2.2deg move=11.7pt depth=0.3pt
-[halfcut] The Blue Church - Church of St. Elizabeth | pts=37 end0=(4.1,358.5) endN=(136.8,352.9) straight
-[ai-pipeline] caption built | The Blue Church - Church of St. Elizabeth halfcut=true
+[seat] The Blue Church | Church of St. Elizabeth | rotated -1.0deg to endpoint chord.
+[seat] The Blue Church | Church of St. Elizabeth | seated rot=-1deg move=8.8pt depth=0.3pt
+[halfcut] The Blue Church | Church of St. Elizabeth | pts=41 end0=(28,353.8) endN=(113.5,352.6) curved
+[ai-pipeline] caption built | The Blue Church | Church of St. Elizabeth halfcut=true
 [seat] Michael's Gate | rotated -2.8deg to endpoint chord.
 [seat] Michael's Gate | seated rot=-2.8deg move=9.3pt depth=0.3pt
 [halfcut] Michael's Gate | pts=33 end0=(-201.3,344.9) endN=(-146.4,342) straight
@@ -116,19 +113,19 @@
 [step7a] regular   | ratio=0.881 | Bojnice Castle
 [step7a] regular   | ratio=0.877 | Orava Castle
 [step7a] regular   | ratio=0.847 | Michael's Gate
-[step7a] regular   | ratio=0.9 | The Blue Church - Church of St. Elizabeth
+[step7a] regular   | ratio=0.878 | The Blue Church | Church of St. Elizabeth
 [step7a] regular   | ratio=0.896 | Čumil Statue
 [step7a] irregular | ratio=0.761 | Bratislava(text)
-[step7a] irregular | ratio=0.749 | Šúľance s Makom
-[step7a] irregular | ratio=0.728 | Pirohy
-[step7a] irregular | ratio=0.794 | Bryndzové halušky
-[step7a] irregular | ratio=0.683 | Kraslice
+[step7a] irregular | ratio=0.737 | Šúľance s Makom
+[step7a] irregular | ratio=0.73 | Pirohy
+[step7a] irregular | ratio=0.79 | Bryndzové halušky
+[step7a] irregular | ratio=0.682 | Kraslice
 [step7a] irregular | ratio=0.709 | Kroje
 [step7a] irregular | ratio=0.717 | Fujara
 [step7a] irregular | ratio=0.653 | Tram
-[step7a] irregular | ratio=0.575 | National Animal - Tatra chamois
+[step7a] irregular | ratio=0.533 | Tatra chamois
 [step7a] regular   | ratio=0.918 | Carpathian Wooden Churches
-[step7a] regular   | ratio=0.829 | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
+[step7a] regular   | ratio=0.862 | St Elizabeth's Cathedral | (Dóm Svätej Alzbety)
 [step7a] irregular | ratio=0.599 | National Flower
 [step7a] regular   | ratio=0.928 | UFO Observation Deck, Bridge SNP
 [step7a] classified: 15 regular, 11 irregular (threshold=0.82)
