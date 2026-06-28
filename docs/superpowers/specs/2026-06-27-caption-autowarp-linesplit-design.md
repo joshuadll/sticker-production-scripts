@@ -2,7 +2,9 @@
 
 **Date:** 2026-06-27
 **Branch:** `feature/illustrator-native-rewrite`
-**Status:** approved (design); not yet implemented
+**Status:** implemented + Illustrator-validated on the Slovakia fixture (commits `a039cdd` → `0813fc7`,
+2026-06-28). Open: a warped caption through Pipeline 2's actual seat/half-cut (the full `run.sh`
+end-to-end, blocked this session by Illustrator AppleEvent instability). See Component 2's LANDED note.
 
 ## Goal
 
@@ -40,7 +42,7 @@ No prior warp/envelope code exists in git history; this is greenfield.
 
 | Question | Decision |
 | --- | --- |
-| How much to bend each caption? | **Measure each element's real bottom edge and fit per element** (concentric arc, uniform gap). |
+| How much to bend each caption? | **Measure each element's real bottom edge where the caption connects and arc to that radius exactly** (no offset; roundness judged size-relative — see Component 2). |
 | Multi-line **and** curved? | **Warp multi-line too** — extend the pill builder to allow a curved multi-line pill. |
 | Which style codes warp? | **WC only.** GC's decorative plate is a rigid raster that can't follow an arc (and GC is unvalidated). The `\|` split still applies to **both** WC and GC. |
 | Warp mechanism | **Live Arc Warp via `applyEffect`** (Approach A) — editable by the artist, consistent with existing code, sampler expands a throwaway duplicate to read the curve. |
@@ -62,9 +64,18 @@ A flat two-line caption needs nothing downstream — `_capIsMultiLine` already c
 
 ## Component 2 — auto-warp to the base curve (WC only)
 
+> **LANDED (2026-06-28).** This section is updated to the implemented design. Two things evolved
+> during Illustrator validation vs. the original plan: (1) the warp is the live effect **`Adobe
+> Deform`** (Effect → Warp), not `"Adobe Warp"` (an unknown name is a silent no-op); (2) roundness
+> is decided **size-relative** (curve's circle ≤ the element width) rather than by a fixed radius
+> range + bow deadband, and the caption arcs to the **base radius exactly** (no offset). Commits
+> `a039cdd` → `0813fc7`.
+
 The traced `outline` path already exists when text is placed, so we measure the element's real
-bottom edge and fit the caption to it as a **concentric arc** (same center of curvature, radius =
-art radius + gap → uniform gap → seamless when Pipeline 2 seats the pill up into the art).
+bottom edge **where the caption connects** and bend the caption to **the same radius as that edge**
+(an exact curvature match; no offset). Illustrator's Arc obeys `R = W / (2·sin(π·B/2))` (measured on
+a clean line, <1.5% error), so the bend that yields radius `R` over a caption of width `W` is
+`B = (2/π)·arcsin(W / (2·R))`.
 
 ### Decision ladder (default flat; warp only when every gate passes)
 
@@ -75,17 +86,25 @@ art radius + gap → uniform gap → seamless when Pipeline 2 seats the pill up 
 2. **Robust quadratic fit** with median/MAD inlier rejection — bumps, spikes, and a single notch
    become outliers, not data. Generalize the existing `_capRobustBaselineFit` core so the same
    proven machinery serves both the text baseline (today) and the art base (new).
-3. **Gate A — goodness of fit:** residual RMS after inlier rejection must be small vs. text height.
-   A wavy bottom that isn't well-explained by an arc → "not a clean curve" → **flat.** (Primary
-   wavy-base guard.)
-4. **Gate B — chord-bow deadband:** the smooth trend's bow across the span must exceed a CONFIG
-   threshold; a flat-on-average wavy base has ~zero bow → **flat.**
-5. **Gate C — sane geometry:** fitted radius within a plausible range (reject tiny = sharp notch,
-   huge = effectively flat) and the arc vertex roughly centered over the text (a real round base
-   is symmetric; a one-sided lump is not) → else **flat.**
-6. **Warp:** compute the bend from the fitted local radius and apply a live Arc Warp.
+3. **Gate A — arc-like:** residual RMS after inlier rejection must be small vs. text height. A wavy
+   or notched bottom that isn't well-explained by an arc → **flat.** (Primary ragged-base guard;
+   also what lets us drop any radius floor — a sharp notch fails here, not by being "too tight".)
+4. **Gate B — symmetry:** the fitted arc's vertex sits near the span centre (a one-sided lump is not
+   a round base) → else **flat.**
+5. **Gate C — roundness, SIZE-RELATIVE:** warp when the curve's circle is **no bigger than the
+   element** — `radius ≤ tightRadiusFactor × element width`. This is scale-invariant (a tiny egg and
+   a big plate both pass) and, crucially, span-independent, so a **short** caption over a big round
+   base still warps even though its bow is small. **OR** the edge **clearly dips** across the caption
+   (`bow ≥ minBow`) — the wide-gently-round backup (e.g. a broad badge with a long caption whose
+   circle is large vs. the element). Measured separation on the fixture: round bases ≤0.75× the
+   width, flat buildings ≥1.5× → `tightRadiusFactor = 1.0` separates cleanly.
+6. **Warp:** bend to the **base radius exactly** (`B = (2/π)·arcsin(W/(2·R_base))`, scaled by
+   `captionWarpBendCalib`) and apply the live `Adobe Deform` Arc.
 
-Multi-wave bottoms, central notches, and asymmetric lumps all fall through to flat.
+Multi-wave bottoms, central notches, and asymmetric lumps all fall through to flat. (The earlier
+plan's bow-only "is it curved enough" deadband + a fixed radius range wrongly skipped a short-caption
+round base like *Pirohy* and a small clean egg-bottom like *Kraslice*; the size-relative rule fixes
+both — see commit `c749558`.)
 
 ### Applying the warp
 
@@ -105,24 +124,27 @@ Multi-wave bottoms, central notches, and asymmetric lumps all fall through to fl
   already reports the full two-line vertical span, so `radius = percentile(full-span heights)/2 +
   pad` and `spine = baseline + halfBody` extend naturally; only the gating changes.
 
-### Bend ↔ curvature calibration (the main risk)
+### Bend ↔ radius calibration — SOLVED
 
-Illustrator's Arc-warp `bend` parameter is not a 1:1 map to real arc curvature. Plan: derive the
-mapping analytically, expose it as a single CONFIG calibration constant, and **guard + log +
-visual-checklist** it (cannot run Illustrator in this environment), to be tuned on a real round
-SKU — consistent with how the seat/half-cut reworks were landed. The seater
-(`seatPlateToOutline`) refines the final pose, so the warp only needs to land the text curvature
-in the right ballpark, not pixel-perfect.
+Illustrator's Arc warp obeys `R = W / (2·sin(π·B/2))`, confirmed by direct measurement on a clean
+horizontal line (<1.5% error across bend 0.1–0.6). So the bend for a target radius is the exact
+inverse `B = (2/π)·arcsin(W / (2·R))` — no magic numbers. `captionWarpBendCalib` (default **1.0**)
+scales it: 1.0 = the caption radius equals the base radius (exact match); <1.0 = gentler. A no-op
+guard checks the visible bounds actually changed after `applyEffect`, so a future bad effect
+name/dict can't silently render nothing again.
 
-## CONFIG (new knobs, in `AI_BuildCutlines.jsx`)
+## CONFIG (knobs, in `AI_BuildCutlines.jsx`)
 
 - `captionWarpEnabled` (bool) — master on/off.
-- `captionWarpMinBowMm` — Gate B chord-bow deadband.
-- `captionWarpMaxResidualFrac` — Gate A residual ceiling (fraction of text height).
-- `captionWarpRadiusRangeMm` — Gate C `[min, max]` plausible fitted radius.
-- `captionWarpGapMm` — concentric gap (art radius → text radius).
-- `captionWarpMaxBend` — clamp on the applied bend.
-- `captionWarpBendCalib` — the bend↔curvature calibration constant.
+- `captionWarpMaxResidFrac` — Gate A residual ceiling (fraction of text height).
+- `captionWarpMinBowMm` — Gate C clear-dip backup (edge dips ≥ this → round).
+- `captionWarpTightRadiusFactor` — Gate C roundness: warp when `radius ≤ factor × element width`
+  (size-relative, default **1.0** = "circle no bigger than the sticker").
+- `captionWarpMaxBend` — clamp on the applied Arc bend fraction.
+- `captionWarpBendCalib` — bend magnitude scale (1.0 = caption radius matches the base exactly).
+
+(Dropped from the original plan: `captionWarpRadiusRangeMm` — replaced by the size-relative factor;
+and `captionWarpGapMm` — there is no radial offset, the caption matches the base radius directly.)
 
 ## Testing
 
