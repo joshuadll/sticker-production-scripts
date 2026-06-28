@@ -806,11 +806,26 @@ function warpTextToBaseArc(textFrame, outline, opts) {
     });
     if (!dec.warp) return { warped: false, bend: 0, reason: dec.reason };
 
-    // Adobe Warp live effect: style 1 = Arc, horizontal orientation, bend in -1..1.
-    var xml = '<LiveEffect name="Adobe Warp"><Dict data="I styleVer 1 R bend '
-        + dec.bend + ' I horizontal 1 R distortV 0 R distortH 0 I rotate 0 I style 1 "/></LiveEffect>';
+    // Effect > Warp is the live effect "Adobe Deform" (NOT "Adobe Warp" — applyEffect silently
+    // ignores an unknown name, which made the whole warp a no-op). Arc = DeformStyle 1; DeformValue
+    // is the bend fraction (-1..1, |0.6| = 60%); Rotate 0 = horizontal; DeformHoriz/Vert 0.
+    // Sign: Illustrator's Arc bends a POSITIVE value into an arch (middle up); a round/convex base
+    // (dec.bend>0 here, = a U-valley bottom edge) needs the caption to be a U, so NEGATE dec.bend.
+    var deformValue = -dec.bend;
+    var xml = '<LiveEffect name="Adobe Deform"><Dict data="S DisplayString Warp:Arc I DeformStyle 1'
+        + ' B Rotate 0 R DeformValue ' + deformValue + ' R DeformHoriz 0 R DeformVert 0 "/></LiveEffect>';
     try { textFrame.applyEffect(xml); }
     catch (e2) { return { warped: false, bend: 0, reason: "warp effect rejected (" + e2.message + ")" }; }
+
+    // Defense-in-depth: applyEffect silently no-ops on an unrecognised effect name/dict (this is
+    // exactly how the wrong "Adobe Warp" name passed once with zero visible bend). A real Arc warp
+    // grows the visible bounds beyond the (unchanged) glyph geometry; if nothing grew, the effect
+    // did not render — surface it as not-warped rather than reporting a phantom success.
+    var vb = textFrame.visibleBounds, gb2 = textFrame.geometricBounds;   // [l,t,r,b] y-up
+    var grew = (vb[1] - vb[3]) - (gb2[1] - gb2[3]);
+    if (grew < 0.1) {
+        return { warped: false, bend: 0, reason: "warp applied but did not render (effect no-op)" };
+    }
     return { warped: true, bend: dec.bend, reason: "warped r=" + Math.round(dec.radius) + "pt" };
 }
 
