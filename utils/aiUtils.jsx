@@ -5,11 +5,17 @@
 // ─── REGEX ────────────────────────────────────────────────────────────────────
 
 // Same naming convention as Photoshop — element names are consistent across apps.
+// Keep this regex identical to psUtils.jsx NAME_REGEX.
 // Matches "Horseshoe Bend [WC-LM]"  → captures (Horseshoe Bend)(WC)(LM)(undefined)
 // Matches "Eiffel Tower [WC-LM+]"   → captures (Eiffel Tower)(WC)(LM)(+)
 // Matches "Small Snack [WC-FD-]"    → captures (Small Snack)(WC)(FD)(-)
 // Matches "Orlando Stamp [ST]"      → captures (Orlando Stamp)(ST)(undefined)(undefined)
-var NAME_REGEX = /^(.+)\s\[([A-Z]+)(?:-([A-Z]+)([+-])?)?\]$/;
+// Matches "Big Stamp [ST+]"         → captures (Big Stamp)(ST)(undefined)(+)
+// Matches "Tiny Stamp [ST-]"        → captures (Tiny Stamp)(ST)(undefined)(-)
+// The size hint is OUTSIDE the catCode group so it can follow a category-less
+// style code (stamps); without this an "[ST+]" typo would parse to null and the
+// stamp would be silently dropped from the cutline/export pipeline.
+var NAME_REGEX = /^(.+)\s\[([A-Z]+)(?:-([A-Z]+))?([+-])?\]$/;
 
 // ─── PURE HELPERS ─────────────────────────────────────────────────────────────
 
@@ -479,6 +485,562 @@ function _appendCap(poly, C, r, fromPt, toPt, through) {
 function _capUnit(x, y) {
     var len = Math.sqrt(x * x + y * y) || 1;
     return [x / len, y / len];
+}
+
+// ─── CAPTION SPINE FIT (baseline-based — pure geometry, node-testable) ───
+// The pill spine is derived from the text BASELINE (per-column bottom-of-ink), NOT the ink
+// midpoint. The midpoint moves with glyph height (caps vs x-height vs ascenders) and isolated
+// marks, so it spuriously bows/tilts under straight text; the baseline is glyph-height-invariant
+// — every on-baseline glyph sits on it — so straight text fits flat regardless of the letters.
+// Under a warp the baseline and the centreline are parallel arcs (same curvature), so curvature
+// measured on the clean baseline transfers to the centreline. (Replaces the old midpoint
+// _capQuadFitSpine, which the new crisp-vector pill exposed as under-robust — see
+// docs/superpowers/specs/2026-06-27-caption-pill-baseline-spine-design.md.)
+
+// y of a fitted quadratic { a, b, c, xm } at px. Coordinate-agnostic (PS y-down / AI y-up).
+function _capYAt(fit, px) { var d = px - fit.xm; return fit.a * d * d + fit.b * d + fit.c; }
+
+// Robust least-squares quadratic through baseline-candidate points (per-column bottom-of-ink).
+// Rejects descenders (sit below the baseline) and floating marks — apostrophes, dots, accents
+// (sit above) — via a median/MAD inlier test, 2 iterations. Decides straight vs curved from the
+// inlier fit's deviation from its endpoint CHORD (pure curvature, tilt removed). pts: [{x,y}].
+// Returns { straight:Bool, bow:Number, nIn:Number, fit:{a,b,c,xm} }.
+// straight when there are fewer than minCols inliers (too sparse to trust a curve) OR the
+// chord-bow stays within snapTolPt.
+function _capRobustBaselineFit(pts, x0, x1, snapTolPt, minCols) {
+    if (!pts || pts.length < 3) {
+        return { straight: true, bow: 0, nIn: pts ? pts.length : 0, fit: { a: 0, b: 0, c: 0, xm: 0 } };
+    }
+    function fitQuad(ps) {
+        var n = ps.length, i, xm = 0;
+        for (i = 0; i < n; i++) xm += ps[i].x; xm /= n;
+        var S0 = n, S1 = 0, S2 = 0, S3 = 0, S4 = 0, Ty = 0, Txy = 0, Tx2y = 0;
+        for (i = 0; i < n; i++) {
+            var dx = ps[i].x - xm, y = ps[i].y, dx2 = dx * dx;
+            S1 += dx; S2 += dx2; S3 += dx2 * dx; S4 += dx2 * dx2;
+            Ty += y; Txy += dx * y; Tx2y += dx2 * y;
+        }
+        var a = 0, b = 0, c = Ty / n;
+        var sol = _capSolve3(S4, S3, S2, S3, S2, S1, S2, S1, S0, Tx2y, Txy, Ty);
+        if (sol) { a = sol[0]; b = sol[1]; c = sol[2]; }
+        return { a: a, b: b, c: c, xm: xm };
+    }
+    function median(arr) {
+        var a = arr.slice(0).sort(function (p, q) { return p - q; }), n = a.length;
+        if (!n) return 0;
+        return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2;
+    }
+    var inl = pts, f = fitQuad(inl), iter, i;
+    for (iter = 0; iter < 2; iter++) {
+        var res = [];
+        for (i = 0; i < pts.length; i++) res.push(pts[i].y - _capYAt(f, pts[i].x));
+        var med = median(res), ad = [];
+        for (i = 0; i < res.length; i++) ad.push(Math.abs(res[i] - med));
+        var mad = median(ad); if (mad < 0.5) mad = 0.5;   // floor: don't over-reject a clean baseline
+        var keep = [];
+        for (i = 0; i < pts.length; i++) if (Math.abs(res[i] - med) <= 2.5 * mad) keep.push(pts[i]);
+        if (keep.length < minCols) break;                  // too few inliers to refine — stop
+        inl = keep; f = fitQuad(inl);
+    }
+    // Pure curvature = max deviation of the inlier fit from the chord through its endpoints.
+    var y0 = _capYAt(f, x0), y1 = _capYAt(f, x1), bow = 0, p;
+    for (p = 0; p <= 24; p++) {
+        var px = x0 + (x1 - x0) * (p / 24);
+        var ch = (x1 === x0) ? y0 : y0 + (y1 - y0) * ((px - x0) / (x1 - x0));
+        var dv = Math.abs(_capYAt(f, px) - ch);
+        if (dv > bow) bow = dv;
+    }
+    var straight = (inl.length < minCols) || (bow <= snapTolPt);
+    return { straight: straight, bow: bow, nIn: inl.length, fit: f };
+}
+
+// For a MULTI-LINE caption, keep only the bottom line's baseline points. The per-column
+// bottom-of-ink (the baseline proxy) jumps UP to an upper line wherever the bottom line is
+// narrower and doesn't cover that column, so the full-width envelope of a flat-but-narrow-bottom
+// caption (e.g. "St Elizabeth's Cathedral | (Dóm Svätej Alzbety)") fakes a ∪ curve and the pill
+// is wrongly built curved. We split the baseline-y values at their single largest gap (the
+// inter-line break ≈ the leading, far bigger than within-line column noise) and return the LOW
+// group (y-up: the bottom line sits at smaller y). Guards keep it conservative — only when the
+// caller says the caption is multi-line, only when a real break exists, and only if the bottom
+// group is big enough to trust; otherwise the input is returned untouched (single-line is never
+// reshaped, and a lone descender can't split a one-line caption). Pure geometry — node-testable.
+// The break gap is SIZE-RELATIVE: a fraction (lineBreakFrac) of the caption's per-line height
+// (`lineHeightPt`, passed by the caller as text-box-height / line-count), so it tracks the font
+// instead of a fixed pt value (the caption size is a CONFIG knob that has changed before). A real
+// inter-line break is ≈0.6–0.7 of a line; the within-line bottom-of-ink noise (descenders) ≈0.25;
+// 0.3 separates them. Fallback ≈ an 8pt-caption leading if the caller can't supply a height.
+function _capBottomLineBaseline(base, isMultiLine, lineHeightPt) {
+    var lineBreakFrac = 0.3;
+    var lineBreakPt = (lineHeightPt > 0 ? lineHeightPt : 9.6) * lineBreakFrac;
+    if (!isMultiLine || !base || base.length < 6) return base;
+    var ys = [], i;
+    for (i = 0; i < base.length; i++) ys.push(base[i].y);
+    ys.sort(function (p, q) { return p - q; });
+    var maxGap = 0, splitY = ys[0];
+    for (i = 1; i < ys.length; i++) {
+        var g = ys[i] - ys[i - 1];
+        if (g > maxGap) { maxGap = g; splitY = (ys[i] + ys[i - 1]) / 2; }
+    }
+    if (maxGap < lineBreakPt) return base;              // no real line break -> leave untouched
+    var low = [];
+    for (i = 0; i < base.length; i++) if (base[i].y < splitY) low.push(base[i]);
+    return (low.length >= 4) ? low : base;              // bottom cluster too small to trust
+}
+
+// Two-point horizontal spine at height y over [x0, x1].
+function _capStraightSpine(x0, x1, y) { return [{ x: x0, y: y }, { x: x1, y: y }]; }
+
+// Splits a caption display name into stacked lines on "|": "A | B" -> ["A","B"]. Trims each
+// segment and drops empties; a name with no "|" returns a single-element array. The cutline
+// group name and the text-frame name keep the FULL string — only the visible text uses these.
+function _capSplitLines(displayName) {
+    var whole = String(displayName == null ? "" : displayName);
+    var raw = whole.split("|"), out = [], i, s;
+    for (i = 0; i < raw.length; i++) {
+        s = raw[i].replace(/^\s+|\s+$/g, "");
+        if (s.length > 0) out.push(s);
+    }
+    if (out.length === 0) out.push(whole.replace(/^\s+|\s+$/g, ""));
+    return out;
+}
+
+// p-quantile (0..1) of a numeric array (need not be sorted).
+function _capPercentile(arr, p) {
+    var a = arr.slice(0);
+    a.sort(function (x, y) { return x - y; });
+    var idx = Math.floor(p * (a.length - 1));
+    if (idx < 0) idx = 0;
+    if (idx > a.length - 1) idx = a.length - 1;
+    return a[idx];
+}
+
+// Solves a 3x3 linear system by Cramer's rule. Returns [x,y,z] or null if singular.
+function _capSolve3(a11, a12, a13, a21, a22, a23, a31, a32, a33, b1, b2, b3) {
+    function det3(m11, m12, m13, m21, m22, m23, m31, m32, m33) {
+        return m11 * (m22 * m33 - m23 * m32) - m12 * (m21 * m33 - m23 * m31) + m13 * (m21 * m32 - m22 * m31);
+    }
+    var D = det3(a11, a12, a13, a21, a22, a23, a31, a32, a33);
+    if (Math.abs(D) < 1e-9) return null;
+    var Dx = det3(b1, a12, a13, b2, a22, a23, b3, a32, a33);
+    var Dy = det3(a11, b1, a13, a21, b2, a23, a31, b3, a33);
+    var Dz = det3(a11, a12, b1, a21, a22, b2, a31, a32, b3);
+    return [Dx / D, Dy / D, Dz / D];
+}
+
+// ─── CAPTION TEXT SAMPLER (AI vector analog of PS _sampleTextSpine) ───
+// Outlines a COPY of the text and samples it in 1mm-wide BANDS (matching PS _sampleTextSpine,
+// which reads the bounding-span of all ink in a slice — the AI port had regressed this to a
+// single scan line, which over-reacts to isolated marks and gaps). Per band it records the
+// bottom-of-ink (baseline candidate) and the ink height. Returns
+//   { base:[{x,y}…] (band centre x, bottom-of-ink y), heights:[Number…], bounds:[l,t,r,b] }
+// in AI points (y-up), or null if there is no ink.
+function _capSampleTextOutline(textFrame, sliceMm) {
+    var dup = textFrame.duplicate();
+    // Bake any live appearance (e.g. a Step-6 Arc warp) into geometry so the sampled baseline
+    // reflects the warp. expandStyle is a no-op for a plain frame, which then still needs
+    // createOutline; a warped frame expands to a group of warped paths we can sample directly.
+    var outlined;
+    try {
+        app.selection = [dup];
+        app.executeMenuCommand("expandStyle");
+        var ex = (app.selection && app.selection.length) ? app.selection[0] : dup;
+        outlined = (ex.typename === "TextFrame") ? ex.createOutline() : ex;
+    } catch (eEx) {
+        outlined = dup.createOutline();
+    }
+    var polys = samplePathToPolygons(outlined, 16);
+    var gb = outlined.geometricBounds;           // [l, t, r, b]  (t > b, y-up)
+    try { outlined.remove(); } catch (e) {}
+    if (!polys || polys.length === 0) return null;
+
+    var L = gb[0], T = gb[1], R = gb[2], B = gb[3];
+    if (R - L <= 0 || T - B <= 0) return null;
+    var step = mmToPoints(sliceMm), base = [], heights = [], x;
+    for (x = L; x < R; x += step) {
+        var bx1 = (x + step < R) ? x + step : R;
+        var span = _capBandSpan(polys, x, bx1, 8); // {lo, hi} = span of all ink in the band, or null
+        if (!span) continue;
+        base.push({ x: (x + bx1) / 2, y: span.lo }); // bottom-of-ink = baseline candidate
+        heights.push(span.hi - span.lo);
+    }
+    if (base.length === 0) return null;
+    return { base: base, heights: heights, bounds: [L, T, R, B] };
+}
+
+// Filled vertical span of a polygon set over a BAND [x0, x1]: union of the per-scanline spans
+// at sub+1 sample columns across the band (PS reads the band's pixel bounding box). {lo,hi} or null.
+function _capBandSpan(polys, x0, x1, sub) {
+    var lo = null, hi = null, j, n = (sub > 0 ? sub : 1);
+    for (j = 0; j <= n; j++) {
+        var x = (x1 === x0) ? x0 : x0 + (x1 - x0) * (j / n);
+        var sp = _capColumnSpan(polys, x);
+        if (!sp) continue;
+        if (lo === null || sp.lo < lo) lo = sp.lo;
+        if (hi === null || sp.hi > hi) hi = sp.hi;
+    }
+    if (lo === null) return null;
+    return { lo: lo, hi: hi };
+}
+
+// Filled vertical span of a polygon set at vertical line x: the min and max y over all
+// crossings of the line x with the polygons' edges. Returns {lo, hi} or null.
+function _capColumnSpan(polys, x) {
+    var lo = null, hi = null, p, k, A, Bp, ys;
+    for (p = 0; p < polys.length; p++) {
+        var poly = polys[p];
+        for (k = 0; k < poly.length; k++) {
+            A = poly[k]; Bp = poly[(k + 1) % poly.length];
+            if ((A.x <= x && Bp.x > x) || (Bp.x <= x && A.x > x)) {   // edge straddles x
+                ys = A.y + (Bp.y - A.y) * ((x - A.x) / (Bp.x - A.x));
+                if (lo === null || ys < lo) lo = ys;
+                if (hi === null || ys > hi) hi = ys;
+            }
+        }
+    }
+    if (lo === null) return null;
+    return { lo: lo, hi: hi };
+}
+
+// Bottom-edge profile of a sampled outline (polys from samplePathToPolygons) over [x0,x1]:
+// per column the LOWEST crossing y (lower envelope). Returns [{x,y}…] (y-up: lower = smaller y);
+// columns with no ink are skipped. Pure geometry (reuses _capColumnSpan) — node-testable.
+function _capBottomProfile(polys, x0, x1, stepPt) {
+    var out = [], x, step = (stepPt > 0 ? stepPt : 1);
+    for (x = x0; x <= x1 + 1e-6; x += step) {
+        var sp = _capColumnSpan(polys, x);
+        if (sp) out.push({ x: x, y: sp.lo });
+    }
+    return out;
+}
+
+// Decides whether a caption under this base should warp. CONSERVATIVE: returns warp:false on
+// anything wavy/ambiguous (default flat). Reuses _capRobustBaselineFit (robust quadratic + chord
+// bow) then gates:
+//   A arc-like:  residual RMS over ALL profile pts <= maxResidPt (wavy/notched => high resid => flat)
+//   B symmetric: fitted vertex near the span centre (an off-centre lump => flat)
+//   C round:     SIZE-RELATIVE — the curve's circle is no bigger than the element
+//                (radius <= tightFactor*elementWidth), scale-invariant, so a tiny egg and a big plate
+//                both pass AND a short caption over a round base still warps; OR the edge clearly
+//                dips across the caption (bow >= minBowPt), catching a wide gently-round base whose
+//                circle is large vs the element. NO radius floor — a sharp notch is caught by A.
+// radius ~ 1/(2|a|). bend carries DIRECTION only (a>0 = valley/smile = round base; a<0 = arch) —
+// warpTextToBaseArc computes the magnitude that matches the base radius. Pure geometry —
+// node-testable. Returns {warp,bend,radius,bow,resid,reason}.
+function _capBaseArcFit(profilePts, x0, x1, opts) {
+    opts = opts || {};
+    var minCols     = opts.minCols     != null ? opts.minCols     : 8;
+    var minBowPt    = opts.minBowPt    != null ? opts.minBowPt    : 1.42;
+    var maxResidPt  = opts.maxResidPt  != null ? opts.maxResidPt  : 1.42;
+    var tightFactor = opts.tightFactor != null ? opts.tightFactor : 1.0;
+    var elWidthPt   = opts.elementWidthPt != null ? opts.elementWidthPt : 0;
+    function none(reason) { return { warp: false, bend: 0, radius: 0, bow: 0, resid: 0, reason: reason }; }
+    if (!profilePts || profilePts.length < minCols) return none("too few columns");
+
+    var fit = _capRobustBaselineFit(profilePts, x0, x1, minBowPt, minCols);
+    var i, se = 0, n = profilePts.length;
+    for (i = 0; i < n; i++) { var dy = profilePts[i].y - _capYAt(fit.fit, profilePts[i].x); se += dy * dy; }
+    var resid = Math.sqrt(se / n);
+    if (resid > maxResidPt) return none("base not arc-like (resid " + resid.toFixed(2) + ")");
+
+    var a = fit.fit.a;
+    if (a === 0) return none("base ~flat (no curvature)");
+    var radius = 1 / (2 * Math.abs(a));
+
+    // Symmetry: the vertex of y=a*(x-xm)^2+b*(x-xm)+c is at xm - b/(2a), NOT xm (the mean-x). A true
+    // round base is symmetric — vertex near the span centre; an off-centre lump fails here.
+    var xv = fit.fit.xm - fit.fit.b / (2 * a);
+    var cx = (x0 + x1) / 2, halfSpan = (x1 - x0) / 2;
+    if (halfSpan <= 0 || Math.abs(xv - cx) > 0.5 * halfSpan) return none("arc not centred");
+
+    // Roundness — size-relative OR clear-dip (see header). The circle is the span-independent measure
+    // of curvature; bow is span-dependent (a short caption under-reads a round base), so the size test
+    // is primary and the bow test is the wide-gentle backup.
+    var roundBySize = (elWidthPt > 0) && (radius <= tightFactor * elWidthPt);
+    var roundByDip  = (fit.bow >= minBowPt);
+    if (!roundBySize && !roundByDip) {
+        return none("base ~flat (R/elW " + (elWidthPt > 0 ? (radius / elWidthPt).toFixed(2) : "?")
+            + ", bow " + fit.bow.toFixed(2) + ")");
+    }
+
+    var bend = (a >= 0) ? 1 : -1;   // direction only; magnitude set by warpTextToBaseArc to match R
+    return { warp: true, bend: bend, radius: radius, bow: fit.bow, resid: resid, reason: "warp" };
+}
+
+// Builds the white caption pill around a native (artist-shaped) text frame: sample the text
+// BASELINE -> robust-fit + snap -> radius from text height + pad -> sweep a capsule. One path
+// for straight, multi-line, and curved text (no type branch). For straight/multi-line text it
+// is the proven flat bbox stadium; the baseline-derived curved spine runs only for genuinely
+// warped text. Returns { pill:PathItem (white, unstroked), spine:[{x,y}…], radius:Number }.
+function buildCaptionPill(layer, textFrame, opts) {
+    opts = opts || {};
+    var sliceMm = opts.sliceMm != null ? opts.sliceMm : 1.0;
+    var padPt   = mmToPoints(opts.padMm  != null ? opts.padMm  : 1.69);
+    var snapPt  = mmToPoints(opts.snapMm != null ? opts.snapMm : 0.6);
+    var pctile  = opts.pctile  != null ? opts.pctile  : 0.9;
+    var minCols = opts.minCols != null ? opts.minCols : 8;
+
+    var s = _capSampleTextOutline(textFrame, sliceMm);
+    var bb = s ? s.bounds : textFrame.geometricBounds;   // [l,t,r,b] y-up
+    var boxH = bb[1] - bb[3];
+
+    // The flat bbox stadium: proven straight pill — covers the full text box (incl. descenders).
+    function flatPill() {
+        return { spine: _capStraightSpine(bb[0], bb[2], (bb[1] + bb[3]) / 2),
+                 radius: boxH / 2 + padPt / 2 };
+    }
+
+    var spine, radius;
+    if (!s || s.base.length < 3) {                 // degenerate -> flat
+        var fp0 = flatPill(); spine = fp0.spine; radius = fp0.radius;
+    } else {
+        // For a multi-line caption judge straight/curved from only the BOTTOM line's baseline over
+        // its own x-extent [fx0,fx1]: a narrower bottom line otherwise lets the upper line's baseline
+        // (picked up at the edge columns it doesn't cover) fake a ∪ curve and build a wrongly curved
+        // pill. The break gap is sized from the per-line height (boxH / line count). Single-line text
+        // keeps all its points (only the sampler's edge margin is trimmed). See _capBottomLineBaseline.
+        var lineCount = _capLineCount(textFrame);
+        var lineHeightPt = (lineCount > 0) ? boxH / lineCount : boxH;
+        var baseF = _capBottomLineBaseline(s.base, lineCount >= 2, lineHeightPt);
+        var fx0 = baseF[0].x, fx1 = baseF[baseF.length - 1].x;
+        var fit = _capRobustBaselineFit(baseF, fx0, fx1, snapPt, minCols);
+        if (fit.straight) {                        // straight (single OR multi-line) -> flat bbox stadium
+            var fp = flatPill(); spine = fp.spine; radius = fp.radius;
+        } else {
+            // Genuinely curved (single OR multi-line): the centreline is the bottom-of-ink baseline
+            // lifted by half the body height (parallel under warp). For multi-line, the band sampler
+            // reports the full two-line vertical span, so halfBody covers both lines + pad.
+            var halfBody = _capPercentile(s.heights, pctile) / 2;
+            radius = halfBody + padPt / 2;
+            spine = [];
+            var M = 40, p;
+            for (p = 0; p <= M; p++) {
+                var sx = bb[0] + (bb[2] - bb[0]) * (p / M);
+                // Clamp the curve evaluation to the fitted x-range so the parabola is never
+                // EXTRAPOLATED past where we have baseline data (a narrow bottom line would otherwise
+                // overshoot at the pill ends); beyond the range the spine continues flat at the
+                // endpoint height while still spanning the full pill width.
+                var ex = (sx < fx0) ? fx0 : ((sx > fx1) ? fx1 : sx);
+                spine.push({ x: sx, y: _capYAt(fit.fit, ex) + halfBody });
+            }
+        }
+    }
+    var pill = buildCapsuleFromSpine(layer, spine, radius);   // existing helper
+    pill.filled = true; pill.fillColor = whiteCmyk();
+    pill.stroked = false;
+    return { pill: pill, spine: spine, radius: radius };
+}
+
+// Warps a caption text frame to follow its element's curved base — but ONLY when the base is a
+// confidently smooth, symmetric arc (see _capBaseArcFit). Measures the outline's bottom profile
+// over the TEXT's x-span, fits, and on a pass applies a LIVE Arc warp via applyEffect (editable;
+// the Pipeline-2 pill sampler bakes it for measurement). DOM-only, guarded — degrades to flat
+// (warped:false) on any failure. Returns { warped:Bool, bend:Number, reason:String }.
+function warpTextToBaseArc(textFrame, outline, opts) {
+    opts = opts || {};
+    var steps = opts.sampleSteps != null ? opts.sampleSteps : 16;
+    var tb = textFrame.geometricBounds;            // [l,t,r,b] y-up
+    var x0 = tb[0], x1 = tb[2], textH = tb[1] - tb[3];
+    if (x1 - x0 <= 0) return { warped: false, bend: 0, reason: "empty text bounds" };
+
+    var polys;
+    try { polys = samplePathToPolygons(outline, steps); }
+    catch (e) { return { warped: false, bend: 0, reason: "sample failed (" + e.message + ")" }; }
+
+    var stepPt = (x1 - x0) / 48;                    // ~48 columns across the text span
+    var profile = _capBottomProfile(polys, x0, x1, stepPt);
+    var ob = outline.geometricBounds;               // element bounds — width is the scale the curve is judged against
+    var elWidthPt = ob[2] - ob[0];
+    var dec = _capBaseArcFit(profile, x0, x1, {
+        minBowPt:       mmToPoints(opts.minBowMm != null ? opts.minBowMm : 0.5),
+        maxResidPt:     (opts.maxResidFrac != null ? opts.maxResidFrac : 0.5) * textH,
+        tightFactor:    opts.tightRadiusFactor != null ? opts.tightRadiusFactor : 1.0,
+        elementWidthPt: elWidthPt
+    });
+    if (!dec.warp) return { warped: false, bend: 0, reason: dec.reason };
+
+    // The caption arcs to the SAME radius as the base edge where it connects — an exact curvature
+    // match (no offset). Illustrator's Arc obeys R = W / (2*sin(pi*B/2)) (measured, <1.5% error), so
+    // the bend for a target radius R_text is B = (2/pi)*asin(W/(2*R_text)). W = the text width = the
+    // connection span the base radius was measured over; R_text = the base radius itself. calib scales
+    // it (1.0 = match exactly; <1 = gentler). (An earlier version added the placement gap to R_text,
+    // making tight bases too gentle; dropped — the placement gap is temporary and unrelated to the
+    // seated mate.)
+    var W = x1 - x0;
+    var calib   = opts.calib   != null ? opts.calib   : 1.0;
+    var maxBend = opts.maxBend != null ? opts.maxBend : 0.6;
+    var rTextPt = dec.radius;
+    var sinArg  = (rTextPt > 0) ? (W / (2 * rTextPt)) : 1;
+    if (sinArg > 1) sinArg = 1;                        // can't bend past a semicircle
+    var mag = (2 / Math.PI) * Math.asin(sinArg) * calib;
+    if (mag > maxBend) mag = maxBend;
+    // "Adobe Deform" = Effect > Warp (NOT "Adobe Warp" — applyEffect silently ignores an unknown
+    // name, which once made the whole warp a no-op). Arc = DeformStyle 1; Rotate 0 = horizontal.
+    // Sign: Illustrator's Arc bends a POSITIVE value into an arch (middle up); a round/convex base
+    // (dec.bend>=0, a U-valley bottom edge) needs a U, so DeformValue is NEGATIVE for a valley base.
+    var deformValue = (dec.bend >= 0) ? -mag : mag;
+    var xml = '<LiveEffect name="Adobe Deform"><Dict data="S DisplayString Warp:Arc I DeformStyle 1'
+        + ' B Rotate 0 R DeformValue ' + deformValue + ' R DeformHoriz 0 R DeformVert 0 "/></LiveEffect>';
+    // Defense-in-depth: applyEffect silently no-ops on an unrecognised effect name/dict (this is
+    // exactly how the wrong "Adobe Warp" name passed once with zero visible bend). Compare the SAME
+    // measure (visibleBounds = ink) before vs after: a real Arc warp lifts the ends (taller) and
+    // pulls them inward (narrower). If neither moved, the effect did not render. (Comparing
+    // visibleBounds to geometricBounds is WRONG — for text the ink box and the type box differ.)
+    try { app.redraw(); } catch (eR0) {}
+    var pre = textFrame.visibleBounds;             // [l,t,r,b] y-up — ink box before the warp
+    var preH = pre[1] - pre[3], preW = pre[2] - pre[0];
+    try { textFrame.applyEffect(xml); }
+    catch (e2) { return { warped: false, bend: 0, reason: "warp effect rejected (" + e2.message + ")" }; }
+    try { app.redraw(); } catch (eR1) {}           // render the live effect so visibleBounds is current
+    var post = textFrame.visibleBounds;
+    var dH = (post[1] - post[3]) - preH, dW = preW - (post[2] - post[0]);
+    if (dH < 0.1 && Math.abs(dW) < 0.1) {
+        return { warped: false, bend: 0, reason: "warp applied but did not render (effect no-op)" };
+    }
+    return { warped: true, bend: deformValue, reason: "warped R=" + Math.round(dec.radius) + "pt" };
+}
+
+// Count the caption's non-empty visual lines (point text -> a line per hard return). Drives both
+// the multi-line test and the per-line height used to size the line-break gap in buildCaptionPill.
+function _capLineCount(textFrame) {
+    try {
+        var s = String(textFrame.contents).split(/[\r\n]+/), n = 0, i;
+        for (i = 0; i < s.length; i++) if (s[i].replace(/^\s+|\s+$/g, "").length > 0) n++;
+        return n;
+    } catch (e) { return 1; }
+}
+// Multi-line if the caption has >= 2 non-empty lines.
+function _capIsMultiLine(textFrame) { return _capLineCount(textFrame) >= 2; }
+
+// Caption note = "{style}|{lines}|a{pillAreaPt2}" (+ "|R" when the seat flagged review).
+// pillArea is the SPEC pill area stamped at build. Step 8b recovers the artist's uniform
+// nest-scale factor as sqrt(specArea / currentArea) — AREA is rotation-invariant, so the
+// seat's tilt doesn't corrupt the reference the way a bounding-box height would. Tokens
+// after [1] are order-independent.
+function _capNoteFormat(styleCode, lines, pillArea, review) {
+    return styleCode + "|" + lines + "|a" + Math.round(pillArea) + (review ? "|R" : "");
+}
+
+// Parses a caption note. Back-compatible with legacy "{style}|{lines}" and "{style}|{lines}|R".
+function _capNoteParse(note) {
+    var out = { styleCode: null, lines: 1, pillArea: null, review: false };
+    if (!note) return out;
+    var t = String(note).split("|"), i;
+    out.styleCode = t[0];
+    if (t.length > 1 && t[1].length) out.lines = parseInt(t[1], 10) || 1;
+    for (i = 2; i < t.length; i++) {
+        if (t[i] === "R") out.review = true;
+        else if (t[i].charAt(0) === "a") {
+            var a = parseFloat(t[i].substring(1));
+            if (!isNaN(a)) out.pillArea = a;
+        }
+    }
+    return out;
+}
+
+// Elongates a GC-LM caption-plate ARTWORK group by scaling only its center piece (C); the L/R
+// end caps keep their size; R slides to abut the stretched C. AI port of PS elongateCaptionPlate
+// (horizontal only -> y-up vs y-down is irrelevant). Children must be named "L", "C", "R".
+// Returns true on success; false (caller logs "use as-is") if L/C/R missing or degenerate.
+function elongateCaptionPlateAI(plateGroup, targetWidthPt) {
+    var L = null, C = null, R = null, i, ch;
+    for (i = 0; i < plateGroup.pageItems.length; i++) {
+        ch = plateGroup.pageItems[i];
+        if (ch.name === "L") L = ch; else if (ch.name === "C") C = ch; else if (ch.name === "R") R = ch;
+    }
+    if (!L || !C || !R) return false;
+    function w(it) { var b = it.geometricBounds; return b[2] - b[0]; }
+    var lW = w(L), rW = w(R), cW = w(C);
+    var cTarget = targetWidthPt - lW - rW;
+    if (cTarget <= 0 || cW <= 0) return false;
+    C.resize(cTarget / cW * 100, 100,            // horizontal only, anchored at the left edge
+        true, true, true, true, 100, Transformation.LEFT);
+    R.translate(C.geometricBounds[2] - R.geometricBounds[0], 0);
+    return true;
+}
+
+// Full native-caption build for one element: pill around the (artist-shaped) text -> (GC plate
+// raster) -> seat the rigid caption unit INTO the white-edge outline -> unite into the cut -> bundle
+// -> half-cut. The PRINTED caption RIDES the cut group: the white pill stays VISIBLE (printed
+// background), and the text (+ GC plate raster) become named, visible members. `outline` = the
+// traced white-edged element path (the contour that becomes the cut). `doc` is needed for the
+// half-cut layer. opts: { name, styleCode, strokePt, plateRasterFile, plateHeightMm, plateWidthPadMm }.
+// Returns { ok, group, needsReview, moved, halfcut, reason }; ok:false leaves inputs untouched.
+function buildCaption(doc, layer, textFrame, outline, opts) {
+    opts = opts || {};
+    var name      = opts.name || String(textFrame.contents || "(caption)");
+    var styleCode = opts.styleCode || "WC";
+    var built     = buildCaptionPill(layer, textFrame, opts);
+    var pill      = built.pill;
+
+    // Ride-along printed items move rigidly with the pill during the seat. The GC decorative
+    // plate (a raster) is placed BEHIND the text and rides too.
+    var plateRaster = null;
+    if (opts.plateRasterFile) {
+        plateRaster = _placeCaptionPlateRaster(layer, pill, opts.plateRasterFile,
+            (opts.plateHeightMm != null ? opts.plateHeightMm : 4.0),
+            (opts.plateWidthPadMm != null ? opts.plateWidthPadMm : 1.69));
+    }
+
+    var rideGroup = layer.groupItems.add();
+    textFrame.move(rideGroup, ElementPlacement.PLACEATEND);
+    if (plateRaster) plateRaster.move(rideGroup, ElementPlacement.PLACEATEND);
+    var rideItem = rideGroup;
+
+    // Seat into the white-edge outline (authoritative). The overlap IS the attachment.
+    var seat = seatPlateToOutline(name, outline, pill, rideItem, { polyCache: {} });
+    if (!seat.ok) {
+        // Un-nest the ride items so a failed seat leaves clean inputs.
+        try { textFrame.move(layer, ElementPlacement.PLACEATEND); } catch (e1) {}
+        try { if (plateRaster) plateRaster.move(layer, ElementPlacement.PLACEATEND); } catch (e2) {}
+        try { rideGroup.remove(); } catch (e3) {}
+        return { ok: false, needsReview: !!seat.needsReview, reason: seat.reason };
+    }
+
+    // Unite outline + pill into the fused cut; bundle the separable members.
+    var cut = deriveCutline(outline, pill);
+    strokeRecursive(cut, (opts.strokePt != null ? opts.strokePt : 0.25), blackCmyk());
+    var group = assembleElementGroup(layer, name, outline, pill, cut);
+
+    // PRINTED caption rides the cut group: pill stays VISIBLE (white background), and the text
+    // (+ GC plate raster) become named, visible members. assembleElementGroup hid the plate
+    // (cut-shaper convention) — re-show it for native captions.
+    var plateM = findGroupMember(group, " plate");
+    if (plateM) plateM.hidden = false;
+
+    var i, kids = [];
+    for (i = 0; i < rideGroup.pageItems.length; i++) kids.push(rideGroup.pageItems[i]);
+    for (i = 0; i < kids.length; i++) kids[i].move(group, ElementPlacement.PLACEATBEGINNING);
+    try { rideGroup.remove(); } catch (eR) {}
+    textFrame.name = name + " caption text";
+    if (plateRaster) plateRaster.name = name + " caption plate";
+
+    var lines = _capIsMultiLine(textFrame) ? 2 : 1;
+    var pillArea = 0;
+    try { pillArea = Math.abs(pill.area); } catch (ePA) {}   // rotation-invariant scale reference
+    group.note = _capNoteFormat(styleCode, lines, pillArea, !!seat.needsReview);
+
+    // Derive the half-cut from the submerged pill arc.
+    var hc = syncHalfcut(doc, group, { polyCache: {} });
+    return { ok: true, group: group, needsReview: !!seat.needsReview, moved: seat.moved,
+             halfcut: !!(hc && hc.ok), reason: hc ? hc.reason : null };
+}
+
+// Places a GC decorative plate raster behind the caption, scaled to span the pill width (+ pad
+// each side) at a fixed spec bar height. Width-driven; non-uniform, so the L/R caps may distort
+// slightly — accepted as cosmetic + tunable (plateHeightMm / plateWidthPadMm). The plate is
+// PRINTED-INK only; it does NOT enter deriveCutline (the cut stays outline+pill).
+function _placeCaptionPlateRaster(layer, pill, plateFile, heightMm, widthPadMm) {
+    var pb = pill.geometricBounds;                 // [l,t,r,b] y-up
+    var targetW = (pb[2] - pb[0]) + mmToPoints(widthPadMm) * 2;
+    var targetH = mmToPoints(heightMm);
+    var placed = layer.placedItems.add();
+    placed.file = plateFile;
+    placed.resize((targetW / placed.width) * 100, (targetH / placed.height) * 100);
+    // Centre on the pill.
+    var pcx = (pb[0] + pb[2]) / 2, pcy = (pb[1] + pb[3]) / 2;
+    placed.translate(pcx - (placed.position[0] + placed.width / 2),
+                     pcy - (placed.position[1] - placed.height / 2));
+    return placed;
 }
 
 // Derives the fused cutline = boolean union of element_outline and plate.

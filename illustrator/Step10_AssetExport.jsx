@@ -132,6 +132,8 @@ function _s10ExportJpegs(doc, clipData, outFolder, stkCode) {
             cutDupe.moveToBeginning(grp);   // pageItems[0] = clipping mask
             artDupe.moveToEnd(grp);
             whiteDupe.moveToEnd(grp);
+            _s10AddCaptionMembers(grp, entry.cutline, tmpLayer);   // native caption (text+pill+plate), in front of art
+            cutDupe.moveToBeginning(grp);   // re-assert the mask at pageItems[0]
             grp.clipped = true;
         }
         // Stamps (PlacedItem cutline): artDupe placed directly on tmpLayer, no clip mask.
@@ -190,6 +192,8 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
         cutDupe.moveToBeginning(grp);   // pageItems[0] = clipping mask
         artDupe.moveToEnd(grp);
         whiteDupe.moveToEnd(grp);
+        _s10AddCaptionMembers(grp, entry.cutline, tmpLayer);   // native caption (text+pill+plate), in front of art
+        cutDupe.moveToBeginning(grp);   // re-assert the mask at pageItems[0]
         grp.clipped = true;
     } else {
         // Stamp: no vector clipping path available. Use a white-filled bounding
@@ -224,26 +228,55 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
 
 // ─── PRIVATE HELPERS ─────────────────────────────────────────────────────────
 
-// Returns the clippable PathItem/CompoundPathItem from a cutline GroupItem.
-// Returns null for PlacedItems (stamps) — they cannot serve as clip masks.
+// Returns the clippable PathItem/CompoundPathItem from a cutline. Drills into groups —
+// the named cut member can itself be a GroupItem (Pathfinder Unite wraps its result), and
+// that must resolve to a flat path to serve as a clip mask. Returns null for PlacedItems
+// (stamps) — they cannot serve as clip masks.
 function _s10GetCutlinePath(cutlineItem) {
-    var j, tn;
-    if (cutlineItem.typename === "GroupItem") {
+    if (!cutlineItem) return null;
+    var tn = cutlineItem.typename;
+    if (tn === "PathItem" || tn === "CompoundPathItem") return cutlineItem;
+    if (tn === "GroupItem") {
+        // Prefer the named cut member, then any path in it; fall back to the whole group.
         var candidate = findGroupMember(cutlineItem, "");
-        if (candidate) return candidate;
-        for (j = 0; j < cutlineItem.pageItems.length; j++) {
-            tn = cutlineItem.pageItems[j].typename;
-            if ((tn === "PathItem" || tn === "CompoundPathItem")
-                    && !cutlineItem.pageItems[j].hidden) {
-                return cutlineItem.pageItems[j];
-            }
-        }
-    }
-    if (cutlineItem.typename === "PathItem"
-            || cutlineItem.typename === "CompoundPathItem") {
-        return cutlineItem;
+        var p = candidate ? _s10FirstClipPath(candidate) : null;
+        if (p) return p;
+        return _s10FirstClipPath(cutlineItem);
     }
     return null;
+}
+
+// First visible PathItem/CompoundPathItem in `item`, drilling into nested groups; else null.
+function _s10FirstClipPath(item) {
+    if (!item) return null;
+    var tn = item.typename, j, r;
+    if (tn === "PathItem" || tn === "CompoundPathItem") return item.hidden ? null : item;
+    if (tn === "GroupItem") {
+        for (j = 0; j < item.pageItems.length; j++) {
+            r = _s10FirstClipPath(item.pageItems[j]);
+            if (r) return r;
+        }
+    }
+    return null;
+}
+
+// Duplicates a native caption's VISIBLE printed members (decorative plate raster, white pill,
+// text) from the element's cutline group into the temp clip group `grp`, placing each at the
+// FRONT so the final stack is text > pill > plate > art > white-backing. The caller re-asserts
+// the clip mask at pageItems[0] afterward. The caption lives inside the cut boundary, so it is
+// clipped cleanly with the rest. No-op for stamps (PlacedItem cutline) / missing members.
+function _s10AddCaptionMembers(grp, cutlineItem, tmpLayer) {
+    if (!cutlineItem || cutlineItem.typename !== "GroupItem") return;
+    // Back-to-front insertion (each moved to the front): plate, then pill, then text.
+    var order = [" caption plate", " plate", " caption text"];
+    var k, member, dup;
+    for (k = 0; k < order.length; k++) {
+        member = findGroupMember(cutlineItem, order[k]);
+        if (member && !member.hidden) {
+            dup = member.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
+            dup.move(grp, ElementPlacement.PLACEATBEGINNING);
+        }
+    }
 }
 
 // Recursively applies white fill and removes stroke on all path items within item.

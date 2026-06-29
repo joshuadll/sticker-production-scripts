@@ -1,9 +1,12 @@
 #target photoshop
 #include "../utils/psUtils.jsx"
+#include "../utils/json2.jsx"
 #include "../photoshop/Step1_CombineElements.jsx"
 #include "../photoshop/Step2A_AutoResize.jsx"
 #include "../photoshop/Step2B_WhiteEdge.jsx"
-#include "../photoshop/Step3A_CaptionText.jsx"
+#include "../photoshop/Step3B_CaptionWhite.jsx"
+#include "../photoshop/Step5_Silhouette.jsx"
+#include "../photoshop/Step5b_ExportHandoff.jsx"
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 // All tuneable values live here. Step files contain functions only.
@@ -79,38 +82,17 @@ var CONFIG = {
     whiteEdgeSmoothRadiusPx: 20,
     whiteEdgeLayerName: "White Base_Cutline", // name given to the created layer
 
-    // ── Step 3A: Caption text ──────────────────────────────────────────────────
+    // Captions are NO LONGER authored in Photoshop — they are placed + built natively in
+    // Illustrator (Step 6 / Pipeline 2). Step 3A is gone; Step 3B is reduced to element
+    // grouping. The font/size/tracking spec now lives in the AI CONFIG (AI_BuildCutlines).
 
-    // ⚠️  Confirm PostScript font name on artist machine: run app.fonts in PS
-    // to list installed fonts. "Kalam-Regular" is the expected value.
-    captionFont:             "Kalam-Regular",
-
-    // ⚠️  GC-LM caption font — confirm with artist whether:
-    //   (a) a different font is used for plate captions, or
-    //   (b) the caption is embedded in the plate artwork (no T layer needed).
-    // Defaults to captionFont until confirmed.
-    captionFontPlate:        "Kalam-Regular",
-
-    captionSizePt:    8,    // pt — real caption size; Step 6 places the silhouette at
-                            // source DPI so 8pt renders at a true 8pt on the printed sticker.
-    captionTracking:  -20,  // thousandths of an em
-    captionGap:        5,   // px: text top below white border bottom (WBC bounds[3]) — this is only
-                            //     the REVIEW position the artist sees after Step 3A. Final placement is
-                            //     re-seated in Step 3B (snapCaptionToBorder, CONFIG.captionBorderOverlapPx),
-                            //     which slides text+pill along the pill→art centre line to an exact overlap.
-    captionMaxGapFrac: 0.5, // caption↔element positional matching ceiling: reject a caption farther
-                            //     than this × the element's smaller side. Element-relative → DPI/scale-free.
-                            //     Stops a genuinely-uncaptioned element from absorbing a far stray text
-                            //     layer. Used by Step 3A's re-run guard (buildCaptionAssignment).
-
-    // [styleCode, catCode] pairs that use the plate treatment.
-    // Extend this array (no code change) when new plate-style categories are added.
-    captionPlateCodes: [["GC", "LM"]]
+    // ── BridgeTalk handoff → Illustrator ───────────────────────────────────────
+    bridgeTalkTimeout: 20    // seconds to wait for Illustrator to respond
 };
 
-CONFIG.logPath = ($.fileName
-    ? new File($.fileName).parent.fsName
-    : Folder.desktop.fsName) + "/PS_BuildElements.log";
+var _root = $.fileName ? new File($.fileName).parent.parent.fsName : Folder.desktop.fsName;
+CONFIG.logPath        = _root + "/pipelines/PS_BuildElements.log";
+CONFIG.aiPipelinePath = _root + "/pipelines/AI_BuildCutlines.jsx";
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -149,6 +131,51 @@ function saveWorkingDoc(doc, folder) {
     doc.saveAs(saveFile, opts, false);
     log("[pipeline] saved | " + savePath);
     return savePath;
+}
+
+// Exports the silhouette PNG + slim sidecar, then BridgeTalks to Illustrator to trace the cut
+// and place native caption text (AI_BuildCutlines.buildDocAndImport). Returns the parsed JSON
+// status from the Illustrator half, or null if it didn't respond. (Ported from the retired
+// PSAI pipeline; the export helpers now live in Step5b_ExportHandoff.jsx.)
+function handOffToIllustrator(doc) {
+    var silhPngPath  = exportSilhouettePng(doc);
+    var elementsPath = writeElementsFile(doc);
+
+    if (!silhPngPath || !elementsPath) {
+        log("[pipeline] ERROR | export failed — BridgeTalk handoff aborted.");
+        var abortFolder = null;
+        try { abortFolder = doc.fullName.parent.fsName; } catch (eAb) {}
+        scriptAlert("❌ Couldn't export the silhouette / elements sidecar.\n\n"
+            + "Check that the Elements group exists.\n\n"
+            + "Send this to Josh:\n" + copyLogBeside(abortFolder, "Noteworthie_ERROR.log"));
+        return null;
+    }
+
+    if (!CONFIG.aiPipelinePath) {
+        log("[pipeline] WARN: aiPipelinePath not set — sidecars written, skipping BridgeTalk.");
+        return null;
+    }
+
+    function esc(p) { return p.replace(/\\/g, "/").replace(/"/g, '\\"'); }
+
+    var aiStatus = null;
+    var bt = new BridgeTalk();
+    bt.target = "illustrator";
+    // Set the handoff flag first so AI_BuildCutlines' bottom dispatch does NOT auto-run main();
+    // end the body with buildDocAndImport(...) so its returned JSON status is this message's result.
+    bt.body = '$.global.__aiBuildCutlinesHandoff = true;'
+        + '$.evalFile(new File("' + esc(CONFIG.aiPipelinePath) + '"));'
+        + 'buildDocAndImport("' + esc(silhPngPath) + '","' + esc(elementsPath) + '");';
+    bt.onResult = function(resultMsg) {
+        aiStatus = resultMsg.body;
+        log("[pipeline] BridgeTalk result: " + aiStatus);
+    };
+    bt.onError = function(e) { log("[pipeline] BridgeTalk error: " + e.body); };
+    bt.send(CONFIG.bridgeTalkTimeout);
+    log("[pipeline] BridgeTalk: handed off to Illustrator | silh: " + silhPngPath);
+
+    if (!aiStatus) return null;
+    try { return JSON.parse(aiStatus); } catch (e) { return null; }
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
@@ -254,61 +281,91 @@ function main() {
     }
     log("[pipeline] step 3 complete | " + whiteEdgeResult.processed + " element(s).");
 
-    // ── Step 3A: Caption text ──────────────────────────────────────
-    log("[pipeline] --- Step 3A: Caption text ---");
+    // ── Step 3B: Group elements (no captions — those are native in Illustrator) ──
+    log("[pipeline] --- Step 3B: Group elements ---");
     var snapshotD = doc.activeHistoryState;
-    var captionResult;
-
+    var groupResult;
     try {
-        captionResult = runCaptionText(doc);
+        groupResult = runCaptionWhite(doc);   // slimmed: groups SO + white edge per element
     } catch (e) {
         doc.activeHistoryState = snapshotD;
-        log("[pipeline] ERROR | step 3A line " + e.line + ": " + e.message
-            + " — rolled back to post-white-edge state. White edges preserved.");
-        scriptAlert("ERROR in Step 3A (Caption text).\nLine " + e.line + ": " + e.message
-            + "\n\nWhite edges preserved. Rolled back to post-white-edge state.\n"
-            + "Fix the issue and re-run.\n\nSend this to Josh:\n" + copyLogBeside(folder.fsName, "Noteworthie_ERROR.log"));
+        log("[pipeline] ERROR | step 3B line " + e.line + ": " + e.message + " — rolled back.");
+        scriptAlert("ERROR in Step 3B (Group elements).\nLine " + e.line + ": " + e.message
+            + "\n\nRolled back to post-white-edge state.\n\nSend this to Josh:\n"
+            + copyLogBeside(folder.fsName, "Noteworthie_ERROR.log"));
         return;
     }
-    log("[pipeline] step 3A complete | " + captionResult.placed + " caption(s) placed.");
+    log("[pipeline] step 3B complete | " + groupResult.grouped + " element(s) grouped.");
+
+    // ── Step 5: Finalize Elements group ──────────────────────────────
+    log("[pipeline] --- Step 5: Finalize Elements group ---");
+    var snapshotE = doc.activeHistoryState;
+    try {
+        runSilhouette(doc);
+    } catch (e) {
+        doc.activeHistoryState = snapshotE;
+        log("[pipeline] ERROR | step 5 line " + e.line + ": " + e.message + " — rolled back.");
+        scriptAlert("ERROR in Step 5 (Finalize Elements).\nLine " + e.line + ": " + e.message
+            + "\n\nSend this to Josh:\n" + copyLogBeside(folder.fsName, "Noteworthie_ERROR.log"));
+        return;
+    }
+    log("[pipeline] step 5 complete | Elements finalized.");
+
+    // Reveal any off-canvas element pixels so each trim / silhouette captures full bounds.
+    if (!CONFIG.dryRun) { doc.revealAll(); }
 
     // ── Save working document ──────────────────────────────────────
     var savedPath = null;
     try {
         savedPath = saveWorkingDoc(doc, folder);
     } catch (e) {
-        log("[pipeline] WARN | auto-save failed line " + e.line + ": " + e.message
-            + " — save the document manually before running PSAI_BuildAndExportCutlines.");
+        log("[pipeline] WARN | auto-save failed line " + e.line + ": " + e.message + ".");
     }
 
-    // ── Completion summary ─────────────────────────────────────────
+    // ── Export per-element art PNGs + GC plate PNG, then BridgeTalk → Illustrator ──
+    var aiStatus = null;
+    if (!CONFIG.dryRun) {
+        exportElementPngs(doc);
+        exportCaptionPlatePng(doc);          // GC SKUs only; null (no-op) for WC
+        log("[pipeline] --- BridgeTalk handoff → Illustrator (trace cut + place caption text) ---");
+        aiStatus = handOffToIllustrator(doc);
+    } else {
+        log("[pipeline] [DRY RUN] would export PNGs + sidecar and hand off to Illustrator.");
+    }
+
     log("[pipeline] === PS_BuildElements done ===");
 
-    var msg = "✅ Elements built.\n\n"
-        + "  Combined " + combineResult.placed + " element(s) from "
-        + combineResult.fileCount + " file(s) → resized " + resizeResult.resized
-        + ", white-edged " + whiteEdgeResult.processed + ", "
-        + captionResult.placed + " caption(s) placed.";
-
+    // ── Completion summary ─────────────────────────────────────────
+    var summary = "Combined " + combineResult.placed + " element(s) from " + combineResult.fileCount
+        + " file(s) → resized " + resizeResult.resized + ", white-edged " + whiteEdgeResult.processed
+        + ", grouped " + groupResult.grouped + ".";
+    var msg;
+    if (aiStatus && aiStatus.ok) {
+        msg = "✅ Elements built + cut traced.\n\n  " + summary + "\n\n"
+            + "Illustrator has traced the cut and placed native caption text.\n"
+            + "Review/reshape the captions in Illustrator, then run Pipeline 2 (Build and Export Cutlines).";
+    } else if (aiStatus && aiStatus.error) {
+        var errLog = aiStatus.errorLog || copyLogBeside(folder.fsName, "Noteworthie_ERROR.log");
+        msg = "❌ Couldn't finish tracing the cut in Illustrator.\n\n"
+            + "Reason: " + aiStatus.error + "\n\n  " + summary + "\n\n"
+            + "Send this file to Josh:\n" + errLog;
+    } else {
+        msg = "⏳ Illustrator is tracing the cut + placing captions.\n\n  " + summary + "\n\n"
+            + "When it finishes, review the captions there, then run Pipeline 2 (Build and Export Cutlines)."
+            + (savedPath ? "\n\nSaved: " + savedPath : "\n\n⚠️ Auto-save failed — save manually.");
+    }
     if (resizeResult.skipped.length > 0) {
         msg += "\n\n⚠️ Resize skipped (" + resizeResult.skipped.length + "):";
-        for (var s = 0; s < resizeResult.skipped.length; s++) {
-            msg += "\n   • " + resizeResult.skipped[s];
-        }
+        for (var s = 0; s < resizeResult.skipped.length; s++) msg += "\n   • " + resizeResult.skipped[s];
     }
-
-    if (captionResult.skipped.length > 0) {
-        msg += "\n\n⚠️ Caption skipped (" + captionResult.skipped.length + "):";
-        for (var c = 0; c < captionResult.skipped.length; c++) {
-            msg += "\n   • " + captionResult.skipped[c];
-        }
+    if (groupResult.skipped.length > 0) {
+        msg += "\n\n⚠️ Couldn't group " + groupResult.skipped.length + " element(s):";
+        for (var c = 0; c < groupResult.skipped.length; c++) msg += "\n   • " + groupResult.skipped[c];
     }
-
-    msg += "\n\nReview and adjust the caption positions, then run Noteworthie 2."
-        + (savedPath ? "\nSaved: " + savedPath
-                     : "\n⚠️ Auto-save failed — save the file manually first.");
-
     scriptAlert(msg);
 }
 
-main();
+// Dispatch: artist double-click runs main(). A test sets $.global.__psBuildElementsNoAuto = true
+// BEFORE evaluating this file to load the functions (incl. handOffToIllustrator) without firing
+// the full combine, then drives the phases itself.
+if (!$.global.__psBuildElementsNoAuto) { main(); }

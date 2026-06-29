@@ -8,7 +8,13 @@
 // Matches "Eiffel Tower [WC-LM+]"   → captures (Eiffel Tower)(WC)(LM)(+)
 // Matches "Small Snack [WC-FD-]"    → captures (Small Snack)(WC)(FD)(-)
 // Matches "Orlando Stamp [ST]"      → captures (Orlando Stamp)(ST)(undefined)(undefined)
-var NAME_REGEX = /^(.+)\s\[([A-Z]+)(?:-([A-Z]+)([+-])?)?\]$/;
+// Matches "Big Stamp [ST+]"         → captures (Big Stamp)(ST)(undefined)(+)
+// Matches "Tiny Stamp [ST-]"        → captures (Tiny Stamp)(ST)(undefined)(-)
+// The size hint is OUTSIDE the catCode group so it can follow a category-less
+// style code (stamps): a hinted stamp still parses, and getTargetPx ignores the
+// hint (ST is a fixed 450px). Without this an "[ST+]" typo would parse to null and
+// the stamp would be silently skipped by the pipeline.
+var NAME_REGEX = /^(.+)\s\[([A-Z]+)(?:-([A-Z]+))?([+-])?\]$/;
 
 // ─── PURE HELPERS ─────────────────────────────────────────────────────────────
 // No Adobe API calls — logic only.

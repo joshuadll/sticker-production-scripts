@@ -13,11 +13,30 @@ tests/integration/fixtures/*.svg
 tests/integration/fixtures/*_elements/
 tests/integration/fixtures/*_elements.json
 
+# Pipeline 1 (ps-build-elements) handoff artifacts written into the source fixture folder
+# by the two-phase runner's live run (Step5b silhouette/sidecar/per-element PNGs + any AI
+# Step 7A SVGs). Regenerated each run — the runner's clean-slate wipes them on entry — so
+# never committed. (The working .psd/.ai are already covered by the global *.psd/*.ai.)
+tests/integration/ps-build-elements/fixtures/source-psds/*_silhouette.png
+tests/integration/ps-build-elements/fixtures/source-psds/*_elements.json
+tests/integration/ps-build-elements/fixtures/source-psds/*_elements/
+tests/integration/ps-build-elements/fixtures/source-psds/*_regular.svg
+tests/integration/ps-build-elements/fixtures/source-psds/*_irregular.svg
+
 # Exception: the committed import-nesting golden-test fixture — the recurring
 # rotation/overlap regression case (Slovakia SKU). Tracked despite the global *.ai
 # and the fixtures/* ignores above, so the test runs anywhere from a clean checkout.
-!tests/integration/fixtures/import-nesting/
-!tests/integration/fixtures/import-nesting/**
+# Negated via ** so it stays tracked wherever the per-pipeline reorg places the
+# import-nesting/ dir (e.g. tests/integration/ai-import-nesting/fixtures/import-nesting/).
+!tests/integration/**/import-nesting/
+!tests/integration/**/import-nesting/**
+
+# Exception: the committed Pipeline 2 (ai-build-and-export-cutlines) test fixture — the
+# post-Step-6 working .ai (traced cut + native caption text, Slovakia SKU) that Pipeline 2
+# consumes as its starting file. Tracked despite the global *.ai so the test runs anywhere
+# from a clean checkout. (The sibling traced-cutlines_elements.json sidecar is not ignored
+# in this dir, so it's tracked normally.)
+!tests/integration/ai-build-and-export-cutlines/fixtures/traced-cutlines.ai
 
 # Golden-mismatch scratch output (written by test runners on a diff; copy over the
 # real golden to accept — never committed).
