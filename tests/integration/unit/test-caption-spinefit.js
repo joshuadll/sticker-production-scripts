@@ -26,6 +26,7 @@ eval(extract('_capColumnSpan'));
 eval(extract('_capBandSpan'));
 eval(extract('_capRobustBaselineFit'));
 eval(extract('_capBottomLineBaseline'));
+eval(extract('_capLineCount'));
 
 function approx(a, b, t) { return Math.abs(a - b) <= t; }
 var fails = 0;
@@ -104,7 +105,7 @@ var MIN  = 8;
     var full = _capRobustBaselineFit(base, 0, 80, SNAP, MIN);
     check(full.straight === false, 'pre-fix: full envelope of narrow-bottom 2-line should read curved');
 
-    var bottom = _capBottomLineBaseline(base, true);
+    var bottom = _capBottomLineBaseline(base, true, 12);   // ~12pt line height (gap to top line = 12)
     check(bottom.length < base.length, 'bottom-line filter should drop the upper-line edge columns');
     var ex0 = bottom[0].x, ex1 = bottom[bottom.length - 1].x;
     var r = _capRobustBaselineFit(bottom, ex0, ex1, SNAP, MIN);
@@ -119,7 +120,7 @@ var MIN  = 8;
         var y = (i >= 20 && i <= 60) ? arc : (arc + 12);     // top line 12pt above, same bow
         base.push({ x: i, y: y });
     }
-    var bottom = _capBottomLineBaseline(base, true);
+    var bottom = _capBottomLineBaseline(base, true, 12);
     var ex0 = bottom[0].x, ex1 = bottom[bottom.length - 1].x;
     var r = _capRobustBaselineFit(bottom, ex0, ex1, SNAP, MIN);
     check(r.straight === false, 'a truly warped 2-line caption must stay curved after bottom-line filter');
@@ -130,11 +131,30 @@ var MIN  = 8;
     var base = [], i;
     for (i = 0; i <= 14; i++) base.push({ x: i, y: 100 });
     base[5].y = 90;   // a descender — must NOT be treated as a separate "line"
-    var same = _capBottomLineBaseline(base, false);
+    var same = _capBottomLineBaseline(base, false, 12);
     check(same.length === base.length, 'single-line (isMultiLine=false) must pass through unchanged');
     // and even if mislabeled multi-line, a lone descender cluster is too small to trust → unchanged
-    var safe = _capBottomLineBaseline(base, true);
+    var safe = _capBottomLineBaseline(base, true, 12);
     check(safe.length === base.length, 'a single stray descender must not split a one-line caption');
+})();
+
+// ── 9. Line-break threshold is SIZE-RELATIVE: the same gap splits at a small line height but
+//       not at a large one (so a font-size change can't break the gate — replaces the old fixed 3pt) ──
+(function () {
+    var base = [], i;
+    for (i = 0; i <= 80; i++) base.push({ x: i, y: (i >= 20 && i <= 60) ? 100 : 105 }); // gap = 5pt
+    var small = _capBottomLineBaseline(base, true, 12);   // threshold 0.3*12=3.6 < 5 → splits
+    check(small.length < base.length, 'gap 5pt should split when line height is small (thr 3.6)');
+    var large = _capBottomLineBaseline(base, true, 20);   // threshold 0.3*20=6.0 > 5 → no split
+    check(large.length === base.length, 'same gap 5pt should NOT split when line height is large (thr 6.0)');
+})();
+
+// ── 10. _capLineCount — non-empty visual lines from point-text contents (drives multi-line + line height) ──
+(function () {
+    check(_capLineCount({ contents: 'Pirohy' }) === 1, 'one line → 1');
+    check(_capLineCount({ contents: 'St Elizabeth\'s Cathedral\r(Dóm Svätej Alzbety)' }) === 2, 'two lines → 2');
+    check(_capLineCount({ contents: 'A\r\rB' }) === 2, 'blank middle line is not counted');
+    check(_capLineCount({ contents: 'A\nB\nC' }) === 3, 'three lines → 3');
 })();
 
 // ── Helper sanity (unchanged) ──

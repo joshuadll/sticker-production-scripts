@@ -25,25 +25,25 @@
 [halfcut] Kroje | pts=30 end0=(-186.5,-139.2) endN=(-160.8,-140.2) curved
 [ai-pipeline] caption built | Kroje halfcut=true
 [seat] Kraslice | midpoint bulge relieved by 15% shrink.
-[seat] Kraslice | rotated 3.9deg to endpoint chord.
-[seat] Kraslice | seated rot=3.9deg move=9.6pt depth=0.3pt
-[halfcut] Kraslice | pts=602 end0=(542.4,121.3) endN=(571.8,121.7) curved
+[seat] Kraslice | rotated 3.5deg to endpoint chord.
+[seat] Kraslice | seated rot=3.5deg move=9.8pt depth=0.3pt
+[halfcut] Kraslice | pts=566 end0=(543.3,120.6) endN=(571.6,121.5) curved
 [ai-pipeline] caption built | Kraslice halfcut=true
 [seat] Bryndzové halušky | midpoint bulge relieved by 15% shrink.
 [seat] Bryndzové halušky | rotated 1.2deg to endpoint chord.
 [seat] Bryndzové halušky | seated rot=1.2deg move=12.1pt depth=0.3pt
 [halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
-[halfcut] Bryndzové halušky | pts=563 end0=(289.6,114) endN=(345.3,115.9) curved
+[halfcut] Bryndzové halušky | pts=548 end0=(290,113.9) endN=(345.2,115.8) curved
 [ai-pipeline] caption built | Bryndzové halušky halfcut=true
 [seat] Pirohy | rotated 2.1deg to endpoint chord.
 [seat] Pirohy | seated rot=2.1deg move=7.7pt depth=0.3pt
 [halfcut] Pirohy | pts=35 end0=(56.5,106.6) endN=(84.6,107.8) straight
 [ai-pipeline] caption built | Pirohy halfcut=true
 [seat] Šúľance s Makom | midpoint bulge relieved by 15% shrink.
-[seat] Šúľance s Makom | rotated 0.8deg to endpoint chord.
-[seat] Šúľance s Makom | seated rot=0.8deg move=12.7pt depth=0.3pt
+[seat] Šúľance s Makom | rotated 0.7deg to endpoint chord.
+[seat] Šúľance s Makom | seated rot=0.7deg move=12.7pt depth=0.3pt
 [halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
-[halfcut] Šúľance s Makom | pts=614 end0=(-203.6,131.5) endN=(-141,133) curved
+[halfcut] Šúľance s Makom | pts=609 end0=(-203.5,131.4) endN=(-142.4,132.5) curved
 [ai-pipeline] caption built | Šúľance s Makom halfcut=true
 [seat] Bratislava(text) | rotated -0.1deg to endpoint chord.
 [seat] Bratislava(text) | seated rot=-0.1deg move=6.9pt depth=0.3pt
@@ -118,7 +118,7 @@
 [step7a] irregular | ratio=0.761 | Bratislava(text)
 [step7a] irregular | ratio=0.737 | Šúľance s Makom
 [step7a] irregular | ratio=0.73 | Pirohy
-[step7a] irregular | ratio=0.79 | Bryndzové halušky
+[step7a] irregular | ratio=0.789 | Bryndzové halušky
 [step7a] irregular | ratio=0.682 | Kraslice
 [step7a] irregular | ratio=0.709 | Kroje
 [step7a] irregular | ratio=0.717 | Fujara

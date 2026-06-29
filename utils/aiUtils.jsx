@@ -564,11 +564,14 @@ function _capRobustBaselineFit(pts, x0, x1, snapTolPt, minCols) {
 // caller says the caption is multi-line, only when a real break exists, and only if the bottom
 // group is big enough to trust; otherwise the input is returned untouched (single-line is never
 // reshaped, and a lone descender can't split a one-line caption). Pure geometry — node-testable.
-// lineBreakPt = the minimum baseline-y gap that counts as a line break (pt). The caption font
-// is fixed (Kalam 8pt, leading ≈ 9.6pt); a real break measures ≈5–7pt of bottom-of-ink separation
-// after descenders, well above the <1pt within-line column noise, so 3pt cleanly separates them.
-function _capBottomLineBaseline(base, isMultiLine) {
-    var lineBreakPt = 3.0;
+// The break gap is SIZE-RELATIVE: a fraction (lineBreakFrac) of the caption's per-line height
+// (`lineHeightPt`, passed by the caller as text-box-height / line-count), so it tracks the font
+// instead of a fixed pt value (the caption size is a CONFIG knob that has changed before). A real
+// inter-line break is ≈0.6–0.7 of a line; the within-line bottom-of-ink noise (descenders) ≈0.25;
+// 0.3 separates them. Fallback ≈ an 8pt-caption leading if the caller can't supply a height.
+function _capBottomLineBaseline(base, isMultiLine, lineHeightPt) {
+    var lineBreakFrac = 0.3;
+    var lineBreakPt = (lineHeightPt > 0 ? lineHeightPt : 9.6) * lineBreakFrac;
     if (!isMultiLine || !base || base.length < 6) return base;
     var ys = [], i;
     for (i = 0; i < base.length; i++) ys.push(base[i].y);
@@ -790,11 +793,14 @@ function buildCaptionPill(layer, textFrame, opts) {
     if (!s || s.base.length < 3) {                 // degenerate -> flat
         var fp0 = flatPill(); spine = fp0.spine; radius = fp0.radius;
     } else {
-        // For a multi-line caption keep only the BOTTOM line's baseline, then judge straight/curved
-        // over its own x-extent: a narrower bottom line otherwise lets the upper line's baseline
+        // For a multi-line caption judge straight/curved from only the BOTTOM line's baseline over
+        // its own x-extent [fx0,fx1]: a narrower bottom line otherwise lets the upper line's baseline
         // (picked up at the edge columns it doesn't cover) fake a ∪ curve and build a wrongly curved
-        // pill. Single-line text passes through untouched. See _capBottomLineBaseline.
-        var baseF = _capBottomLineBaseline(s.base, _capIsMultiLine(textFrame));
+        // pill. The break gap is sized from the per-line height (boxH / line count). Single-line text
+        // keeps all its points (only the sampler's edge margin is trimmed). See _capBottomLineBaseline.
+        var lineCount = _capLineCount(textFrame);
+        var lineHeightPt = (lineCount > 0) ? boxH / lineCount : boxH;
+        var baseF = _capBottomLineBaseline(s.base, lineCount >= 2, lineHeightPt);
         var fx0 = baseF[0].x, fx1 = baseF[baseF.length - 1].x;
         var fit = _capRobustBaselineFit(baseF, fx0, fx1, snapPt, minCols);
         if (fit.straight) {                        // straight (single OR multi-line) -> flat bbox stadium
@@ -809,7 +815,12 @@ function buildCaptionPill(layer, textFrame, opts) {
             var M = 40, p;
             for (p = 0; p <= M; p++) {
                 var sx = bb[0] + (bb[2] - bb[0]) * (p / M);
-                spine.push({ x: sx, y: _capYAt(fit.fit, sx) + halfBody });
+                // Clamp the curve evaluation to the fitted x-range so the parabola is never
+                // EXTRAPOLATED past where we have baseline data (a narrow bottom line would otherwise
+                // overshoot at the pill ends); beyond the range the spine continues flat at the
+                // endpoint height while still spanning the full pill width.
+                var ex = (sx < fx0) ? fx0 : ((sx > fx1) ? fx1 : sx);
+                spine.push({ x: sx, y: _capYAt(fit.fit, ex) + halfBody });
             }
         }
     }
@@ -888,14 +899,17 @@ function warpTextToBaseArc(textFrame, outline, opts) {
     return { warped: true, bend: deformValue, reason: "warped R=" + Math.round(dec.radius) + "pt" };
 }
 
-// Multi-line if the caption has >= 2 non-empty lines (point text -> a line per hard return).
-function _capIsMultiLine(textFrame) {
+// Count the caption's non-empty visual lines (point text -> a line per hard return). Drives both
+// the multi-line test and the per-line height used to size the line-break gap in buildCaptionPill.
+function _capLineCount(textFrame) {
     try {
         var s = String(textFrame.contents).split(/[\r\n]+/), n = 0, i;
         for (i = 0; i < s.length; i++) if (s[i].replace(/^\s+|\s+$/g, "").length > 0) n++;
-        return n >= 2;
-    } catch (e) { return false; }
+        return n;
+    } catch (e) { return 1; }
 }
+// Multi-line if the caption has >= 2 non-empty lines.
+function _capIsMultiLine(textFrame) { return _capLineCount(textFrame) >= 2; }
 
 // Caption note = "{style}|{lines}|a{pillAreaPt2}" (+ "|R" when the seat flagged review).
 // pillArea is the SPEC pill area stamped at build. Step 8b recovers the artist's uniform
