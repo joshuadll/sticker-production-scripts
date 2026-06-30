@@ -2526,6 +2526,81 @@ function _sampleCached(cache, slot, item, steps) {
     return polys;
 }
 
+// Points → millimetres (inverse of mmToPoints). 1pt = 25.4/72 mm.
+function pointsToMm(pt) { return pt * (25.4 / 72); }
+
+// Smallest angle between two directions treated as UNORIENTED lines (a straight edge may be
+// sampled in either direction). Returns 0..π/2.
+function _angDiff180(a, b) {
+    var d = Math.abs(a - b) % Math.PI;       // 0..π
+    if (d > Math.PI / 2) d = Math.PI - d;     // fold to 0..π/2
+    return d;
+}
+
+// Simple vertex-average centroid (good enough to decide which side is "outward").
+function _polyCentroid(poly) {
+    var sx = 0, sy = 0, i;
+    for (i = 0; i < poly.length; i++) { sx += poly[i].x; sy += poly[i].y; }
+    return { x: sx / poly.length, y: sy / poly.length };
+}
+
+// Chooses the longest near-straight run of the outline perimeter and returns the tab seat:
+//   { ok, midX, midY, dirAngle, outwardAngle, lengthMm }
+// dirAngle  = direction of the chord (radians, y-up).
+// outwardAngle = perpendicular to dirAngle pointing AWAY from the polygon centroid (the tab body
+//   points this way).
+// lengthMm = straight chord length of the run (what must clear the PEEL HERE tab width).
+// A "run" accumulates consecutive perimeter edges whose direction stays within
+// straightToleranceDeg of the run's anchor direction (unoriented), so diagonal/vertical edges
+// qualify — generalises the old horizontal-only _findLongestHorizontalSeg.
+function pickTabEdge(outline, opts) {
+    opts = opts || {};
+    var steps = (opts.steps != null) ? opts.steps : (CONFIG.peelTabEdgeSampleSteps || 12);
+    var tolRad = ((opts.straightToleranceDeg != null) ? opts.straightToleranceDeg
+                 : (CONFIG.peelTabEdgeStraightToleranceDeg != null ? CONFIG.peelTabEdgeStraightToleranceDeg : 8))
+                 * Math.PI / 180;
+
+    var poly = _largestPoly(samplePathToPolygons(outline, steps));
+    if (!poly || poly.length < 3) return { ok: false, reason: "degenerate outline polygon" };
+
+    var n = poly.length;
+    var best = null;          // { sx, sy, ex, ey, lenPt }
+    var i, j;
+
+    // Try each vertex as a run start; extend while edges stay within tolerance of the anchor dir.
+    for (i = 0; i < n; i++) {
+        var ax = poly[i].x, ay = poly[i].y;
+        var bx = poly[(i + 1) % n].x, by = poly[(i + 1) % n].y;
+        var anchor = Math.atan2(by - ay, bx - ax);
+        var endIdx = (i + 1) % n;
+        for (j = i + 1; j < i + n; j++) {
+            var c0 = poly[j % n], c1 = poly[(j + 1) % n];
+            var ed = Math.atan2(c1.y - c0.y, c1.x - c0.x);
+            if (_angDiff180(ed, anchor) > tolRad) break;
+            endIdx = (j + 1) % n;
+        }
+        var ex = poly[endIdx].x, ey = poly[endIdx].y;
+        var dx = ex - ax, dy = ey - ay;
+        var lenPt = Math.sqrt(dx * dx + dy * dy);   // straight chord span of the run
+        if (!best || lenPt > best.lenPt) best = { sx: ax, sy: ay, ex: ex, ey: ey, lenPt: lenPt };
+    }
+    if (!best || best.lenPt <= 0) return { ok: false, reason: "no straight edge found" };
+
+    var midX = (best.sx + best.ex) / 2, midY = (best.sy + best.ey) / 2;
+    var dirAngle = Math.atan2(best.ey - best.sy, best.ex - best.sx);
+    var c = _polyCentroid(poly);
+
+    // Two perpendicular candidates; pick the one whose small step increases distance from centroid.
+    var cand1 = dirAngle + Math.PI / 2, cand2 = dirAngle - Math.PI / 2;
+    var probe = 1.0;
+    var d1 = Math.pow(midX + Math.cos(cand1) * probe - c.x, 2) + Math.pow(midY + Math.sin(cand1) * probe - c.y, 2);
+    var d2 = Math.pow(midX + Math.cos(cand2) * probe - c.x, 2) + Math.pow(midY + Math.sin(cand2) * probe - c.y, 2);
+    var outwardAngle = (d1 >= d2) ? cand1 : cand2;
+
+    return { ok: true, midX: midX, midY: midY, dirAngle: dirAngle, outwardAngle: outwardAngle,
+             lengthMm: pointsToMm(best.lenPt) };
+}
+
 // True if point pt {x, y} is inside polygon poly ([{x, y}, …]) — ray casting.
 function pointInPolygon(pt, poly) {
     var inside = false;
