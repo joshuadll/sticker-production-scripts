@@ -2670,11 +2670,17 @@ function pickTabEdge(outline, opts) {
 // (caller treats null as a hard error naming the element — no silent guess).
 function _tabAssetItems(items) {
     if (!items || items.length !== 2) return null;
+    // The cutline is a stroked, unfilled PATH (PathItem/CompoundPathItem). The fill is simply the
+    // OTHER item — in the real assets a GroupItem named "Sign" (a coloured fill, plus the "PEEL
+    // HERE" lettering for tab B), which only rides along and never enters the cut. Require exactly
+    // one cutline so two paths / two groups stay ambiguous (a hard error naming the asset).
+    function isCut(it) {
+        return (it.typename === "PathItem" || it.typename === "CompoundPathItem") && it.stroked && !it.filled;
+    }
     var a = items[0], b = items[1];
-    function isCut(it)  { return it.stroked && !it.filled; }
-    function isFill(it) { return it.filled; }
-    if (isCut(a) && isFill(b)) return { cutline: a, fill: b };
-    if (isCut(b) && isFill(a)) return { cutline: b, fill: a };
+    var ca = isCut(a), cb = isCut(b);
+    if (ca && !cb) return { cutline: a, fill: b };
+    if (cb && !ca) return { cutline: b, fill: a };
     return null;
 }
 
@@ -2692,12 +2698,13 @@ function placeTabAsset(doc, layer, assetFile, edge, displayName) {
     }
     if (!assetDoc) assetDoc = app.open(assetFile);
 
-    // Collect the asset's drawable paths (single "Layer 1", two paths).
+    // Collect the asset's two top-level items (single "Layer 1"): the stroked cutline PATH and the
+    // "Sign" GROUP fill. Include GroupItem — the fill is authored as a group, not a bare path.
     var assetItems = [];
     var al = assetDoc.layers[0];
     for (i = 0; i < al.pageItems.length; i++) {
         var t = al.pageItems[i].typename;
-        if (t === "PathItem" || t === "CompoundPathItem") assetItems.push(al.pageItems[i]);
+        if (t === "PathItem" || t === "CompoundPathItem" || t === "GroupItem") assetItems.push(al.pageItems[i]);
     }
     var cls = _tabAssetItems(assetItems);
     if (!cls) { try { app.activeDocument = doc; } catch (eA) {} return { ok: false, reason: "tab asset has ambiguous cutline/fill: " + assetFile.name }; }
