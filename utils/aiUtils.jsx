@@ -1060,6 +1060,12 @@ function buildDefaultTab(doc, layer, tabGroup, outline, opts) {
     // Seat the cutline (plate) into the outline; the fill rides rigidly.
     var seat = seatPlateToOutline(name, outline, cutline, fill, { polyCache: {} });
     if (!seat.ok) {
+        // Restore a re-runnable loose "{name} tab" group (mirror buildCaption's input-restore on
+        // failure) so the artist can reposition and re-run; members keep their tab-member names.
+        var restore = layer.groupItems.add();
+        restore.name = name + " tab";
+        try { cutline.move(restore, ElementPlacement.PLACEATEND); } catch (eRc) {}
+        try { if (fill) fill.move(restore, ElementPlacement.PLACEATEND); } catch (eRf) {}
         return { ok: false, needsReview: !!seat.needsReview, reason: seat.reason };
     }
 
