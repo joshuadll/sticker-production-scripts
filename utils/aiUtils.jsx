@@ -1941,6 +1941,8 @@ function syncSpacingBuffer(doc, group, opts) {
 function wrapStampsInGroups(cutlinesLayer) {
     // Snapshot direct-child bare paths first — adding a group + moving items into it re-indexes
     // the live pathItems/compoundPathItems collections mid-loop.
+    // NOTE: a default-tab element is a GroupItem (not a bare path), so it is naturally skipped
+    // here — only genuinely bare stamp cutlines (no tab) are wrapped for a halo.
     var bare = [], i, it;
     for (i = 0; i < cutlinesLayer.pathItems.length; i++) {
         it = cutlinesLayer.pathItems[i];
@@ -1994,7 +1996,9 @@ function unwrapStampGroups(doc) {
         g = cutLayer.groupItems[i];
         if (g.parent !== cutLayer) continue;
         note = parseNote(g.note);
-        if (note && note.styleCode === "ST") groups.push(g);
+        // Only unwrap HALO-ONLY wrappers (no plate member). A real default-tab group has a
+        // "{name} plate" member (the tab cutline) and must ship as a group — never unwrap it.
+        if (note && note.styleCode === "ST" && findGroupMember(g, " plate") === null) groups.push(g);
     }
     var unwrapped = 0, member;
     for (i = 0; i < groups.length; i++) {
