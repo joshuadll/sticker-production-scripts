@@ -2647,12 +2647,16 @@ function placeTabAsset(doc, layer, assetFile, edge, displayName) {
     app.activeDocument = doc;
     app.executeMenuCommand("paste");
     var pasted = app.selection;
-    if (!pasted || pasted.length !== 2) return { ok: false, reason: "tab paste returned " + (pasted ? pasted.length : 0) + " items" };
+
+    // Helper to drop pasted items on error paths (prevent float leak).
+    function _dropPasted(arr) { var z; for (z = 0; arr && z < arr.length; z++) { try { arr[z].remove(); } catch (eD) {} } }
+
+    if (!pasted || pasted.length !== 2) { _dropPasted(pasted); return { ok: false, reason: "tab paste returned " + (pasted ? pasted.length : 0) + " items" }; }
 
     var group = layer.groupItems.add();
     group.name = displayName + " tab";
     var pCls = _tabAssetItems([pasted[0], pasted[1]]);
-    if (!pCls) return { ok: false, reason: "pasted tab ambiguous cutline/fill" };
+    if (!pCls) { _dropPasted(pasted); return { ok: false, reason: "pasted tab ambiguous cutline/fill" }; }
     pCls.fill.move(group, ElementPlacement.PLACEATEND);
     pCls.cutline.move(group, ElementPlacement.PLACEATEND);
     pCls.cutline.name = displayName + " tab cutline";
