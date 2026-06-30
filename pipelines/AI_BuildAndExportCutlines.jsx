@@ -61,7 +61,25 @@ function runBuildAndExport(doc) {
     for (i = 0; i < sidecar.elements.length; i++) {
         var el = sidecar.elements[i];
         if (!elementGetsCaption(el.styleCode)) {
-            // Default peel tab (Task 6 fills this branch); for now keep prior behaviour.
+            // Default peel tab: find the loose "{name} tab" group Pipeline 1 placed (artist may
+            // have repositioned it) and run it through the same seat/unite/half-cut machinery.
+            var tabGroup = _findItemByName(layer, el.displayName + " tab");
+            var tabOutline = _findItemByName(layer, el.displayName + " outline");
+            if (!tabGroup || !tabOutline) {
+                skipped.push(el.displayName + (tabOutline ? "" : " [no outline]") + (tabGroup ? "" : " [no tab]"));
+                continue;
+            }
+            var tres;
+            try { tres = buildDefaultTab(doc, layer, tabGroup, tabOutline,
+                                         { name: el.displayName, strokePt: CONFIG.cutlineStrokePt }); }
+            catch (eT) { failed.push(el.displayName + " tab (line " + eT.line + ": " + eT.message + ")"); continue; }
+            if (tres && tres.ok) {
+                built++;
+                log("[ai-pipeline] tab built | " + el.displayName + " halfcut=" + tres.halfcut
+                    + (tres.needsReview ? " REVIEW" : ""));
+            } else {
+                failed.push(el.displayName + " tab" + (tres ? " (" + tres.reason + ")" : ""));
+            }
             continue;
         }
         var outline   = _findItemByName(layer, el.displayName + " outline");
