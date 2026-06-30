@@ -1032,6 +1032,60 @@ function buildCaption(doc, layer, textFrame, outline, opts) {
              halfcut: !!(hc && hc.ok), reason: hc ? hc.reason : null };
 }
 
+// Pipeline-2 build for a DEFAULT PEEL TAB (uncaptioned element). Mirrors buildCaption minus the
+// pill/text build: the loose "{name} tab" group (placed in Pipeline 1, possibly repositioned by
+// the artist) supplies a CUTLINE (the plate) and a FILL (a ride-along printed member). Seats the
+// cutline into the traced outline, unites into the fused cut, bundles the separable members, and
+// derives the half-cut from the submerged tab arc. An unseated tab returns { ok:false } for the
+// caller to surface as a hard error (no fallback).
+function buildDefaultTab(doc, layer, tabGroup, outline, opts) {
+    opts = opts || {};
+    var name = opts.name || tabGroup.name.replace(/ tab$/, "");
+
+    // Extract the two tab members by name (placeTabAsset named them).
+    var cutline = null, fill = null, i;
+    for (i = 0; i < tabGroup.pageItems.length; i++) {
+        var it = tabGroup.pageItems[i];
+        if (it.name === name + " tab cutline") cutline = it;
+        else if (it.name === name + " tab fill") fill = it;
+    }
+    if (!cutline) return { ok: false, reason: "tab cutline member not found" };
+
+    // Promote the tab members out of the loose wrapper onto the layer (seat/derive operate on
+    // layer-level items, like the caption pill/text). Keep the fill as the ride-along.
+    cutline.move(layer, ElementPlacement.PLACEATEND);
+    if (fill) fill.move(layer, ElementPlacement.PLACEATEND);
+    try { tabGroup.remove(); } catch (eT) {}
+
+    // Seat the cutline (plate) into the outline; the fill rides rigidly.
+    var seat = seatPlateToOutline(name, outline, cutline, fill, { polyCache: {} });
+    if (!seat.ok) {
+        return { ok: false, needsReview: !!seat.needsReview, reason: seat.reason };
+    }
+
+    // Unite outline + tab cutline into the fused cut; bundle the separable members.
+    var cut = deriveCutline(outline, cutline);
+    strokeRecursive(cut, (opts.strokePt != null ? opts.strokePt : 0.25), blackCmyk());
+    var group = assembleElementGroup(layer, name, outline, cutline, cut);
+
+    // The fill is a PRINTED ride-along member (never part of the cut). Move it into the group and
+    // keep it visible; it is NOT named "{name} plate" so it never enters reuniteCutline/halfcut.
+    if (fill) {
+        fill.move(group, ElementPlacement.PLACEATBEGINNING);
+        fill.name = name + " tab fill";
+        fill.hidden = false;
+    }
+
+    // Note marks a default-tab group: styleCode "ST", lines 0 (tab, not text), + plate area.
+    var plateArea = 0;
+    try { plateArea = Math.abs(cutline.area); } catch (ePA) {}
+    group.note = _capNoteFormat("ST", 0, plateArea, !!seat.needsReview);
+
+    var hc = syncHalfcut(doc, group, { polyCache: {} });
+    return { ok: true, group: group, needsReview: !!seat.needsReview,
+             halfcut: !!(hc && hc.ok), reason: hc ? hc.reason : null };
+}
+
 // Places a GC decorative plate raster behind the caption, scaled to span the pill width (+ pad
 // each side) at a fixed spec bar height. Width-driven; non-uniform, so the L/R caps may distort
 // slightly — accepted as cosmetic + tunable (plateHeightMm / plateWidthPadMm). The plate is
