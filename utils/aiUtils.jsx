@@ -30,6 +30,13 @@ function parseLayerName(name) {
     };
 }
 
+// Single source of truth for "does this element get a named caption?" — its inverse
+// is exactly the set that gets a DEFAULT PEEL TAB. Used by Step 6 (Pipeline 1) and
+// AI_BuildAndExportCutlines (Pipeline 2). Mirrors psUtils.needsCaption on the AI side.
+function elementGetsCaption(styleCode) {
+    return styleCode === "WC" || styleCode === "GC";
+}
+
 // Converts millimetres to Illustrator points (1 mm = 2.834645 pt).
 // Used for offset path distances, stroke weights, etc.
 function mmToPoints(mm) {

@@ -170,7 +170,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             continue;
         }
 
-        if (matched.styleCode === "WC" || matched.styleCode === "GC") {
+        if (elementGetsCaption(matched.styleCode)) {
             // Native caption: name the outline + place review text. The PILL/PLATE/cut are built in
             // Pipeline 2 (AI_BuildAndExportCutlines) after the artist reviews the text. The sidecar
             // no longer carries a caption object — caption presence is decided by styleCode.

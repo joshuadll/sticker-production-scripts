@@ -60,7 +60,10 @@ function runBuildAndExport(doc) {
     var built = 0, skipped = [], failed = [], i;
     for (i = 0; i < sidecar.elements.length; i++) {
         var el = sidecar.elements[i];
-        if (el.styleCode !== "WC" && el.styleCode !== "GC") continue;   // ST / uncaptioned
+        if (!elementGetsCaption(el.styleCode)) {
+            // Default peel tab (Task 6 fills this branch); for now keep prior behaviour.
+            continue;
+        }
         var outline   = _findItemByName(layer, el.displayName + " outline");
         var textFrame = _findItemByName(layer, el.displayName + " caption text");
         if (!outline || !textFrame) {
