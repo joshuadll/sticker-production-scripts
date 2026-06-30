@@ -105,7 +105,16 @@ var CONFIG = {
     // ── Step 7A: Deepnest Export ─────────────────────────────────────────────
     // Extent ratio threshold: paths >= this are "regular" (90° rotation in Deepnest).
     // Tune on first real SKU run — every path's ratio is logged.
-    deepnestRectThreshold: 0.82
+    deepnestRectThreshold: 0.82,
+
+    // ── Default peel tab (Pipeline 1 rough placement for uncaptioned elements) ──
+    // Resolved to File objects below (after _root). peelHereTabWidthMm is the authored width of
+    // the PEEL HERE tab; when the chosen edge >= that + the fit margin, use PEEL HERE, else the
+    // semi-circle. straightTolerance generalises the old horizontal-only edge search.
+    peelHereTabWidthMm:              40.0,   // FIRST GUESS — re-measure from Peel_Teb_B.ai, then tune
+    peelTabEdgeFitMarginMm:          2.0,
+    peelTabEdgeStraightToleranceDeg: 8,
+    peelTabEdgeSampleSteps:          12
 };
 
 var _root = $.fileName
@@ -113,6 +122,8 @@ var _root = $.fileName
     : Folder.desktop.fsName;
 
 CONFIG.logPath = _root + "/pipelines/AI_BuildCutlines.log";
+CONFIG.peelTabAssetPathPeelHere   = _root + "/assets/Peel_Teb_B.ai";
+CONFIG.peelTabAssetPathSemiCircle = _root + "/assets/Peel_Tab_A.ai";
 
 // ─── SHARED: Step 7A export ───────────────────────────────────────────────────
 
