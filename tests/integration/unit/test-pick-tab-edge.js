@@ -12,6 +12,7 @@ function extract(name) {
 eval(extract('pointsToMm'));
 eval(extract('_angDiff180'));
 eval(extract('_polyCentroid'));
+eval(extract('_edgeRadialAlign'));
 eval(extract('_polyBbox'));
 eval(extract('_largestPoly'));
 eval(extract('pickTabEdge'));
@@ -62,6 +63,28 @@ var HALF_PI = Math.PI / 2;
     var e = pickTabEdge({}, { steps: 1, straightToleranceDeg: 5 });
     check(e.ok, 'collinear: ok');
     check(approx(e.lengthMm, pointsToMm(150), 0.01), 'collinear: merged span is 150pt, got ' + e.lengthMm);
+})();
+
+// ── _edgeRadialAlign: cos between the outward normal and the centroid→midpoint radial. ──
+(function () {
+    check(approx(_edgeRadialAlign(0, 40, 0, 1, 0, 0), 1, 1e-9), 'align: normal radial (up) = 1');
+    check(approx(_edgeRadialAlign(0, 40, 1, 0, 0, 0), 0, 1e-9), 'align: normal tangential = 0');
+    check(approx(_edgeRadialAlign(0, 40, Math.SQRT1_2, Math.SQRT1_2, 0, 0), Math.SQRT1_2, 1e-9), 'align: 45deg ~0.707');
+    check(approx(_edgeRadialAlign(0, 0, 1, 0, 0, 0), 1, 1e-9), 'align: mid==centroid -> 1');
+})();
+
+// ── Radial preference distinguishes the scoring from pure-longest. A square (x -40..40,
+// y -40..40) with a long thin SPIKE on the right pulls the vertex centroid to x=40. Several
+// edges are ~80pt long, but the LEFT edge's normal points straight away from the centroid
+// (align 1) while the top/bottom are tilted (align ~0.707) and the spike runs radially
+// (align ~0.12). So the LEFT edge wins and the tab points left (outward ~π) — the tab faces
+// "away" from the bulk. Pure-longest would have tied/picked a different ~80pt edge. ──
+(function () {
+    FAKE_POLY = [{x:-40,y:40},{x:40,y:40},{x:40,y:5},{x:120,y:2},{x:120,y:-2},{x:40,y:-5},{x:40,y:-40},{x:-40,y:-40}];
+    var e = pickTabEdge({}, { steps: 1, straightToleranceDeg: 5 });
+    check(e.ok, 'radial: ok');
+    check(approx(_angDiff180(e.outwardAngle, Math.PI), 0, 1e-6), 'radial: chosen edge faces left (outward ~pi), got ' + (e.outwardAngle * 180 / Math.PI));
+    check(e.midX < -30, 'radial: chosen edge is the left edge (midX ~ -40), got ' + e.midX);
 })();
 
 if (fails) { console.log(fails + ' failure(s)'); process.exit(1); }

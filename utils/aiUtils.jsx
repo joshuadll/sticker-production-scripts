@@ -2608,6 +2608,18 @@ function _polyCentroid(poly) {
     return { x: sx / poly.length, y: sy / poly.length };
 }
 
+// Cosine of the angle between an edge's outward normal (unit ux,uy) and the radial line from the
+// polygon centroid (cx,cy) through the edge midpoint (mx,my). 1 = the edge is perpendicular to that
+// radial line, so the tab points straight AWAY from the piece; ~0 = the edge faces sideways (it
+// runs roughly radially, e.g. a petal). Returns a value in [-1,1] (outward is chosen away from the
+// centroid, so it is ≥0 in practice). Pure geometry.
+function _edgeRadialAlign(mx, my, ux, uy, cx, cy) {
+    var rx = mx - cx, ry = my - cy;
+    var rl = Math.sqrt(rx * rx + ry * ry);
+    if (rl === 0) return 1;
+    return (ux * rx + uy * ry) / rl;
+}
+
 // Chooses the longest near-straight run of the outline perimeter and returns the tab seat:
 //   { ok, midX, midY, dirAngle, outwardAngle, lengthMm }
 // dirAngle  = direction of the chord (radians, y-up).
@@ -2628,10 +2640,14 @@ function pickTabEdge(outline, opts) {
     if (!poly || poly.length < 3) return { ok: false, reason: "degenerate outline polygon" };
 
     var n = poly.length;
-    var best = null;          // { sx, sy, ex, ey, lenPt }
+    var c = _polyCentroid(poly);
+    var best = null;   // highest score = the longest run that also faces radially OUTWARD
     var i, j;
 
     // Try each vertex as a run start; extend while edges stay within tolerance of the anchor dir.
+    // Score each run by length × radial alignment, so the chosen edge is long AND roughly
+    // perpendicular to the centroid→edge line — the tab then points straight "away" from the piece
+    // (a long edge that faces sideways, e.g. a petal pointing radially outward, is down-weighted).
     for (i = 0; i < n; i++) {
         var ax = poly[i].x, ay = poly[i].y;
         var bx = poly[(i + 1) % n].x, by = poly[(i + 1) % n].y;
@@ -2646,23 +2662,24 @@ function pickTabEdge(outline, opts) {
         var ex = poly[endIdx].x, ey = poly[endIdx].y;
         var dx = ex - ax, dy = ey - ay;
         var lenPt = Math.sqrt(dx * dx + dy * dy);   // straight chord span of the run
-        if (!best || lenPt > best.lenPt) best = { sx: ax, sy: ay, ex: ex, ey: ey, lenPt: lenPt };
+        if (lenPt <= 0) continue;
+
+        var mX = (ax + ex) / 2, mY = (ay + ey) / 2;
+        var dir = Math.atan2(ey - ay, ex - ax);
+        // outward normal = perpendicular to the chord, pointing away from the centroid.
+        var cand1 = dir + Math.PI / 2, cand2 = dir - Math.PI / 2;
+        var u1x = Math.cos(cand1), u1y = Math.sin(cand1);
+        var outA = ((u1x * (mX - c.x) + u1y * (mY - c.y)) >= 0) ? cand1 : cand2;
+        var align = _edgeRadialAlign(mX, mY, Math.cos(outA), Math.sin(outA), c.x, c.y);
+        var score = lenPt * (align > 0 ? align : 0);
+        if (!best || score > best.score) {
+            best = { lenPt: lenPt, midX: mX, midY: mY, dirAngle: dir, outwardAngle: outA, score: score };
+        }
     }
-    if (!best || best.lenPt <= 0) return { ok: false, reason: "no straight edge found" };
+    if (!best) return { ok: false, reason: "no straight edge found" };
 
-    var midX = (best.sx + best.ex) / 2, midY = (best.sy + best.ey) / 2;
-    var dirAngle = Math.atan2(best.ey - best.sy, best.ex - best.sx);
-    var c = _polyCentroid(poly);
-
-    // Two perpendicular candidates; pick the one whose small step increases distance from centroid.
-    var cand1 = dirAngle + Math.PI / 2, cand2 = dirAngle - Math.PI / 2;
-    var probe = 1.0;
-    var d1 = Math.pow(midX + Math.cos(cand1) * probe - c.x, 2) + Math.pow(midY + Math.sin(cand1) * probe - c.y, 2);
-    var d2 = Math.pow(midX + Math.cos(cand2) * probe - c.x, 2) + Math.pow(midY + Math.sin(cand2) * probe - c.y, 2);
-    var outwardAngle = (d1 >= d2) ? cand1 : cand2;
-
-    return { ok: true, midX: midX, midY: midY, dirAngle: dirAngle, outwardAngle: outwardAngle,
-             lengthMm: pointsToMm(best.lenPt) };
+    return { ok: true, midX: best.midX, midY: best.midY, dirAngle: best.dirAngle,
+             outwardAngle: best.outwardAngle, lengthMm: pointsToMm(best.lenPt) };
 }
 
 // Classifies an asset's two paths: the CUTLINE is stroked & unfilled, the FILL is filled &
@@ -2736,18 +2753,28 @@ function placeTabAsset(doc, layer, assetFile, edge, displayName) {
     // Orient: the asset is authored with its FLAT (attach) edge on top and the body/dome pointing
     // DOWN (-π/2). The flat edge is what connects to the art; the dome bulges OUTWARD (the grab).
     // Rotate by the delta between the desired outward direction and the authored body direction so
-    // the dome ends up pointing along edge.outwardAngle and the flat edge faces the art.
+    // the dome ends up pointing along edge.outwardAngle and the flat edge faces the art. The
+    // authored flat-to-dome depth = the group height BEFORE rotation (flat edge on top, dome below);
+    // after rotation this is the tab's extent along the outward normal.
     var authoredOutward = -Math.PI / 2;
+    var gbA = group.geometricBounds;                 // [l,t,r,b] y-up, pre-rotation
+    var depthPt = gbA[1] - gbA[3];
     var rotDeg = (edge.outwardAngle - authoredOutward) * 180 / Math.PI;
     try { group.rotate(rotDeg); } catch (eR) {}
 
-    var gb = group.geometricBounds;                  // [l,t,r,b] y-up
+    // Place the tab fully OUTSIDE the element: push the group out along the outward normal by half
+    // its depth + a small gap, so the flat (attach) edge sits just BEYOND the art edge and the body
+    // points away — no intersection. Pipeline 2's seat then pulls it in to the overlap depth.
+    var gapPt = mmToPoints((CONFIG.peelTabPlacementGapMm != null) ? CONFIG.peelTabPlacementGapMm : 0.5);
+    var pushPt = depthPt / 2 + gapPt;
+    var gb = group.geometricBounds;                  // [l,t,r,b] y-up, post-rotation
     var gcx = (gb[0] + gb[2]) / 2, gcy = (gb[1] + gb[3]) / 2;
-    group.translate(edge.midX - gcx, edge.midY - gcy);
+    var ux = Math.cos(edge.outwardAngle), uy = Math.sin(edge.outwardAngle);
+    group.translate((edge.midX + pushPt * ux) - gcx, (edge.midY + pushPt * uy) - gcy);
 
     log("[step6] tab placed | " + group.name + " | edge " + _r1(edge.lengthMm)
         + "mm dir " + _r1(edge.dirAngle * 180 / Math.PI) + "deg outward "
-        + _r1(edge.outwardAngle * 180 / Math.PI) + "deg");
+        + _r1(edge.outwardAngle * 180 / Math.PI) + "deg push " + _r1(pointsToMm(pushPt)) + "mm");
     return { ok: true, group: group, cutline: pCls.cutline, fill: pCls.fill };
 }
 

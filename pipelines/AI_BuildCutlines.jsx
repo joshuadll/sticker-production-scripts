@@ -114,6 +114,7 @@ var CONFIG = {
     peelHereTabWidthMm:              17.3,   // measured cutline width of Peel_Teb_B.ai (PEEL HERE)
     peelTabEdgeFitMarginMm:          2.0,
     peelTabEdgeStraightToleranceDeg: 8,
+    peelTabPlacementGapMm:           0.5,    // gap the tab sits OUTSIDE the art edge (room to seat in)
     peelTabEdgeSampleSteps:          12
 };
 
