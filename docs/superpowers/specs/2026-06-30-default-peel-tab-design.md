@@ -6,9 +6,9 @@
 
 ## Problem
 
-WC/GC elements get a named caption that doubles as a peeling tab. Everything else —
-**ST stamps and any uncaptioned element** — currently ships with **no peel tab and no
-half-cut**. An artist has to add one by hand.
+Elements that get a caption (today: `needsCaption(parsed)` → WC/GC) have a named caption that
+doubles as a peeling tab. **Every element that does NOT get a caption** currently ships with
+**no peel tab and no half-cut**. An artist has to add one by hand.
 
 An earlier attempt existed (`illustrator/Step9B_PeelingTab.jsx`, added in `974a44d`,
 removed in `c245b19`) but was "not well refined": it only looked at **horizontal** edges,
@@ -25,9 +25,13 @@ Every non-WC/GC element automatically gets a default peel tab:
 
 ## Confirmed decisions
 
-1. **Scope:** ALL non-WC/GC elements (ST stamps + uncaptioned) get an auto tab. This
-   **reverses** the current behavior where stamps get no half-cut (`ST|0` note → Step 9A
-   skips, artist hides the tab manually).
+1. **Scope / trigger:** an element gets a default tab **iff it does not get a caption** —
+   i.e. `!needsCaption(parsed)`. `needsCaption` is the single source of truth (today: WC/GC →
+   caption; everything else → default tab). The rule is expressed as the inverse of that
+   predicate, NOT as a literal `ST` check, so it tracks any future change to `needsCaption`.
+   ST stamps are today's concrete members of this set. This **reverses** the current behavior
+   where these elements get no half-cut (`ST|0` note → Step 9A skips, artist hides the tab
+   manually). No naming-regex change and no blank-name sentinel is needed.
 2. **Edge choice:** the **longest near-straight perimeter run, anywhere** on the element
    (top/side/bottom), ignoring position. The tab is oriented **perpendicular to that edge,
    pointing outward**.
@@ -76,9 +80,10 @@ review caption text today. Pipeline 1 still stops for review.
 
 ### Pipeline 2 — `runBuildAndExport` (`AI_BuildAndExportCutlines.jsx`)
 
-Today the loop does `if (styleCode !== "WC" && styleCode !== "GC") continue;`. Add a branch:
-for non-WC/GC elements, find the placed `[Display Name] tab` group (at the artist's current
-pose) and call `buildDefaultTab()`.
+Today the loop does `if (styleCode !== "WC" && styleCode !== "GC") continue;` (equivalently,
+`!needsCaption`). Replace the `continue` with a branch: when the element does not get a
+caption, find the placed `[Display Name] tab` group (at the artist's current pose) and call
+`buildDefaultTab()`.
 
 ### `buildDefaultTab(doc, layer, tabGroup, outline, opts)` — new in `aiUtils.jsx`
 
