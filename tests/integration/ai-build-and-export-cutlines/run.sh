@@ -114,6 +114,14 @@ else
     echo "FAIL [$STEP]: captions built=$BUILT failed=$FAILED ($SUMMARY)."; FAIL=1
 fi
 
+# Default tabs: the ST elements must build as tabs with a half-cut (built > 0, failed = 0).
+if grep -qE "\[ai-pipeline\] tab built \| .* halfcut=true" "$LOG"; then
+    echo "  PASS: at least one default tab built with a half-cut."
+else
+    echo "FAIL [$STEP]: no default tab built with a half-cut."
+    grep -E "\[ai-pipeline\] tab built|tab \(" "$LOG" || true; FAIL=1
+fi
+
 # Both SVGs reported exported in the log AND present + non-empty on disk.
 if grep -q "\[step7a\] exported: .*_regular.svg" "$LOG" && grep -q "\[step7a\] exported: .*_irregular.svg" "$LOG"; then
     echo "  PASS: Step 7A reported both SVG exports."
