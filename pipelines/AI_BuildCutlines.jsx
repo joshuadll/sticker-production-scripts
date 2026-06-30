@@ -111,7 +111,7 @@ var CONFIG = {
     // Resolved to File objects below (after _root). peelHereTabWidthMm is the authored width of
     // the PEEL HERE tab; when the chosen edge >= that + the fit margin, use PEEL HERE, else the
     // semi-circle. straightTolerance generalises the old horizontal-only edge search.
-    peelHereTabWidthMm:              40.0,   // FIRST GUESS — re-measure from Peel_Teb_B.ai, then tune
+    peelHereTabWidthMm:              17.3,   // measured cutline width of Peel_Teb_B.ai (PEEL HERE)
     peelTabEdgeFitMarginMm:          2.0,
     peelTabEdgeStraightToleranceDeg: 8,
     peelTabEdgeSampleSteps:          12

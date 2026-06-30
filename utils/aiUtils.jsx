@@ -2733,10 +2733,11 @@ function placeTabAsset(doc, layer, assetFile, edge, displayName) {
     pCls.cutline.name = displayName + " tab cutline";
     pCls.fill.name    = displayName + " tab fill";
 
-    // Orient: the asset is authored body-pointing-up (outwardAngle = +π/2). Rotate by the delta
-    // between the desired outward direction and the authored one. translate so the group's outward-
-    // facing inner edge midpoint lands on the chosen art-edge midpoint.
-    var authoredOutward = Math.PI / 2;
+    // Orient: the asset is authored with its FLAT (attach) edge on top and the body/dome pointing
+    // DOWN (-π/2). The flat edge is what connects to the art; the dome bulges OUTWARD (the grab).
+    // Rotate by the delta between the desired outward direction and the authored body direction so
+    // the dome ends up pointing along edge.outwardAngle and the flat edge faces the art.
+    var authoredOutward = -Math.PI / 2;
     var rotDeg = (edge.outwardAngle - authoredOutward) * 180 / Math.PI;
     try { group.rotate(rotDeg); } catch (eR) {}
 
