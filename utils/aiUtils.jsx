@@ -1768,8 +1768,8 @@ function syncHalfcut(doc, group, opts) {
         return { ok: false, reason: "stamp / non-group (no caption seam)" };
     }
     var note = parseNote(group.note);
-    if (!note || (note.styleCode !== "GC" && note.styleCode !== "WC")) {
-        return { ok: false, reason: "not GC/WC" };
+    if (!note || (note.styleCode !== "GC" && note.styleCode !== "WC" && note.styleCode !== "ST")) {
+        return { ok: false, reason: "not GC/WC/tab" };
     }
 
     var plate   = findGroupMember(group, " plate");
