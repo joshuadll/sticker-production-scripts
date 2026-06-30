@@ -2601,6 +2601,80 @@ function pickTabEdge(outline, opts) {
              lengthMm: pointsToMm(best.lenPt) };
 }
 
+// Classifies an asset's two paths: the CUTLINE is stroked & unfilled, the FILL is filled &
+// (typically) unstroked. Returns { cutline, fill } or null when it cannot tell them apart
+// (caller treats null as a hard error naming the element — no silent guess).
+function _tabAssetItems(items) {
+    if (!items || items.length !== 2) return null;
+    var a = items[0], b = items[1];
+    function isCut(it)  { return it.stroked && !it.filled; }
+    function isFill(it) { return it.filled; }
+    if (isCut(a) && isFill(b)) return { cutline: a, fill: b };
+    if (isCut(b) && isFill(a)) return { cutline: b, fill: a };
+    return null;
+}
+
+// Opens the asset file (reusing it if already open), copies its two paths into `layer` as a
+// group named "{displayName} tab", then rotates the group to edge.dirAngle and translates it so
+// the group's inner edge sits on the chosen art edge midpoint with the body pointing outward.
+// Returns { ok, group, cutline, fill } or { ok:false, reason }.
+function placeTabAsset(doc, layer, assetFile, edge, displayName) {
+    if (!assetFile || !assetFile.exists) return { ok: false, reason: "tab asset not found: " + (assetFile ? assetFile.fsName : "(null)") };
+
+    var assetDoc = null, i;
+    for (i = 0; i < app.documents.length; i++) {
+        try { if (app.documents[i].fullName.fsName === assetFile.fsName) { assetDoc = app.documents[i]; break; } }
+        catch (e2) {}
+    }
+    if (!assetDoc) assetDoc = app.open(assetFile);
+
+    // Collect the asset's drawable paths (single "Layer 1", two paths).
+    var assetItems = [];
+    var al = assetDoc.layers[0];
+    for (i = 0; i < al.pageItems.length; i++) {
+        var t = al.pageItems[i].typename;
+        if (t === "PathItem" || t === "CompoundPathItem") assetItems.push(al.pageItems[i]);
+    }
+    var cls = _tabAssetItems(assetItems);
+    if (!cls) { try { app.activeDocument = doc; } catch (eA) {} return { ok: false, reason: "tab asset has ambiguous cutline/fill: " + assetFile.name }; }
+
+    // Copy both into the working doc inside a fresh group (DOM duplicate across docs is unreliable
+    // for live styles; copy/paste preserves appearance).
+    app.activeDocument = assetDoc;
+    app.selection = null;
+    cls.cutline.selected = true; cls.fill.selected = true;
+    app.executeMenuCommand("copy");
+    app.activeDocument = doc;
+    app.executeMenuCommand("paste");
+    var pasted = app.selection;
+    if (!pasted || pasted.length !== 2) return { ok: false, reason: "tab paste returned " + (pasted ? pasted.length : 0) + " items" };
+
+    var group = layer.groupItems.add();
+    group.name = displayName + " tab";
+    var pCls = _tabAssetItems([pasted[0], pasted[1]]);
+    if (!pCls) return { ok: false, reason: "pasted tab ambiguous cutline/fill" };
+    pCls.fill.move(group, ElementPlacement.PLACEATEND);
+    pCls.cutline.move(group, ElementPlacement.PLACEATEND);
+    pCls.cutline.name = displayName + " tab cutline";
+    pCls.fill.name    = displayName + " tab fill";
+
+    // Orient: the asset is authored body-pointing-up (outwardAngle = +π/2). Rotate by the delta
+    // between the desired outward direction and the authored one. translate so the group's outward-
+    // facing inner edge midpoint lands on the chosen art-edge midpoint.
+    var authoredOutward = Math.PI / 2;
+    var rotDeg = (edge.outwardAngle - authoredOutward) * 180 / Math.PI;
+    try { group.rotate(rotDeg); } catch (eR) {}
+
+    var gb = group.geometricBounds;                  // [l,t,r,b] y-up
+    var gcx = (gb[0] + gb[2]) / 2, gcy = (gb[1] + gb[3]) / 2;
+    group.translate(edge.midX - gcx, edge.midY - gcy);
+
+    log("[step6] tab placed | " + group.name + " | edge " + _r1(edge.lengthMm)
+        + "mm dir " + _r1(edge.dirAngle * 180 / Math.PI) + "deg outward "
+        + _r1(edge.outwardAngle * 180 / Math.PI) + "deg");
+    return { ok: true, group: group, cutline: pCls.cutline, fill: pCls.fill };
+}
+
 // True if point pt {x, y} is inside polygon poly ([{x, y}, …]) — ray casting.
 function pointInPolygon(pt, poly) {
     var inside = false;
