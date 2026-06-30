@@ -18,7 +18,7 @@ half-cut. We are replacing that with a version that routes the default tab throu
 
 ## Goal
 
-Every non-WC/GC element automatically gets a default peel tab:
+Every element that does not get a caption (`!needsCaption`) automatically gets a default peel tab:
 - placed roughly in **Pipeline 1** (best edge + outward orientation) for the artist to review
   and optionally reposition, then
 - seated, cut, and half-cut in **Pipeline 2** through the existing caption primitives.
@@ -63,8 +63,8 @@ element (no silent guess).
 
 ### Pipeline 1 — Step 6 (`Step6_CreateCutlines.jsx`)
 
-Replace the current ST/uncaptioned **else-branch** (which only names the bare cut path) with
-`placeDefaultTab()`:
+Replace the current **else-branch** (the `!needsCaption` path — today ST/uncaptioned — which
+only names the bare cut path) with `placeDefaultTab()`:
 
 1. Name the traced silhouette `[Display Name] outline` (separable component, matching WC/GC —
    today the stamp trace is named just `[Display Name]`).
@@ -125,7 +125,7 @@ Three existing touch-points change:
    at export). A tabbed stamp is now a **permanent** group (it ships with a fused cutline +
    half-cut), so it is treated like any caption group — no wrap/unwrap. The wrap/unwrap path
    is gated to fire only for a stamp with **no** tab (defensive; should not occur once all
-   non-WC/GC elements are tabbed).
+   uncaptioned elements are tabbed).
 3. **Step 9A** currently selects only GC/WC and skips ST. It will include default-tab groups
    (their half-cut is already built by `syncHalfcut` in Pipeline 2; Step 9A re-syncs them in
    its canonical pass, like captions).
