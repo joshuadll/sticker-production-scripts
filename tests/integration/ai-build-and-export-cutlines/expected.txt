@@ -45,9 +45,9 @@
 [halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
 [halfcut] Šúľance s Makom | pts=609 end0=(-203.5,131.4) endN=(-142.4,132.5) curved
 [ai-pipeline] caption built | Šúľance s Makom halfcut=true
-[seat] Bratislava(text) | rotated 2.5deg to endpoint chord.
-[seat] Bratislava(text) | seated rot=2.5deg move=8.3pt depth=0.3pt
-[halfcut] Bratislava(text) | pts=24 end0=(581.1,388.1) endN=(536.8,387.7) curved
+[seat] Bratislava(text) | rotated 1.0deg to endpoint chord.
+[seat] Bratislava(text) | seated rot=1deg move=5.8pt depth=0.3pt
+[halfcut] Bratislava(text) | pts=30 end0=(585.1,388.3) endN=(532.6,387.8) curved
 [ai-pipeline] tab built | Bratislava(text) halfcut=true
 [seat] Čumil Statue | rotated -2.9deg to endpoint chord.
 [seat] Čumil Statue | seated rot=-2.9deg move=9.6pt depth=0.3pt
@@ -73,21 +73,22 @@
 [seat] Old Town Hall (Bratislava) | seated rot=0.8deg move=6.9pt depth=0.3pt
 [halfcut] Old Town Hall (Bratislava) | pts=27 end0=(23.2,605.3) endN=(118.7,606.1) straight
 [ai-pipeline] caption built | Old Town Hall (Bratislava) halfcut=true
-[seat] UFO Observation Deck, Bridge SNP | rotated 2.1deg to endpoint chord.
-[seat] UFO Observation Deck, Bridge SNP | seated rot=2.1deg move=8.5pt depth=0.3pt
-[halfcut] UFO Observation Deck, Bridge SNP | pts=23 end0=(-152.9,611.8) endN=(-197.2,612.3) curved
+[seat] UFO Observation Deck, Bridge SNP | rotated 0.4deg to endpoint chord.
+[seat] UFO Observation Deck, Bridge SNP | seated rot=0.4deg move=5.7pt depth=0.3pt
+[halfcut] UFO Observation Deck, Bridge SNP | pts=18 end0=(-148.7,611.5) endN=(-201.7,612.2) straight
 [ai-pipeline] tab built | UFO Observation Deck, Bridge SNP halfcut=true
 [seat] St. Martin's Cathedral | rotated -0.9deg to endpoint chord.
 [seat] St. Martin's Cathedral | seated rot=-0.9deg move=8.6pt depth=0.3pt
 [halfcut] St. Martin's Cathedral | pts=30 end0=(520.6,837) endN=(600.1,835.7) straight
 [ai-pipeline] caption built | St. Martin's Cathedral halfcut=true
-[seat] Slovakia Map | rotated -0.1deg to endpoint chord.
-[seat] Slovakia Map | seated rot=-0.1deg move=-5.9pt depth=0.3pt
-[halfcut] Slovakia Map | pts=35 end0=(352.4,926.4) endN=(325.8,923.4) curved
+[seat] Slovakia Map | rotated 0.0deg to endpoint chord.
+[seat] Slovakia Map | seated rot=0deg move=-5.9pt depth=0.3pt
+[halfcut] Slovakia Map | pts=35 end0=(352.4,926.4) endN=(325.8,923.4) straight
 [ai-pipeline] tab built | Slovakia Map halfcut=true
-[seat] National Flower | rotated -13.6deg to endpoint chord.
-[seat] National Flower | seated rot=-13.6deg move=-13.8pt depth=0.3pt
-[halfcut] National Flower | pts=22 end0=(87.8,923.2) endN=(87.8,923.2) straight
+[seat] National Flower | rotated -6.3deg to endpoint chord.
+[seat] National Flower | seated rot=-6.3deg move=-13.9pt depth=0.3pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
+[halfcut] National Flower | pts=35 end0=(93,913.3) endN=(85,926.7) straight
 [ai-pipeline] tab built | National Flower halfcut=true
 [seat] Štrbské Pleso | rotated -0.8deg to endpoint chord.
 [seat] Štrbské Pleso | seated rot=-0.8deg move=8.3pt depth=0.3pt
@@ -115,17 +116,17 @@
 [step7a] regular   | ratio=0.884 | Spiš Castle
 [step7a] regular   | ratio=0.905 | Bratislava Castle
 [step7a] regular   | ratio=0.861 | Štrbské Pleso
-[step7a] irregular | ratio=0.622 | National Flower
+[step7a] irregular | ratio=0.62 | National Flower
 [step7a] irregular | ratio=0.64 | Slovakia Map
 [step7a] regular   | ratio=0.869 | St. Martin's Cathedral
-[step7a] regular   | ratio=0.903 | UFO Observation Deck, Bridge SNP
+[step7a] regular   | ratio=0.885 | UFO Observation Deck, Bridge SNP
 [step7a] regular   | ratio=0.91 | Old Town Hall (Bratislava)
 [step7a] regular   | ratio=0.881 | Bojnice Castle
 [step7a] regular   | ratio=0.877 | Orava Castle
 [step7a] regular   | ratio=0.847 | Michael's Gate
 [step7a] regular   | ratio=0.878 | The Blue Church | Church of St. Elizabeth
 [step7a] regular   | ratio=0.896 | Čumil Statue
-[step7a] irregular | ratio=0.728 | Bratislava(text)
+[step7a] irregular | ratio=0.7 | Bratislava(text)
 [step7a] irregular | ratio=0.737 | Šúľance s Makom
 [step7a] irregular | ratio=0.73 | Pirohy
 [step7a] irregular | ratio=0.789 | Bryndzové halušky

@@ -1074,8 +1074,16 @@ function buildDefaultTab(doc, layer, tabGroup, outline, opts) {
     if (fill) fill.move(layer, ElementPlacement.PLACEATEND);
     try { tabGroup.remove(); } catch (eT) {}
 
-    // Seat the cutline (plate) into the outline; the fill rides rigidly.
-    var seat = seatPlateToOutline(name, outline, cutline, fill, { polyCache: {} });
+    // Seat the cutline (plate) into the outline; the fill rides rigidly. The tab supplies its own
+    // attach-edge TIPS as the endpoints to kiss — the pill inner-edge finder would skip them as
+    // caps, over-seating the tab (it kissed the cap BASES, burying the real tips ~1.5mm into the
+    // art). With the tips, both endpoints land on the white-edge border.
+    var seatSteps = CONFIG.seatSampleSteps || 24;
+    var tipPoly = _largestPoly(samplePathToPolygons(cutline, seatSteps));
+    var tips = tipPoly ? _tabAttachTips(tipPoly, _aiSeatGeometry(cutline, outline)) : null;
+    var seatOpts = { polyCache: {} };
+    if (tips) seatOpts.innerEndpoints = [tips.e0, tips.e1];
+    var seat = seatPlateToOutline(name, outline, cutline, fill, seatOpts);
     if (!seat.ok) {
         // Restore a re-runnable loose "{name} tab" group (mirror buildCaption's input-restore on
         // failure) so the artist can reposition and re-run; members keep their tab-member names.
@@ -1297,81 +1305,94 @@ function seatPlateToOutline(name, outline, plate, captionItem, opts) {
         log("[seat] " + name + " | SKIP — degenerate plate polygon.");
         return { ok: false, reason: "degenerate plate" };
     }
-    // REAL inner-edge vertices (the art-facing long edge of the plate), preserving the actual
-    // curve. NOT a straight PCA-chord reconstruction — that floats off an arced caption and
-    // under-seats it (the Šúľance gap: the kiss sank a phantom chord while the real plate
-    // stayed out). See _innerEdgeVerts.
-    var ie = _innerEdgeVerts(pp, geom);
-    if (!ie || ie.verts.length === 0) {
-        log("[seat] " + name + " | SKIP — could not resolve plate inner edge.");
-        return { ok: false, reason: "degenerate plate" };
-    }
-
     var needsReview = false, shrunk = false;
     var items = [plate];
     if (captionItem) items.push(captionItem);
 
-    var verts = ie.verts, n = verts.length, r = ie.radius;
-    var shrinkF = (CONFIG.seatShrinkFrac != null) ? CONFIG.seatShrinkFrac : 0.15;
+    var E0, E1, B0, B1, r, kissOnly = false;
 
-    // ── ENDPOINTS + probe (the REAL plate boundary, curved or straight — no chord float) ──
-    // The two ends of the inner edge, taken from the actual sampled plate outline. Look from
-    // each toward the art and grab the edge in front of it.
-    var iLo = 0, iHi = n - 1;
-    var E0 = verts[iLo], E1 = verts[iHi];
-    var B0 = _probeOutline(artPolys, geom, E0);
-    var B1 = _probeOutline(artPolys, geom, E1);
-
-    // OVERHANG: an endpoint with no art in front of it → one 15% balanced shrink along the real
-    // edge (this also trims a rising corner off the ends). Still none → caption wider than its
-    // art; flag + don't seat.
-    if (!B0 || !B1) {
-        var oa = Math.floor(shrinkF * (n - 1)), ob = Math.floor((1 - shrinkF) * (n - 1));
-        var oB0 = (ob > oa) ? _probeOutline(artPolys, geom, verts[oa]) : null;
-        var oB1 = (ob > oa) ? _probeOutline(artPolys, geom, verts[ob]) : null;
-        if (oB0 && oB1) {
-            iLo = oa; iHi = ob; E0 = verts[oa]; E1 = verts[ob]; B0 = oB0; B1 = oB1; shrunk = true;
-            log("[seat] " + name + " | overhang rescued by " + Math.round(shrinkF * 100) + "% shrink.");
-        } else {
-            log("[seat] " + name + " | WARN — caption wider than its art (no edge under the inner "
-                + "edge even after shrink); not seated.");
-            return { ok: false, needsReview: true, reason: "caption wider than art" };
+    if (opts.innerEndpoints) {
+        // ── TAB path: the caller supplies the two attach-edge TIPS (the "pointy" endpoints that
+        // must land on the border). The pill inner-edge finder skips these as caps, so tabs pass
+        // them in directly — no cap-skip, no overhang/bulge shrink (all pill-specific). ──
+        E0 = opts.innerEndpoints[0]; E1 = opts.innerEndpoints[1];
+        r = Math.sqrt((E1.x - E0.x) * (E1.x - E0.x) + (E1.y - E0.y) * (E1.y - E0.y)) / 2;
+        B0 = _probeOutline(artPolys, geom, E0);
+        B1 = _probeOutline(artPolys, geom, E1);
+        if (!B0 || !B1) {
+            log("[seat] " + name + " | WARN — tab tip has no art in front of it; not seated.");
+            return { ok: false, needsReview: true, reason: "tab tip off the art" };
         }
-    }
+    } else {
+        // ── CAPTION path (pill): derive the REAL inner-edge vertices (the art-facing long edge),
+        // preserving the actual curve — NOT a straight PCA-chord reconstruction (that floats off an
+        // arced caption and under-seats it: the Šúľance gap). See _innerEdgeVerts. Then overhang +
+        // convex-bulge shrink. ──
+        var ie = _innerEdgeVerts(pp, geom);
+        if (!ie || ie.verts.length === 0) {
+            log("[seat] " + name + " | SKIP — could not resolve plate inner edge.");
+            return { ok: false, reason: "degenerate plate" };
+        }
+        kissOnly = ie.kissOnly;
+        var verts = ie.verts, n = verts.length; r = ie.radius;
+        var shrinkF = (CONFIG.seatShrinkFrac != null) ? CONFIG.seatShrinkFrac : 0.15;
 
-    // ── CONVEX-BULGE guard (the ORIGINAL r/2 rule): if the art bulges INTO the pill at the
-    // inner-edge MIDPOINT by more than captionMidProtrudeFrac*2r (default r/2), a straight pill
-    // would bury that bulge into the caption text. Relieve with one 15% shrink — it re-anchors
-    // the seat to a deeper interior point, backing the pill out — then flag if still over. This
-    // is the branch Šúľance hits; its bug was the OLD straight-chord reconstruction floating off
-    // the arc, so the measurement now uses the REAL boundary verts. One shrink budget, shared
-    // with overhang. ──
-    if (CONFIG.captionMidProtrudeFrac > 0) {
-        var limit = CONFIG.captionMidProtrudeFrac * 2 * r;
-        var Bm = _probeOutline(artPolys, geom, verts[Math.floor((iLo + iHi) / 2)]);
-        var p  = _aiMidProtrusion(B0, B1, Bm, geom, depth);
-        if (p !== null && p > limit && !shrunk) {
-            var ba = Math.floor(shrinkF * (n - 1)), bb = Math.floor((1 - shrinkF) * (n - 1));
-            var bB0 = (bb > ba) ? _probeOutline(artPolys, geom, verts[ba]) : null;
-            var bB1 = (bb > ba) ? _probeOutline(artPolys, geom, verts[bb]) : null;
-            if (bB0 && bB1) {
-                iLo = ba; iHi = bb; E0 = verts[ba]; E1 = verts[bb]; B0 = bB0; B1 = bB1; shrunk = true;
-                var Bm2 = _probeOutline(artPolys, geom, verts[Math.floor((iLo + iHi) / 2)]);
-                p = _aiMidProtrusion(B0, B1, Bm2, geom, depth);
-                log("[seat] " + name + " | midpoint bulge relieved by " + Math.round(shrinkF * 100) + "% shrink.");
+        // The two ends of the inner edge, taken from the actual sampled plate outline. Look from
+        // each toward the art and grab the edge in front of it.
+        var iLo = 0, iHi = n - 1;
+        E0 = verts[iLo]; E1 = verts[iHi];
+        B0 = _probeOutline(artPolys, geom, E0);
+        B1 = _probeOutline(artPolys, geom, E1);
+
+        // OVERHANG: an endpoint with no art in front of it → one 15% balanced shrink along the real
+        // edge (this also trims a rising corner off the ends). Still none → caption wider than its
+        // art; flag + don't seat.
+        if (!B0 || !B1) {
+            var oa = Math.floor(shrinkF * (n - 1)), ob = Math.floor((1 - shrinkF) * (n - 1));
+            var oB0 = (ob > oa) ? _probeOutline(artPolys, geom, verts[oa]) : null;
+            var oB1 = (ob > oa) ? _probeOutline(artPolys, geom, verts[ob]) : null;
+            if (oB0 && oB1) {
+                iLo = oa; iHi = ob; E0 = verts[oa]; E1 = verts[ob]; B0 = oB0; B1 = oB1; shrunk = true;
+                log("[seat] " + name + " | overhang rescued by " + Math.round(shrinkF * 100) + "% shrink.");
+            } else {
+                log("[seat] " + name + " | WARN — caption wider than its art (no edge under the inner "
+                    + "edge even after shrink); not seated.");
+                return { ok: false, needsReview: true, reason: "caption wider than art" };
             }
         }
-        if (p !== null && p > limit) {
-            needsReview = true;
-            log("[seat] " + name + " | midpoint bulge " + _r1(p) + "pt > limit " + _r1(limit)
-                + "pt after shrink — flagged.");
+
+        // ── CONVEX-BULGE guard (the ORIGINAL r/2 rule): if the art bulges INTO the pill at the
+        // inner-edge MIDPOINT by more than captionMidProtrudeFrac*2r (default r/2), a straight pill
+        // would bury that bulge into the caption text. Relieve with one 15% shrink — it re-anchors
+        // the seat to a deeper interior point, backing the pill out — then flag if still over. One
+        // shrink budget, shared with overhang. ──
+        if (CONFIG.captionMidProtrudeFrac > 0) {
+            var limit = CONFIG.captionMidProtrudeFrac * 2 * r;
+            var Bm = _probeOutline(artPolys, geom, verts[Math.floor((iLo + iHi) / 2)]);
+            var p  = _aiMidProtrusion(B0, B1, Bm, geom, depth);
+            if (p !== null && p > limit && !shrunk) {
+                var ba = Math.floor(shrinkF * (n - 1)), bb = Math.floor((1 - shrinkF) * (n - 1));
+                var bB0 = (bb > ba) ? _probeOutline(artPolys, geom, verts[ba]) : null;
+                var bB1 = (bb > ba) ? _probeOutline(artPolys, geom, verts[bb]) : null;
+                if (bB0 && bB1) {
+                    iLo = ba; iHi = bb; E0 = verts[ba]; E1 = verts[bb]; B0 = bB0; B1 = bB1; shrunk = true;
+                    var Bm2 = _probeOutline(artPolys, geom, verts[Math.floor((iLo + iHi) / 2)]);
+                    p = _aiMidProtrusion(B0, B1, Bm2, geom, depth);
+                    log("[seat] " + name + " | midpoint bulge relieved by " + Math.round(shrinkF * 100) + "% shrink.");
+                }
+            }
+            if (p !== null && p > limit) {
+                needsReview = true;
+                log("[seat] " + name + " | midpoint bulge " + _r1(p) + "pt > limit " + _r1(limit)
+                    + "pt after shrink — flagged.");
+            }
         }
     }
 
     // ── ROTATE: align the inner edge parallel to the art chord B0->B1, pivot E0. Two real
     // endpoints decide the tilt, so a wiggle in the middle can't swing it. ──
     var rotDeg = 0;
-    if (CONFIG.seatConform && !ie.kissOnly) {
+    if (CONFIG.seatConform && !kissOnly) {
         var baseLen = Math.sqrt((E1.x - E0.x) * (E1.x - E0.x) + (E1.y - E0.y) * (E1.y - E0.y));
         if (baseLen >= epsPt) {
             var phi = _aiNormalizeDeg(_aiChordAngleDeg(B0, B1) - _aiChordAngleDeg(E0, E1));
@@ -1395,7 +1416,7 @@ function seatPlateToOutline(name, outline, plate, captionItem, opts) {
     if (CONFIG.seatDebug) {
         var _e0p = { x: E0.x + k.tx, y: E0.y + k.ty };
         log("[seatdbg] " + name + " | axisX=" + geom.travelIsX + " sign=" + geom.sign
-            + " depth=" + _r1(depth) + " r=" + _r1(r) + " kissOnly=" + ie.kissOnly
+            + " depth=" + _r1(depth) + " r=" + _r1(r) + " kissOnly=" + kissOnly
             + " shrunk=" + shrunk + " rot=" + _r1(rotDeg) + " k=(" + _r1(k.tx) + "," + _r1(k.ty) + ")");
         log("[seatdbg] " + name + "   E0=(" + _r1(E0.x) + "," + _r1(E0.y) + ") B0=(" + _r1(B0.x)
             + "," + _r1(B0.y) + ") E0post=(" + _r1(_e0p.x) + "," + _r1(_e0p.y) + ") inArt="
@@ -1451,6 +1472,36 @@ function _innerEdgeVerts(pp, geom) {
     }
     verts.sort(function (a, b) { return a.t - b.t; });
     return { verts: verts, radius: r, kissOnly: kissOnly };
+}
+
+// A TAB's attach-edge endpoints — the two "pointy tips" that must land on the element border. For
+// a pill, the caps are rounded ends to SKIP (see _innerEdgeVerts line "skip caps"); a tab's tips
+// ARE the endpoints, so we KEEP the extremes of the long axis. Returns the two vertices extreme
+// along the plate's long axis, restricted to the ART-FACING side (so a tab that is wider on its
+// OUTER edge still picks the attach edge). geom = { travelIsX, sign } points plate → art.
+// Returns { e0, e1 } (e0 = min long-axis, e1 = max) or null. Pure geometry.
+function _tabAttachTips(pp, geom) {
+    var n = pp.length; if (n < 3) return null;
+    var cx = 0, cy = 0, i, dx, dy;
+    for (i = 0; i < n; i++) { cx += pp[i].x; cy += pp[i].y; }
+    cx /= n; cy /= n;
+    var sxx = 0, syy = 0, sxy = 0;
+    for (i = 0; i < n; i++) { dx = pp[i].x - cx; dy = pp[i].y - cy; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+    var theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    var ux = Math.cos(theta), uy = Math.sin(theta), vx = -uy, vy = ux;
+    var vTravel = geom.travelIsX ? vx : vy;
+    var sInner = (vTravel * geom.sign >= 0) ? 1 : -1;   // +ss is the art-facing side
+    var loT = 1e15, hiT = -1e15, lo = null, hi = null;
+    for (i = 0; i < n; i++) {
+        dx = pp[i].x - cx; dy = pp[i].y - cy;
+        var ss = dx * vx + dy * vy;
+        if (ss * sInner < 0) continue;                  // art-facing half only
+        var tt = dx * ux + dy * uy;
+        if (tt < loT) { loT = tt; lo = pp[i]; }
+        if (tt > hiT) { hiT = tt; hi = pp[i]; }
+    }
+    if (!lo || !hi || lo === hi) return null;
+    return { e0: { x: lo.x, y: lo.y }, e1: { x: hi.x, y: hi.y } };
 }
 
 // Travel axis (plate centre -> art centre) and its sign (+1 toward the larger coordinate).
