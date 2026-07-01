@@ -30,14 +30,14 @@ function parseLayerName(name) {
     };
 }
 
-// Categories whose elements are SELF-LABELLED — a Map (MP), a Location Name (TL), or a
-// transportation / subway / station sign (TR) already carry their own text, so they get a DEFAULT
-// PEEL TAB instead of a redundant caption. NOTE: Landmarks & Attractions (LM) are illustrations
-// that DO need their name, so they stay captioned. Overridable via CONFIG.peelTabCategories; the
-// array here is the fallback (also used by the node unit test, where CONFIG is not in scope).
+// Categories whose elements are SELF-LABELLED — a Map (MP) or a Location Name (TL) already carry
+// their own text, so they get a DEFAULT PEEL TAB instead of a redundant caption. NOTE: Landmarks
+// (LM) and Transportation (TR) are illustrations that DO need their name, so they stay captioned.
+// Overridable via CONFIG.peelTabCategories; the array here is the fallback (also used by the node
+// unit test, where CONFIG is not in scope).
 function _peelTabCategory(catCode) {
     var cats = (typeof CONFIG !== "undefined" && CONFIG.peelTabCategories)
-             ? CONFIG.peelTabCategories : ["MP", "TR", "TL"];
+             ? CONFIG.peelTabCategories : ["MP", "TL"];
     for (var i = 0; i < cats.length; i++) { if (cats[i] === catCode) return true; }
     return false;
 }

@@ -18,9 +18,9 @@ var CONFIG = {
     cutlineStrokePt:  0.25,
 
     // Self-labelled categories → default peel tab instead of a caption (keep in sync with
-    // AI_BuildCutlines). MP=Maps, TR=Transport/Subway/Station, TL=Location Names. LM (Landmarks) +
-    // IC/FD stay captioned; GC always captions.
-    peelTabCategories: ["MP", "TR", "TL"],
+    // AI_BuildCutlines). MP=Maps, TL=Location Names. LM (Landmarks), TR (Transport) + IC/FD stay
+    // captioned; GC always captions.
+    peelTabCategories: ["MP", "TL"],
 
     // Caption vector seat (aiUtils.seatPlateToOutline) — same knobs as AI_BuildCutlines.
     seatOverlapMm:       0.1,

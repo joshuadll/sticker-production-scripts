@@ -22,11 +22,11 @@ check(elementGetsCaption('ST') === false,      'ST gets a default tab');
 check(elementGetsCaption('')   === false,      'unparsed/blank gets a default tab');
 check(elementGetsCaption(null) === false,      'null gets a default tab');
 
-// Category override on WC: self-labelled categories (Map/Transport/Location-Name) → peel tab;
-// landmarks/icons/food keep their caption.
+// Category override on WC: self-labelled categories (Map/Location-Name) → peel tab;
+// landmarks/transport/icons/food keep their caption.
 check(elementGetsCaption('WC', 'MP') === false, 'WC-MP (map) gets a peel tab');
-check(elementGetsCaption('WC', 'TR') === false, 'WC-TR (transport/subway) gets a peel tab');
 check(elementGetsCaption('WC', 'TL') === false, 'WC-TL (location name) gets a peel tab');
+check(elementGetsCaption('WC', 'TR') === true,  'WC-TR (transport) keeps its caption');
 check(elementGetsCaption('WC', 'LM') === true,  'WC-LM (landmark) keeps its caption');
 check(elementGetsCaption('WC', 'IC') === true,  'WC-IC (cultural/icon) keeps its caption');
 check(elementGetsCaption('WC', 'FD') === true,  'WC-FD (food) keeps its caption');

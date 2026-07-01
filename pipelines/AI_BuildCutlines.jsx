@@ -115,9 +115,9 @@ var CONFIG = {
     peelTabEdgeFitMarginMm:          2.0,
     peelTabEdgeStraightToleranceDeg: 8,
     peelTabPlacementGapMm:           2.0,    // gap the tab sits OUTSIDE the art edge (room to seat in)
-    peelTabCategories:               ["MP", "TR", "TL"],  // self-labelled cats → peel tab, not caption
-                                             //   MP=Maps, TR=Transport/Subway/Station, TL=Location Names
-                                             //   (LM=Landmarks & IC/FD stay captioned)
+    peelTabCategories:               ["MP", "TL"],  // self-labelled cats → peel tab, not caption
+                                             //   MP=Maps, TL=Location Names
+                                             //   (LM=Landmarks, TR=Transport, IC/FD stay captioned)
     peelTabEdgeSampleSteps:          12
 };
 
