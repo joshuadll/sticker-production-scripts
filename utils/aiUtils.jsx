@@ -46,7 +46,7 @@ function _peelTabCategory(catCode) {
 // set that gets a DEFAULT PEEL TAB (routed through the SAME placeDefaultTab/buildDefaultTab path as
 // stamps — no duplication). Used by Step 6 (Pipeline 1) and AI_BuildAndExportCutlines (Pipeline 2).
 //   GC → always caption (GC-LM is the decorative caption-plate product).
-//   WC → caption UNLESS its category is a self-labelled peel-tab category (MP/LM/TR).
+//   WC → caption UNLESS its category is a self-labelled peel-tab category (MP/TL; LM/TR stay captioned).
 //   ST / anything else → peel tab.
 function elementGetsCaption(styleCode, catCode) {
     if (styleCode === "GC") return true;
@@ -1754,10 +1754,14 @@ function simplifyPathItem(path, tolerancePt, cornerAngleDeg) {
 function parseNote(note) {
     if (!note || note === "") return null;
     var parts = note.split("|");
+    // "R" (needs-review) can be in ANY trailing slot — the note gained an area field ("a<pt²>")
+    // between lines and R ("WC|1|a720|R" / "ST|0|a90|R"), so a fixed parts[2] check misses it.
+    var review = false, i;
+    for (i = 2; i < parts.length; i++) { if (parts[i] === "R") review = true; }
     return {
         styleCode:   parts[0],
         capLines:    parts.length > 1 ? parseInt(parts[1], 10) : 1,
-        needsReview: parts.length > 2 && parts[2] === "R"
+        needsReview: review
     };
 }
 
@@ -2812,7 +2816,7 @@ function placeTabAsset(doc, layer, assetFile, edge, displayName) {
     var group = layer.groupItems.add();
     group.name = displayName + " tab";
     var pCls = _tabAssetItems([pasted[0], pasted[1]]);
-    if (!pCls) { _dropPasted(pasted); return { ok: false, reason: "pasted tab ambiguous cutline/fill" }; }
+    if (!pCls) { _dropPasted(pasted); try { group.remove(); } catch (eG) {} return { ok: false, reason: "pasted tab ambiguous cutline/fill" }; }
     pCls.fill.move(group, ElementPlacement.PLACEATEND);
     pCls.cutline.move(group, ElementPlacement.PLACEATEND);
     pCls.cutline.name = displayName + " tab cutline";
