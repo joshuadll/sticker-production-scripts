@@ -30,11 +30,28 @@ function parseLayerName(name) {
     };
 }
 
-// Single source of truth for "does this element get a named caption?" — its inverse
-// is exactly the set that gets a DEFAULT PEEL TAB. Used by Step 6 (Pipeline 1) and
-// AI_BuildAndExportCutlines (Pipeline 2). Mirrors psUtils.needsCaption on the AI side.
-function elementGetsCaption(styleCode) {
-    return styleCode === "WC" || styleCode === "GC";
+// Categories whose elements are SELF-LABELLED — a Map (MP), a Location Name (TL), or a
+// transportation / subway / station sign (TR) already carry their own text, so they get a DEFAULT
+// PEEL TAB instead of a redundant caption. NOTE: Landmarks & Attractions (LM) are illustrations
+// that DO need their name, so they stay captioned. Overridable via CONFIG.peelTabCategories; the
+// array here is the fallback (also used by the node unit test, where CONFIG is not in scope).
+function _peelTabCategory(catCode) {
+    var cats = (typeof CONFIG !== "undefined" && CONFIG.peelTabCategories)
+             ? CONFIG.peelTabCategories : ["MP", "TR", "TL"];
+    for (var i = 0; i < cats.length; i++) { if (cats[i] === catCode) return true; }
+    return false;
+}
+
+// Single source of truth for "does this element get a named caption?" — its inverse is exactly the
+// set that gets a DEFAULT PEEL TAB (routed through the SAME placeDefaultTab/buildDefaultTab path as
+// stamps — no duplication). Used by Step 6 (Pipeline 1) and AI_BuildAndExportCutlines (Pipeline 2).
+//   GC → always caption (GC-LM is the decorative caption-plate product).
+//   WC → caption UNLESS its category is a self-labelled peel-tab category (MP/LM/TR).
+//   ST / anything else → peel tab.
+function elementGetsCaption(styleCode, catCode) {
+    if (styleCode === "GC") return true;
+    if (styleCode === "WC") return !_peelTabCategory(catCode);
+    return false;
 }
 
 // Converts millimetres to Illustrator points (1 mm = 2.834645 pt).

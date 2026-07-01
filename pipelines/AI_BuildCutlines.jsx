@@ -114,7 +114,10 @@ var CONFIG = {
     peelHereTabWidthMm:              17.3,   // measured cutline width of Peel_Teb_B.ai (PEEL HERE)
     peelTabEdgeFitMarginMm:          2.0,
     peelTabEdgeStraightToleranceDeg: 8,
-    peelTabPlacementGapMm:           0.5,    // gap the tab sits OUTSIDE the art edge (room to seat in)
+    peelTabPlacementGapMm:           2.0,    // gap the tab sits OUTSIDE the art edge (room to seat in)
+    peelTabCategories:               ["MP", "TR", "TL"],  // self-labelled cats → peel tab, not caption
+                                             //   MP=Maps, TR=Transport/Subway/Station, TL=Location Names
+                                             //   (LM=Landmarks & IC/FD stay captioned)
     peelTabEdgeSampleSteps:          12
 };
 

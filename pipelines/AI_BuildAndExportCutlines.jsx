@@ -17,6 +17,11 @@ var CONFIG = {
     stickersLayerName: "Sticker",
     cutlineStrokePt:  0.25,
 
+    // Self-labelled categories → default peel tab instead of a caption (keep in sync with
+    // AI_BuildCutlines). MP=Maps, TR=Transport/Subway/Station, TL=Location Names. LM (Landmarks) +
+    // IC/FD stay captioned; GC always captions.
+    peelTabCategories: ["MP", "TR", "TL"],
+
     // Caption vector seat (aiUtils.seatPlateToOutline) — same knobs as AI_BuildCutlines.
     seatOverlapMm:       0.1,
     seatSampleSteps:     24,
@@ -60,7 +65,7 @@ function runBuildAndExport(doc) {
     var built = 0, skipped = [], failed = [], i;
     for (i = 0; i < sidecar.elements.length; i++) {
         var el = sidecar.elements[i];
-        if (!elementGetsCaption(el.styleCode)) {
+        if (!elementGetsCaption(el.styleCode, el.catCode)) {
             // Default peel tab: find the loose "{name} tab" group Pipeline 1 placed (artist may
             // have repositioned it) and run it through the same seat/unite/half-cut machinery.
             var tabGroup = _findItemByName(layer, el.displayName + " tab");
