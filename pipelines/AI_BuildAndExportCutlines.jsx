@@ -17,6 +17,11 @@ var CONFIG = {
     stickersLayerName: "Sticker",
     cutlineStrokePt:  0.25,
 
+    // Self-labelled categories → default peel tab instead of a caption (keep in sync with
+    // AI_BuildCutlines). MP=Maps, TL=Location Names. LM (Landmarks), TR (Transport) + IC/FD stay
+    // captioned; GC always captions.
+    peelTabCategories: ["MP", "TL"],
+
     // Caption vector seat (aiUtils.seatPlateToOutline) — same knobs as AI_BuildCutlines.
     seatOverlapMm:       0.1,
     seatSampleSteps:     24,
@@ -60,7 +65,28 @@ function runBuildAndExport(doc) {
     var built = 0, skipped = [], failed = [], i;
     for (i = 0; i < sidecar.elements.length; i++) {
         var el = sidecar.elements[i];
-        if (el.styleCode !== "WC" && el.styleCode !== "GC") continue;   // ST / uncaptioned
+        if (!elementGetsCaption(el.styleCode, el.catCode)) {
+            // Default peel tab: find the loose "{name} tab" group Pipeline 1 placed (artist may
+            // have repositioned it) and run it through the same seat/unite/half-cut machinery.
+            var tabGroup = _findItemByName(layer, el.displayName + " tab");
+            var tabOutline = _findItemByName(layer, el.displayName + " outline");
+            if (!tabGroup || !tabOutline) {
+                skipped.push(el.displayName + (tabOutline ? "" : " [no outline]") + (tabGroup ? "" : " [no tab]"));
+                continue;
+            }
+            var tres;
+            try { tres = buildDefaultTab(doc, layer, tabGroup, tabOutline,
+                                         { name: el.displayName, strokePt: CONFIG.cutlineStrokePt }); }
+            catch (eT) { failed.push(el.displayName + " tab (line " + eT.line + ": " + eT.message + ")"); continue; }
+            if (tres && tres.ok) {
+                built++;
+                log("[ai-pipeline] tab built | " + el.displayName + " halfcut=" + tres.halfcut
+                    + (tres.needsReview ? " REVIEW" : ""));
+            } else {
+                failed.push(el.displayName + " tab" + (tres ? " (" + tres.reason + ")" : ""));
+            }
+            continue;
+        }
         var outline   = _findItemByName(layer, el.displayName + " outline");
         var textFrame = _findItemByName(layer, el.displayName + " caption text");
         if (!outline || !textFrame) {

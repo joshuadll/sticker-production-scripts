@@ -203,12 +203,16 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
             gNote = parseNote(gItem.note);
             if (!gNote) continue;
             var isCaptioned = (gNote.styleCode === "GC" || gNote.styleCode === "WC");
+            // A default-tab group is note "ST" WITH a " plate" member (the tab cutline); a bare
+            // stamp wrapper is note "ST" with no plate. Tabs get a half-cut like captions.
+            var isTab       = (gNote.styleCode === "ST" && findGroupMember(gItem, " plate") !== null);
             var isStamp     = (gNote.styleCode === "ST");
             if (!isCaptioned && !isStamp) continue;
-            // Half-cut: GC/WC only. syncHalfcut clears the prior tab BEFORE re-deriving, so a
-            // re-sync that fails to re-seat leaves NO half-cut — name the element rather than
-            // silently undercount.
-            if (isCaptioned) {
+            // Half-cut: GC/WC + default tabs. syncHalfcut clears the prior tab BEFORE re-deriving,
+            // so a re-sync that fails to re-seat leaves NO half-cut — name the element rather than
+            // silently undercount. (Without this, a tab's half-cut stays at its pre-nest pose until
+            // Step 9A re-syncs it at export.)
+            if (isCaptioned || isTab) {
                 var hcRes = syncHalfcut(doc, gItem, {});
                 if (hcRes.ok) hcSynced++;
                 else log("[step-nest] half-cut SKIP | " + gItem.name + " — " + hcRes.reason
@@ -221,7 +225,7 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
             if (sbRes.ok) sbSynced++;
             else log("[step-nest] spacing-buffer SKIP | " + gItem.name + " — " + sbRes.reason);
         }
-        log("[step-nest] half-cut sync | " + hcSynced + " GC/WC element(s) re-synced to nested pose");
+        log("[step-nest] half-cut sync | " + hcSynced + " GC/WC/tab element(s) re-synced to nested pose");
         log("[step-nest] spacing-buffer | " + sbSynced + " keep-out halo(s) built (GC/WC + stamps)");
     }
 

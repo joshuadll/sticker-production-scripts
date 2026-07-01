@@ -170,7 +170,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             continue;
         }
 
-        if (matched.styleCode === "WC" || matched.styleCode === "GC") {
+        if (elementGetsCaption(matched.styleCode, matched.catCode)) {
             // Native caption: name the outline + place review text. The PILL/PLATE/cut are built in
             // Pipeline 2 (AI_BuildAndExportCutlines) after the artist reviews the text. The sidecar
             // no longer carries a caption object — caption presence is decided by styleCode.
@@ -194,11 +194,16 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             }
             named++;
         } else {
-            // ST and any uncaptioned element: bare named cutline path.
+            // Uncaptioned element: name the trace as a separable outline, then place a loose
+            // default peel tab (PEEL HERE or semi-circle) for the artist to review/reposition.
+            // Pipeline 2 seats + cuts + half-cuts it via the same machinery as captions.
             setStrokeStyle(path, CONFIG.cutlineStrokePt, blackCmyk());
-            path.name = matched.displayName;
-            log("[step6] named | " + path.name);
-            named++;
+            path.name = matched.displayName + " outline";
+            if (_placeDefaultTab(cutlinesLayer, matched.displayName, path)) {
+                named++;
+            } else {
+                unmatched++;   // flagged: artist resolves before Pipeline 2 (hard-error path)
+            }
         }
     }
 
@@ -358,4 +363,29 @@ function _placeCaptionText(layer, displayName, outline, font, sizePt, tracking, 
     tf.translate(ecx - tcx, (ob[3] - mmToPoints(gapMm)) - tb[1]);   // centre just below the element
     tf.name = displayName + " caption text";
     return tf;
+}
+
+// Pipeline 1 rough placement of a default peel tab for an uncaptioned element. Picks the longest
+// near-straight edge, chooses PEEL HERE vs semi-circle by edge length, and places the asset as a
+// loose "{displayName} tab" group. Returns true on success; false (logged) flags the element so
+// the artist resolves it (e.g. an element with no straight edge) before Pipeline 2.
+function _placeDefaultTab(cutlinesLayer, displayName, outlinePath) {
+    var edge = pickTabEdge(outlinePath, {
+        steps: CONFIG.peelTabEdgeSampleSteps,
+        straightToleranceDeg: CONFIG.peelTabEdgeStraightToleranceDeg
+    });
+    if (!edge.ok) {
+        log("[step6] TAB FLAG | " + displayName + " | " + edge.reason);
+        return false;
+    }
+    var usePeelHere = edge.lengthMm >= (CONFIG.peelHereTabWidthMm + CONFIG.peelTabEdgeFitMarginMm);
+    var assetFile = new File(usePeelHere ? CONFIG.peelTabAssetPathPeelHere : CONFIG.peelTabAssetPathSemiCircle);
+    log("[step6] tab choice | " + displayName + " | edge " + Math.round(edge.lengthMm * 10) / 10
+        + "mm -> " + (usePeelHere ? "PEEL HERE" : "semi-circle"));
+    var res = placeTabAsset(cutlinesLayer.parent /*doc*/, cutlinesLayer, assetFile, edge, displayName);
+    if (!res.ok) {
+        log("[step6] TAB FLAG | " + displayName + " | " + res.reason);
+        return false;
+    }
+    return true;
 }

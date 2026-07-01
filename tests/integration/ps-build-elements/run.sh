@@ -114,6 +114,8 @@ fi
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
     s|CONFIG\.logPath\s*=\s*_root[^;]+;|CONFIG.logPath = "'"$LOG_AI"'";|;
+    s|CONFIG\.peelTabAssetPathPeelHere\s*=\s*_root[^;]+;|CONFIG.peelTabAssetPathPeelHere = "'"$REPO_ROOT"'/assets/Peel_Teb_B.ai";|;
+    s|CONFIG\.peelTabAssetPathSemiCircle\s*=\s*_root[^;]+;|CONFIG.peelTabAssetPathSemiCircle = "'"$REPO_ROOT"'/assets/Peel_Tab_A.ai";|;
     s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
     s|^(#target illustrator.*)|$1\n\$.global.__aiBuildCutlinesHandoff = true;|;
 ' "$SCRIPT_AI" > "$TEMP_SCRIPT_AI"

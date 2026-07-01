@@ -95,6 +95,7 @@ function writeElementsFile(doc) {
         data.elements.push({
             displayName: parsed.displayName,
             styleCode:   parsed.styleCode,
+            catCode:     parsed.catCode,        // needed by elementGetsCaption (MP/LM/TR → peel tab)
             left:   Math.round(b[0].as("px")),
             top:    Math.round(b[1].as("px")),
             right:  Math.round(b[2].as("px")),

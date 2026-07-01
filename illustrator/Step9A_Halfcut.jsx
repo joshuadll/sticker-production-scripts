@@ -33,7 +33,7 @@ function runHalfcut(doc) {
     }
 
     var items = _collectHalfcutItems(cutlinesLayer);
-    log("[step9a] found " + items.length + " GC/WC item(s) for half-cut.");
+    log("[step9a] found " + items.length + " GC/WC/tab item(s) for half-cut.");
 
     var placed = 0, flags = [], i;
 
@@ -67,7 +67,9 @@ function _collectHalfcutItems(cutlinesLayer) {
         if (item.parent !== cutlinesLayer) continue;
         if (item.typename !== "GroupItem") continue;
         note = parseNote(item.note);
-        if (note && (note.styleCode === "GC" || note.styleCode === "WC")) {
+        var isCapStyle = note && (note.styleCode === "GC" || note.styleCode === "WC");
+        var isTab = note && note.styleCode === "ST" && findGroupMember(item, " plate") !== null;
+        if (isCapStyle || isTab) {
             out.push({ name: item.name, group: item });
         }
     }

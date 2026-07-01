@@ -30,7 +30,7 @@
 [step1] closed | Slovakia%20Sticker%20Set%20A4%20-%202.psd
 [step1] opened | Slovakia%20Sticker%20Set%20A4%20-%203.psd
 [step1] found | 11 group(s) in Slovakia%20Sticker%20Set%20A4%20-%203.psd
-[step1] placed | Bratislava(text) [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 495px
+[step1] placed | Bratislava(text) [WC-TL] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 900px
 [step1] placed | Šúľance s Makom [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
 [step1] placed | Pirohy [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
 [step1] placed | Bryndzové halušky [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
@@ -55,7 +55,7 @@
 [step2] layer[7] = Bryndzové halušky [WC-FD]
 [step2] layer[8] = Pirohy [WC-FD]
 [step2] layer[9] = Šúľance s Makom [WC-FD]
-[step2] layer[10] = Bratislava(text) [WC-IC]
+[step2] layer[10] = Bratislava(text) [WC-TL]
 [step2] layer[11] = Čumil Statue [WC-IC]
 [step2] layer[12] = The Blue Church | Church of St. Elizabeth [WC-LM]
 [step2] layer[13] = Michael's Gate [WC-LM-]
@@ -82,7 +82,7 @@
 [step2] resized | Bryndzové halušky [WC-FD] -> art 485px (final 525px incl. 40px white edge)
 [step2] resized | Pirohy [WC-FD] -> art 485px (final 525px incl. 40px white edge)
 [step2] resized | Šúľance s Makom [WC-FD] -> art 485px (final 525px incl. 40px white edge)
-[step2] resized | Bratislava(text) [WC-IC] -> art 455px (final 495px incl. 40px white edge)
+[step2] resized | Bratislava(text) [WC-TL] -> art 860px (final 900px incl. 40px white edge)
 [step2] resized | Čumil Statue [WC-IC] -> art 455px (final 495px incl. 40px white edge)
 [step2] resized | The Blue Church | Church of St. Elizabeth [WC-LM] -> art 575px (final 615px incl. 40px white edge)
 [step2] resized | Michael's Gate [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
@@ -114,7 +114,7 @@
 [step2] grid | Michael's Gate [WC-LM-] -> col 0 row 3
 [step2] grid | The Blue Church | Church of St. Elizabeth [WC-LM] -> col 1 row 3
 [step2] grid | Čumil Statue [WC-IC] -> col 2 row 3
-[step2] grid | Bratislava(text) [WC-IC] -> col 3 row 3
+[step2] grid | Bratislava(text) [WC-TL] -> col 3 row 3
 [step2] grid | Šúľance s Makom [WC-FD] -> col 0 row 4
 [step2] grid | Pirohy [WC-FD] -> col 1 row 4
 [step2] grid | Bryndzové halušky [WC-FD] -> col 2 row 4
@@ -139,7 +139,7 @@
 [step2B] white edge | Bryndzové halušky [WC-FD]
 [step2B] white edge | Pirohy [WC-FD]
 [step2B] white edge | Šúľance s Makom [WC-FD]
-[step2B] white edge | Bratislava(text) [WC-IC]
+[step2B] white edge | Bratislava(text) [WC-TL]
 [step2B] white edge | Čumil Statue [WC-IC]
 [step2B] white edge | The Blue Church | Church of St. Elizabeth [WC-LM]
 [step2B] white edge | Michael's Gate [WC-LM-]
@@ -175,7 +175,7 @@
 [step3B] grouped | Michael's Gate [WC-LM-]
 [step3B] grouped | The Blue Church | Church of St. Elizabeth [WC-LM]
 [step3B] grouped | Čumil Statue [WC-IC]
-[step3B] grouped | Bratislava(text) [WC-IC]
+[step3B] grouped | Bratislava(text) [WC-TL]
 [step3B] grouped | Šúľance s Makom [WC-FD]
 [step3B] grouped | Pirohy [WC-FD]
 [step3B] grouped | Bryndzové halušky [WC-FD]

@@ -30,6 +30,30 @@ function parseLayerName(name) {
     };
 }
 
+// Categories whose elements are SELF-LABELLED — a Map (MP) or a Location Name (TL) already carry
+// their own text, so they get a DEFAULT PEEL TAB instead of a redundant caption. NOTE: Landmarks
+// (LM) and Transportation (TR) are illustrations that DO need their name, so they stay captioned.
+// Overridable via CONFIG.peelTabCategories; the array here is the fallback (also used by the node
+// unit test, where CONFIG is not in scope).
+function _peelTabCategory(catCode) {
+    var cats = (typeof CONFIG !== "undefined" && CONFIG.peelTabCategories)
+             ? CONFIG.peelTabCategories : ["MP", "TL"];
+    for (var i = 0; i < cats.length; i++) { if (cats[i] === catCode) return true; }
+    return false;
+}
+
+// Single source of truth for "does this element get a named caption?" — its inverse is exactly the
+// set that gets a DEFAULT PEEL TAB (routed through the SAME placeDefaultTab/buildDefaultTab path as
+// stamps — no duplication). Used by Step 6 (Pipeline 1) and AI_BuildAndExportCutlines (Pipeline 2).
+//   GC → always caption (GC-LM is the decorative caption-plate product).
+//   WC → caption UNLESS its category is a self-labelled peel-tab category (MP/TL; LM/TR stay captioned).
+//   ST / anything else → peel tab.
+function elementGetsCaption(styleCode, catCode) {
+    if (styleCode === "GC") return true;
+    if (styleCode === "WC") return !_peelTabCategory(catCode);
+    return false;
+}
+
 // Converts millimetres to Illustrator points (1 mm = 2.834645 pt).
 // Used for offset path distances, stroke weights, etc.
 function mmToPoints(mm) {
@@ -1025,6 +1049,74 @@ function buildCaption(doc, layer, textFrame, outline, opts) {
              halfcut: !!(hc && hc.ok), reason: hc ? hc.reason : null };
 }
 
+// Pipeline-2 build for a DEFAULT PEEL TAB (uncaptioned element). Mirrors buildCaption minus the
+// pill/text build: the loose "{name} tab" group (placed in Pipeline 1, possibly repositioned by
+// the artist) supplies a CUTLINE (the plate) and a FILL (a ride-along printed member). Seats the
+// cutline into the traced outline, unites into the fused cut, bundles the separable members, and
+// derives the half-cut from the submerged tab arc. An unseated tab returns { ok:false } for the
+// caller to surface as a hard error (no fallback).
+function buildDefaultTab(doc, layer, tabGroup, outline, opts) {
+    opts = opts || {};
+    var name = opts.name || tabGroup.name.replace(/ tab$/, "");
+
+    // Extract the two tab members by name (placeTabAsset named them).
+    var cutline = null, fill = null, i;
+    for (i = 0; i < tabGroup.pageItems.length; i++) {
+        var it = tabGroup.pageItems[i];
+        if (it.name === name + " tab cutline") cutline = it;
+        else if (it.name === name + " tab fill") fill = it;
+    }
+    if (!cutline) return { ok: false, reason: "tab cutline member not found" };
+
+    // Promote the tab members out of the loose wrapper onto the layer (seat/derive operate on
+    // layer-level items, like the caption pill/text). Keep the fill as the ride-along.
+    cutline.move(layer, ElementPlacement.PLACEATEND);
+    if (fill) fill.move(layer, ElementPlacement.PLACEATEND);
+    try { tabGroup.remove(); } catch (eT) {}
+
+    // Seat the cutline (plate) into the outline; the fill rides rigidly. The tab supplies its own
+    // attach-edge TIPS as the endpoints to kiss — the pill inner-edge finder would skip them as
+    // caps, over-seating the tab (it kissed the cap BASES, burying the real tips ~1.5mm into the
+    // art). With the tips, both endpoints land on the white-edge border.
+    var seatSteps = CONFIG.seatSampleSteps || 24;
+    var tipPoly = _largestPoly(samplePathToPolygons(cutline, seatSteps));
+    var tips = tipPoly ? _tabAttachTips(tipPoly, _aiSeatGeometry(cutline, outline)) : null;
+    var seatOpts = { polyCache: {} };
+    if (tips) seatOpts.innerEndpoints = [tips.e0, tips.e1];
+    var seat = seatPlateToOutline(name, outline, cutline, fill, seatOpts);
+    if (!seat.ok) {
+        // Restore a re-runnable loose "{name} tab" group (mirror buildCaption's input-restore on
+        // failure) so the artist can reposition and re-run; members keep their tab-member names.
+        var restore = layer.groupItems.add();
+        restore.name = name + " tab";
+        try { cutline.move(restore, ElementPlacement.PLACEATEND); } catch (eRc) {}
+        try { if (fill) fill.move(restore, ElementPlacement.PLACEATEND); } catch (eRf) {}
+        return { ok: false, needsReview: !!seat.needsReview, reason: seat.reason };
+    }
+
+    // Unite outline + tab cutline into the fused cut; bundle the separable members.
+    var cut = deriveCutline(outline, cutline);
+    strokeRecursive(cut, (opts.strokePt != null ? opts.strokePt : 0.25), blackCmyk());
+    var group = assembleElementGroup(layer, name, outline, cutline, cut);
+
+    // The fill is a PRINTED ride-along member (never part of the cut). Move it into the group and
+    // keep it visible; it is NOT named "{name} plate" so it never enters reuniteCutline/halfcut.
+    if (fill) {
+        fill.move(group, ElementPlacement.PLACEATBEGINNING);
+        fill.name = name + " tab fill";
+        fill.hidden = false;
+    }
+
+    // Note marks a default-tab group: styleCode "ST", lines 0 (tab, not text), + plate area.
+    var plateArea = 0;
+    try { plateArea = Math.abs(cutline.area); } catch (ePA) {}
+    group.note = _capNoteFormat("ST", 0, plateArea, !!seat.needsReview);
+
+    var hc = syncHalfcut(doc, group, { polyCache: {} });
+    return { ok: true, group: group, needsReview: !!seat.needsReview,
+             halfcut: !!(hc && hc.ok), reason: hc ? hc.reason : null };
+}
+
 // Places a GC decorative plate raster behind the caption, scaled to span the pill width (+ pad
 // each side) at a fixed spec bar height. Width-driven; non-uniform, so the L/R caps may distort
 // slightly — accepted as cosmetic + tunable (plateHeightMm / plateWidthPadMm). The plate is
@@ -1213,81 +1305,94 @@ function seatPlateToOutline(name, outline, plate, captionItem, opts) {
         log("[seat] " + name + " | SKIP — degenerate plate polygon.");
         return { ok: false, reason: "degenerate plate" };
     }
-    // REAL inner-edge vertices (the art-facing long edge of the plate), preserving the actual
-    // curve. NOT a straight PCA-chord reconstruction — that floats off an arced caption and
-    // under-seats it (the Šúľance gap: the kiss sank a phantom chord while the real plate
-    // stayed out). See _innerEdgeVerts.
-    var ie = _innerEdgeVerts(pp, geom);
-    if (!ie || ie.verts.length === 0) {
-        log("[seat] " + name + " | SKIP — could not resolve plate inner edge.");
-        return { ok: false, reason: "degenerate plate" };
-    }
-
     var needsReview = false, shrunk = false;
     var items = [plate];
     if (captionItem) items.push(captionItem);
 
-    var verts = ie.verts, n = verts.length, r = ie.radius;
-    var shrinkF = (CONFIG.seatShrinkFrac != null) ? CONFIG.seatShrinkFrac : 0.15;
+    var E0, E1, B0, B1, r, kissOnly = false;
 
-    // ── ENDPOINTS + probe (the REAL plate boundary, curved or straight — no chord float) ──
-    // The two ends of the inner edge, taken from the actual sampled plate outline. Look from
-    // each toward the art and grab the edge in front of it.
-    var iLo = 0, iHi = n - 1;
-    var E0 = verts[iLo], E1 = verts[iHi];
-    var B0 = _probeOutline(artPolys, geom, E0);
-    var B1 = _probeOutline(artPolys, geom, E1);
-
-    // OVERHANG: an endpoint with no art in front of it → one 15% balanced shrink along the real
-    // edge (this also trims a rising corner off the ends). Still none → caption wider than its
-    // art; flag + don't seat.
-    if (!B0 || !B1) {
-        var oa = Math.floor(shrinkF * (n - 1)), ob = Math.floor((1 - shrinkF) * (n - 1));
-        var oB0 = (ob > oa) ? _probeOutline(artPolys, geom, verts[oa]) : null;
-        var oB1 = (ob > oa) ? _probeOutline(artPolys, geom, verts[ob]) : null;
-        if (oB0 && oB1) {
-            iLo = oa; iHi = ob; E0 = verts[oa]; E1 = verts[ob]; B0 = oB0; B1 = oB1; shrunk = true;
-            log("[seat] " + name + " | overhang rescued by " + Math.round(shrinkF * 100) + "% shrink.");
-        } else {
-            log("[seat] " + name + " | WARN — caption wider than its art (no edge under the inner "
-                + "edge even after shrink); not seated.");
-            return { ok: false, needsReview: true, reason: "caption wider than art" };
+    if (opts.innerEndpoints) {
+        // ── TAB path: the caller supplies the two attach-edge TIPS (the "pointy" endpoints that
+        // must land on the border). The pill inner-edge finder skips these as caps, so tabs pass
+        // them in directly — no cap-skip, no overhang/bulge shrink (all pill-specific). ──
+        E0 = opts.innerEndpoints[0]; E1 = opts.innerEndpoints[1];
+        r = Math.sqrt((E1.x - E0.x) * (E1.x - E0.x) + (E1.y - E0.y) * (E1.y - E0.y)) / 2;
+        B0 = _probeOutline(artPolys, geom, E0);
+        B1 = _probeOutline(artPolys, geom, E1);
+        if (!B0 || !B1) {
+            log("[seat] " + name + " | WARN — tab tip has no art in front of it; not seated.");
+            return { ok: false, needsReview: true, reason: "tab tip off the art" };
         }
-    }
+    } else {
+        // ── CAPTION path (pill): derive the REAL inner-edge vertices (the art-facing long edge),
+        // preserving the actual curve — NOT a straight PCA-chord reconstruction (that floats off an
+        // arced caption and under-seats it: the Šúľance gap). See _innerEdgeVerts. Then overhang +
+        // convex-bulge shrink. ──
+        var ie = _innerEdgeVerts(pp, geom);
+        if (!ie || ie.verts.length === 0) {
+            log("[seat] " + name + " | SKIP — could not resolve plate inner edge.");
+            return { ok: false, reason: "degenerate plate" };
+        }
+        kissOnly = ie.kissOnly;
+        var verts = ie.verts, n = verts.length; r = ie.radius;
+        var shrinkF = (CONFIG.seatShrinkFrac != null) ? CONFIG.seatShrinkFrac : 0.15;
 
-    // ── CONVEX-BULGE guard (the ORIGINAL r/2 rule): if the art bulges INTO the pill at the
-    // inner-edge MIDPOINT by more than captionMidProtrudeFrac*2r (default r/2), a straight pill
-    // would bury that bulge into the caption text. Relieve with one 15% shrink — it re-anchors
-    // the seat to a deeper interior point, backing the pill out — then flag if still over. This
-    // is the branch Šúľance hits; its bug was the OLD straight-chord reconstruction floating off
-    // the arc, so the measurement now uses the REAL boundary verts. One shrink budget, shared
-    // with overhang. ──
-    if (CONFIG.captionMidProtrudeFrac > 0) {
-        var limit = CONFIG.captionMidProtrudeFrac * 2 * r;
-        var Bm = _probeOutline(artPolys, geom, verts[Math.floor((iLo + iHi) / 2)]);
-        var p  = _aiMidProtrusion(B0, B1, Bm, geom, depth);
-        if (p !== null && p > limit && !shrunk) {
-            var ba = Math.floor(shrinkF * (n - 1)), bb = Math.floor((1 - shrinkF) * (n - 1));
-            var bB0 = (bb > ba) ? _probeOutline(artPolys, geom, verts[ba]) : null;
-            var bB1 = (bb > ba) ? _probeOutline(artPolys, geom, verts[bb]) : null;
-            if (bB0 && bB1) {
-                iLo = ba; iHi = bb; E0 = verts[ba]; E1 = verts[bb]; B0 = bB0; B1 = bB1; shrunk = true;
-                var Bm2 = _probeOutline(artPolys, geom, verts[Math.floor((iLo + iHi) / 2)]);
-                p = _aiMidProtrusion(B0, B1, Bm2, geom, depth);
-                log("[seat] " + name + " | midpoint bulge relieved by " + Math.round(shrinkF * 100) + "% shrink.");
+        // The two ends of the inner edge, taken from the actual sampled plate outline. Look from
+        // each toward the art and grab the edge in front of it.
+        var iLo = 0, iHi = n - 1;
+        E0 = verts[iLo]; E1 = verts[iHi];
+        B0 = _probeOutline(artPolys, geom, E0);
+        B1 = _probeOutline(artPolys, geom, E1);
+
+        // OVERHANG: an endpoint with no art in front of it → one 15% balanced shrink along the real
+        // edge (this also trims a rising corner off the ends). Still none → caption wider than its
+        // art; flag + don't seat.
+        if (!B0 || !B1) {
+            var oa = Math.floor(shrinkF * (n - 1)), ob = Math.floor((1 - shrinkF) * (n - 1));
+            var oB0 = (ob > oa) ? _probeOutline(artPolys, geom, verts[oa]) : null;
+            var oB1 = (ob > oa) ? _probeOutline(artPolys, geom, verts[ob]) : null;
+            if (oB0 && oB1) {
+                iLo = oa; iHi = ob; E0 = verts[oa]; E1 = verts[ob]; B0 = oB0; B1 = oB1; shrunk = true;
+                log("[seat] " + name + " | overhang rescued by " + Math.round(shrinkF * 100) + "% shrink.");
+            } else {
+                log("[seat] " + name + " | WARN — caption wider than its art (no edge under the inner "
+                    + "edge even after shrink); not seated.");
+                return { ok: false, needsReview: true, reason: "caption wider than art" };
             }
         }
-        if (p !== null && p > limit) {
-            needsReview = true;
-            log("[seat] " + name + " | midpoint bulge " + _r1(p) + "pt > limit " + _r1(limit)
-                + "pt after shrink — flagged.");
+
+        // ── CONVEX-BULGE guard (the ORIGINAL r/2 rule): if the art bulges INTO the pill at the
+        // inner-edge MIDPOINT by more than captionMidProtrudeFrac*2r (default r/2), a straight pill
+        // would bury that bulge into the caption text. Relieve with one 15% shrink — it re-anchors
+        // the seat to a deeper interior point, backing the pill out — then flag if still over. One
+        // shrink budget, shared with overhang. ──
+        if (CONFIG.captionMidProtrudeFrac > 0) {
+            var limit = CONFIG.captionMidProtrudeFrac * 2 * r;
+            var Bm = _probeOutline(artPolys, geom, verts[Math.floor((iLo + iHi) / 2)]);
+            var p  = _aiMidProtrusion(B0, B1, Bm, geom, depth);
+            if (p !== null && p > limit && !shrunk) {
+                var ba = Math.floor(shrinkF * (n - 1)), bb = Math.floor((1 - shrinkF) * (n - 1));
+                var bB0 = (bb > ba) ? _probeOutline(artPolys, geom, verts[ba]) : null;
+                var bB1 = (bb > ba) ? _probeOutline(artPolys, geom, verts[bb]) : null;
+                if (bB0 && bB1) {
+                    iLo = ba; iHi = bb; E0 = verts[ba]; E1 = verts[bb]; B0 = bB0; B1 = bB1; shrunk = true;
+                    var Bm2 = _probeOutline(artPolys, geom, verts[Math.floor((iLo + iHi) / 2)]);
+                    p = _aiMidProtrusion(B0, B1, Bm2, geom, depth);
+                    log("[seat] " + name + " | midpoint bulge relieved by " + Math.round(shrinkF * 100) + "% shrink.");
+                }
+            }
+            if (p !== null && p > limit) {
+                needsReview = true;
+                log("[seat] " + name + " | midpoint bulge " + _r1(p) + "pt > limit " + _r1(limit)
+                    + "pt after shrink — flagged.");
+            }
         }
     }
 
     // ── ROTATE: align the inner edge parallel to the art chord B0->B1, pivot E0. Two real
     // endpoints decide the tilt, so a wiggle in the middle can't swing it. ──
     var rotDeg = 0;
-    if (CONFIG.seatConform && !ie.kissOnly) {
+    if (CONFIG.seatConform && !kissOnly) {
         var baseLen = Math.sqrt((E1.x - E0.x) * (E1.x - E0.x) + (E1.y - E0.y) * (E1.y - E0.y));
         if (baseLen >= epsPt) {
             var phi = _aiNormalizeDeg(_aiChordAngleDeg(B0, B1) - _aiChordAngleDeg(E0, E1));
@@ -1311,7 +1416,7 @@ function seatPlateToOutline(name, outline, plate, captionItem, opts) {
     if (CONFIG.seatDebug) {
         var _e0p = { x: E0.x + k.tx, y: E0.y + k.ty };
         log("[seatdbg] " + name + " | axisX=" + geom.travelIsX + " sign=" + geom.sign
-            + " depth=" + _r1(depth) + " r=" + _r1(r) + " kissOnly=" + ie.kissOnly
+            + " depth=" + _r1(depth) + " r=" + _r1(r) + " kissOnly=" + kissOnly
             + " shrunk=" + shrunk + " rot=" + _r1(rotDeg) + " k=(" + _r1(k.tx) + "," + _r1(k.ty) + ")");
         log("[seatdbg] " + name + "   E0=(" + _r1(E0.x) + "," + _r1(E0.y) + ") B0=(" + _r1(B0.x)
             + "," + _r1(B0.y) + ") E0post=(" + _r1(_e0p.x) + "," + _r1(_e0p.y) + ") inArt="
@@ -1367,6 +1472,36 @@ function _innerEdgeVerts(pp, geom) {
     }
     verts.sort(function (a, b) { return a.t - b.t; });
     return { verts: verts, radius: r, kissOnly: kissOnly };
+}
+
+// A TAB's attach-edge endpoints — the two "pointy tips" that must land on the element border. For
+// a pill, the caps are rounded ends to SKIP (see _innerEdgeVerts line "skip caps"); a tab's tips
+// ARE the endpoints, so we KEEP the extremes of the long axis. Returns the two vertices extreme
+// along the plate's long axis, restricted to the ART-FACING side (so a tab that is wider on its
+// OUTER edge still picks the attach edge). geom = { travelIsX, sign } points plate → art.
+// Returns { e0, e1 } (e0 = min long-axis, e1 = max) or null. Pure geometry.
+function _tabAttachTips(pp, geom) {
+    var n = pp.length; if (n < 3) return null;
+    var cx = 0, cy = 0, i, dx, dy;
+    for (i = 0; i < n; i++) { cx += pp[i].x; cy += pp[i].y; }
+    cx /= n; cy /= n;
+    var sxx = 0, syy = 0, sxy = 0;
+    for (i = 0; i < n; i++) { dx = pp[i].x - cx; dy = pp[i].y - cy; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+    var theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    var ux = Math.cos(theta), uy = Math.sin(theta), vx = -uy, vy = ux;
+    var vTravel = geom.travelIsX ? vx : vy;
+    var sInner = (vTravel * geom.sign >= 0) ? 1 : -1;   // +ss is the art-facing side
+    var loT = 1e15, hiT = -1e15, lo = null, hi = null;
+    for (i = 0; i < n; i++) {
+        dx = pp[i].x - cx; dy = pp[i].y - cy;
+        var ss = dx * vx + dy * vy;
+        if (ss * sInner < 0) continue;                  // art-facing half only
+        var tt = dx * ux + dy * uy;
+        if (tt < loT) { loT = tt; lo = pp[i]; }
+        if (tt > hiT) { hiT = tt; hi = pp[i]; }
+    }
+    if (!lo || !hi || lo === hi) return null;
+    return { e0: { x: lo.x, y: lo.y }, e1: { x: hi.x, y: hi.y } };
 }
 
 // Travel axis (plate centre -> art centre) and its sign (+1 toward the larger coordinate).
@@ -1619,10 +1754,14 @@ function simplifyPathItem(path, tolerancePt, cornerAngleDeg) {
 function parseNote(note) {
     if (!note || note === "") return null;
     var parts = note.split("|");
+    // "R" (needs-review) can be in ANY trailing slot — the note gained an area field ("a<pt²>")
+    // between lines and R ("WC|1|a720|R" / "ST|0|a90|R"), so a fixed parts[2] check misses it.
+    var review = false, i;
+    for (i = 2; i < parts.length; i++) { if (parts[i] === "R") review = true; }
     return {
         styleCode:   parts[0],
         capLines:    parts.length > 1 ? parseInt(parts[1], 10) : 1,
-        needsReview: parts.length > 2 && parts[2] === "R"
+        needsReview: review
     };
 }
 
@@ -1701,8 +1840,8 @@ function syncHalfcut(doc, group, opts) {
         return { ok: false, reason: "stamp / non-group (no caption seam)" };
     }
     var note = parseNote(group.note);
-    if (!note || (note.styleCode !== "GC" && note.styleCode !== "WC")) {
-        return { ok: false, reason: "not GC/WC" };
+    if (!note || (note.styleCode !== "GC" && note.styleCode !== "WC" && note.styleCode !== "ST")) {
+        return { ok: false, reason: "not GC/WC/tab" };
     }
 
     var plate   = findGroupMember(group, " plate");
@@ -1874,6 +2013,8 @@ function syncSpacingBuffer(doc, group, opts) {
 function wrapStampsInGroups(cutlinesLayer) {
     // Snapshot direct-child bare paths first — adding a group + moving items into it re-indexes
     // the live pathItems/compoundPathItems collections mid-loop.
+    // NOTE: a default-tab element is a GroupItem (not a bare path), so it is naturally skipped
+    // here — only genuinely bare stamp cutlines (no tab) are wrapped for a halo.
     var bare = [], i, it;
     for (i = 0; i < cutlinesLayer.pathItems.length; i++) {
         it = cutlinesLayer.pathItems[i];
@@ -1927,7 +2068,9 @@ function unwrapStampGroups(doc) {
         g = cutLayer.groupItems[i];
         if (g.parent !== cutLayer) continue;
         note = parseNote(g.note);
-        if (note && note.styleCode === "ST") groups.push(g);
+        // Only unwrap HALO-ONLY wrappers (no plate member). A real default-tab group has a
+        // "{name} plate" member (the tab cutline) and must ship as a group — never unwrap it.
+        if (note && note.styleCode === "ST" && findGroupMember(g, " plate") === null) groups.push(g);
     }
     var unwrapped = 0, member;
     for (i = 0; i < groups.length; i++) {
@@ -2517,6 +2660,194 @@ function _sampleCached(cache, slot, item, steps) {
     var polys = samplePathToPolygons(item, steps);
     cache[key] = polys;
     return polys;
+}
+
+// Points → millimetres (inverse of mmToPoints). 1pt = 25.4/72 mm.
+function pointsToMm(pt) { return pt * (25.4 / 72); }
+
+// Smallest angle between two directions treated as UNORIENTED lines (a straight edge may be
+// sampled in either direction). Returns 0..π/2.
+function _angDiff180(a, b) {
+    var d = Math.abs(a - b) % Math.PI;       // 0..π
+    if (d > Math.PI / 2) d = Math.PI - d;     // fold to 0..π/2
+    return d;
+}
+
+// Simple vertex-average centroid (good enough to decide which side is "outward").
+function _polyCentroid(poly) {
+    var sx = 0, sy = 0, i;
+    for (i = 0; i < poly.length; i++) { sx += poly[i].x; sy += poly[i].y; }
+    return { x: sx / poly.length, y: sy / poly.length };
+}
+
+// Cosine of the angle between an edge's outward normal (unit ux,uy) and the radial line from the
+// polygon centroid (cx,cy) through the edge midpoint (mx,my). 1 = the edge is perpendicular to that
+// radial line, so the tab points straight AWAY from the piece; ~0 = the edge faces sideways (it
+// runs roughly radially, e.g. a petal). Returns a value in [-1,1] (outward is chosen away from the
+// centroid, so it is ≥0 in practice). Pure geometry.
+function _edgeRadialAlign(mx, my, ux, uy, cx, cy) {
+    var rx = mx - cx, ry = my - cy;
+    var rl = Math.sqrt(rx * rx + ry * ry);
+    if (rl === 0) return 1;
+    return (ux * rx + uy * ry) / rl;
+}
+
+// Chooses the longest near-straight run of the outline perimeter and returns the tab seat:
+//   { ok, midX, midY, dirAngle, outwardAngle, lengthMm }
+// dirAngle  = direction of the chord (radians, y-up).
+// outwardAngle = perpendicular to dirAngle pointing AWAY from the polygon centroid (the tab body
+//   points this way).
+// lengthMm = straight chord length of the run (what must clear the PEEL HERE tab width).
+// A "run" accumulates consecutive perimeter edges whose direction stays within
+// straightToleranceDeg of the run's anchor direction (unoriented), so diagonal/vertical edges
+// qualify — generalises the old horizontal-only _findLongestHorizontalSeg.
+function pickTabEdge(outline, opts) {
+    opts = opts || {};
+    var steps = (opts.steps != null) ? opts.steps : (CONFIG.peelTabEdgeSampleSteps || 12);
+    var tolRad = ((opts.straightToleranceDeg != null) ? opts.straightToleranceDeg
+                 : (CONFIG.peelTabEdgeStraightToleranceDeg != null ? CONFIG.peelTabEdgeStraightToleranceDeg : 8))
+                 * Math.PI / 180;
+
+    var poly = _largestPoly(samplePathToPolygons(outline, steps));
+    if (!poly || poly.length < 3) return { ok: false, reason: "degenerate outline polygon" };
+
+    var n = poly.length;
+    var c = _polyCentroid(poly);
+    var best = null;   // highest score = the longest run that also faces radially OUTWARD
+    var i, j;
+
+    // Try each vertex as a run start; extend while edges stay within tolerance of the anchor dir.
+    // Score each run by length × radial alignment, so the chosen edge is long AND roughly
+    // perpendicular to the centroid→edge line — the tab then points straight "away" from the piece
+    // (a long edge that faces sideways, e.g. a petal pointing radially outward, is down-weighted).
+    for (i = 0; i < n; i++) {
+        var ax = poly[i].x, ay = poly[i].y;
+        var bx = poly[(i + 1) % n].x, by = poly[(i + 1) % n].y;
+        var anchor = Math.atan2(by - ay, bx - ax);
+        var endIdx = (i + 1) % n;
+        for (j = i + 1; j < i + n; j++) {
+            var c0 = poly[j % n], c1 = poly[(j + 1) % n];
+            var ed = Math.atan2(c1.y - c0.y, c1.x - c0.x);
+            if (_angDiff180(ed, anchor) > tolRad) break;
+            endIdx = (j + 1) % n;
+        }
+        var ex = poly[endIdx].x, ey = poly[endIdx].y;
+        var dx = ex - ax, dy = ey - ay;
+        var lenPt = Math.sqrt(dx * dx + dy * dy);   // straight chord span of the run
+        if (lenPt <= 0) continue;
+
+        var mX = (ax + ex) / 2, mY = (ay + ey) / 2;
+        var dir = Math.atan2(ey - ay, ex - ax);
+        // outward normal = perpendicular to the chord, pointing away from the centroid.
+        var cand1 = dir + Math.PI / 2, cand2 = dir - Math.PI / 2;
+        var u1x = Math.cos(cand1), u1y = Math.sin(cand1);
+        var outA = ((u1x * (mX - c.x) + u1y * (mY - c.y)) >= 0) ? cand1 : cand2;
+        var align = _edgeRadialAlign(mX, mY, Math.cos(outA), Math.sin(outA), c.x, c.y);
+        var score = lenPt * (align > 0 ? align : 0);
+        if (!best || score > best.score) {
+            best = { lenPt: lenPt, midX: mX, midY: mY, dirAngle: dir, outwardAngle: outA, score: score };
+        }
+    }
+    if (!best) return { ok: false, reason: "no straight edge found" };
+
+    return { ok: true, midX: best.midX, midY: best.midY, dirAngle: best.dirAngle,
+             outwardAngle: best.outwardAngle, lengthMm: pointsToMm(best.lenPt) };
+}
+
+// Classifies an asset's two paths: the CUTLINE is stroked & unfilled, the FILL is filled &
+// (typically) unstroked. Returns { cutline, fill } or null when it cannot tell them apart
+// (caller treats null as a hard error naming the element — no silent guess).
+function _tabAssetItems(items) {
+    if (!items || items.length !== 2) return null;
+    // The cutline is a stroked, unfilled PATH (PathItem/CompoundPathItem). The fill is simply the
+    // OTHER item — in the real assets a GroupItem named "Sign" (a coloured fill, plus the "PEEL
+    // HERE" lettering for tab B), which only rides along and never enters the cut. Require exactly
+    // one cutline so two paths / two groups stay ambiguous (a hard error naming the asset).
+    function isCut(it) {
+        return (it.typename === "PathItem" || it.typename === "CompoundPathItem") && it.stroked && !it.filled;
+    }
+    var a = items[0], b = items[1];
+    var ca = isCut(a), cb = isCut(b);
+    if (ca && !cb) return { cutline: a, fill: b };
+    if (cb && !ca) return { cutline: b, fill: a };
+    return null;
+}
+
+// Opens the asset file (reusing it if already open), copies its two paths into `layer` as a
+// group named "{displayName} tab", then rotates the group to edge.dirAngle and translates it so
+// the group's inner edge sits on the chosen art edge midpoint with the body pointing outward.
+// Returns { ok, group, cutline, fill } or { ok:false, reason }.
+function placeTabAsset(doc, layer, assetFile, edge, displayName) {
+    if (!assetFile || !assetFile.exists) return { ok: false, reason: "tab asset not found: " + (assetFile ? assetFile.fsName : "(null)") };
+
+    var assetDoc = null, i;
+    for (i = 0; i < app.documents.length; i++) {
+        try { if (app.documents[i].fullName.fsName === assetFile.fsName) { assetDoc = app.documents[i]; break; } }
+        catch (e2) {}
+    }
+    if (!assetDoc) assetDoc = app.open(assetFile);
+
+    // Collect the asset's two top-level items (single "Layer 1"): the stroked cutline PATH and the
+    // "Sign" GROUP fill. Include GroupItem — the fill is authored as a group, not a bare path.
+    var assetItems = [];
+    var al = assetDoc.layers[0];
+    for (i = 0; i < al.pageItems.length; i++) {
+        var t = al.pageItems[i].typename;
+        if (t === "PathItem" || t === "CompoundPathItem" || t === "GroupItem") assetItems.push(al.pageItems[i]);
+    }
+    var cls = _tabAssetItems(assetItems);
+    if (!cls) { try { app.activeDocument = doc; } catch (eA) {} return { ok: false, reason: "tab asset has ambiguous cutline/fill: " + assetFile.name }; }
+
+    // Copy both into the working doc inside a fresh group (DOM duplicate across docs is unreliable
+    // for live styles; copy/paste preserves appearance).
+    app.activeDocument = assetDoc;
+    app.selection = null;
+    cls.cutline.selected = true; cls.fill.selected = true;
+    app.executeMenuCommand("copy");
+    app.activeDocument = doc;
+    app.executeMenuCommand("paste");
+    var pasted = app.selection;
+
+    // Helper to drop pasted items on error paths (prevent float leak).
+    function _dropPasted(arr) { var z; for (z = 0; arr && z < arr.length; z++) { try { arr[z].remove(); } catch (eD) {} } }
+
+    if (!pasted || pasted.length !== 2) { _dropPasted(pasted); return { ok: false, reason: "tab paste returned " + (pasted ? pasted.length : 0) + " items" }; }
+
+    var group = layer.groupItems.add();
+    group.name = displayName + " tab";
+    var pCls = _tabAssetItems([pasted[0], pasted[1]]);
+    if (!pCls) { _dropPasted(pasted); try { group.remove(); } catch (eG) {} return { ok: false, reason: "pasted tab ambiguous cutline/fill" }; }
+    pCls.fill.move(group, ElementPlacement.PLACEATEND);
+    pCls.cutline.move(group, ElementPlacement.PLACEATEND);
+    pCls.cutline.name = displayName + " tab cutline";
+    pCls.fill.name    = displayName + " tab fill";
+
+    // Orient: the asset is authored with its FLAT (attach) edge on top and the body/dome pointing
+    // DOWN (-π/2). The flat edge is what connects to the art; the dome bulges OUTWARD (the grab).
+    // Rotate by the delta between the desired outward direction and the authored body direction so
+    // the dome ends up pointing along edge.outwardAngle and the flat edge faces the art. The
+    // authored flat-to-dome depth = the group height BEFORE rotation (flat edge on top, dome below);
+    // after rotation this is the tab's extent along the outward normal.
+    var authoredOutward = -Math.PI / 2;
+    var gbA = group.geometricBounds;                 // [l,t,r,b] y-up, pre-rotation
+    var depthPt = gbA[1] - gbA[3];
+    var rotDeg = (edge.outwardAngle - authoredOutward) * 180 / Math.PI;
+    try { group.rotate(rotDeg); } catch (eR) {}
+
+    // Place the tab fully OUTSIDE the element: push the group out along the outward normal by half
+    // its depth + a small gap, so the flat (attach) edge sits just BEYOND the art edge and the body
+    // points away — no intersection. Pipeline 2's seat then pulls it in to the overlap depth.
+    var gapPt = mmToPoints((CONFIG.peelTabPlacementGapMm != null) ? CONFIG.peelTabPlacementGapMm : 0.5);
+    var pushPt = depthPt / 2 + gapPt;
+    var gb = group.geometricBounds;                  // [l,t,r,b] y-up, post-rotation
+    var gcx = (gb[0] + gb[2]) / 2, gcy = (gb[1] + gb[3]) / 2;
+    var ux = Math.cos(edge.outwardAngle), uy = Math.sin(edge.outwardAngle);
+    group.translate((edge.midX + pushPt * ux) - gcx, (edge.midY + pushPt * uy) - gcy);
+
+    log("[step6] tab placed | " + group.name + " | edge " + _r1(edge.lengthMm)
+        + "mm dir " + _r1(edge.dirAngle * 180 / Math.PI) + "deg outward "
+        + _r1(edge.outwardAngle * 180 / Math.PI) + "deg push " + _r1(pointsToMm(pushPt)) + "mm");
+    return { ok: true, group: group, cutline: pCls.cutline, fill: pCls.fill };
 }
 
 // True if point pt {x, y} is inside polygon poly ([{x, y}, …]) — ray casting.
