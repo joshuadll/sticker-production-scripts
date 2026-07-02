@@ -1,0 +1,48 @@
+name: Publish installer
+
+# Rebuild and publish installer.zip whenever the installer itself changes, or the
+# menu-entry set (which lives in install.command) could have changed. Manual dispatch
+# lets the maintainer force a republish.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'installer/**'
+      - '.github/workflows/publish-installer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # required to create/update the Release and upload the asset
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build folder-wrapped installer.zip
+        run: |
+          # Zip the installer/ DIRECTORY so the archive is folder-wrapped:
+          # unzipping yields installer/install.command + installer/update.sh.
+          zip -r installer.zip installer -x 'installer/.DS_Store' 'installer/installer.zip'
+          echo "--- asset contents ---"
+          unzip -l installer.zip
+          # Enforce the folder-wrap guarantee (hard error, don't just eyeball the log):
+          # the asset must contain BOTH expected files, each under the installer/ prefix.
+          for f in installer/install.command installer/update.sh; do
+            unzip -l installer.zip | grep -q " $f\$" || { echo "ERROR: $f missing from installer.zip"; exit 1; }
+          done
+
+      - name: Publish to the 'installer' Release (marked latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: installer
+          name: Installer (latest)
+          body: |
+            Auto-published by CI from `installer/`. Always the newest build.
+            Artist download link:
+            https://github.com/joshuadll/sticker-production-scripts/releases/latest/download/installer.zip
+          files: installer.zip
+          prerelease: false
+          make_latest: true
