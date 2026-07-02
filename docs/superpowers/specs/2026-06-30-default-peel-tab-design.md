@@ -47,7 +47,7 @@ Every element that does not get a caption (`!needsCaption`) automatically gets a
 
 ## Assets
 
-- `assets/Peel_Teb_B.ai` — "PEEL HERE tab" (trapezoid). **Preferred.**
+- `assets/Peel_Tab_B.ai` — "PEEL HERE tab" (trapezoid). **Preferred.**
 - `assets/Peel_Tab_A.ai` — semi-circle tab. **Fallback** when no edge is long enough for
   PEEL HERE.
 
@@ -138,7 +138,7 @@ Three existing touch-points change:
 
 ## CONFIG knobs (new)
 
-- `peelTabAssetPathPeelHere` = `_root + "/assets/Peel_Teb_B.ai"`
+- `peelTabAssetPathPeelHere` = `_root + "/assets/Peel_Tab_B.ai"`
 - `peelTabAssetPathSemiCircle` = `_root + "/assets/Peel_Tab_A.ai"`
 - `peelHereTabWidthMm` — measured from the asset at runtime; CONFIG holds the fit margin only.
 - `peelTabEdgeFitMarginMm` — extra length required beyond the tab width to prefer PEEL HERE.

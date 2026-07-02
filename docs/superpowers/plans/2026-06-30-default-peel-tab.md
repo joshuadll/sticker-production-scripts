@@ -17,7 +17,7 @@
 - No fallback for unseated geometry: an unseated tab is a HARD ERROR that names the element and aborts before export (mirror the caption rule).
 - mm↔pt: `mmToPoints(mm)` exists in aiUtils; 1 pt = `0.352777778` mm (use the constant `25.4/72`, matching the repo's `/2.834645` convention).
 - Asset paths resolve via `_root + "/assets/FileName.ai"` where `_root = new File($.fileName).parent.parent.fsName`.
-- Assets: `assets/Peel_Teb_B.ai` = "PEEL HERE" (preferred), `assets/Peel_Tab_A.ai` = semi-circle (fallback). Note the `Teb` spelling of the PEEL HERE file is intentional (that is the real filename on disk).
+- Assets: `assets/Peel_Tab_B.ai` = "PEEL HERE" (preferred), `assets/Peel_Tab_A.ai` = semi-circle (fallback).
 
 ---
 
@@ -489,14 +489,14 @@ In the CONFIG object (after the half-cut block ~line 50), add:
     // Resolved to File objects below (after _root). peelHereTabWidthMm is the authored width of
     // the PEEL HERE tab; when the chosen edge >= that + the fit margin, use PEEL HERE, else the
     // semi-circle. straightTolerance generalises the old horizontal-only edge search.
-    peelHereTabWidthMm:              40.0,   // FIRST GUESS — re-measure from Peel_Teb_B.ai, then tune
+    peelHereTabWidthMm:              40.0,   // FIRST GUESS — re-measure from Peel_Tab_B.ai, then tune
     peelTabEdgeFitMarginMm:          2.0,
     peelTabEdgeStraightToleranceDeg: 8,
     peelTabEdgeSampleSteps:          12,
 ```
 After the `CONFIG.logPath = ...` line (~line 115), add:
 ```javascript
-CONFIG.peelTabAssetPathPeelHere   = _root + "/assets/Peel_Teb_B.ai";
+CONFIG.peelTabAssetPathPeelHere   = _root + "/assets/Peel_Tab_B.ai";
 CONFIG.peelTabAssetPathSemiCircle = _root + "/assets/Peel_Tab_A.ai";
 ```
 
@@ -895,7 +895,7 @@ Run Pipeline 1 then Pipeline 2 on a stamp-bearing SKU and confirm:
       curved/tilted edge. Peel test: grabbing the tab separates cleanly.
 - [ ] Steep/diagonal/vertical edge: seat does NOT shear or float (seatPlateToOutline was only
       validated on bottom-ish captions — record the result here and tune seat knobs if needed).
-- [ ] `peelHereTabWidthMm` re-measured from `Peel_Teb_B.ai`; A/B threshold tuned with the artist.
+- [ ] `peelHereTabWidthMm` re-measured from `Peel_Tab_B.ai`; A/B threshold tuned with the artist.
 - [ ] Final file (Step 11): tab groups ship as groups (NOT unwrapped to bare paths); no QA/halo
       layers leak into print.
 ```
