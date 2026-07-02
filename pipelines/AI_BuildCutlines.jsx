@@ -111,7 +111,7 @@ var CONFIG = {
     // Resolved to File objects below (after _root). peelHereTabWidthMm is the authored width of
     // the PEEL HERE tab; when the chosen edge >= that + the fit margin, use PEEL HERE, else the
     // semi-circle. straightTolerance generalises the old horizontal-only edge search.
-    peelHereTabWidthMm:              17.3,   // measured cutline width of Peel_Teb_B.ai (PEEL HERE)
+    peelHereTabWidthMm:              17.3,   // measured cutline width of Peel_Tab_B.ai (PEEL HERE)
     peelTabEdgeFitMarginMm:          2.0,
     peelTabEdgeStraightToleranceDeg: 8,
     peelTabPlacementGapMm:           2.0,    // gap the tab sits OUTSIDE the art edge (room to seat in)
@@ -126,7 +126,7 @@ var _root = $.fileName
     : Folder.desktop.fsName;
 
 CONFIG.logPath = _root + "/pipelines/AI_BuildCutlines.log";
-CONFIG.peelTabAssetPathPeelHere   = _root + "/assets/Peel_Teb_B.ai";
+CONFIG.peelTabAssetPathPeelHere   = _root + "/assets/Peel_Tab_B.ai";
 CONFIG.peelTabAssetPathSemiCircle = _root + "/assets/Peel_Tab_A.ai";
 
 // ─── SHARED: Step 7A export ───────────────────────────────────────────────────
