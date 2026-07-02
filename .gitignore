@@ -53,3 +53,7 @@ node_modules/
 
 # Scratch render output for visual verification (not committed)
 tmp-verify/
+
+# Installer distributable — built and published by CI (see .github/workflows/publish-installer.yml),
+# never committed. The artist downloads it from the GitHub Releases "latest" permalink.
+installer/installer.zip
