@@ -64,12 +64,20 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         log("[step-nest] WARN | Stickers layer not found — artwork will not be placed.");
     }
 
-    // Re-run safety: clear any previously placed artwork so it doesn't stack.
+    // Re-run safety: clear any previously placed artwork so it doesn't stack. Art is now
+    // EMBEDDED at placement (rasterItems) for a portable handoff, so the clear must sweep
+    // BOTH collections: rasterItems (embedded art, the norm) AND placedItems (a stray
+    // linked item from an older run or a partial embed). Clearing only placedItems would
+    // let embedded art DUPLICATE on every re-run.
     if (stickersLayer && !CONFIG.dryRun) {
         var cleared = 0;
         var pi;
         for (pi = stickersLayer.placedItems.length - 1; pi >= 0; pi--) {
             stickersLayer.placedItems[pi].remove();
+            cleared++;
+        }
+        for (pi = stickersLayer.rasterItems.length - 1; pi >= 0; pi--) {
+            stickersLayer.rasterItems[pi].remove();
             cleared++;
         }
         if (cleared > 0) {
@@ -261,8 +269,15 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     // Only the per-element ART PNG lands on Stickers now — the native caption rides its
     // cutline group (not Stickers). A mismatch means an item landed on the wrong layer
     // (e.g. the locked Cutlines layer) — a silent regression unless asserted.
-    var placedOnStickers = stickersLayer ? stickersLayer.placedItems.length : 0;
+    // Art is embedded at placement, so it lives on Stickers as rasterItems now (not
+    // placedItems). Count BOTH so a stray un-embedded link still registers as "on Stickers"
+    // (this check gates LAYER LOCATION, not embed status) — and surface embedded vs linked so
+    // an embed regression is visible: a healthy run reads "embedded N / linked 0".
+    var rasterN = stickersLayer ? stickersLayer.rasterItems.length : 0;
+    var linkedN = stickersLayer ? stickersLayer.placedItems.length : 0;
+    var placedOnStickers = rasterN + linkedN;
     log("[step-nest] art-layer-check | on Stickers: " + placedOnStickers
+        + " (embedded " + rasterN + " / linked " + linkedN + ")"
         + " / placed: " + totalArtPlaced
         + (placedOnStickers === totalArtPlaced ? "  ok" : "  *** ITEM ON WRONG LAYER ***"));
 
@@ -1246,7 +1261,27 @@ function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFac
             + " outline=" + Math.round(cW) + "x" + Math.round(cHb)
             + " dW=" + Math.round(aW - cW) + " dH=" + Math.round(aH - cHb));
 
-        return placed;
+        // Embed the linked PNG so the working + handoff .ai is SELF-CONTAINED (portable):
+        // a placed item stores an ABSOLUTE path that breaks on any other machine. Done here,
+        // AFTER all geometry (resize/translate/ART-FIT), so those run on the well-understood
+        // PlacedItem and the ART-FIT/VERIFY goldens are unchanged; embed() then bakes the
+        // pixels in, converting the PlacedItem into a RasterItem in place (same pose). A
+        // RasterItem transforms identically to a PlacedItem, so the downstream nest transform
+        // (_nestApplyPairTransform) + cluster moves keep working on the returned item.
+        placed.embed();
+        // embed() can invalidate the original reference (version-dependent). Prefer the
+        // surviving ref; else re-fetch the raster from the top of the layer (placedItems.add
+        // + PLACEATBEGINNING put it there, and embed replaces it in place). Re-apply the name
+        // either way — Step 10 matches art -> cutline by this name.
+        var art;
+        try {
+            placed.name = displayName;
+            art = placed;
+        } catch (eStale) {
+            art = stickersLayer.pageItems[0];
+            art.name = displayName;
+        }
+        return art;
 
     } catch (e) {
         // Don't leak a half-placed orphan: if add() succeeded but a later move/resize/
