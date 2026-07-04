@@ -757,6 +757,7 @@ function _capBaseArcFit(profilePts, x0, x1, opts) {
     var maxResidPt  = opts.maxResidPt  != null ? opts.maxResidPt  : 1.42;
     var tightFactor = opts.tightFactor != null ? opts.tightFactor : 1.0;
     var elWidthPt   = opts.elementWidthPt != null ? opts.elementWidthPt : 0;
+    var maxTiltDeg  = opts.maxTiltDeg  != null ? opts.maxTiltDeg  : 35;
     function none(reason) { return { warp: false, bend: 0, radius: 0, bow: 0, resid: 0, reason: reason }; }
     if (!profilePts || profilePts.length < minCols) return none("too few columns");
 
@@ -770,11 +771,19 @@ function _capBaseArcFit(profilePts, x0, x1, opts) {
     if (a === 0) return none("base ~flat (no curvature)");
     var radius = 1 / (2 * Math.abs(a));
 
-    // Symmetry: the vertex of y=a*(x-xm)^2+b*(x-xm)+c is at xm - b/(2a), NOT xm (the mean-x). A true
-    // round base is symmetric — vertex near the span centre; an off-centre lump fails here.
-    var xv = fit.fit.xm - fit.fit.b / (2 * a);
-    var cx = (x0 + x1) / 2, halfSpan = (x1 - x0) / 2;
-    if (halfSpan <= 0 || Math.abs(xv - cx) > 0.5 * halfSpan) return none("arc not centred");
+    // Tilt cap (2026-07-04, replaces the old vertical-vertex "symmetry" test). A quadratic can only
+    // be TILTED, not skewed, so "vertex xm-b/(2a) near the VERTICAL centre cx" was really rejecting
+    // TILT in disguise: a balanced arc that is merely ANGLED has its lowest *vertical* point off to
+    // the downhill side yet is centred along its own chord, and it SHOULD warp — the Run-2 seat
+    // rotates the bent caption to the base chord (seatPlateToOutline), so a symmetric bend (radius R)
+    // + seat tilt reconstructs the tilted arc. So judge in the chord frame (a symmetric arc is always
+    // centred there) and reject only a base too STEEP to sit a caption on — it would climb the side.
+    // Tilt = chord angle over the caption span.
+    // ⚠ NOT yet Illustrator-validated: maxTiltDeg is a first guess. The reason string logs each
+    //   element's tilt so a real fixture run reveals the actual distribution to tune against.
+    if (x1 <= x0) return none("degenerate span");
+    var tiltDeg = Math.abs(Math.atan2(_capYAt(fit.fit, x1) - _capYAt(fit.fit, x0), x1 - x0)) * 180 / Math.PI;
+    if (tiltDeg > maxTiltDeg) return none("base too tilted (" + tiltDeg.toFixed(0) + "deg)");
 
     // Roundness — size-relative OR clear-dip (see header). The circle is the span-independent measure
     // of curvature; bow is span-dependent (a short caption under-reads a round base), so the size test
@@ -787,7 +796,8 @@ function _capBaseArcFit(profilePts, x0, x1, opts) {
     }
 
     var bend = (a >= 0) ? 1 : -1;   // direction only; magnitude set by warpTextToBaseArc to match R
-    return { warp: true, bend: bend, radius: radius, bow: fit.bow, resid: resid, reason: "warp" };
+    return { warp: true, bend: bend, radius: radius, bow: fit.bow, resid: resid, tiltDeg: tiltDeg,
+             reason: "warp (tilt " + tiltDeg.toFixed(0) + "deg)" };
 }
 
 // Builds the white caption pill around a native (artist-shaped) text frame: sample the text
@@ -920,7 +930,8 @@ function warpTextToBaseArc(textFrame, outline, opts) {
     if (dH < 0.1 && Math.abs(dW) < 0.1) {
         return { warped: false, bend: 0, reason: "warp applied but did not render (effect no-op)" };
     }
-    return { warped: true, bend: deformValue, reason: "warped R=" + Math.round(dec.radius) + "pt" };
+    return { warped: true, bend: deformValue,
+             reason: "warped R=" + Math.round(dec.radius) + "pt, tilt " + Math.round(dec.tiltDeg || 0) + "deg" };
 }
 
 // Count the caption's non-empty visual lines (point text -> a line per hard return). Drives both
