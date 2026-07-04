@@ -315,6 +315,14 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
             // separate placement/binding needed (Pipeline 2 built it into the group).
         }
 
+        // Bake the caption's live Arc warp to static outlines BEFORE the nest rotation.
+        // The auto-warp is a LIVE "Adobe Deform" Arc that bends along the PAGE horizontal,
+        // so a rotated sticker misaligns it — the pill (a plain path) rotates rigidly while
+        // the live-warped text re-evaluates and spills out of its pill (wrong-direction curve
+        // / text into the art). Expanding freezes the warp into the glyph outlines, which then
+        // transform rigidly with the pill through this AND every later cluster rotation.
+        _nestBakeCaptionWarp(doc, cutlineItem);
+
         _nestApplyPairTransform(cutlineItem, artItem, rotation, svgItem.center);
 
         // ── Objective correctness check ──────────────────────────────────────────
@@ -449,6 +457,37 @@ function _nestTranslatePairs(pairs, dx, dy) {
         p.cut.translate(dx, dy);
         if (p.art)     p.art.translate(dx, dy);
         if (p.caption) p.caption.translate(dx, dy);
+    }
+}
+
+// Bakes a captioned group's live Arc warp into static glyph outlines so it survives the
+// nest rotation rigidly (see the call site for why a live page-horizontal warp misaligns).
+// Uses Expand Appearance (executeMenuCommand "expandStyle"), which is a NO-OP on a plain
+// (unwarped) text frame — so only the round/oval-base captions that actually carry a warp
+// get outlined; flat-bottomed captions stay editable. Idempotent (a member already expanded
+// to a GroupItem is skipped). The baked group keeps the "{name} caption text" name so Step 8b
+// (which only SCALES the member) and export still find it. dryRun-safe. Returns true if it ran.
+function _nestBakeCaptionWarp(doc, group) {
+    if (CONFIG.dryRun) return false;
+    if (!group || group.typename !== "GroupItem") return false;
+    var text = findGroupMember(group, " caption text");
+    if (!text || text.typename !== "TextFrame") return false;   // no caption / already baked
+    var name = text.name;
+    try {
+        doc.selection = null;
+        text.selected = true;
+        app.executeMenuCommand("expandStyle");   // Object > Expand Appearance — freezes the live warp
+        var baked = (doc.selection && doc.selection.length) ? doc.selection[0] : null;
+        if (baked && baked.typename === "GroupItem") {
+            baked.name = name;                   // preserve "{name} caption text" for Step 8b / export
+            log("[step-nest] caption warp baked | " + group.name);
+        }
+        doc.selection = null;
+        return true;
+    } catch (e) {
+        log("[step-nest] WARN | caption warp bake failed | " + group.name + ": " + e.message);
+        try { doc.selection = null; } catch (e2) {}
+        return false;
     }
 }
 
