@@ -888,6 +888,7 @@ function warpTextToBaseArc(textFrame, outline, opts) {
         minBowPt:       mmToPoints(opts.minBowMm != null ? opts.minBowMm : 0.5),
         maxResidPt:     (opts.maxResidFrac != null ? opts.maxResidFrac : 0.5) * textH,
         tightFactor:    opts.tightRadiusFactor != null ? opts.tightRadiusFactor : 1.0,
+        maxTiltDeg:     opts.maxTiltDeg,   // null -> _capBaseArcFit's 35deg default
         elementWidthPt: elWidthPt
     });
     if (!dec.warp) return { warped: false, bend: 0, reason: dec.reason };

@@ -38,6 +38,11 @@ var CONFIG = {
     captionWarpTightRadiusFactor: 1.0,    // ⚠ ROUNDNESS: warp when the curve's circle radius <= factor ×
                                           //     element width (size-relative, scale-free). 1.0 = "circle no
                                           //     bigger than the sticker". Round bases here ≤0.75×, flat ≥1.5×.
+    captionWarpMaxTiltDeg:     35,        // ⚠ TILT CAP: skip the warp when the base under the caption is
+                                          //     steeper than this (chord angle, deg) — the caption would
+                                          //     climb the side. Must stay <= maxSeatRotationDeg (75) so the
+                                          //     seat can still rotate a warped tilted caption. First guess —
+                                          //     tune on a genuinely tilted round SKU (tilt is logged per element).
     captionWarpMaxBend:        0.6,       // clamp on the applied Arc-warp bend fraction (-1..1)
     captionWarpBendCalib:      1.0,       // bend magnitude scale: 1.0 = caption radius matches the base
                                           //     (concentric); <1.0 = gentler. Tune on a real round SKU.
