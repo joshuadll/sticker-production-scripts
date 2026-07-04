@@ -84,10 +84,21 @@ function opt(elWidthPt) { return { minCols: 8, minBowPt: 1.42, maxResidPt: 1.42,
     check(r.warp === false, 'central notch should not warp (' + r.reason + ')');
 })();
 
-// 7. Asymmetric lump (arc vertex near the left end) -> NO warp (symmetry gate)
+// 7. Mildly-tilted balanced arc -> WARP (tilt cap, 2026-07-04). Vertex sits left of the span centre
+//    in the VERTICAL frame, but the chord tilt is gentle (~9deg). The old vertical-vertex "symmetry"
+//    gate wrongly rejected this as off-centre; the tilt-cap model warps it, because a quadratic can
+//    only be tilted (not skewed) and the Run-2 seat supplies the tilt. (Kapustnica's class.)
 (function () {
     var r = _capBaseArcFit(profile(function (x) { return 100 + 0.0018 * (x - 15) * (x - 15); }), 0, 120, opt(200));
-    check(r.warp === false, 'off-centre arc should not warp (' + r.reason + ')');
+    check(r.warp === true, 'mildly-tilted balanced arc should warp (' + r.reason + ')');
+})();
+
+// 8. Steeply-tilted base (caption on the side of a small circle) -> NO warp (tilt cap). The chord
+//    climbs ~70deg over the span; warping+seating it would run the caption up the side.
+(function () {
+    var r = _capBaseArcFit(profileN(function (x) { return 0.02 * (x + 40) * (x + 40); }, 60, 1), 0, 60, opt(200));
+    check(r.warp === false, 'steeply-tilted base should stay flat (' + r.reason + ')');
+    check(/too tilted/.test(r.reason), 'steep base should be rejected by the tilt cap (' + r.reason + ')');
 })();
 
 console.log(fails === 0 ? 'PASS warpfit' : ('FAIL warpfit (' + fails + ' failure(s))'));

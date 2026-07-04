@@ -26,6 +26,12 @@ var CONFIG = {
     // All alerts are still written to the log regardless.
     suppressAlerts: false,
 
+    // Top-level source-PSD layer names to treat as non-elements (case-insensitive).
+    // Background is always ignored; add helper layers a source PSD legitimately keeps
+    // at the top level (e.g. "Guides", "Colour Reference") so they don't warn as
+    // failed imports. Every other un-importable top-level layer IS warned.
+    ignoreTopLevelLayers: [],
+
     logPath: "", // resolved below — same folder as this script
 
     // Pixel targets at 300 DPI (longest edge) — midpoints for range categories.
@@ -120,6 +126,23 @@ function createTemplateDoc() {
         + CONFIG.templateWidthCm + " x " + CONFIG.templateHeightCm + " cm, "
         + CONFIG.templateDPI + " DPI).");
     return doc;
+}
+
+// Builds the "N element(s) NOT imported" warning block for the completion alert
+// (empty string when nothing failed). Shared by the dry-run and normal-run paths so
+// both surface the same failed-import list.
+function notImportedWarning(notImported) {
+    var ni = notImported || [];
+    if (ni.length === 0) return "";
+    var out = "⚠️ " + ni.length + " element" + (ni.length === 1 ? " was" : "s were") + " NOT imported:\n";
+    for (var n = 0; n < ni.length; n++) {
+        out += "   • \"" + ni[n].name + "\"  — " + (ni[n].reason || "invalid name")
+            + "  (in " + decodeURI(ni[n].file) + ")\n";
+    }
+    out += "\nFix these in the source PSD (rename, ungroup folders, remove duplicates),\n"
+        + "then re-run Pipeline 1.\n\n"
+        + "──────────────────────────────\n\n";
+    return out;
 }
 
 function saveWorkingDoc(doc, folder) {
@@ -220,7 +243,8 @@ function main() {
         var dryResult = runCombine(doc, folder);
         log("[pipeline] [DRY RUN] complete. Would place " + dryResult.placed
             + " element(s) from " + dryResult.fileCount + " file(s). No changes made.");
-        scriptAlert("[DRY RUN] Complete.\n\n"
+        scriptAlert(notImportedWarning(dryResult.notImported)
+            + "[DRY RUN] Complete.\n\n"
             + "Would place:  " + dryResult.placed + " element(s)\n"
             + "From:         " + dryResult.fileCount + " file(s)\n\n"
             + "No changes made. Log: " + CONFIG.logPath);
@@ -362,6 +386,10 @@ function main() {
         msg += "\n\n⚠️ Couldn't group " + groupResult.skipped.length + " element(s):";
         for (var c = 0; c < groupResult.skipped.length; c++) msg += "\n   • " + groupResult.skipped[c];
     }
+
+    // Failed imports go at the TOP — most important, and the artist must fix + re-run.
+    msg = notImportedWarning(combineResult.notImported) + msg;
+
     scriptAlert(msg);
 }
 
