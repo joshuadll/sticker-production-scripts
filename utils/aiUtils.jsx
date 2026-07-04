@@ -285,16 +285,35 @@ function _bwdMarginBand(doc) {
         rects[ri].stroked    = false;
     }
 
-    // "Make Compound Path" on the two rects — the inner becomes a hole.
-    app.selection = null;
-    outer.selected = true;
-    inner.selected = true;
-    app.executeMenuCommand("compoundPath");
-    app.selection = null;
+    // Build the compound path natively via the DOM — NOT executeMenuCommand,
+    // which drives the "Object > Compound Path > Make" UI menu and silently
+    // NO-OPs on a cold-launched (not-yet-warm) Illustrator: it creates ZERO
+    // compound paths, so margin.compoundPathItems[0] then throws Error 1302
+    // ("No such element") and the whole pipeline dies at document setup. Instead
+    // add an empty compound path item and reparent the two styled rects into it
+    // (same move() reparenting idiom as wrapStampsInGroups) — works cold.
+    var cp = margin.compoundPathItems.add();
+    outer.move(cp, ElementPlacement.PLACEATEND);
+    inner.move(cp, ElementPlacement.PLACEATEND);
 
-    var cp = margin.compoundPathItems[0];
-    cp.evenodd = true;   // inner rect reads as a hole
-    cp.opacity = 30;     // 30% black band — container opacity (applies to the whole compound)
+    // Guard: a healthy compound now holds exactly the two subpaths. If the DOM
+    // construction somehow yielded nothing (rather than silently limping on to a
+    // 1302 elsewhere), fail loudly with an actionable message.
+    if (margin.compoundPathItems.length === 0 || cp.pathItems.length < 2) {
+        throw new Error("Margin band: compound path build failed (compoundPaths=" +
+            margin.compoundPathItems.length + ", subpaths=" +
+            (cp ? cp.pathItems.length : "n/a") +
+            ") — expected 1 compound of 2 rects. Try re-running once Illustrator is fully launched.");
+    }
+
+    // A DOM-created compound does NOT inherit appearance from a Make-Compound-Path
+    // selection, so paint the compound itself black too (belt-and-suspenders with
+    // the per-rect styling above) — otherwise the band could render invisible.
+    cp.filled    = true;
+    cp.fillColor = blackCmyk();
+    cp.stroked   = false;
+    cp.evenodd   = true;   // inner rect reads as a hole
+    cp.opacity   = 30;     // 30% black band — container opacity (applies to the whole compound)
 
     margin.zOrder(ZOrderMethod.BRINGTOFRONT);
     margin.locked = true;
