@@ -178,6 +178,19 @@ else
         echo "PASS [$STEP]: artwork on Stickers layer."
     fi
 
+    # Art-POSITION correctness: each art item must ride the nest transform WITH its cutline
+    # and stay co-located. ART-FIT (size) + VERIFY (cutline bbox) + art-layer-check (count) are
+    # all blind to a detached art item that keeps the right size on the right layer but sits far
+    # from its cutline — exactly the failure mode when the embed/reference handling is wrong.
+    if grep -q "ART MISPLACED" "$LOG"; then
+        echo "FAIL [$STEP]: art detached from its cutline (rode the wrong reference):"
+        grep "art-pos-check" "$LOG"
+        FAIL=1
+    else
+        echo "PASS [$STEP]: art co-located with cutlines."
+        grep "art-pos-check" "$LOG" || true
+    fi
+
     # Group-rotation correctness: the regular cluster's −90° rotation must transpose
     # its bbox (W↔H). A failure means elements spun in place instead of orbiting the
     # pivot, so the group never actually rotated to its top-left landscape band.

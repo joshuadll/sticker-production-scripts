@@ -262,6 +262,28 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
             + "gates overlap at export");
     }
 
+    // ── 5d. Embed placed art (portable handoff) ──────────────────────────────────
+    // Art is placed LINKED (placedItems.add + absolute .file path), which breaks on any
+    // other machine. Embed it now — AFTER every transform (placement, nest pair transform,
+    // cluster rotate/translate/contour-fit) so all geometry ran on the well-understood
+    // PlacedItems; this pass only bakes the pixels in. embed() converts each PlacedItem to a
+    // RasterItem IN PLACE (same pose) and PRESERVES its name (Step 10 matches art->cutline by
+    // name). Critically it also DETACHES the original reference, so it must run here, not at
+    // placement, where callers still hold the ref to transform it. Loop on placedItems[0]:
+    // each embed drops that item from the collection, so we never reuse a detached ref.
+    if (stickersLayer && !CONFIG.dryRun) {
+        var embedded = 0, embedGuard = 0;
+        while (stickersLayer.placedItems.length > 0 && embedGuard < 10000) {
+            embedGuard++;
+            try { stickersLayer.placedItems[0].embed(); embedded++; }
+            catch (eEmb) {
+                log("[step-nest] WARN | embed failed — line " + eEmb.line + ": " + eEmb.message);
+                break;   // avoid an infinite loop on a stuck item
+            }
+        }
+        log("[step-nest] embed | " + embedded + " art item(s) embedded (portable handoff)");
+    }
+
     // ── 6. Summary ───────────────────────────────────────────────────────────────
     // Verify art actually landed on the Stickers layer (not Cutlines): doc.placedItems
     // .add() ignores the active layer after the cutline passes, so a regression here is
@@ -280,6 +302,45 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         + " (embedded " + rasterN + " / linked " + linkedN + ")"
         + " / placed: " + totalArtPlaced
         + (placedOnStickers === totalArtPlaced ? "  ok" : "  *** ITEM ON WRONG LAYER ***"));
+
+    // Art-POSITION check (the invariant ART-FIT/VERIFY were blind to): each art item must end
+    // up CO-LOCATED with its cutline, not just correctly sized and on the right layer. Art is
+    // centred on the cutline's " outline" member (element-art trace) at placement, then MUST
+    // ride the nest+cluster transforms with its cutline — so the two centres stay together. A
+    // detached art item (e.g. the transform moved a phantom, not the real raster) shows up here
+    // as a large centre offset even though every other check passes. Stamps (no " outline"
+    // member) fall back to the cutline path centre. Skipped under dryRun (no transforms run).
+    if (!CONFIG.dryRun && stickersLayer && cutlinesLayer) {
+        var artByName = {};
+        var si2;
+        for (si2 = 0; si2 < stickersLayer.pageItems.length; si2++) {
+            var ai2 = stickersLayer.pageItems[si2];
+            if (ai2.parent === stickersLayer) artByName[ai2.name] = ai2;
+        }
+        var worstPos = 0, worstName = "", checkedPos = 0, gp;
+        for (gp = 0; gp < cutlinesLayer.groupItems.length; gp++) {
+            var gpItem = cutlinesLayer.groupItems[gp];
+            if (gpItem.parent !== cutlinesLayer) continue;
+            var artIt = artByName[gpItem.name];
+            if (!artIt) continue;   // stamps carry no separate art item — nothing to check
+            var refM = findGroupMember(gpItem, " outline");
+            var refB = refM ? refM.geometricBounds : gpItem.geometricBounds;
+            var refC = boundsCenter(refB), artC = boundsCenter(artIt.geometricBounds);
+            var offX = artC.x - refC.x, offY = artC.y - refC.y;
+            var off = Math.sqrt(offX * offX + offY * offY);
+            checkedPos++;
+            if (off > worstPos) { worstPos = off; worstName = gpItem.name; }
+        }
+        // Tolerance 20pt: art centres on the outline trace, so the offset is normally a few
+        // pt (trace-inset asymmetry — a thin diagonal like Fujara reaches ~11pt). A detached/
+        // un-transformed art item is 65..1000+ pt off, so 20pt cleanly separates healthy from
+        // broken while leaving headroom above the worst legitimate residual.
+        var posTol = 20;
+        log("[step-nest] art-pos-check | checked: " + checkedPos
+            + " | worst art-outline centre offset: " + Math.round(worstPos) + "pt"
+            + (worstName ? " (" + worstName + ")" : "")
+            + (worstPos <= posTol ? "  ok" : "  *** ART MISPLACED ***"));
+    }
 
     log("[step-nest] result | matched: " + totalMatched
         + " | unmatched: " + totalUnmatched
@@ -1261,27 +1322,12 @@ function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFac
             + " outline=" + Math.round(cW) + "x" + Math.round(cHb)
             + " dW=" + Math.round(aW - cW) + " dH=" + Math.round(aH - cHb));
 
-        // Embed the linked PNG so the working + handoff .ai is SELF-CONTAINED (portable):
-        // a placed item stores an ABSOLUTE path that breaks on any other machine. Done here,
-        // AFTER all geometry (resize/translate/ART-FIT), so those run on the well-understood
-        // PlacedItem and the ART-FIT/VERIFY goldens are unchanged; embed() then bakes the
-        // pixels in, converting the PlacedItem into a RasterItem in place (same pose). A
-        // RasterItem transforms identically to a PlacedItem, so the downstream nest transform
-        // (_nestApplyPairTransform) + cluster moves keep working on the returned item.
-        placed.embed();
-        // embed() can invalidate the original reference (version-dependent). Prefer the
-        // surviving ref; else re-fetch the raster from the top of the layer (placedItems.add
-        // + PLACEATBEGINNING put it there, and embed replaces it in place). Re-apply the name
-        // either way — Step 10 matches art -> cutline by this name.
-        var art;
-        try {
-            placed.name = displayName;
-            art = placed;
-        } catch (eStale) {
-            art = stickersLayer.pageItems[0];
-            art.name = displayName;
-        }
-        return art;
+        // Return the PlacedItem UNCHANGED — the nest transform (_nestApplyPairTransform) +
+        // cluster moves must run on the live placed item. Embedding happens LATER, in a
+        // single final pass (see runNestingImport §5d), once all transforms are done — embed()
+        // detaches the original reference (leaves it a phantom), so it must never be embedded
+        // while a caller still holds it for transforming.
+        return placed;
 
     } catch (e) {
         // Don't leak a half-placed orphan: if add() succeeded but a later move/resize/
