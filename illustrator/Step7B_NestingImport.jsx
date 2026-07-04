@@ -464,9 +464,10 @@ function _nestTranslatePairs(pairs, dx, dy) {
 // nest rotation rigidly (see the call site for why a live page-horizontal warp misaligns).
 // Uses Expand Appearance (executeMenuCommand "expandStyle"), which is a NO-OP on a plain
 // (unwarped) text frame — so only the round/oval-base captions that actually carry a warp
-// get outlined; flat-bottomed captions stay editable. Idempotent (a member already expanded
-// to a GroupItem is skipped). The baked group keeps the "{name} caption text" name so Step 8b
-// (which only SCALES the member) and export still find it. dryRun-safe. Returns true if it ran.
+// get outlined; flat-bottomed captions stay editable TextFrames. Idempotent (a member already
+// expanded to non-text geometry is skipped). The baked result keeps the "{name} caption text"
+// name so Step 8b (which only SCALES the member) and export still resolve it. dryRun-safe.
+// Returns true if the bake pass ran (whether or not the frame actually carried a warp).
 function _nestBakeCaptionWarp(doc, group) {
     if (CONFIG.dryRun) return false;
     if (!group || group.typename !== "GroupItem") return false;
@@ -474,19 +475,31 @@ function _nestBakeCaptionWarp(doc, group) {
     if (!text || text.typename !== "TextFrame") return false;   // no caption / already baked
     var name = text.name;
     try {
-        doc.selection = null;
+        // executeMenuCommand("expandStyle") acts on the ACTIVE document's selection, so pin the
+        // active doc to `doc` and drive selection through app.selection (not doc.selection) — the
+        // two only agree while doc is frontmost, and _nestCollectFromSvgs can swallow a restore throw.
+        app.activeDocument = doc;
+        app.selection = null;
         text.selected = true;
         app.executeMenuCommand("expandStyle");   // Object > Expand Appearance — freezes the live warp
-        var baked = (doc.selection && doc.selection.length) ? doc.selection[0] : null;
-        if (baked && baked.typename === "GroupItem") {
-            baked.name = name;                   // preserve "{name} caption text" for Step 8b / export
+        // A WARPED frame expands to path geometry — usually a GroupItem, but a CompoundPathItem for
+        // simple/single-colour glyphs; either way reapply the name so downstream name lookups still
+        // hit it. A PLAIN frame is a no-op and stays a TextFrame — correctly left editable, unnamed
+        // touch. Warn (never silently drop) if it expanded to an unexpected multi-item shape.
+        var sel = app.selection;
+        var baked = (sel && sel.length === 1) ? sel[0] : null;
+        if (baked && baked.typename !== "TextFrame") {
+            baked.name = name;                   // GroupItem OR CompoundPathItem OR PathItem
             log("[step-nest] caption warp baked | " + group.name);
+        } else if (sel && sel.length > 1) {
+            log("[step-nest] WARN | caption warp expanded to " + sel.length
+                + " items — '" + name + "' name not reapplied | " + group.name);
         }
-        doc.selection = null;
+        app.selection = null;
         return true;
     } catch (e) {
         log("[step-nest] WARN | caption warp bake failed | " + group.name + ": " + e.message);
-        try { doc.selection = null; } catch (e2) {}
+        try { app.selection = null; } catch (e2) {}
         return false;
     }
 }
