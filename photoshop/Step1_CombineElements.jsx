@@ -118,11 +118,10 @@ function runCombine(templateDoc, folder) {
             // Second pass: place each group or log what would happen.
             for (var k = 0; k < groupNames.length; k++) {
                 var groupName  = groupNames[k];
-                var parsed     = parseLayerName(groupName);
-                var targetPx   = getTargetPx(parsed);
-                var resizeNote = (targetPx !== null)
-                    ? " -> resize to " + targetPx + "px"
-                    : " -> WARN: unrecognised category, will skip at resize";
+                // groupNames only holds importable names, so getTargetPx is always
+                // non-null here (isImportableName already gated on it).
+                var targetPx   = getTargetPx(parseLayerName(groupName));
+                var resizeNote = " -> resize to " + targetPx + "px";
 
                 if (CONFIG.dryRun) {
                     log("[step1] [DRY RUN] would place | " + groupName + " from " + fileName + resizeNote);

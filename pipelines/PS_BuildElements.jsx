@@ -128,6 +128,23 @@ function createTemplateDoc() {
     return doc;
 }
 
+// Builds the "N element(s) NOT imported" warning block for the completion alert
+// (empty string when nothing failed). Shared by the dry-run and normal-run paths so
+// both surface the same failed-import list.
+function notImportedWarning(notImported) {
+    var ni = notImported || [];
+    if (ni.length === 0) return "";
+    var out = "⚠️ " + ni.length + " element" + (ni.length === 1 ? " was" : "s were") + " NOT imported:\n";
+    for (var n = 0; n < ni.length; n++) {
+        out += "   • \"" + ni[n].name + "\"  — " + (ni[n].reason || "invalid name")
+            + "  (in " + decodeURI(ni[n].file) + ")\n";
+    }
+    out += "\nFix these in the source PSD (rename, ungroup folders, remove duplicates),\n"
+        + "then re-run Pipeline 1.\n\n"
+        + "──────────────────────────────\n\n";
+    return out;
+}
+
 function saveWorkingDoc(doc, folder) {
     var savePath = folder.fsName + "/" + folder.name + ".psd";
     var saveFile = new File(savePath);
@@ -226,7 +243,8 @@ function main() {
         var dryResult = runCombine(doc, folder);
         log("[pipeline] [DRY RUN] complete. Would place " + dryResult.placed
             + " element(s) from " + dryResult.fileCount + " file(s). No changes made.");
-        scriptAlert("[DRY RUN] Complete.\n\n"
+        scriptAlert(notImportedWarning(dryResult.notImported)
+            + "[DRY RUN] Complete.\n\n"
             + "Would place:  " + dryResult.placed + " element(s)\n"
             + "From:         " + dryResult.fileCount + " file(s)\n\n"
             + "No changes made. Log: " + CONFIG.logPath);
@@ -370,18 +388,7 @@ function main() {
     }
 
     // Failed imports go at the TOP — most important, and the artist must fix + re-run.
-    var ni = combineResult.notImported || [];
-    if (ni.length > 0) {
-        var niMsg = "⚠️ " + ni.length + " element" + (ni.length === 1 ? " was" : "s were") + " NOT imported:\n";
-        for (var n = 0; n < ni.length; n++) {
-            niMsg += "   • \"" + ni[n].name + "\"  — " + (ni[n].reason || "invalid name")
-                + "  (in " + decodeURI(ni[n].file) + ")\n";
-        }
-        niMsg += "\nFix these in the source PSD (rename, ungroup folders, remove duplicates),\n"
-            + "then re-run Pipeline 1.\n\n"
-            + "──────────────────────────────\n\n";
-        msg = niMsg + msg;
-    }
+    msg = notImportedWarning(combineResult.notImported) + msg;
 
     scriptAlert(msg);
 }
