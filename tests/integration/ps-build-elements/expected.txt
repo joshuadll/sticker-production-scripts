@@ -9,6 +9,7 @@
 [step1] template cleared.
 [step1] opened | Slovakia%20Sticker%20Set%20A4%20-%201.psd
 [step1] found | 7 group(s) in Slovakia%20Sticker%20Set%20A4%20-%201.psd
+[step1] NOT IMPORTED (invalid name) | "Flag + Slovakia(text) [WC-IC] " in Slovakia%20Sticker%20Set%20A4%20-%201.psd
 [step1] placed | Devín Castle [WC-LM-] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 540px
 [step1] placed | Slovak Paradise National Park [WC-LM-] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 540px
 [step1] placed | Spiš Castle [WC-LM+] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 690px
@@ -30,6 +31,7 @@
 [step1] closed | Slovakia%20Sticker%20Set%20A4%20-%202.psd
 [step1] opened | Slovakia%20Sticker%20Set%20A4%20-%203.psd
 [step1] found | 11 group(s) in Slovakia%20Sticker%20Set%20A4%20-%203.psd
+[step1] NOT IMPORTED (invalid name) | "Kapustnica WC-FD]" in Slovakia%20Sticker%20Set%20A4%20-%203.psd
 [step1] placed | Bratislava(text) [WC-TL] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 900px
 [step1] placed | Šúľance s Makom [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
 [step1] placed | Pirohy [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
