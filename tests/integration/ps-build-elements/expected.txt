@@ -8,12 +8,12 @@
 [step1] clearing element layers from template...
 [step1] template cleared.
 [step1] opened | Slovakia%20Sticker%20Set%20A4%20-%201.psd
-[step1] found | 7 group(s) in Slovakia%20Sticker%20Set%20A4%20-%201.psd
-[step1] NOT IMPORTED (invalid name) | "Flag + Slovakia(text) [WC-IC] " in Slovakia%20Sticker%20Set%20A4%20-%201.psd
+[step1] found | 8 group(s) in Slovakia%20Sticker%20Set%20A4%20-%201.psd
 [step1] placed | Devín Castle [WC-LM-] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 540px
 [step1] placed | Slovak Paradise National Park [WC-LM-] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 540px
 [step1] placed | Spiš Castle [WC-LM+] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 690px
 [step1] placed | Bratislava Castle [WC-LM+] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 690px
+[step1] placed | Flag + Slovakia(text) [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 495px
 [step1] placed | Štrbské Pleso [WC-LM-] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 540px
 [step1] placed | National Flower [ST] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 450px
 [step1] placed | Slovakia Map [WC-MP] from Slovakia%20Sticker%20Set%20A4%20-%201.psd -> resize to 570px
@@ -30,11 +30,11 @@
 [step1] placed | Čumil Statue [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%202.psd -> resize to 495px
 [step1] closed | Slovakia%20Sticker%20Set%20A4%20-%202.psd
 [step1] opened | Slovakia%20Sticker%20Set%20A4%20-%203.psd
-[step1] found | 11 group(s) in Slovakia%20Sticker%20Set%20A4%20-%203.psd
-[step1] NOT IMPORTED (invalid name) | "Kapustnica WC-FD]" in Slovakia%20Sticker%20Set%20A4%20-%203.psd
+[step1] found | 12 group(s) in Slovakia%20Sticker%20Set%20A4%20-%203.psd
 [step1] placed | Bratislava(text) [WC-TL] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 900px
 [step1] placed | Šúľance s Makom [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
 [step1] placed | Pirohy [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
+[step1] placed | Kapustnica [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
 [step1] placed | Bryndzové halušky [WC-FD] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 525px
 [step1] placed | Kraslice [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 495px
 [step1] placed | Kroje [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 495px
@@ -44,9 +44,9 @@
 [step1] placed | Carpathian Wooden Churches [WC-IC] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 495px
 [step1] placed | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) [WC-LM] from Slovakia%20Sticker%20Set%20A4%20-%203.psd -> resize to 615px
 [step1] closed | Slovakia%20Sticker%20Set%20A4%20-%203.psd
-[pipeline] step 1 complete | 26 element(s) from 3 file(s).
+[pipeline] step 1 complete | 28 element(s) from 3 file(s).
 [pipeline] --- Step 2: Resize ---
-[step2] doc.layers.length = 27
+[step2] doc.layers.length = 29
 [step2] layer[0] = St Elizabeth's Cathedral | (Dóm Svätej Alzbety) [WC-LM]
 [step2] layer[1] = Carpathian Wooden Churches [WC-IC]
 [step2] layer[2] = Tatra chamois [WC-IC]
@@ -55,25 +55,27 @@
 [step2] layer[5] = Kroje [WC-IC]
 [step2] layer[6] = Kraslice [WC-IC]
 [step2] layer[7] = Bryndzové halušky [WC-FD]
-[step2] layer[8] = Pirohy [WC-FD]
-[step2] layer[9] = Šúľance s Makom [WC-FD]
-[step2] layer[10] = Bratislava(text) [WC-TL]
-[step2] layer[11] = Čumil Statue [WC-IC]
-[step2] layer[12] = The Blue Church | Church of St. Elizabeth [WC-LM]
-[step2] layer[13] = Michael's Gate [WC-LM-]
-[step2] layer[14] = Orava Castle [WC-LM-]
-[step2] layer[15] = Bojnice Castle [WC-LM]
-[step2] layer[16] = Old Town Hall (Bratislava) [WC-LM-]
-[step2] layer[17] = UFO Observation Deck, Bridge SNP [ST]
-[step2] layer[18] = St. Martin's Cathedral [WC-LM]
-[step2] layer[19] = Slovakia Map [WC-MP]
-[step2] layer[20] = National Flower [ST]
-[step2] layer[21] = Štrbské Pleso [WC-LM-]
-[step2] layer[22] = Bratislava Castle [WC-LM+]
-[step2] layer[23] = Spiš Castle [WC-LM+]
-[step2] layer[24] = Slovak Paradise National Park [WC-LM-]
-[step2] layer[25] = Devín Castle [WC-LM-]
-[step2] layer[26] = Background
+[step2] layer[8] = Kapustnica [WC-FD]
+[step2] layer[9] = Pirohy [WC-FD]
+[step2] layer[10] = Šúľance s Makom [WC-FD]
+[step2] layer[11] = Bratislava(text) [WC-TL]
+[step2] layer[12] = Čumil Statue [WC-IC]
+[step2] layer[13] = The Blue Church | Church of St. Elizabeth [WC-LM]
+[step2] layer[14] = Michael's Gate [WC-LM-]
+[step2] layer[15] = Orava Castle [WC-LM-]
+[step2] layer[16] = Bojnice Castle [WC-LM]
+[step2] layer[17] = Old Town Hall (Bratislava) [WC-LM-]
+[step2] layer[18] = UFO Observation Deck, Bridge SNP [ST]
+[step2] layer[19] = St. Martin's Cathedral [WC-LM]
+[step2] layer[20] = Slovakia Map [WC-MP]
+[step2] layer[21] = National Flower [ST]
+[step2] layer[22] = Štrbské Pleso [WC-LM-]
+[step2] layer[23] = Flag + Slovakia(text) [WC-IC]
+[step2] layer[24] = Bratislava Castle [WC-LM+]
+[step2] layer[25] = Spiš Castle [WC-LM+]
+[step2] layer[26] = Slovak Paradise National Park [WC-LM-]
+[step2] layer[27] = Devín Castle [WC-LM-]
+[step2] layer[28] = Background
 [step2] resized | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) [WC-LM] -> art 575px (final 615px incl. 40px white edge)
 [step2] resized | Carpathian Wooden Churches [WC-IC] -> art 455px (final 495px incl. 40px white edge)
 [step2] resized | Tatra chamois [WC-IC] -> art 455px (final 495px incl. 40px white edge)
@@ -82,6 +84,7 @@
 [step2] resized | Kroje [WC-IC] -> art 455px (final 495px incl. 40px white edge)
 [step2] resized | Kraslice [WC-IC] -> art 455px (final 495px incl. 40px white edge)
 [step2] resized | Bryndzové halušky [WC-FD] -> art 485px (final 525px incl. 40px white edge)
+[step2] resized | Kapustnica [WC-FD] -> art 485px (final 525px incl. 40px white edge)
 [step2] resized | Pirohy [WC-FD] -> art 485px (final 525px incl. 40px white edge)
 [step2] resized | Šúľance s Makom [WC-FD] -> art 485px (final 525px incl. 40px white edge)
 [step2] resized | Bratislava(text) [WC-TL] -> art 860px (final 900px incl. 40px white edge)
@@ -96,6 +99,7 @@
 [step2] resized | Slovakia Map [WC-MP] -> art 530px (final 570px incl. 40px white edge)
 [step2] resized | National Flower [ST] -> art 450px
 [step2] resized | Štrbské Pleso [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
+[step2] resized | Flag + Slovakia(text) [WC-IC] -> art 455px (final 495px incl. 40px white edge)
 [step2] resized | Bratislava Castle [WC-LM+] -> art 650px (final 690px incl. 40px white edge)
 [step2] resized | Spiš Castle [WC-LM+] -> art 650px (final 690px incl. 40px white edge)
 [step2] resized | Slovak Paradise National Park [WC-LM-] -> art 500px (final 540px incl. 40px white edge)
@@ -105,30 +109,32 @@
 [step2] grid | Slovak Paradise National Park [WC-LM-] -> col 1 row 0
 [step2] grid | Spiš Castle [WC-LM+] -> col 2 row 0
 [step2] grid | Bratislava Castle [WC-LM+] -> col 3 row 0
-[step2] grid | Štrbské Pleso [WC-LM-] -> col 0 row 1
-[step2] grid | National Flower [ST] -> col 1 row 1
-[step2] grid | Slovakia Map [WC-MP] -> col 2 row 1
-[step2] grid | St. Martin's Cathedral [WC-LM] -> col 3 row 1
-[step2] grid | UFO Observation Deck, Bridge SNP [ST] -> col 0 row 2
-[step2] grid | Old Town Hall (Bratislava) [WC-LM-] -> col 1 row 2
-[step2] grid | Bojnice Castle [WC-LM] -> col 2 row 2
-[step2] grid | Orava Castle [WC-LM-] -> col 3 row 2
-[step2] grid | Michael's Gate [WC-LM-] -> col 0 row 3
-[step2] grid | The Blue Church | Church of St. Elizabeth [WC-LM] -> col 1 row 3
-[step2] grid | Čumil Statue [WC-IC] -> col 2 row 3
-[step2] grid | Bratislava(text) [WC-TL] -> col 3 row 3
-[step2] grid | Šúľance s Makom [WC-FD] -> col 0 row 4
-[step2] grid | Pirohy [WC-FD] -> col 1 row 4
-[step2] grid | Bryndzové halušky [WC-FD] -> col 2 row 4
-[step2] grid | Kraslice [WC-IC] -> col 3 row 4
-[step2] grid | Kroje [WC-IC] -> col 0 row 5
-[step2] grid | Fujara [WC-IC] -> col 1 row 5
-[step2] grid | Tram [WC-TR] -> col 2 row 5
-[step2] grid | Tatra chamois [WC-IC] -> col 3 row 5
-[step2] grid | Carpathian Wooden Churches [WC-IC] -> col 0 row 6
-[step2] grid | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) [WC-LM] -> col 1 row 6
-[step2] grid layout done | 26 element(s), 4 col(s), cell 1020px
-[pipeline] step 2 complete | 26 element(s) resized.
+[step2] grid | Flag + Slovakia(text) [WC-IC] -> col 0 row 1
+[step2] grid | Štrbské Pleso [WC-LM-] -> col 1 row 1
+[step2] grid | National Flower [ST] -> col 2 row 1
+[step2] grid | Slovakia Map [WC-MP] -> col 3 row 1
+[step2] grid | St. Martin's Cathedral [WC-LM] -> col 0 row 2
+[step2] grid | UFO Observation Deck, Bridge SNP [ST] -> col 1 row 2
+[step2] grid | Old Town Hall (Bratislava) [WC-LM-] -> col 2 row 2
+[step2] grid | Bojnice Castle [WC-LM] -> col 3 row 2
+[step2] grid | Orava Castle [WC-LM-] -> col 0 row 3
+[step2] grid | Michael's Gate [WC-LM-] -> col 1 row 3
+[step2] grid | The Blue Church | Church of St. Elizabeth [WC-LM] -> col 2 row 3
+[step2] grid | Čumil Statue [WC-IC] -> col 3 row 3
+[step2] grid | Bratislava(text) [WC-TL] -> col 0 row 4
+[step2] grid | Šúľance s Makom [WC-FD] -> col 1 row 4
+[step2] grid | Pirohy [WC-FD] -> col 2 row 4
+[step2] grid | Kapustnica [WC-FD] -> col 3 row 4
+[step2] grid | Bryndzové halušky [WC-FD] -> col 0 row 5
+[step2] grid | Kraslice [WC-IC] -> col 1 row 5
+[step2] grid | Kroje [WC-IC] -> col 2 row 5
+[step2] grid | Fujara [WC-IC] -> col 3 row 5
+[step2] grid | Tram [WC-TR] -> col 0 row 6
+[step2] grid | Tatra chamois [WC-IC] -> col 1 row 6
+[step2] grid | Carpathian Wooden Churches [WC-IC] -> col 2 row 6
+[step2] grid | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) [WC-LM] -> col 3 row 6
+[step2] grid layout done | 28 element(s), 4 col(s), cell 1020px
+[pipeline] step 2 complete | 28 element(s) resized.
 [pipeline] --- Step 3: White edge ---
 [step2B] smooth radius | 20px
 [step2B] white edge | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) [WC-LM]
@@ -139,6 +145,7 @@
 [step2B] white edge | Kroje [WC-IC]
 [step2B] white edge | Kraslice [WC-IC]
 [step2B] white edge | Bryndzové halušky [WC-FD]
+[step2B] white edge | Kapustnica [WC-FD]
 [step2B] white edge | Pirohy [WC-FD]
 [step2B] white edge | Šúľance s Makom [WC-FD]
 [step2B] white edge | Bratislava(text) [WC-TL]
@@ -153,17 +160,19 @@
 [step2B] white edge | Slovakia Map [WC-MP]
 [step2B] SKIP | "National Flower [ST]" — stamp element, no white edge.
 [step2B] white edge | Štrbské Pleso [WC-LM-]
+[step2B] white edge | Flag + Slovakia(text) [WC-IC]
 [step2B] white edge | Bratislava Castle [WC-LM+]
 [step2B] white edge | Spiš Castle [WC-LM+]
 [step2B] white edge | Slovak Paradise National Park [WC-LM-]
 [step2B] white edge | Devín Castle [WC-LM-]
 [step2B] SKIP | "Background" — no [STYLE-CAT] code.
-[pipeline] step 3 complete | 24 element(s).
+[pipeline] step 3 complete | 26 element(s).
 [pipeline] --- Step 3B: Group elements ---
 [step3B] grouped | Devín Castle [WC-LM-]
 [step3B] grouped | Slovak Paradise National Park [WC-LM-]
 [step3B] grouped | Spiš Castle [WC-LM+]
 [step3B] grouped | Bratislava Castle [WC-LM+]
+[step3B] grouped | Flag + Slovakia(text) [WC-IC]
 [step3B] grouped | Štrbské Pleso [WC-LM-]
 [step3B] WARN | "National Flower [ST]" — no White Base_Cutline found below SO. Ensure Step 2B (white edge) ran before this step.
 [step3B] grouped | National Flower [ST]
@@ -180,6 +189,7 @@
 [step3B] grouped | Bratislava(text) [WC-TL]
 [step3B] grouped | Šúľance s Makom [WC-FD]
 [step3B] grouped | Pirohy [WC-FD]
+[step3B] grouped | Kapustnica [WC-FD]
 [step3B] grouped | Bryndzové halušky [WC-FD]
 [step3B] grouped | Kraslice [WC-IC]
 [step3B] grouped | Kroje [WC-IC]
@@ -188,7 +198,7 @@
 [step3B] grouped | Tatra chamois [WC-IC]
 [step3B] grouped | Carpathian Wooden Churches [WC-IC]
 [step3B] grouped | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) [WC-LM]
-[pipeline] step 3B complete | 26 element(s) grouped.
+[pipeline] step 3B complete | 28 element(s) grouped.
 [pipeline] --- Step 5: Finalize Elements group ---
 [step5] Elements group finalized.
 [pipeline] step 5 complete | Elements finalized.
@@ -201,6 +211,7 @@
 [step5b] element PNG: Kroje
 [step5b] element PNG: Kraslice
 [step5b] element PNG: Bryndzové halušky
+[step5b] element PNG: Kapustnica
 [step5b] element PNG: Pirohy
 [step5b] element PNG: Šúľance s Makom
 [step5b] element PNG: Bratislava(text)
@@ -215,22 +226,23 @@
 [step5b] element PNG: Slovakia Map
 [step5b] element PNG: National Flower
 [step5b] element PNG: Štrbské Pleso
+[step5b] element PNG: Flag + Slovakia(text)
 [step5b] element PNG: Bratislava Castle
 [step5b] element PNG: Spiš Castle
 [step5b] element PNG: Slovak Paradise National Park
 [step5b] element PNG: Devín Castle
-[step5b] element PNGs: 26 art file(s) → /Users/joshuadelallana/sticker-production-scripts/tests/integration/ps-build-elements/fixtures/source-psds/source-psds_elements
+[step5b] element PNGs: 28 art file(s) → /Users/joshuadelallana/sticker-production-scripts/tests/integration/ps-build-elements/fixtures/source-psds/source-psds_elements
 [step5b] no Caption plate layer — WC-only SKU, skipping plate PNG.
 [pipeline] --- BridgeTalk handoff → Illustrator (trace cut + place caption text) ---
 [step5] hid 0 caption sub-layer(s).
 [step5] transient Silhouette built.
 [step5b] exported silhouette PNG (transient layer removed): /Users/joshuadelallana/sticker-production-scripts/tests/integration/ps-build-elements/fixtures/source-psds/source-psds_silhouette.png
-[step5b] wrote elements sidecar: /Users/joshuadelallana/sticker-production-scripts/tests/integration/ps-build-elements/fixtures/source-psds/source-psds_elements.json (26 element(s))
+[step5b] wrote elements sidecar: /Users/joshuadelallana/sticker-production-scripts/tests/integration/ps-build-elements/fixtures/source-psds/source-psds_elements.json (28 element(s))
 [pipeline] WARN: aiPipelinePath not set — sidecars written, skipping BridgeTalk.
 [pipeline] === PS_BuildElements done ===
 ⏳ Illustrator is tracing the cut + placing captions.
 
-  Combined 26 element(s) from 3 file(s) → resized 26, white-edged 24, grouped 26.
+  Combined 28 element(s) from 3 file(s) → resized 28, white-edged 26, grouped 28.
 
 When it finishes, review the captions there, then run Pipeline 2 (Build and Export Cutlines).
 
