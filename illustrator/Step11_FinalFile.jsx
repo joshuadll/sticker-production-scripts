@@ -26,7 +26,13 @@ function runFinalFile(doc) {
     var finalFile = new File(parentFolder + "/" + stkCode + "_final.ai");
 
     log("[step11] saving final file: " + finalFile.fsName);
-    doc.saveAs(finalFile, new IllustratorSaveOptions());
+    // Ship a SELF-CONTAINED final file: embed every linked asset so {STK}_final.ai survives
+    // being handed to another machine / the printer (a linked placement stores an absolute
+    // path that breaks off-machine). Art is already embedded upstream (Step 7B); this also
+    // catches the GC caption-plate raster and any other straggler at save time.
+    var saveOpts = new IllustratorSaveOptions();
+    saveOpts.embedLinkedFiles = true;
+    doc.saveAs(finalFile, saveOpts);
 
     // After saveAs, app.activeDocument is now the final file.
     var fd = app.activeDocument;
