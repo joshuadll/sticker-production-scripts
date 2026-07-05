@@ -265,7 +265,11 @@ fi
 # assert the reconcile rotates art back to match — the failure the fresh run cannot exercise.
 RERUN_LOG="/tmp/AI_ImportNesting_rerun.log"
 PROBE="$(cd "$(dirname "$0")" && pwd)/probe-artpos.jsx"
-perl -pi -e 's|CONFIG\.logPath\s*=\s*"[^"]*";|CONFIG.logPath = "'"$RERUN_LOG"'";|' "$TEMP_SCRIPT"
+# Re-point the log AND turn the overlap sweep OFF for the re-run: it is the dominant cost of an
+# import (~65% of wall time) and this phase only tests the art-rotation reconcile — the fresh run
+# above already asserted overlaps=0. Skipping it roughly halves the re-run phase's runtime.
+perl -pi -e 's|CONFIG\.logPath\s*=\s*"[^"]*";|CONFIG.logPath = "'"$RERUN_LOG"'";|;
+             s|verifyOverlaps:\s*true|verifyOverlaps: false|;' "$TEMP_SCRIPT"
 rm -f "$RERUN_LOG"
 echo "[$STEP] Re-running import on the same doc (idempotent reconcile)..."
 osascript -e 'with timeout of 600 seconds' \
