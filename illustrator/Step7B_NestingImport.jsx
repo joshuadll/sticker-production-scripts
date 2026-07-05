@@ -89,6 +89,14 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     for (k in cutlineMap) { totalCutlines++; }
     log("[step-nest] found " + totalCutlines + " cutline(s) in working file.");
 
+    // Bake all caption warps NOW, while every cutline is still upright — one batched
+    // Expand Appearance for the whole sheet (vs one selection-redraw per element in the
+    // rotation loop). See _nestBatchBakeCaptionWarps.
+    if (!CONFIG.dryRun) {
+        var warpsBaked = _nestBatchBakeCaptionWarps(doc, cutlinesLayer);
+        log("[step-nest] caption warp bake | " + warpsBaked + " warp(s) baked (batched)");
+    }
+
     // ── 3. Identify regular vs irregular SVG by filename ─────────────────────────
     var regularSvg = null, irregularSvg = null;
     var f;
@@ -315,13 +323,11 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
             // separate placement/binding needed (Pipeline 2 built it into the group).
         }
 
-        // Bake the caption's live Arc warp to static outlines BEFORE the nest rotation.
-        // The auto-warp is a LIVE "Adobe Deform" Arc that bends along the PAGE horizontal,
-        // so a rotated sticker misaligns it — the pill (a plain path) rotates rigidly while
-        // the live-warped text re-evaluates and spills out of its pill (wrong-direction curve
-        // / text into the art). Expanding freezes the warp into the glyph outlines, which then
-        // transform rigidly with the pill through this AND every later cluster rotation.
-        _nestBakeCaptionWarp(doc, cutlineItem);
+        // Caption warps were already baked to static outlines in ONE batch pass at §2 (before any
+        // rotation) — see _nestBatchBakeCaptionWarps. That freezes each live "Adobe Deform" Arc
+        // (which bends along the PAGE horizontal and would otherwise spill out of its pill once the
+        // sticker is rotated) into glyph outlines that now transform rigidly with the pill through
+        // this and every later cluster rotation. Nothing to bake per-element here.
 
         _nestApplyPairTransform(cutlineItem, artItem, rotation, svgItem.center);
 
@@ -460,48 +466,77 @@ function _nestTranslatePairs(pairs, dx, dy) {
     }
 }
 
-// Bakes a captioned group's live Arc warp into static glyph outlines so it survives the
-// nest rotation rigidly (see the call site for why a live page-horizontal warp misaligns).
-// Uses Expand Appearance (executeMenuCommand "expandStyle"), which is a NO-OP on a plain
-// (unwarped) text frame — so only the round/oval-base captions that actually carry a warp
-// get outlined; flat-bottomed captions stay editable TextFrames. Idempotent (a member already
-// expanded to non-text geometry is skipped). The baked result keeps the "{name} caption text"
-// name so Step 8b (which only SCALES the member) and export still resolve it. dryRun-safe.
-// Returns true if the bake pass ran (whether or not the frame actually carried a warp).
-function _nestBakeCaptionWarp(doc, group) {
-    if (CONFIG.dryRun) return false;
-    if (!group || group.typename !== "GroupItem") return false;
-    var text = findGroupMember(group, " caption text");
-    if (!text || text.typename !== "TextFrame") return false;   // no caption / already baked
-    var name = text.name;
-    try {
-        // executeMenuCommand("expandStyle") acts on the ACTIVE document's selection, so pin the
-        // active doc to `doc` and drive selection through app.selection (not doc.selection) — the
-        // two only agree while doc is frontmost, and _nestCollectFromSvgs can swallow a restore throw.
-        app.activeDocument = doc;
-        app.selection = null;
-        text.selected = true;
-        app.executeMenuCommand("expandStyle");   // Object > Expand Appearance — freezes the live warp
-        // A WARPED frame expands to path geometry — usually a GroupItem, but a CompoundPathItem for
-        // simple/single-colour glyphs; either way reapply the name so downstream name lookups still
-        // hit it. A PLAIN frame is a no-op and stays a TextFrame — correctly left editable, unnamed
-        // touch. Warn (never silently drop) if it expanded to an unexpected multi-item shape.
-        var sel = app.selection;
-        var baked = (sel && sel.length === 1) ? sel[0] : null;
-        if (baked && baked.typename !== "TextFrame") {
-            baked.name = name;                   // GroupItem OR CompoundPathItem OR PathItem
-            log("[step-nest] caption warp baked | " + group.name);
-        } else if (sel && sel.length > 1) {
-            log("[step-nest] WARN | caption warp expanded to " + sel.length
-                + " items — '" + name + "' name not reapplied | " + group.name);
-        }
-        app.selection = null;
-        return true;
-    } catch (e) {
-        log("[step-nest] WARN | caption warp bake failed | " + group.name + ": " + e.message);
-        try { app.selection = null; } catch (e2) {}
-        return false;
+// Bakes EVERY captioned group's live Arc warp into static glyph outlines in ONE pass so they
+// survive the nest rotation rigidly (see the call site for why a live page-horizontal warp
+// misaligns). Uses Expand Appearance (executeMenuCommand "expandStyle"), a NO-OP on a plain
+// (unwarped) frame — so only the round/oval-base captions that actually carry a warp get
+// outlined; flat-bottomed captions stay editable TextFrames.
+//
+// WHY BATCHED (not once per element at rotation time): expandStyle acts on `app.selection`, and
+// EACH `app.selection` mutation forces an Illustrator redraw (~55–80ms). The command itself is
+// cheap (~12ms flat / ~30ms warped); the per-element selection churn was the cost — ~1.7s across
+// a 26-element sheet, ~90% of it pure redraw waste. Assigning the whole frame array to
+// app.selection ONCE collapses N redraws into one. Must run while cutlines are still UPRIGHT
+// (before any rotation), so it's called at §2 — not interleaved in the per-element transform loop.
+//
+// Idempotent: an already-baked caption has no " caption text" TextFrame (it's geometry now) and
+// is skipped, so a re-import bakes nothing. Each baked (warped) caption's expansion is unnamed, so
+// its "{name} caption text" name is reapplied — Step 8b (which SCALES the member) and Step 10
+// export resolve it by that name. dryRun-safe. Returns the number of warps actually baked.
+function _nestBatchBakeCaptionWarps(doc, cutlinesLayer) {
+    if (CONFIG.dryRun) return 0;
+    // Gather every unbaked caption frame (snapshot before mutating the selection).
+    var frames = [], i, g, t;
+    for (i = 0; i < cutlinesLayer.groupItems.length; i++) {
+        g = cutlinesLayer.groupItems[i];
+        if (g.parent !== cutlinesLayer) continue;
+        t = findGroupMember(g, " caption text");
+        if (t && t.typename === "TextFrame") frames.push(t);
     }
+    if (frames.length === 0) return 0;
+
+    var sel;
+    try {
+        // Pin the active doc to `doc` (app.selection is document-scoped) and select ALL frames in a
+        // SINGLE assignment — one redraw for the whole sheet instead of one per element.
+        app.activeDocument = doc;
+        app.selection = frames;
+        app.executeMenuCommand("expandStyle");   // Object > Expand Appearance — freezes the live warps
+        sel = app.selection;                     // one top-level result per input frame
+    } catch (e) {
+        log("[step-nest] WARN | batch caption warp bake failed: " + e.message);
+        try { app.selection = null; } catch (e2) {}
+        return 0;
+    }
+
+    // Reapply names from the post-expand selection. A FLAT frame is untouched — it stays a
+    // TextFrame keeping its name (skip). A WARPED frame became path geometry (GroupItem /
+    // CompoundPathItem / PathItem) with its name lost; Expand Appearance replaces the item IN
+    // PLACE, so the expansion's `.parent` is still its cutline group — restore
+    // "{group.name} caption text" so Step 8b (SCALE) and Step 10 (export) still resolve it.
+    // Identify the group via `.parent` (not selection order, which isn't guaranteed). Warn
+    // (never silently drop) on an unexpected parent or a group that somehow expands twice.
+    var baked = 0, done = {}, s, it, par;
+    for (s = 0; s < sel.length; s++) {
+        it = sel[s];
+        if (it.typename === "TextFrame") continue;   // flat / unwarped — nothing to rename
+        par = it.parent;
+        if (!par || par.typename !== "GroupItem" || par.parent !== cutlinesLayer) {
+            log("[step-nest] WARN | baked caption has unexpected parent — name not reapplied");
+            continue;
+        }
+        if (done[par.name]) {
+            log("[step-nest] WARN | caption warp expanded to >1 item — '"
+                + par.name + " caption text' name not reapplied | " + par.name);
+            continue;
+        }
+        it.name = par.name + " caption text";
+        done[par.name] = true;
+        baked++;
+        log("[step-nest] caption warp baked | " + par.name);
+    }
+    try { app.selection = null; } catch (e3) {}
+    return baked;
 }
 
 // Moves one {cut, art} pair to its nest pose: rotates both by `rotation` about the

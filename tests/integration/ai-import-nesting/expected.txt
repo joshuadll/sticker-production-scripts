@@ -3,6 +3,11 @@
 [pipeline] --- importing Deepnest layout ---
 [step-nest] art sizing: factor=0.24000 pt/px (psdWidth=4961, sourceDPI=300)
 [step-nest] found 26 cutline(s) in working file.
+[step-nest] caption warp baked | Šúľance s Makom
+[step-nest] caption warp baked | Pirohy
+[step-nest] caption warp baked | Bryndzové halušky
+[step-nest] caption warp baked | Kraslice
+[step-nest] caption warp bake | 4 warp(s) baked (batched)
 [step-nest] --- processing regular SVG: import-nesting_regular_nested.svg ---
 [step-nest] read 15 part(s) from import-nesting_regular_nested.svg
 [step-nest] found 15 nested part(s) in import-nesting_regular_nested.svg
@@ -47,7 +52,6 @@
 [step-nest] ART-FIT | Kroje art=86x119 outline=86x118 dW=0 dH=0
 [step-nest] VERIFY | Kroje rot=-45 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] ART-FIT | Pirohy art=126x111 outline=126x111 dW=0 dH=0
-[step-nest] caption warp baked | Pirohy
 [step-nest] VERIFY | Pirohy rot=-135 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] ART-FIT | Bratislava(text) art=214x38 outline=214x38 dW=0 dH=0
 [step-nest] VERIFY | Bratislava(text) rot=-146 fitRMS=0 bboxΔ=(0,0)  ok
@@ -56,13 +60,10 @@
 [step-nest] ART-FIT | Tram art=136x96 outline=136x96 dW=0 dH=0
 [step-nest] VERIFY | Tram rot=-79 fitRMS=0 bboxΔ=(1,0)  ok
 [step-nest] ART-FIT | Kraslice art=118x89 outline=118x89 dW=0 dH=0
-[step-nest] caption warp baked | Kraslice
 [step-nest] VERIFY | Kraslice rot=135 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] ART-FIT | Bryndzové halušky art=125x102 outline=125x101 dW=0 dH=0
-[step-nest] caption warp baked | Bryndzové halušky
 [step-nest] VERIFY | Bryndzové halušky rot=-157 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] ART-FIT | Šúľance s Makom art=125x70 outline=126x70 dW=0 dH=0
-[step-nest] caption warp baked | Šúľance s Makom
 [step-nest] VERIFY | Šúľance s Makom rot=-45 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] ART-FIT | Slovakia Map art=136x73 outline=136x73 dW=0 dH=0
 [step-nest] VERIFY | Slovakia Map rot=-79 fitRMS=0 bboxΔ=(3,0)  ok
