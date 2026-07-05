@@ -516,6 +516,7 @@ function _nestBatchBakeCaptionWarps(doc, cutlinesLayer) {
     // "{group.name} caption text" so Step 8b (SCALE) and Step 10 (export) still resolve it.
     // Identify the group via `.parent` (not selection order, which isn't guaranteed). Warn
     // (never silently drop) on an unexpected parent or a group that somehow expands twice.
+    if (!sel) sel = [];   // app.selection can come back null (not []) — don't deref null.length
     var baked = 0, done = {}, s, it, par;
     for (s = 0; s < sel.length; s++) {
         it = sel[s];
