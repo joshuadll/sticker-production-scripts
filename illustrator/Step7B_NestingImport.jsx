@@ -262,6 +262,59 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
             + "gates overlap at export");
     }
 
+    // ── 5c-bis. Reconcile art rotation to its cutline (idempotent re-run safety) ──
+    // Art is placed UPRIGHT then rotated by the SAME matrix as its cutline, so on a FRESH
+    // (post-Step-6, upright) file art and cutline rotate together — correct. But on a RE-RUN
+    // over an already-nested file the cutline PERSISTS its pose while art restarts upright,
+    // and the per-element rotation computed against the already-rotated cutline is only the
+    // delta (≈ the inverse cluster angle), which the cluster pass then cancels — leaving art
+    // UPRIGHT under a rotated cutline (the "placed but not rotated" bug). Fix: on the first
+    // (fresh) run stamp each element's correct art rotation onto its cutline note; on any
+    // later run rotate the freshly-placed art back to that stamped angle. Runs BEFORE the
+    // embed pass so art is still a PlacedItem — matrix-readable and matrix-rotatable in the
+    // cutline's own rotation convention. (Precondition still: the FIRST run is a fresh file.)
+    if (!CONFIG.dryRun) {
+        var allPairs = [], pc;
+        if (typeof regResult !== "undefined" && regResult && regResult.pairs)
+            for (pc = 0; pc < regResult.pairs.length; pc++) allPairs.push(regResult.pairs[pc]);
+        if (typeof irrResult !== "undefined" && irrResult && irrResult.pairs)
+            for (pc = 0; pc < irrResult.pairs.length; pc++) allPairs.push(irrResult.pairs[pc]);
+
+        var rotStamped = 0, rotFixed = 0, worstResid = 0, worstResidName = "";
+        for (pc = 0; pc < allPairs.length; pc++) {
+            var pr = allPairs[pc];
+            if (!pr || !pr.art) continue;
+            var cur    = _nestVisAngle(pr.art);
+            var stampR = _nestReadRotStamp(pr.cut.note);
+            if (stampR === null) {
+                // First (fresh) run: art rode the cutline correctly — record its rotation.
+                stampR = cur;
+                rotStamped++;
+            } else {
+                // Later run: drive the upright-restarted art back to the stamped angle.
+                var delta = stampR - cur;
+                while (delta > 180)   delta -= 360;
+                while (delta <= -180) delta += 360;
+                if (Math.abs(delta) > 0.5) {
+                    var ac = boundsCenter(pr.art.geometricBounds);
+                    pr.art.transform(_nestPivotMatrix(delta, ac.x, ac.y),
+                        true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
+                    rotFixed++;
+                }
+                var resid = _nestVisAngle(pr.art) - stampR;
+                while (resid > 180)   resid -= 360;
+                while (resid <= -180) resid += 360;
+                resid = Math.abs(resid);
+                if (resid > worstResid) { worstResid = resid; worstResidName = pr.cut.name; }
+            }
+            pr.cut.note = _nestWriteRotStamp(pr.cut.note, stampR);
+        }
+        log("[step-nest] art-rot-reconcile | stamped " + rotStamped + " | corrected " + rotFixed
+            + " | worst residual " + Math.round(worstResid) + "°"
+            + (worstResidName ? " (" + worstResidName + ")" : "")
+            + (worstResid <= 5 ? "  ok" : "  *** ART ROTATION OFF ***"));
+    }
+
     // ── 5d. Embed placed art (portable handoff) ──────────────────────────────────
     // Art is placed LINKED (placedItems.add + absolute .file path), which breaks on any
     // other machine. Embed it now — AFTER every transform (placement, nest pair transform,
@@ -534,6 +587,45 @@ function _nestTranslatePairs(pairs, dx, dy) {
         if (p.art)     p.art.translate(dx, dy);
         if (p.caption) p.caption.translate(dx, dy);
     }
+}
+
+// ── Art-rotation reconcile helpers (idempotent re-run safety) ───────────────────
+// Visual rotation of an item in degrees, in the +CCW convention that _nestPivotMatrix /
+// concatenateRotationMatrix apply — so a value read here can be driven back to a target by
+// _nestPivotMatrix(target - value). atan2 of the matrix's first column, robust to the
+// uniform art scale. MUST be read on the PlacedItem BEFORE embed(): embedding flips the
+// resulting raster's matrix sign (measured), which would invert the angle.
+function _nestVisAngle(item) {
+    var m = item.matrix;
+    var a = -Math.atan2(m.mValueB, m.mValueA) * 180 / Math.PI;
+    while (a > 180)   a -= 360;
+    while (a <= -180) a += 360;
+    return a;
+}
+
+// Reads the art-rotation stamp ("u<deg>") the reconcile appends to a cutline note. Returns
+// the degrees (float) or null if absent. The stamp rides alongside the caption fields;
+// parseNote / _capNoteParse ignore any "u…" field, so it is invisible to Steps 8b/9A.
+function _nestReadRotStamp(note) {
+    if (!note) return null;
+    var parts = String(note).split("|"), i;
+    for (i = 0; i < parts.length; i++) {
+        if (parts[i].charAt(0) === "u" && parts[i].length > 1) {
+            var v = parseFloat(parts[i].substring(1));
+            if (!isNaN(v)) return v;
+        }
+    }
+    return null;
+}
+
+// Writes/replaces the "u<deg>" art-rotation stamp on a note, preserving every other field.
+function _nestWriteRotStamp(note, deg) {
+    var parts = note ? String(note).split("|") : [], out = [], i;
+    for (i = 0; i < parts.length; i++) {
+        if (!(parts[i].charAt(0) === "u" && parts[i].length > 1)) out.push(parts[i]);
+    }
+    out.push("u" + Math.round(deg));
+    return out.join("|");
 }
 
 // Bakes a captioned group's live Arc warp into static glyph outlines so it survives the

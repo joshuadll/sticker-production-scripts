@@ -101,6 +101,7 @@
 [step-nest] half-cut sync | 26 GC/WC/tab element(s) re-synced to nested pose
 [step-nest] spacing-buffer | 26 keep-out halo(s) built (GC/WC + stamps)
 [step-nest] overlap-check | 0 overlapping cut-line pair(s)  ok
+[step-nest] art-rot-reconcile | stamped 26 | corrected 0 | worst residual 0°  ok
 [step-nest] embed | 26 art item(s) embedded (portable handoff)
 [step-nest] art-layer-check | on Stickers: 26 (embedded 26 / linked 0) / placed: 26  ok
 [step-nest] art-pos-check | checked: 26 | worst art-outline centre offset: 11pt (Fujara)  ok

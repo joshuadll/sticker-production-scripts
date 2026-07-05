@@ -88,7 +88,8 @@ osascript -e 'with timeout of 600 seconds' \
   -e "do javascript file (POSIX file \"$TEMP_SCRIPT\")" \
   -e 'end tell' -e 'end timeout'
 
-rm -f "$TEMP_SCRIPT"
+# NOTE: $TEMP_SCRIPT is kept — the re-run phase (below) runs it a SECOND time on the same
+# (now-nested) doc to exercise the idempotent art-rotation reconcile. Removed at the very end.
 
 # ── Wait for log ─────────────────────────────────────────────────────────────
 
@@ -191,6 +192,18 @@ else
         grep "art-pos-check" "$LOG" || true
     fi
 
+    # Art-ROTATION correctness: art must be rotated to match its cutline. The reconcile stamps
+    # the correct rotation on the first (fresh) run and restores it on re-runs; a large residual
+    # means art did not reach its cutline's orientation (the "placed but not rotated" bug).
+    if grep -q "ART ROTATION OFF" "$LOG"; then
+        echo "FAIL [$STEP]: art rotation does not match its cutline:"
+        grep "art-rot-reconcile" "$LOG"
+        FAIL=1
+    else
+        echo "PASS [$STEP]: art rotation reconciled."
+        grep "art-rot-reconcile" "$LOG" || true
+    fi
+
     # Group-rotation correctness: the regular cluster's −90° rotation must transpose
     # its bbox (W↔H). A failure means elements spun in place instead of orbiting the
     # pivot, so the group never actually rotated to its top-left landscape band.
@@ -243,6 +256,54 @@ else
     echo "    cp \"$EXPECTED.new\" \"$EXPECTED\""
     FAIL=1
 fi
+
+# ── Re-run phase: idempotent art-rotation reconcile ──────────────────────────
+# The fresh run above leaves the nested doc open with a rotation stamp on each cutline.
+# Re-running the import on that already-nested doc is the case that used to leave art
+# "placed but not rotated" (art restarts upright while the cutline persists its pose, and
+# the cluster pass cancels the per-element delta). Re-run once more on the SAME doc and
+# assert the reconcile rotates art back to match — the failure the fresh run cannot exercise.
+RERUN_LOG="/tmp/AI_ImportNesting_rerun.log"
+PROBE="$(cd "$(dirname "$0")" && pwd)/probe-artpos.jsx"
+perl -pi -e 's|CONFIG\.logPath\s*=\s*"[^"]*";|CONFIG.logPath = "'"$RERUN_LOG"'";|' "$TEMP_SCRIPT"
+rm -f "$RERUN_LOG"
+echo "[$STEP] Re-running import on the same doc (idempotent reconcile)..."
+osascript -e 'with timeout of 600 seconds' \
+  -e "tell application \"$APP\"" \
+  -e "do javascript file (POSIX file \"$TEMP_SCRIPT\")" \
+  -e 'end tell' -e 'end timeout'
+
+E=0
+until { [ -f "$RERUN_LOG" ] && grep -q "\[step-nest\] result " "$RERUN_LOG"; } || [ "$E" -ge 180 ]; do
+    sleep 2; E=$((E + 2))
+done
+
+if [ ! -f "$RERUN_LOG" ] || ! grep -q "\[step-nest\] result " "$RERUN_LOG"; then
+    echo "FAIL [$STEP] (re-run): no result — script may have crashed."
+    FAIL=1
+else
+    RR_REC=$(grep "art-rot-reconcile" "$RERUN_LOG" || true)
+    echo "[$STEP] (re-run) $RR_REC"
+    CORR=$(echo "$RR_REC" | grep -oE "corrected [0-9]+" | grep -oE "[0-9]+")
+    if grep -q "ART ROTATION OFF" "$RERUN_LOG"; then
+        echo "FAIL [$STEP] (re-run): art rotation off after reconcile."; FAIL=1
+    elif [ "${CORR:-0}" -gt 0 ]; then
+        echo "PASS [$STEP] (re-run): reconcile re-rotated ${CORR} art item(s) to match cutlines."
+    else
+        echo "WARN [$STEP] (re-run): reconcile corrected 0 — expected >0 on a re-run."
+    fi
+    grep -q "ART MISPLACED" "$RERUN_LOG" && { echo "FAIL [$STEP] (re-run): art detached after re-run."; FAIL=1; } || true
+    # Independent geometry check: no 90° bbox swaps may remain (art now matches its cutline).
+    SWAPS=$(osascript -e "tell application \"$APP\" to do javascript file (POSIX file \"$PROBE\")" 2>/dev/null || echo "probe-failed")
+    echo "[$STEP] (re-run) probe: $SWAPS"
+    NSWAP=$(echo "$SWAPS" | grep -oE "bboxSwaps\([0-9]+\)" | grep -oE "[0-9]+")
+    if [ "${NSWAP:-99}" -eq 0 ]; then
+        echo "PASS [$STEP] (re-run): no 90° art/cutline mismatches."
+    else
+        echo "FAIL [$STEP] (re-run): ${NSWAP} art item(s) still unrotated (90° swap)."; FAIL=1
+    fi
+fi
+rm -f "$TEMP_SCRIPT"
 
 if [ "$FAIL" -ne 0 ]; then
     echo "  Log contents:"
