@@ -285,29 +285,24 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
             var pr = allPairs[pc];
             if (!pr || !pr.art) continue;
             var cur    = _nestVisAngle(pr.art);
-            var stampR = _nestReadRotStamp(pr.cut.note);
+            var stampR = noteReadRotStamp(pr.cut.note);
             if (stampR === null) {
                 // First (fresh) run: art rode the cutline correctly — record its rotation.
                 stampR = cur;
                 rotStamped++;
             } else {
                 // Later run: drive the upright-restarted art back to the stamped angle.
-                var delta = stampR - cur;
-                while (delta > 180)   delta -= 360;
-                while (delta <= -180) delta += 360;
+                var delta = _aiNormalizeDeg(stampR - cur);
                 if (Math.abs(delta) > 0.5) {
                     var ac = boundsCenter(pr.art.geometricBounds);
                     pr.art.transform(_nestPivotMatrix(delta, ac.x, ac.y),
                         true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
                     rotFixed++;
                 }
-                var resid = _nestVisAngle(pr.art) - stampR;
-                while (resid > 180)   resid -= 360;
-                while (resid <= -180) resid += 360;
-                resid = Math.abs(resid);
+                var resid = Math.abs(_aiNormalizeDeg(_nestVisAngle(pr.art) - stampR));
                 if (resid > worstResid) { worstResid = resid; worstResidName = pr.cut.name; }
             }
-            pr.cut.note = _nestWriteRotStamp(pr.cut.note, stampR);
+            pr.cut.note = noteWriteRotStamp(pr.cut.note, stampR);
         }
         log("[step-nest] art-rot-reconcile | stamped " + rotStamped + " | corrected " + rotFixed
             + " | worst residual " + Math.round(worstResid) + "°"
@@ -323,18 +318,25 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     // RasterItem IN PLACE (same pose) and PRESERVES its name (Step 10 matches art->cutline by
     // name). Critically it also DETACHES the original reference, so it must run here, not at
     // placement, where callers still hold the ref to transform it. Loop on placedItems[0]:
-    // each embed drops that item from the collection, so we never reuse a detached ref.
+    // Snapshot the placed-item refs first, THEN embed each: embed() removes the item from
+    // placedItems, so iterating the live collection and BREAKING on the first failure would
+    // strand every remaining item LINKED (non-portable) behind one bad PNG. A stored ref to a
+    // *different* item stays valid across another item's embed, so a per-item try/catch lets
+    // one bad item fail alone. A non-zero failed count is surfaced so a partial embed isn't
+    // silent (art-layer-check only gates layer LOCATION, not embed status).
     if (stickersLayer && !CONFIG.dryRun) {
-        var embedded = 0, embedGuard = 0;
-        while (stickersLayer.placedItems.length > 0 && embedGuard < 10000) {
-            embedGuard++;
-            try { stickersLayer.placedItems[0].embed(); embedded++; }
+        var toEmbed = [], ei;
+        for (ei = 0; ei < stickersLayer.placedItems.length; ei++) toEmbed.push(stickersLayer.placedItems[ei]);
+        var embedded = 0, embedFailed = 0;
+        for (ei = 0; ei < toEmbed.length; ei++) {
+            try { toEmbed[ei].embed(); embedded++; }
             catch (eEmb) {
-                log("[step-nest] WARN | embed failed — line " + eEmb.line + ": " + eEmb.message);
-                break;   // avoid an infinite loop on a stuck item
+                embedFailed++;
+                log("[step-nest] WARN | embed failed for an art item — line " + eEmb.line + ": " + eEmb.message);
             }
         }
-        log("[step-nest] embed | " + embedded + " art item(s) embedded (portable handoff)");
+        log("[step-nest] embed | " + embedded + " embedded / " + embedFailed + " failed (portable handoff)"
+            + (embedFailed === 0 ? "" : "  *** EMBED INCOMPLETE — art shipped LINKED ***"));
     }
 
     // ── 6. Summary ───────────────────────────────────────────────────────────────
@@ -589,43 +591,16 @@ function _nestTranslatePairs(pairs, dx, dy) {
     }
 }
 
-// ── Art-rotation reconcile helpers (idempotent re-run safety) ───────────────────
 // Visual rotation of an item in degrees, in the +CCW convention that _nestPivotMatrix /
 // concatenateRotationMatrix apply — so a value read here can be driven back to a target by
 // _nestPivotMatrix(target - value). atan2 of the matrix's first column, robust to the
 // uniform art scale. MUST be read on the PlacedItem BEFORE embed(): embedding flips the
-// resulting raster's matrix sign (measured), which would invert the angle.
+// resulting raster's matrix sign (measured), which would invert the angle. (The note-stamp
+// read/write helpers live in aiUtils — noteReadRotStamp / noteWriteRotStamp — beside the
+// note grammar they share.)
 function _nestVisAngle(item) {
     var m = item.matrix;
-    var a = -Math.atan2(m.mValueB, m.mValueA) * 180 / Math.PI;
-    while (a > 180)   a -= 360;
-    while (a <= -180) a += 360;
-    return a;
-}
-
-// Reads the art-rotation stamp ("u<deg>") the reconcile appends to a cutline note. Returns
-// the degrees (float) or null if absent. The stamp rides alongside the caption fields;
-// parseNote / _capNoteParse ignore any "u…" field, so it is invisible to Steps 8b/9A.
-function _nestReadRotStamp(note) {
-    if (!note) return null;
-    var parts = String(note).split("|"), i;
-    for (i = 0; i < parts.length; i++) {
-        if (parts[i].charAt(0) === "u" && parts[i].length > 1) {
-            var v = parseFloat(parts[i].substring(1));
-            if (!isNaN(v)) return v;
-        }
-    }
-    return null;
-}
-
-// Writes/replaces the "u<deg>" art-rotation stamp on a note, preserving every other field.
-function _nestWriteRotStamp(note, deg) {
-    var parts = note ? String(note).split("|") : [], out = [], i;
-    for (i = 0; i < parts.length; i++) {
-        if (!(parts[i].charAt(0) === "u" && parts[i].length > 1)) out.push(parts[i]);
-    }
-    out.push("u" + Math.round(deg));
-    return out.join("|");
+    return _aiNormalizeDeg(-Math.atan2(m.mValueB, m.mValueA) * 180 / Math.PI);
 }
 
 // Bakes a captioned group's live Arc warp into static glyph outlines so it survives the

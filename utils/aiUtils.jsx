@@ -992,6 +992,33 @@ function _capNoteParse(note) {
     return out;
 }
 
+// Art-rotation stamp ("u<deg>") that Step 7B's rotation reconcile rides in the cutline note,
+// beside the caption fields. parseNote / _capNoteParse ignore any "u…" field, so it is
+// invisible to Steps 8b/9A. NOTE: _capNoteFormat rebuilds the note from scratch and does NOT
+// preserve this field, so a full note rewrite (e.g. re-running buildCaption on a stamped
+// group) drops the stamp — the one place the reconcile's persistence can be defeated.
+function noteReadRotStamp(note) {
+    if (!note) return null;
+    var parts = String(note).split("|"), i;
+    for (i = 0; i < parts.length; i++) {
+        if (parts[i].charAt(0) === "u" && parts[i].length > 1) {
+            var v = parseFloat(parts[i].substring(1));
+            if (!isNaN(v)) return v;
+        }
+    }
+    return null;
+}
+
+// Writes/replaces the "u<deg>" art-rotation stamp on a note, preserving every other field.
+function noteWriteRotStamp(note, deg) {
+    var parts = note ? String(note).split("|") : [], out = [], i;
+    for (i = 0; i < parts.length; i++) {
+        if (!(parts[i].charAt(0) === "u" && parts[i].length > 1)) out.push(parts[i]);
+    }
+    out.push("u" + Math.round(deg));
+    return out.join("|");
+}
+
 // Elongates a GC-LM caption-plate ARTWORK group by scaling only its center piece (C); the L/R
 // end caps keep their size; R slides to abut the stretched C. AI port of PS elongateCaptionPlate
 // (horizontal only -> y-up vs y-down is irrelevant). Children must be named "L", "C", "R".
