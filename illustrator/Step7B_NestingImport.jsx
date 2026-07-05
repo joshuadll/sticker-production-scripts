@@ -64,12 +64,20 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         log("[step-nest] WARN | Stickers layer not found — artwork will not be placed.");
     }
 
-    // Re-run safety: clear any previously placed artwork so it doesn't stack.
+    // Re-run safety: clear any previously placed artwork so it doesn't stack. Art is now
+    // EMBEDDED at placement (rasterItems) for a portable handoff, so the clear must sweep
+    // BOTH collections: rasterItems (embedded art, the norm) AND placedItems (a stray
+    // linked item from an older run or a partial embed). Clearing only placedItems would
+    // let embedded art DUPLICATE on every re-run.
     if (stickersLayer && !CONFIG.dryRun) {
         var cleared = 0;
         var pi;
         for (pi = stickersLayer.placedItems.length - 1; pi >= 0; pi--) {
             stickersLayer.placedItems[pi].remove();
+            cleared++;
+        }
+        for (pi = stickersLayer.rasterItems.length - 1; pi >= 0; pi--) {
+            stickersLayer.rasterItems[pi].remove();
             cleared++;
         }
         if (cleared > 0) {
@@ -262,6 +270,83 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
             + "gates overlap at export");
     }
 
+    // ── 5c-bis. Reconcile art rotation to its cutline (idempotent re-run safety) ──
+    // Art is placed UPRIGHT then rotated by the SAME matrix as its cutline, so on a FRESH
+    // (post-Step-6, upright) file art and cutline rotate together — correct. But on a RE-RUN
+    // over an already-nested file the cutline PERSISTS its pose while art restarts upright,
+    // and the per-element rotation computed against the already-rotated cutline is only the
+    // delta (≈ the inverse cluster angle), which the cluster pass then cancels — leaving art
+    // UPRIGHT under a rotated cutline (the "placed but not rotated" bug). Fix: on the first
+    // (fresh) run stamp each element's correct art rotation onto its cutline note; on any
+    // later run rotate the freshly-placed art back to that stamped angle. Runs BEFORE the
+    // embed pass so art is still a PlacedItem — matrix-readable and matrix-rotatable in the
+    // cutline's own rotation convention. (Precondition still: the FIRST run is a fresh file.)
+    if (!CONFIG.dryRun) {
+        var allPairs = [], pc;
+        if (typeof regResult !== "undefined" && regResult && regResult.pairs)
+            for (pc = 0; pc < regResult.pairs.length; pc++) allPairs.push(regResult.pairs[pc]);
+        if (typeof irrResult !== "undefined" && irrResult && irrResult.pairs)
+            for (pc = 0; pc < irrResult.pairs.length; pc++) allPairs.push(irrResult.pairs[pc]);
+
+        var rotStamped = 0, rotFixed = 0, worstResid = 0, worstResidName = "";
+        for (pc = 0; pc < allPairs.length; pc++) {
+            var pr = allPairs[pc];
+            if (!pr || !pr.art) continue;
+            var cur    = _nestVisAngle(pr.art);
+            var stampR = noteReadRotStamp(pr.cut.note);
+            if (stampR === null) {
+                // First (fresh) run: art rode the cutline correctly — record its rotation.
+                stampR = cur;
+                rotStamped++;
+            } else {
+                // Later run: drive the upright-restarted art back to the stamped angle.
+                var delta = _aiNormalizeDeg(stampR - cur);
+                if (Math.abs(delta) > 0.5) {
+                    var ac = boundsCenter(pr.art.geometricBounds);
+                    pr.art.transform(_nestPivotMatrix(delta, ac.x, ac.y),
+                        true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
+                    rotFixed++;
+                }
+                var resid = Math.abs(_aiNormalizeDeg(_nestVisAngle(pr.art) - stampR));
+                if (resid > worstResid) { worstResid = resid; worstResidName = pr.cut.name; }
+            }
+            pr.cut.note = noteWriteRotStamp(pr.cut.note, stampR);
+        }
+        log("[step-nest] art-rot-reconcile | stamped " + rotStamped + " | corrected " + rotFixed
+            + " | worst residual " + Math.round(worstResid) + "°"
+            + (worstResidName ? " (" + worstResidName + ")" : "")
+            + (worstResid <= 5 ? "  ok" : "  *** ART ROTATION OFF ***"));
+    }
+
+    // ── 5d. Embed placed art (portable handoff) ──────────────────────────────────
+    // Art is placed LINKED (placedItems.add + absolute .file path), which breaks on any
+    // other machine. Embed it now — AFTER every transform (placement, nest pair transform,
+    // cluster rotate/translate/contour-fit) so all geometry ran on the well-understood
+    // PlacedItems; this pass only bakes the pixels in. embed() converts each PlacedItem to a
+    // RasterItem IN PLACE (same pose) and PRESERVES its name (Step 10 matches art->cutline by
+    // name). Critically it also DETACHES the original reference, so it must run here, not at
+    // placement, where callers still hold the ref to transform it. Loop on placedItems[0]:
+    // Snapshot the placed-item refs first, THEN embed each: embed() removes the item from
+    // placedItems, so iterating the live collection and BREAKING on the first failure would
+    // strand every remaining item LINKED (non-portable) behind one bad PNG. A stored ref to a
+    // *different* item stays valid across another item's embed, so a per-item try/catch lets
+    // one bad item fail alone. A non-zero failed count is surfaced so a partial embed isn't
+    // silent (art-layer-check only gates layer LOCATION, not embed status).
+    if (stickersLayer && !CONFIG.dryRun) {
+        var toEmbed = [], ei;
+        for (ei = 0; ei < stickersLayer.placedItems.length; ei++) toEmbed.push(stickersLayer.placedItems[ei]);
+        var embedded = 0, embedFailed = 0;
+        for (ei = 0; ei < toEmbed.length; ei++) {
+            try { toEmbed[ei].embed(); embedded++; }
+            catch (eEmb) {
+                embedFailed++;
+                log("[step-nest] WARN | embed failed for an art item — line " + eEmb.line + ": " + eEmb.message);
+            }
+        }
+        log("[step-nest] embed | " + embedded + " embedded / " + embedFailed + " failed (portable handoff)"
+            + (embedFailed === 0 ? "" : "  *** EMBED INCOMPLETE — art shipped LINKED ***"));
+    }
+
     // ── 6. Summary ───────────────────────────────────────────────────────────────
     // Verify art actually landed on the Stickers layer (not Cutlines): doc.placedItems
     // .add() ignores the active layer after the cutline passes, so a regression here is
@@ -269,10 +354,56 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     // Only the per-element ART PNG lands on Stickers now — the native caption rides its
     // cutline group (not Stickers). A mismatch means an item landed on the wrong layer
     // (e.g. the locked Cutlines layer) — a silent regression unless asserted.
-    var placedOnStickers = stickersLayer ? stickersLayer.placedItems.length : 0;
+    // Art is embedded at placement, so it lives on Stickers as rasterItems now (not
+    // placedItems). Count BOTH so a stray un-embedded link still registers as "on Stickers"
+    // (this check gates LAYER LOCATION, not embed status) — and surface embedded vs linked so
+    // an embed regression is visible: a healthy run reads "embedded N / linked 0".
+    var rasterN = stickersLayer ? stickersLayer.rasterItems.length : 0;
+    var linkedN = stickersLayer ? stickersLayer.placedItems.length : 0;
+    var placedOnStickers = rasterN + linkedN;
     log("[step-nest] art-layer-check | on Stickers: " + placedOnStickers
+        + " (embedded " + rasterN + " / linked " + linkedN + ")"
         + " / placed: " + totalArtPlaced
         + (placedOnStickers === totalArtPlaced ? "  ok" : "  *** ITEM ON WRONG LAYER ***"));
+
+    // Art-POSITION check (the invariant ART-FIT/VERIFY were blind to): each art item must end
+    // up CO-LOCATED with its cutline, not just correctly sized and on the right layer. Art is
+    // centred on the cutline's " outline" member (element-art trace) at placement, then MUST
+    // ride the nest+cluster transforms with its cutline — so the two centres stay together. A
+    // detached art item (e.g. the transform moved a phantom, not the real raster) shows up here
+    // as a large centre offset even though every other check passes. Stamps (no " outline"
+    // member) fall back to the cutline path centre. Skipped under dryRun (no transforms run).
+    if (!CONFIG.dryRun && stickersLayer && cutlinesLayer) {
+        var artByName = {};
+        var si2;
+        for (si2 = 0; si2 < stickersLayer.pageItems.length; si2++) {
+            var ai2 = stickersLayer.pageItems[si2];
+            if (ai2.parent === stickersLayer) artByName[ai2.name] = ai2;
+        }
+        var worstPos = 0, worstName = "", checkedPos = 0, gp;
+        for (gp = 0; gp < cutlinesLayer.groupItems.length; gp++) {
+            var gpItem = cutlinesLayer.groupItems[gp];
+            if (gpItem.parent !== cutlinesLayer) continue;
+            var artIt = artByName[gpItem.name];
+            if (!artIt) continue;   // stamps carry no separate art item — nothing to check
+            var refM = findGroupMember(gpItem, " outline");
+            var refB = refM ? refM.geometricBounds : gpItem.geometricBounds;
+            var refC = boundsCenter(refB), artC = boundsCenter(artIt.geometricBounds);
+            var offX = artC.x - refC.x, offY = artC.y - refC.y;
+            var off = Math.sqrt(offX * offX + offY * offY);
+            checkedPos++;
+            if (off > worstPos) { worstPos = off; worstName = gpItem.name; }
+        }
+        // Tolerance 20pt: art centres on the outline trace, so the offset is normally a few
+        // pt (trace-inset asymmetry — a thin diagonal like Fujara reaches ~11pt). A detached/
+        // un-transformed art item is 65..1000+ pt off, so 20pt cleanly separates healthy from
+        // broken while leaving headroom above the worst legitimate residual.
+        var posTol = 20;
+        log("[step-nest] art-pos-check | checked: " + checkedPos
+            + " | worst art-outline centre offset: " + Math.round(worstPos) + "pt"
+            + (worstName ? " (" + worstName + ")" : "")
+            + (worstPos <= posTol ? "  ok" : "  *** ART MISPLACED ***"));
+    }
 
     log("[step-nest] result | matched: " + totalMatched
         + " | unmatched: " + totalUnmatched
@@ -464,6 +595,18 @@ function _nestTranslatePairs(pairs, dx, dy) {
         if (p.art)     p.art.translate(dx, dy);
         if (p.caption) p.caption.translate(dx, dy);
     }
+}
+
+// Visual rotation of an item in degrees, in the +CCW convention that _nestPivotMatrix /
+// concatenateRotationMatrix apply — so a value read here can be driven back to a target by
+// _nestPivotMatrix(target - value). atan2 of the matrix's first column, robust to the
+// uniform art scale. MUST be read on the PlacedItem BEFORE embed(): embedding flips the
+// resulting raster's matrix sign (measured), which would invert the angle. (The note-stamp
+// read/write helpers live in aiUtils — noteReadRotStamp / noteWriteRotStamp — beside the
+// note grammar they share.)
+function _nestVisAngle(item) {
+    var m = item.matrix;
+    return _aiNormalizeDeg(-Math.atan2(m.mValueB, m.mValueA) * 180 / Math.PI);
 }
 
 // Bakes EVERY captioned group's live Arc warp into static glyph outlines in ONE pass so they
@@ -1282,6 +1425,11 @@ function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFac
             + " outline=" + Math.round(cW) + "x" + Math.round(cHb)
             + " dW=" + Math.round(aW - cW) + " dH=" + Math.round(aH - cHb));
 
+        // Return the PlacedItem UNCHANGED — the nest transform (_nestApplyPairTransform) +
+        // cluster moves must run on the live placed item. Embedding happens LATER, in a
+        // single final pass (see runNestingImport §5d), once all transforms are done — embed()
+        // detaches the original reference (leaves it a phantom), so it must never be embedded
+        // while a caller still holds it for transforming.
         return placed;
 
     } catch (e) {
