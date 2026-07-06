@@ -12,10 +12,12 @@
 #     HOW THIS FIXTURE WAS BUILT (2026-07-06): opened the ai-normalise-captions fixture
 #     (the assembled/nested Slovakia SKU), ran AI_NormaliseCaptions, saved as quality-check.ai.
 #     Then, to exercise the MARGIN-violation path (the nest was otherwise fully in-bounds),
-#     two elements were nudged past the safe area: "Bratislava Castle" translated up ~6mm
-#     (over the TOP margin) and "Tram" translated right ~6mm (over the RIGHT margin). The
-#     golden therefore expects margin: 2. If you regenerate the fixture from scratch, redo
-#     those two moves or the golden's margin lines won't match.
+#     two elements were nudged past the safe area: "Bratislava Castle" up ~5.7mm (over the TOP
+#     margin) and "Tram" right ~6.3mm (over the RIGHT margin). For EACH, both the Cutlines
+#     GroupItem AND the matching Sticker-layer RasterItem (same name) are translated by the
+#     IDENTICAL vector, so the element stays visually intact (art rides with its cut). The
+#     golden expects margin: 2. If you regenerate the fixture, redo those two moves (cut+art
+#     together) or the golden's margin lines won't match.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
