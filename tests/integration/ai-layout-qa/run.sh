@@ -9,6 +9,13 @@
 #   tests/integration/ai-layout-qa/fixtures/quality-check.ai
 #     A working .ai file that has been through Steps 6 + Deepnest import —
 #     must have a "Cutlines" layer with nested PathItems/CompoundPathItems.
+#     HOW THIS FIXTURE WAS BUILT (2026-07-06): opened the ai-normalise-captions fixture
+#     (the assembled/nested Slovakia SKU), ran AI_NormaliseCaptions, saved as quality-check.ai.
+#     Then, to exercise the MARGIN-violation path (the nest was otherwise fully in-bounds),
+#     two elements were nudged past the safe area: "Bratislava Castle" translated up ~6mm
+#     (over the TOP margin) and "Tram" translated right ~6mm (over the RIGHT margin). The
+#     golden therefore expects margin: 2. If you regenerate the fixture from scratch, redo
+#     those two moves or the golden's margin lines won't match.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
@@ -37,13 +44,16 @@ if [ ! -f "$FIXTURE_AI" ]; then
 fi
 
 # ── Prepare patched script ───────────────────────────────────────────────────
-# Disable alerts and overlay so the script runs non-interactively.
+# Suppress alerts so the script runs non-interactively. We deliberately KEEP the QA
+# overlay ON (showOverlay stays true; showFlagMarkers already defaults true) so the run
+# leaves an inspectable result open in Illustrator — spacing dots, amber margin flags,
+# AND the NQI pocket fills all drawn. The golden asserts the scoring log lines; the
+# overlay adds its own deterministic "drew … | N …" / "overlay drawn … | N rect(s)" lines.
 
 rm -f "$LOG" "$TEMP_SCRIPT"
 
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
-    s|showOverlay:\s*true|showOverlay: false|;
     s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 

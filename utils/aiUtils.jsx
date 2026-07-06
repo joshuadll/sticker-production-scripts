@@ -3206,13 +3206,26 @@ function qaDrawArrow(layer, cx, cy, dirX, dirY, sizePt, colorObj, opacity) {
 }
 
 // Draws a filled (unstroked) polygon on the layer from an array of {x,y} points —
-// used for the amber margin-overhang sliver. Skips degenerate (<3 point) input.
+// used for the amber margin-overhang sliver. setEntirePath throws "Illegal Argument" on
+// a <3-point, non-finite, zero-extent, OR VERY DENSE path — and a real overhang sliver
+// (the overhang of a densely-traced silhouette like a castle, sampled at 12 steps/segment)
+// easily exceeds the point limit. So guard finiteness/extent, decimate to a safe cap, and
+// wrap the call: this is an ADVISORY overlay, so an undrawable sliver must WARN + skip, not
+// abort the whole QA pass (the margin violation is already logged and marked by the halo +
+// inward arrow). Same guards the half-cut seam uses (_decimateSeam / _seamFinite).
 function qaFillPolygon(layer, poly, colorObj, opacity) {
-    if (!poly || poly.length < 3) return null;
+    if (!poly || poly.length < 3 || !_seamFinite(poly)) return null;
+    var capped = _decimateSeam(poly, 400);
     var pts = [], i;
-    for (i = 0; i < poly.length; i++) pts.push([poly[i].x, poly[i].y]);
+    for (i = 0; i < capped.length; i++) pts.push([capped[i].x, capped[i].y]);
     var p = layer.pathItems.add();
-    p.setEntirePath(pts);
+    try {
+        p.setEntirePath(pts);
+    } catch (e) {
+        try { p.remove(); } catch (e2) {}
+        log("[step8c] WARN | margin sliver not drawn (" + pts.length + " pts): " + e.message);
+        return null;
+    }
     p.closed    = true;
     p.stroked   = false;
     p.filled    = true;
