@@ -2,26 +2,24 @@
 [pipeline] dryRun: false
 [pipeline] document: quality-check.ai
 [pipeline] --- Spacing + Margin QA ---
-[step8c] collected 34 cut line(s).
-[step8c] FLAG | spacing 1mm (< 2mm) | (unnamed) <-> (unnamed)
-[step8c] FLAG | spacing 2mm (< 2mm) | (unnamed) <-> 
-[step8c] FLAG | spacing 1.7mm (< 2mm) | (unnamed) <-> 
-[step8c] FLAG | spacing 0mm (< 2mm) | (unnamed) <-> 
-[step8c] FLAG | spacing 1.7mm (< 2mm) | (unnamed) <-> 
-[step8c] FLAG | spacing 0mm (< 2mm) | (unnamed) <-> 
-[step8c] FLAG | spacing 0mm (< 2mm) | (unnamed) <-> 
-[step8c] FLAG | spacing 1.3mm (< 2mm) | (unnamed) <-> 
-[step8c] FLAG | spacing 0mm (< 2mm) | (unnamed) <-> 
-[step8c] FLAG | spacing 1.1mm (< 2mm) | (unnamed) <-> 
-[step8c] FLAG | spacing 1.9mm (< 2mm) |  <-> (unnamed)
+[step8c] collected 26 cut line(s).
+[step8c] FLAG | spacing 1.9mm (< 2mm) | Devín Castle <-> Štrbské Pleso
+[step8c] FLAG | spacing 1.8mm (< 2mm) | Slovak Paradise National Park <-> Tram
+[step8c] FLAG | spacing 1.9mm (< 2mm) | Spiš Castle <-> St. Martin's Cathedral
+[step8c] FLAG | spacing 2mm (< 2mm) | Bratislava Castle <-> St. Martin's Cathedral
+[step8c] FLAG | spacing 1.8mm (< 2mm) | Slovakia Map <-> UFO Observation Deck, Bridge SNP
+[step8c] FLAG | spacing 1.9mm (< 2mm) | UFO Observation Deck, Bridge SNP <-> Old Town Hall (Bratislava)
+[step8c] FLAG | spacing 1.9mm (< 2mm) | Old Town Hall (Bratislava) <-> Čumil Statue
+[step8c] FLAG | spacing 1.8mm (< 2mm) | The Blue Church | Church of St. Elizabeth <-> St Elizabeth's Cathedral | (Dóm Svätej Alzbety)
+[step8c] FLAG | spacing 1.9mm (< 2mm) | Čumil Statue <-> St Elizabeth's Cathedral | (Dóm Svätej Alzbety)
+[step8c] FLAG | spacing 2mm (< 2mm) | Pirohy <-> Bryndzové halušky
+[step8c] FLAG | spacing 1.9mm (< 2mm) | Pirohy <-> Kraslice
+[step8c] FLAG | spacing 2mm (< 2mm) | Pirohy <-> Tatra chamois
 [step8c] margin | 190x267mm safe area.
-[step8c] FLAG | cut line exceeds margin | (unnamed)
-[step8c] FLAG | cut line exceeds margin | 
-[step8c] FLAG | cut line exceeds margin | 
-[step8c] overlay | drew flags on "Layout QA" layer | 16 halo(s), 11 spacing badge(s), 3 margin arrow(s), 3 sliver(s), 0 seat-review badge(s)
-[timing] step8c | sample=3394 spacing=2942 margin=5 overlay=593 (ms)
-[step8c] done | checked=34 flagged=16 (spacing: 11 pair(s); margin: 3)
-[pipeline] spacing/margin complete | 34 checked, 16 flagged.
+[step8c] overlay | drew flags on "Layout QA" layer | 17 halo(s), 12 spacing badge(s), 0 margin arrow(s), 0 sliver(s), 0 seat-review badge(s)
+[timing] step8c | sample=238 spacing=6672 margin=0 overlay=4 (ms)
+[step8c] done | checked=26 flagged=17 (spacing: 12 pair(s); margin: 0)
+[pipeline] spacing/margin complete | 26 checked, 17 flagged.
 [pipeline] --- Nesting Quality (NQI) ---
 [stepQA] sheet: 210 x 297 mm | grid: 106 x 149 cells
 [stepQA] rasterized | 
@@ -50,51 +48,47 @@
 [stepQA] rasterized | 
 [stepQA] rasterized | 
 [stepQA] rasterized | 
-[stepQA] rasterized | 
-[stepQA] rasterized | 
-[stepQA] rasterized | 
-[stepQA] rasterized | 
-[stepQA] rasterized | 
-[stepQA] rasterized | 
-[stepQA] rasterized | 
-[stepQA] rasterized | 
-[stepQA] paths: 34 | total area: 41368.8 mm2
+[stepQA] paths: 26 | total area: 41472 mm2
 [stepQA] margin: 190 x 267 mm | inMarginCells=12730
-[stepQA] pocket | Lower-left | area=312 mm2 | center=(89.4,227.6)mm | bbox=[34,108 17x12]mm
-[stepQA] pocket | Upper-left | area=284 mm2 | center=(102.8,108.1)mm | bbox=[44,48 18x12]mm
-[stepQA] pocket | Upper-right | area=272 mm2 | center=(152.2,106.4)mm | bbox=[66,47 21x11]mm
-[stepQA] pocket | Lower-right | area=172 mm2 | center=(155.7,158.6)mm | bbox=[73,72 9x14]mm
-[stepQA] pocket | Upper-left | area=160 mm2 | center=(53.2,56.1)mm | bbox=[22,24 9x8]mm
-[stepQA] pocket | Lower-left | area=160 mm2 | center=(57.5,227.9)mm | bbox=[24,109 9x10]mm
-[stepQA] pocket | Right edge | area=112 mm2 | center=(185.6,227.6)mm | bbox=[89,108 6x9]mm
-[stepQA] pocket | Bottom edge | area=104 mm2 | center=(136.8,274.8)mm | bbox=[62,134 11x5]mm
-[stepQA] pocket | Bottom edge | area=96 mm2 | center=(87.9,275.3)mm | bbox=[39,135 10x4]mm
-[stepQA] pocket | Top edge | area=92 mm2 | center=(61.7,12.1)mm | bbox=[25,5 15x4]mm
-[stepQA] pocket | Left edge | area=92 mm2 | center=(12.9,211.9)mm | bbox=[5,100 5x11]mm
-[stepQA] NQI=96 | pass=true | utilization=81.5% | recoverableCells=464/12730
-[timing] stepQA | setup+collect=135 raster=463 dilate=547 marginMask=22 pockets=345 overlay=4 (ms)
+[stepQA] pocket | Right edge | area=320 mm2 | center=(187.6,198.9)mm | bbox=[83,92 17x23]mm
+[stepQA] pocket | Lower-left | area=236 mm2 | center=(54.9,233.5)mm | bbox=[22,110 11x13]mm
+[stepQA] pocket | Upper-left | area=212 mm2 | center=(101,106.5)mm | bbox=[45,48 12x10]mm
+[stepQA] pocket | Upper-right | area=200 mm2 | center=(150.8,62.1)mm | bbox=[70,25 11x12]mm
+[stepQA] pocket | Lower-left | area=184 mm2 | center=(50.9,186.1)mm | bbox=[19,88 13x10]mm
+[stepQA] pocket | Lower-left | area=164 mm2 | center=(57,155.1)mm | bbox=[25,70 7x13]mm
+[stepQA] pocket | Bottom edge | area=164 mm2 | center=(134.7,275)mm | bbox=[57,135 18x4]mm
+[stepQA] pocket | Left edge | area=152 mm2 | center=(14.7,234.5)mm | bbox=[5,112 8x12]mm
+[stepQA] pocket | Left edge | area=148 mm2 | center=(14.3,202.5)mm | bbox=[5,96 7x11]mm
+[stepQA] pocket | Lower-left | area=148 mm2 | center=(97.5,164.8)mm | bbox=[41,77 13x11]mm
+[stepQA] pocket | Lower-right | area=140 mm2 | center=(122.6,209.3)mm | bbox=[56,101 9x11]mm
+[stepQA] pocket | Lower-left | area=128 mm2 | center=(101,245.3)mm | bbox=[45,119 11x8]mm
+[stepQA] pocket | Right edge | area=128 mm2 | center=(178.8,273)mm | bbox=[84,131 9x8]mm
+[stepQA] pocket | Left edge | area=92 mm2 | center=(15.3,273.7)mm | bbox=[5,132 9x7]mm
+[stepQA] NQI=95 | pass=true | utilization=81.8% | recoverableCells=604/12730
+[timing] stepQA | setup+collect=119 raster=442 dilate=529 marginMask=18 pockets=289 overlay=5 (ms)
 [pipeline] === AI_LayoutQA done ===
 Layout QA
 
-Spacing/Margin: 16 of 34 cut line(s) FLAGGED (red).
+Spacing/Margin: 17 of 26 cut line(s) FLAGGED (red).
   Fix before exporting — AI_ExportFinal will halt on these.
 
-NQI Score: 96 / 100  —  PASS (threshold: 90)
-Utilization: 81.5%
-11 reworkable pocket(s):
-  1. Lower-left  — 312 mm2
-  2. Upper-left  — 284 mm2
-  3. Upper-right  — 272 mm2
-  4. Lower-right  — 172 mm2
-  5. Upper-left  — 160 mm2
-  6. Lower-left  — 160 mm2
-  7. Right edge  — 112 mm2
-  8. Bottom edge  — 104 mm2
-  9. Bottom edge  — 96 mm2
-  10. Top edge  — 92 mm2
-  11. Left edge  — 92 mm2
+NQI Score: 95 / 100  —  PASS (threshold: 90)
+Utilization: 81.8%
+14 reworkable pocket(s):
+  1. Right edge  — 320 mm2
+  2. Lower-left  — 236 mm2
+  3. Upper-left  — 212 mm2
+  4. Upper-right  — 200 mm2
+  5. Lower-left  — 184 mm2
+  6. Lower-left  — 164 mm2
+  7. Bottom edge  — 164 mm2
+  8. Left edge  — 152 mm2
+  9. Left edge  — 148 mm2
+  10. Lower-left  — 148 mm2
+  11. Lower-right  — 140 mm2
+  12. Lower-left  — 128 mm2
+  13. Right edge  — 128 mm2
+  14. Left edge  — 92 mm2
 All flags + pockets are on the "Layout QA" layer — toggle it to show/hide; it's stripped at export.
 
 Adjust the nesting / pencil, then re-run this script.
-
-Log: /private/tmp/AI_LayoutQA.log
