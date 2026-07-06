@@ -117,7 +117,10 @@ function runOffsetPathQA(doc) {
     for (a = 0; a < records.length; a++) {
         for (b = a + 1; b < records.length; b++) {
             if (!_bboxNear(records[a].bounds, records[b].bounds, threshPt)) continue;
-            var dm = minPolygonSetDistanceEx(records[a].polys, records[b].polys);
+            // Threshold query: pass threshPt so the distance loop caps its running min at
+            // the QA threshold and prunes hard. Exact for any pair that actually flags
+            // (< threshPt); non-flagging pairs just report >= threshPt, which we ignore.
+            var dm = minPolygonSetDistanceEx(records[a].polys, records[b].polys, threshPt);
             if (dm.dist < threshPt) {
                 records[a].spacingFail = true;
                 records[b].spacingFail = true;

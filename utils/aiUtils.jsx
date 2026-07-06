@@ -3025,6 +3025,15 @@ function minPolygonSetDistance(polysA, polysB) {
     return minPolygonSetDistanceEx(polysA, polysB).dist;
 }
 
+// Optional third arg `maxDist` (points): a caller that only cares whether the sets are
+// closer than a threshold (spacing QA) passes it to SEED the running minimum at maxDist²
+// instead of Infinity. Because the per-vertex bbox distance is a strict LOWER BOUND, any
+// vertex that could yield a distance < maxDist is still NEVER pruned, so the result — the
+// distance AND the witness pair — is byte-identical for every pair whose true distance is
+// < maxDist (the only pairs a threshold caller acts on). Pairs that are actually ≥ maxDist
+// short-circuit almost entirely (every vertex prunes immediately) and report dist == maxDist
+// with a meaningless witness, which the caller discards. Omit maxDist for the exact minimum.
+
 // Same minimum-distance computation as minPolygonSetDistance, but also returns
 // the witness pair — the two closest points, one on each polygon set — so QA can
 // draw a connector spanning the actual gap. Returns
@@ -3033,14 +3042,18 @@ function minPolygonSetDistance(polysA, polysB) {
 // (dist 0) the witness collapses to the contained vertex (connector degenerates
 // to a dot, which still marks the spot). Points are in the polygons' own
 // coordinate space (document points, as produced by samplePathToPolygons).
-function minPolygonSetDistanceEx(polysA, polysB) {
+function minPolygonSetDistanceEx(polysA, polysB, maxDist) {
     // Work in SQUARED distance throughout (no per-pair sqrt) and prune each vertex
     // against the other polygon's bounding box. Both are exact: sqrt is monotonic so
     // every comparison is unchanged, and a vertex whose distance to B's bbox already
     // exceeds the running min cannot beat it (bbox distance is a lower bound), so
     // skipping it leaves the minimum AND the witness pair byte-identical to brute
     // force. This is the heavy inner loop of spacing QA — formerly ~13s of the run.
-    var minD2 = Infinity;
+    // Seeding minD2 at maxDist² (when given) makes the bbox prune effective from the
+    // FIRST vertex instead of only after a close pair is found — see the wrapper note.
+    var minD2 = (maxDist === undefined || maxDist === null)
+        ? Infinity
+        : maxDist * maxDist;
     var wax = 0, way = 0, wbx = 0, wby = 0;
     var ai, bi, pi, qi, c;
 
