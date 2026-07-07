@@ -105,6 +105,51 @@ function _s10BuildClipData(stickersLayer, cutlinesLayer) {
 }
 
 
+// Returns the largest-bbox sub-path of a CompoundPathItem (the real silhouette),
+// ignoring the degenerate near-zero-area slivers the trace/Unite leaves behind.
+function _s10LargestSubPath(cp) {
+    var best = null, bestA = -1, i, p, b, a;
+    for (i = 0; i < cp.pathItems.length; i++) {
+        p = cp.pathItems[i];
+        b = p.geometricBounds;                       // [left, top, right, bottom]
+        a = Math.abs(b[2] - b[0]) * Math.abs(b[1] - b[3]);
+        if (a > bestA) { bestA = a; best = p; }
+    }
+    return best;
+}
+
+// Apply the clipping mask to a prepared clip group (mask already at pageItems[0]).
+// `grp.clipped = true` only accepts a PathItem mask; a CompoundPathItem throws
+// "The top item in the group must be a path item to create a mask". Here the fused
+// cutline is often *spuriously* compound — the real silhouette plus 1–2 degenerate
+// ~zero-area sliver subpaths from the trace/Unite (verified: no true interior holes).
+// So for a compound mask, promote its largest subpath to a standalone PathItem and
+// clip with that: headless-safe (no makeMask menu command, which blocks in this
+// context), and loses no visible geometry. The PathItem case keeps the proven property
+// path unchanged, so the non-compound elements export byte-for-byte as before.
+function _s10ClipGroup(doc, grp) {
+    var mask = grp.pageItems[0];
+    if (mask.typename === "PathItem") {
+        grp.clipped = true;
+        return;
+    }
+    if (mask.typename === "CompoundPathItem") {
+        var biggest = _s10LargestSubPath(mask);
+        if (biggest) {
+            var solo = biggest.duplicate(grp, ElementPlacement.PLACEATBEGINNING);
+            mask.remove();                 // drop the compound (incl. slivers)
+            solo.moveToBeginning(grp);      // re-assert the PathItem mask at [0]
+            grp.clipped = true;
+            return;
+        }
+    }
+    // Unexpected mask type / empty compound — leave unclipped rather than crash; the
+    // per-element art carries its own alpha, so the export is still usable.
+    log("[step10] WARN | could not clip '" + grp.name + "' (mask " + mask.typename
+        + ") — exported unclipped");
+}
+
+
 // ─── PHASE 1: JPEG PREVIEWS ───────────────────────────────────────────────────
 
 // Builds all clip groups on a temporary layer, exports white + green JPEG
@@ -134,7 +179,7 @@ function _s10ExportJpegs(doc, clipData, outFolder, stkCode) {
             whiteDupe.moveToEnd(grp);
             _s10AddCaptionMembers(grp, entry.cutline, tmpLayer);   // native caption (text+pill+plate), in front of art
             cutDupe.moveToBeginning(grp);   // re-assert the mask at pageItems[0]
-            grp.clipped = true;
+            _s10ClipGroup(doc, grp);
         }
         // Stamps (PlacedItem cutline): artDupe placed directly on tmpLayer, no clip mask.
     }
@@ -194,7 +239,7 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
         whiteDupe.moveToEnd(grp);
         _s10AddCaptionMembers(grp, entry.cutline, tmpLayer);   // native caption (text+pill+plate), in front of art
         cutDupe.moveToBeginning(grp);   // re-assert the mask at pageItems[0]
-        grp.clipped = true;
+        _s10ClipGroup(doc, grp);
     } else {
         // Stamp: no vector clipping path available. Use a white-filled bounding
         // rectangle as backing — the stamp artwork defines its own visible extent.
