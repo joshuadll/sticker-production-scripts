@@ -9,6 +9,15 @@
 #   tests/integration/ai-layout-qa/fixtures/quality-check.ai
 #     A working .ai file that has been through Steps 6 + Deepnest import —
 #     must have a "Cutlines" layer with nested PathItems/CompoundPathItems.
+#     HOW THIS FIXTURE WAS BUILT (2026-07-06): opened the ai-normalise-captions fixture
+#     (the assembled/nested Slovakia SKU), ran AI_NormaliseCaptions, saved as quality-check.ai.
+#     Then, to exercise the MARGIN-violation path (the nest was otherwise fully in-bounds),
+#     two elements were nudged past the safe area: "Bratislava Castle" up ~5.7mm (over the TOP
+#     margin) and "Tram" right ~6.3mm (over the RIGHT margin). For EACH, both the Cutlines
+#     GroupItem AND the matching Sticker-layer RasterItem (same name) are translated by the
+#     IDENTICAL vector, so the element stays visually intact (art rides with its cut). The
+#     golden expects margin: 2. If you regenerate the fixture, redo those two moves (cut+art
+#     together) or the golden's margin lines won't match.
 #
 # GOLDEN FILE WORKFLOW — first run:
 #   1. Run this script (SKIP diff if no golden file yet)
@@ -37,13 +46,16 @@ if [ ! -f "$FIXTURE_AI" ]; then
 fi
 
 # ── Prepare patched script ───────────────────────────────────────────────────
-# Disable alerts and overlay so the script runs non-interactively.
+# Suppress alerts so the script runs non-interactively. We deliberately KEEP the QA
+# overlay ON (showOverlay stays true; showFlagMarkers already defaults true) so the run
+# leaves an inspectable result open in Illustrator — spacing dots, amber margin flags,
+# AND the NQI pocket fills all drawn. The golden asserts the scoring log lines; the
+# overlay adds its own deterministic "drew … | N …" / "overlay drawn … | N rect(s)" lines.
 
 rm -f "$LOG" "$TEMP_SCRIPT"
 
 perl -pe '
     s|suppressAlerts:\s*false|suppressAlerts: true|;
-    s|showOverlay:\s*true|showOverlay: false|;
     s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
@@ -103,10 +115,19 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    # Drop run-variable lines: pipeline banners + the advisory [timing] lines (wall
-    # durations differ every run by design — they measure, they don't assert).
+    # Drop run-variable lines so the golden asserts the SCORING, not the drawing:
+    #   • pipeline banners + advisory [timing] lines (wall durations differ every run);
+    #   • the overlay-drawing tallies — "[step8c] overlay | drew flags … | N halo(s), …"
+    #     and "[stepQA] overlay drawn … | N rect(s)". Those counts are pixel-derived
+    #     (greedy maximal-rectangle tiling + the 400-pt sliver decimation cap), so a
+    #     future tiling/decimation tweak would churn the golden even when spacing/margin/
+    #     NQI scoring is unchanged. The scoring counts they'd otherwise duplicate are
+    #     already asserted by "[step8c] done | … spacing: N pair(s); margin: N" and the
+    #     per-pocket "[stepQA] pocket …" lines, so nothing is lost.
     grep -Ev "^\[pipeline\] (=== AI_LayoutQA (start|done)|document:)" \
         | grep -Ev "^\[timing\] " \
+        | grep -Ev "^\[step8c\] overlay \| drew flags " \
+        | grep -Ev "^\[stepQA\] overlay drawn " \
         | grep '^\['
 }
 

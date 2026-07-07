@@ -51,15 +51,22 @@ function runNestingQA(doc) {
 
     var allPaths     = _qa_collectPaths(cutlinesLayer);
     _tCollect = _t.lap();
-    var totalAreaMm2 = 0;
     var i;
 
     for (i = 0; i < allPaths.length; i++) {
         _qa_rasterizePath(allPaths[i], grid, gridW, gridH, artLeft, artTop, PT);
-        totalAreaMm2 += Math.abs(allPaths[i].area) / (PT * PT);
         log("[stepQA] rasterized | " + allPaths[i].name);
     }
     _tRaster = _t.lap();
+
+    // Total art footprint = occupied cells, counted from the occupancy grid itself
+    // BEFORE dilation + margin-mask. Deliberately NOT sum(item.area): CompoundPathItem.area
+    // returns NaN in Illustrator ExtendScript (a united art+plate cut is frequently compound,
+    // and one NaN poisons the whole sum → "total area: NaN"). The grid is a union, so it is
+    // also correct for holes and for any overlapping/duplicate sub-paths — no double-count.
+    var occupiedCells = 0;
+    for (i = 0; i < totalCells; i++) if (grid[i]) occupiedCells++;
+    var totalAreaMm2 = occupiedCells * CONFIG.cellSizeMm * CONFIG.cellSizeMm;
 
     log("[stepQA] paths: " + allPaths.length
         + " | total area: " + _qa_fmt(totalAreaMm2) + " mm2");
@@ -171,21 +178,51 @@ function runNestingQA(doc) {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-// Returns flat array of all PathItems and CompoundPathItems in a layer,
-// recursing through GroupItems of any depth.
+// Returns a flat array of the one fused cut path per sticker in a layer, recursing
+// through GroupItems of any depth.
 //
 // Cutlines arrive in two shapes and this must handle both:
-//   • loose PathItems (stamps), and pipeline triads grouped as
-//     [Display Name] fused + outline (hidden) + plate (hidden) — Step 6 output;
-//   • single closed paths wrapped in unnamed GroupItems — real artist deliverables.
-// Walking pageItems recursively collects the leaf paths by TYPE, so grouping,
-// naming, and the hidden outline/plate sub-paths are all irrelevant: occupancy
-// is a union, and hidden components are geometric subsets of the fused contour.
-// True if the item is a spacing-buffer halo (named "{element} buffer"). Defined here so
-// _qa_collectPaths can drop it before it reaches the occupancy grid.
+//   • pipeline elements: a group [Display Name] bundling the FUSED cut (a member also
+//     named [Display Name]) + hidden outline + hidden plate + a caption-text member
+//     (often expanded into many letter paths) + a buffer halo, and — for stamps — a
+//     "tab fill". Only the fused cut is the sticker footprint; the rest are geometric
+//     subsets of it (outline/plate/text/tab) or a transient aid (buffer). Collecting
+//     them all would ~3x the path count and rasterize dozens of caption letter paths —
+//     slow, and pointless since occupancy is a union.
+//   • artist deliverables: a loose PathItem, or a single closed path in an UNNAMED
+//     wrapper GroupItem.
+// Rule: inside a NAMED group, collect only the member whose name equals the group's own
+// name (the fused cut), resolving through a wrapper group to its leaf path; skip the
+// siblings. A group with no self-named member (unnamed wrapper / artist deliverable) is
+// recursed wholesale so nothing is dropped.
+function _qa_endsWith(n, suffix) {
+    return !!(n && n.length >= suffix.length
+              && n.substring(n.length - suffix.length) === suffix);
+}
+
+// True for a spacing-buffer halo (aiUtils.syncSpacingBuffer, "{element} buffer") — a
+// transient drag-time aid offset OUTSIDE the real cut. Any type (it's a GroupItem cloned
+// from a group cutline); skipping it here also skips its unnamed descendants.
 function _qa_isSpacingBuffer(item) {
-    var n = item.name;
-    return !!(n && n.length >= 7 && n.substring(n.length - 7) === " buffer");
+    return _qa_endsWith(item.name, " buffer");
+}
+
+// The fused cut member of a pipeline element group: the child whose name equals the
+// group's own name. Returns null for an unnamed group (artist deliverable) so the caller
+// recurses it wholesale. Empty group name is treated as unnamed (avoids ""==="" matching
+// an unnamed child).
+function _qa_selfNamedMember(group) {
+    var nm = group.name;
+    if (!nm) return null;
+    var kids = group.pageItems, i, t;
+    for (i = 0; i < kids.length; i++) {
+        t = kids[i].typename;
+        if (kids[i].name === nm
+            && (t === "GroupItem" || t === "PathItem" || t === "CompoundPathItem")) {
+            return kids[i];
+        }
+    }
+    return null;
 }
 
 function _qa_collectPaths(container) {
@@ -206,20 +243,31 @@ function _qa_collectPaths(container) {
     }
 
     var items = container.pageItems;
-    var t;
+    var t, fused;
     for (i = 0; i < items.length; i++) {
-        // Skip spacing-buffer halos (aiUtils.syncSpacingBuffer) — they live INSIDE the cutline
-        // groups but are a transient drag-time aid, offset outward past the real cut. Counting
-        // them would inflate occupancy and erase real pockets. Matched by the " buffer" suffix;
-        // a buffer cloned from a group cutline is itself a named GroupItem, so skipping it here
-        // also skips its (unnamed) descendants.
+        // Spacing-buffer halos are offset OUTSIDE the real cut — counting them inflates
+        // occupancy and erases real pockets. (Also non-self-named, but guard explicitly so
+        // the artist-deliverable recurse branch below can't pick one up either.)
         if (_qa_isSpacingBuffer(items[i])) continue;
         t = items[i].typename;
         if (t === "PathItem" || t === "CompoundPathItem") {
             result.push(items[i]);
         } else if (t === "GroupItem") {
-            inner = _qa_collectPaths(items[i]);
-            for (j = 0; j < inner.length; j++) result.push(inner[j]);
+            fused = _qa_selfNamedMember(items[i]);
+            if (fused) {
+                // Pipeline element group: take only the fused cut (recurse if it's a
+                // wrapper group), dropping outline/plate/caption-text/tab-fill siblings.
+                if (fused.typename === "GroupItem") {
+                    inner = _qa_collectPaths(fused);
+                    for (j = 0; j < inner.length; j++) result.push(inner[j]);
+                } else {
+                    result.push(fused);
+                }
+            } else {
+                // Unnamed wrapper / artist deliverable: recurse wholesale.
+                inner = _qa_collectPaths(items[i]);
+                for (j = 0; j < inner.length; j++) result.push(inner[j]);
+            }
         }
     }
     return result;
