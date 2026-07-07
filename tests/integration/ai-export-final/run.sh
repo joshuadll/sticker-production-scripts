@@ -117,7 +117,15 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
+    # Drop run-variable lines so the golden asserts the QA SCORING, not the drawing
+    # (mirrors ai-layout-qa/run.sh): pipeline banners + advisory [timing] lines (wall
+    # durations differ every run) + the overlay-drawing tally ("[step8c] overlay | drew
+    # flags … | N halo(s), …"), whose counts are pixel-derived (greedy tiling + sliver
+    # decimation) and would churn on a future tweak. The scoring is already asserted by
+    # "[step8c] done | … spacing: N pair(s); margin: N".
     grep -Ev "^\[pipeline\] (document:|=== AI_ExportFinal (start|done))" \
+        | grep -Ev "^\[timing\] " \
+        | grep -Ev "^\[step8c\] overlay \| drew flags " \
         | grep '^\['
 }
 
