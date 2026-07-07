@@ -115,10 +115,19 @@ fi
 # ── Diff against golden file ─────────────────────────────────────────────────
 
 strip_variable_lines() {
-    # Drop run-variable lines: pipeline banners + the advisory [timing] lines (wall
-    # durations differ every run by design — they measure, they don't assert).
+    # Drop run-variable lines so the golden asserts the SCORING, not the drawing:
+    #   • pipeline banners + advisory [timing] lines (wall durations differ every run);
+    #   • the overlay-drawing tallies — "[step8c] overlay | drew flags … | N halo(s), …"
+    #     and "[stepQA] overlay drawn … | N rect(s)". Those counts are pixel-derived
+    #     (greedy maximal-rectangle tiling + the 400-pt sliver decimation cap), so a
+    #     future tiling/decimation tweak would churn the golden even when spacing/margin/
+    #     NQI scoring is unchanged. The scoring counts they'd otherwise duplicate are
+    #     already asserted by "[step8c] done | … spacing: N pair(s); margin: N" and the
+    #     per-pocket "[stepQA] pocket …" lines, so nothing is lost.
     grep -Ev "^\[pipeline\] (=== AI_LayoutQA (start|done)|document:)" \
         | grep -Ev "^\[timing\] " \
+        | grep -Ev "^\[step8c\] overlay \| drew flags " \
+        | grep -Ev "^\[stepQA\] overlay drawn " \
         | grep '^\['
 }
 
