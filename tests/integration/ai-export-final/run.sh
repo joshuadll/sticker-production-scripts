@@ -27,8 +27,20 @@ AI_FIXTURE="$FIXTURE_DIR/step8c-cutlines.ai"
 EXPECTED="$(cd "$(dirname "$0")" && pwd)/expected.txt"
 
 TEMP_SCRIPT="/tmp/${STEP}-test.jsx"
-TEMP_FIXTURE="/tmp/${STEP}-fixture.ai"
 LOG="/tmp/AI_ExportFinal.log"
+
+# Illustrator's exportFile() is SILENTLY BLOCKED by macOS TCC when the target is under
+# /tmp (the call returns without error but no file is written — verified). Step 10 writes
+# its JPEG/PNG deliverables next to the working .ai, so the fixture must live in a
+# TCC-allowed dir for those assets to actually land on disk. $HOME dotfolder = not /tmp,
+# not a TCC-protected special folder (Desktop/Documents/Downloads) → no sandbox block, no
+# prompt. (saveAs for _final.ai is NOT subject to this, which is why it worked from /tmp.)
+WORKDIR="$HOME/.ai-export-final-test"
+TEMP_FIXTURE="$WORKDIR/${STEP}-fixture.ai"
+STK="${STEP}-fixture"                       # stkCode = filename up to first space
+FINAL_AI="$WORKDIR/${STK}_final.ai"
+PREVIEW_WHITE="$WORKDIR/${STK}_preview_white.jpg"
+PREVIEW_GREEN="$WORKDIR/${STK}_preview_green.jpg"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
@@ -39,7 +51,9 @@ if [ ! -f "$AI_FIXTURE" ]; then
 fi
 
 # ── Clean slate ───────────────────────────────────────────────────────────────
-rm -f "$LOG" "$TEMP_SCRIPT" "$TEMP_FIXTURE" /tmp/${STEP}-fixture_final.ai
+rm -f "$LOG" "$TEMP_SCRIPT"
+rm -rf "$WORKDIR"
+mkdir -p "$WORKDIR"
 osascript -e "tell application \"$APP\" to do javascript \"while(app.documents.length>0){app.documents[0].close(SaveOptions.DONOTSAVECHANGES);}\"" >/dev/null 2>&1 || true
 
 cp "$AI_FIXTURE" "$TEMP_FIXTURE"
@@ -117,6 +131,36 @@ else
     echo "WARN [$STEP]: flagged=0 — fixture may not include a too-close pair."
 fi
 
+# ── Verify the full export path ran AND the deliverables landed on disk ───────
+# This fixture clears the QA gate (test-only 1.7mm relax) so Steps 9A→10→11 run
+# end-to-end. Assert the actual files exist — the log's "saved" lines alone are NOT
+# proof: exportFile() no-ops silently under a TCC block, so a green log can still
+# ship zero assets (which is exactly why WORKDIR is a $HOME dir, not /tmp).
+if grep -q "\[step11\] done |" "$LOG"; then
+    echo "PASS [$STEP]: reached Step 11 (final file)."
+else
+    echo "FAIL [$STEP]: pipeline did not reach '[step11] done' — export halted early."
+    FAIL=1
+fi
+
+PNG_LOG=$(grep -oE "pngCount=[0-9]+" "$LOG" | grep -oE "[0-9]+$" | head -1 || echo "0")
+PNG_DISK=$(ls "$WORKDIR"/*.png 2>/dev/null | wc -l | tr -d ' ')
+if [ "${PNG_DISK:-0}" -gt 0 ] && [ "${PNG_DISK}" = "${PNG_LOG:-0}" ]; then
+    echo "PASS [$STEP]: $PNG_DISK per-element PNG(s) on disk (matches log pngCount)."
+else
+    echo "FAIL [$STEP]: per-element PNGs on disk ($PNG_DISK) != log pngCount ($PNG_LOG)."
+    FAIL=1
+fi
+
+for f in "$FINAL_AI" "$PREVIEW_WHITE" "$PREVIEW_GREEN"; do
+    if [ -f "$f" ]; then
+        echo "PASS [$STEP]: wrote $(basename "$f")."
+    else
+        echo "FAIL [$STEP]: missing expected output: $(basename "$f")"
+        FAIL=1
+    fi
+done
+
 if [ "$FAIL" -ne 0 ]; then
     echo "  Log contents:"
     cat "$LOG"
@@ -132,9 +176,12 @@ strip_variable_lines() {
     # flags … | N halo(s), …"), whose counts are pixel-derived (greedy tiling + sliver
     # decimation) and would churn on a future tweak. The scoring is already asserted by
     # "[step8c] done | … spacing: N pair(s); margin: N".
+    # Also normalise the WORKDIR absolute path (which now appears in the Step 11 log
+    # lines) to a placeholder so the golden is portable — it embeds $HOME otherwise.
     grep -Ev "^\[pipeline\] (document:|=== AI_ExportFinal (start|done))" \
         | grep -Ev "^\[timing\] " \
         | grep -Ev "^\[step8c\] overlay \| drew flags " \
+        | sed "s#${WORKDIR}/#<out>/#g" \
         | grep '^\['
 }
 
@@ -142,9 +189,10 @@ if [ ! -f "$EXPECTED" ]; then
     echo ""
     echo "NOTE [$STEP]: no golden file yet — this is expected on first run."
     echo "  Log written to: $LOG"
-    echo "  Review the log. If correct, commit it as the golden file:"
+    echo "  Review the log. If correct, commit it as the golden file"
+    echo "  (normalise the WORKDIR path so the golden stays portable):"
     echo ""
-    echo "    cp \"$LOG\" \"$EXPECTED\""
+    echo "    sed 's#$WORKDIR/#<out>/#g' \"$LOG\" > \"$EXPECTED\""
     echo "    git add \"$EXPECTED\""
     echo "    git commit -m 'Add golden output for ai-export-final'"
     echo ""
@@ -156,8 +204,8 @@ if diff -u <(strip_variable_lines < "$EXPECTED") <(strip_variable_lines < "$LOG"
     exit 0
 else
     echo "FAIL [$STEP]: output differs from golden file (diff above)."
-    echo "  If the change is intentional:"
-    echo "    cp \"$LOG\" \"$EXPECTED\""
+    echo "  If the change is intentional (normalise the WORKDIR path for portability):"
+    echo "    sed 's#$WORKDIR/#<out>/#g' \"$LOG\" > \"$EXPECTED\""
     echo "    git add \"$EXPECTED\" && git commit -m 'Update ai-export-final golden output: <reason>'"
     exit 1
 fi
