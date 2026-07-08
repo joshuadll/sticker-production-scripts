@@ -131,9 +131,10 @@ function main() {
         var result = runNestingImport(doc, svgFiles, artFolder, elementsData);
 
         if (!result) {
-            scriptAlert("❌ Import failed — Cutlines layer not found.\n\n"
-                + "Make sure Step 6 has been run on this document.\n\n"
-                + "Send this to Josh:\n" + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
+            // runNestingImport surfaces the specific abort reason (Cutlines layer missing /
+            // art missing on Stickers) via its own scriptAlert + log before returning null —
+            // don't add a second, reason-guessing dialog here.
+            log("[pipeline] import aborted — see the alert/log above.");
             return;
         }
 

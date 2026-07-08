@@ -49,6 +49,11 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     var cutlinesLayer = findLayer(doc, CONFIG.cutlinesLayerName);
     if (!cutlinesLayer) {
         log("[step-nest] ERROR | Cutlines layer not found.");
+        var _cutFolder = null;
+        try { _cutFolder = doc.fullName.parent.fsName; } catch (eCut) {}
+        scriptAlert("❌ Import failed — Cutlines layer not found.\n\n"
+            + "Make sure Step 6 has been run on this document.\n\n"
+            + "Send this to Josh:\n" + copyLogBeside(_cutFolder, "Noteworthie_ERROR.log"));
         return null;
     }
 
