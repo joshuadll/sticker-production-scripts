@@ -102,8 +102,15 @@ Stop importing art; ride the art placed at Step 6:
   element name(s) — the same hard-gate pattern as `AI_ExportFinal`'s unseated-caption error.
   No fallback re-import.
 - **Delete** `_nestPlaceArtUpright` (no longer any placement path in Step 7B) and the
-  now-redundant **final embed pass** (§5d) — art is already embedded.
-- Update the "art landed on Stickers" verification to count raster items.
+  private `_nestArtFactor` (superseded by the shared `artFactorFromData`).
+- **Keep** the existing correctness safety nets — the `art-rot-reconcile` (§5c), the
+  `embed` pass (§5d), and the `art-layer-check` / `art-pos-check` (§6). Under the new design
+  they become harmless no-ops (art is already embedded, so `placedItems` is empty and the
+  embed pass bakes nothing; art rides in lockstep, so the reconcile finds nothing to
+  correct; the layer/position checks still pass). They are subtle, validated correctness
+  guards in an area the project history flags as fragile, so this change leaves them intact
+  rather than pruning un-revalidatable code for a cosmetic win. They can be pruned in a
+  follow-up once the new flow is validated on a real SKU (see checklist).
 
 The `pairs` array already carries `art` through both the per-part transform
 (`_nestApplyPairTransform`) and the cluster-level `_nestRotatePairs` / `_nestTranslatePairs`,
