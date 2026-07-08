@@ -61,6 +61,10 @@ function runFinalFile(doc) {
     for (i = fd.layers.length - 1; i >= 0; i--) {
         if (_s11InList(fd.layers[i].name.toLowerCase(), REMOVE)) {
             log("[step11] removing layer: " + fd.layers[i].name);
+            // buildWorkingDocument creates Margin/Grid/Color Block LOCKED, and
+            // layer.remove() throws "Trying to delete locked layer" — unlock first.
+            fd.layers[i].locked  = false;
+            fd.layers[i].visible = true;
             fd.layers[i].remove();
         }
     }
@@ -71,7 +75,11 @@ function runFinalFile(doc) {
             + " — check final file manually.");
     }
 
-    fd.save();
+    // Persist the layer-stripped file with EXPLICIT save options. A bare fd.save()
+    // pops Illustrator's native "Options" save dialog, which blocks a headless/
+    // scripted run (AppleEvent hangs). Re-use the same IllustratorSaveOptions as the
+    // saveAs above so the write is silent and self-contained (links embedded).
+    fd.saveAs(finalFile, saveOpts);
     log("[step11] done | " + finalFile.fsName + " | layers=" + layerCount);
     return { outputPath: finalFile.fsName, layerCount: layerCount };
 }

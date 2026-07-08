@@ -1,40 +1,147 @@
 [pipeline] === AI_ExportFinal start ===
 [pipeline] dryRun: false
 [pipeline] document: ai-export-final-fixture.ai
-[pipeline] --- Step 8c: Offset Path QA ---
+[buffer] stripped 26 spacing buffer(s) before export.
+[pipeline] --- Spacing + Margin QA guard ---
 [step8c] collected 26 cut line(s).
-[step8c] FLAG | spacing 1mm (< 2mm) | Orava Castle <-> National Animal - Tatra chamois
-[step8c] margin | computed 190x267mm safe area.
-[step8c] FLAG | cut line exceeds margin | Bratislava Castle
-[step8c] FLAG | cut line exceeds margin | Štrbské Pleso
-[step8c] FLAG | cut line exceeds margin | Devín Castle
-[step8c] FLAG | cut line exceeds margin | St. Martin's Cathedral
-[step8c] FLAG | cut line exceeds margin | Slovak Paradise National Park
-[step8c] FLAG | cut line exceeds margin | Spiš Castle
-[step8c] FLAG | cut line exceeds margin | Bojnice Castle
-[step8c] FLAG | cut line exceeds margin | The Blue Church - Church of St. Elizabeth
-[step8c] FLAG | cut line exceeds margin | Old Town Hall (Bratislava)
-[step8c] FLAG | cut line exceeds margin | St Elizabeth's Cathedral (Dóm Svätej Alzbety)
-[step8c] FLAG | cut line exceeds margin | Orava Castle
-[step8c] FLAG | cut line exceeds margin | Michael's Gate
-[step8c] FLAG | cut line exceeds margin | Carpathian Wooden Churches
-[step8c] FLAG | cut line exceeds margin | Čumil Statue
-[step8c] FLAG | cut line exceeds margin | Pirohy
-[step8c] FLAG | cut line exceeds margin | Bryndzové halušky
-[step8c] FLAG | cut line exceeds margin | Kraslice
-[step8c] FLAG | cut line exceeds margin | Kroje
-[step8c] FLAG | cut line exceeds margin | Tram
-[step8c] FLAG | cut line exceeds margin | National Animal - Tatra chamois
-[step8c] FLAG | cut line exceeds margin | Šúľance s Makom
-[step8c] FLAG | cut line exceeds margin | Slovakia Map
-[step8c] FLAG | cut line exceeds margin | Fujara
-[step8c] FLAG | cut line exceeds margin | Bratislava(text)
-[step8c] FLAG | cut line exceeds margin | National Flower
-[step8c] FLAG | cut line exceeds margin | UFO Observation Deck, Bridge SNP
-[step8c] done | checked=26 flagged=26 (spacing: 1 pair(s); margin: 26)
-[pipeline] step 8c complete | 26 path(s) checked, 26 flagged.
-Step 8c: 26 path(s) flagged for review.
-Flagged paths are highlighted in red.
-Fix them before continuing, then re-run this script.
+[step8c] margin | 190x267mm safe area.
+[step8c] overlay | drew flags on "Layout QA" layer | 0 halo(s), 0 spacing badge(s), 0 margin arrow(s), 0 sliver(s), 0 seat-review badge(s)
+[timing] step8c | sample=51 spacing=2102 margin=1 overlay=1 (ms)
+[step8c] done | checked=26 flagged=0 (spacing: 0 pair(s); margin: 0)
+[pipeline] spacing/margin guard complete | 26 path(s) checked, 0 flagged.
+[pipeline] --- Step 9A: Half-cut ---
+[step9a] found 26 GC/WC/tab item(s) for half-cut.
+[step9a] processing | Devín Castle
+[halfcut] Devín Castle | pts=39 end0=(178.7,477.7) endN=(177.4,426.2) straight
+[step9a] placed | Devín Castle (straight)
+[step9a] processing | Slovak Paradise National Park
+[halfcut] Slovak Paradise National Park | pts=23 end0=(308.4,285.8) endN=(420.5,286.7) straight
+[step9a] placed | Slovak Paradise National Park (straight)
+[step9a] processing | Spiš Castle
+[halfcut] Spiš Castle | pts=26 end0=(443.8,751.2) endN=(444.1,706.3) straight
+[step9a] placed | Spiš Castle (straight)
+[step9a] processing | Bratislava Castle
+[halfcut] Bratislava Castle | pts=25 end0=(230.6,800) endN=(174.4,802.3) straight
+[step9a] placed | Bratislava Castle (straight)
+[step9a] processing | Štrbské Pleso
+[halfcut] Štrbské Pleso | pts=33 end0=(413.1,436.7) endN=(415.8,494.3) curved
+[step9a] placed | Štrbské Pleso (curved seam)
+[step9a] processing | National Flower
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
+[halfcut] National Flower | pts=33 end0=(123.7,244) endN=(117.6,260.3) straight
+[step9a] placed | National Flower (straight)
+[step9a] processing | Slovakia Map
+[halfcut] Slovakia Map | pts=35 end0=(266.7,349.6) endN=(239.7,356.9) straight
+[step9a] placed | Slovakia Map (straight)
+[step9a] processing | St. Martin's Cathedral
+[halfcut] St. Martin's Cathedral | pts=32 end0=(315,694.4) endN=(394.5,693.2) straight
+[step9a] placed | St. Martin's Cathedral (straight)
+[step9a] processing | UFO Observation Deck, Bridge SNP
+[halfcut] UFO Observation Deck, Bridge SNP | pts=17 end0=(116.1,346.9) endN=(59.4,346.8) straight
+[step9a] placed | UFO Observation Deck, Bridge SNP (straight)
+[step9a] processing | Old Town Hall (Bratislava)
+[halfcut] Old Town Hall (Bratislava) | pts=28 end0=(48.9,448.9) endN=(146.1,451) straight
+[step9a] placed | Old Town Hall (Bratislava) (straight)
+[step9a] processing | Bojnice Castle
+[halfcut] Bojnice Castle | pts=25 end0=(517.7,627.1) endN=(462.4,628) straight
+[step9a] placed | Bojnice Castle (straight)
+[step9a] processing | Orava Castle
+[halfcut] Orava Castle | pts=26 end0=(410.2,173.6) endN=(463.9,172.9) curved
+[step9a] placed | Orava Castle (curved seam)
+[step9a] processing | Michael's Gate
+[halfcut] Michael's Gate | pts=33 end0=(50.9,686.1) endN=(105.7,683.2) straight
+[step9a] placed | Michael's Gate (straight)
+[step9a] processing | The Blue Church | Church of St. Elizabeth
+[halfcut] The Blue Church | Church of St. Elizabeth | pts=40 end0=(297.7,571) endN=(383.2,569.8) curved
+[step9a] placed | The Blue Church | Church of St. Elizabeth (curved seam)
+[step9a] processing | Čumil Statue
+[halfcut] Čumil Statue | pts=46 end0=(44.2,632.1) endN=(42.6,580.8) curved
+[step9a] placed | Čumil Statue (curved seam)
+[step9a] processing | Bratislava(text)
+[halfcut] Bratislava(text) | pts=30 end0=(529.4,138.5) endN=(528.7,191) curved
+[step9a] placed | Bratislava(text) (curved seam)
+[step9a] processing | Šúľance s Makom
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
+[halfcut] Šúľance s Makom | pts=609 end0=(464,70.4) endN=(506.4,114.4) curved
+[step9a] placed | Šúľance s Makom (curved seam)
+[step9a] processing | Pirohy
+[halfcut] Pirohy | pts=35 end0=(166.2,87.9) endN=(186.8,68.9) straight
+[step9a] placed | Pirohy (straight)
+[step9a] processing | Bryndzové halušky
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
+[halfcut] Bryndzové halušky | pts=548 end0=(42,124.3) endN=(64.9,74) curved
+[step9a] placed | Bryndzové halušky (curved seam)
+[step9a] processing | Kraslice
+[halfcut] Kraslice | pts=566 end0=(168.8,252.2) endN=(174.9,224.6) curved
+[step9a] placed | Kraslice (curved seam)
+[step9a] processing | Kroje
+[halfcut] Kroje | pts=29 end0=(293.6,88.6) endN=(308.4,63.8) curved
+[step9a] placed | Kroje (curved seam)
+[step9a] processing | Fujara
+[halfcut] Fujara | pts=32 end0=(48.9,329.7) endN=(39.8,301.2) curved
+[step9a] placed | Fujara (curved seam)
+[step9a] processing | Tram
+[halfcut] Tram | pts=30 end0=(498.3,296.8) endN=(520.5,306.5) straight
+[step9a] placed | Tram (straight)
+[step9a] processing | Tatra chamois
+[halfcut] Tatra chamois | pts=37 end0=(271.4,170.7) endN=(328.2,172.9) straight
+[step9a] placed | Tatra chamois (straight)
+[step9a] processing | Carpathian Wooden Churches
+[halfcut] Carpathian Wooden Churches | pts=26 end0=(552.3,499.3) endN=(442.5,499.9) straight
+[step9a] placed | Carpathian Wooden Churches (straight)
+[step9a] processing | St Elizabeth's Cathedral | (Dóm Svätej Alzbety)
+[halfcut] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | pts=30 end0=(157,646.2) endN=(158.2,560) straight
+[step9a] placed | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) (straight)
+[step9a] done | placed=26 flagged=0
+[pipeline] step 9a complete | 26 half-cut(s) placed.
+[pipeline] --- Step 10: Asset Export ---
+[step10] 26 element(s) to export; 0 unmatched.
+[step10] building temp clip groups for JPEG...
+[step10] JPEG white saved.
+[step10] JPEG green saved.
+[step10] JPEG export done.
+[step10] PNG | National Flower
+[step10] PNG | Slovakia Map
+[step10] PNG | Šúľance s Makom
+[step10] PNG | Bryndzové halušky
+[step10] PNG | Kraslice
+[step10] PNG | Tram
+[step10] PNG | Tatra chamois
+[step10] PNG | Bratislava(text)
+[step10] PNG | Pirohy
+[step10] PNG | Kroje
+[step10] PNG | Fujara
+[step10] PNG | UFO Observation Deck, Bridge SNP
+[step10] PNG | Čumil Statue
+[step10] PNG | Old Town Hall (Bratislava)
+[step10] PNG | Štrbské Pleso
+[step10] PNG | Slovak Paradise National Park
+[step10] PNG | Devín Castle
+[step10] PNG | Bojnice Castle
+[step10] PNG | St. Martin's Cathedral
+[step10] PNG | Spiš Castle
+[step10] PNG | St Elizabeth's Cathedral | (Dóm Svätej Alzbety)
+[step10] PNG | Orava Castle
+[step10] PNG | The Blue Church | Church of St. Elizabeth
+[step10] PNG | Carpathian Wooden Churches
+[step10] PNG | Michael's Gate
+[step10] PNG | Bratislava Castle
+[step10] done | pngCount=26 flags=0
+[pipeline] step 10 complete | 26 PNG(s) exported.
+[pipeline] --- Step 11: Final File ---
+[step11] saving final file: <out>/ai-export-final-fixture_final.ai
+[step11] halfcut layer → "Halfcut/Peeling Tab"
+[step11] removing layer: Color Block
+[step11] removing layer: Grid
+[step11] removing layer: Margin
+[step11] removing layer: Layout QA
+[step11] WARN | expected 3 layers in final file, found 4 — check final file manually.
+[step11] done | <out>/ai-export-final-fixture_final.ai | layers=4
+[pipeline] step 11 complete | <out>/ai-export-final-fixture_final.ai
+[pipeline] === AI_ExportFinal done ===
+✅ Final file ready.
 
-Log: /private/tmp/AI_ExportFinal.log
+  26 path(s) checked · 26 half-cut(s) · 26 PNG(s) exported.
+  Final file: <out>/ai-export-final-fixture_final.ai
+  WARNING: final file has 4 layer(s) — expected 3. Check manually.
+
