@@ -161,6 +161,14 @@ if grep -q "working document saved:" "$LOG_AI" && [ -f "$WORKING_AI" ]; then
 else
     echo "FAIL [$STEP]: working .ai not saved ($WORKING_AI)."; FAIL=1
 fi
+# Review art: Step 6 embeds each element's art on the Sticker layer so the artist reviews
+# captions against the real art (Step 7B later rides these same items — it no longer imports).
+if grep -qE "\[step6\] review art \| placed [1-9][0-9]* / [0-9]+ element" "$LOG_AI"; then
+    echo "  PASS: review art placed on Sticker ($(grep -oE 'review art \| placed [0-9]+ / [0-9]+ element' "$LOG_AI" | head -1))."
+else
+    echo "FAIL [$STEP]: review art not placed on Sticker."
+    grep "review art" "$LOG_AI" || true; FAIL=1
+fi
 # Auto-warp (Illustrator-side behaviour) — size-relative roundness applied to the REAL traced
 # fixture: round bases warp ("-> bend"), flat-bottomed buildings stay flat ("-> flat"). The node
 # test covers the decision geometry on synthetic data; this asserts the split end-to-end. If the

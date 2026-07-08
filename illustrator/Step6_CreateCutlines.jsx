@@ -139,6 +139,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     var named     = 0;
     var unmatched = 0;
     var droppedFragment = 0;
+    var artTargets = [];   // {name, register} per matched element — art placed after the loop
     var pi;
 
     for (pi = 0; pi < tracedPaths.length; pi++) {
@@ -179,6 +180,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             // no longer carries a caption object — caption presence is decided by styleCode.
             setStrokeStyle(path, CONFIG.cutlineStrokePt, blackRgb());
             path.name = matched.displayName + " outline";
+            artTargets.push({ name: matched.displayName, register: path });
             var capTf = _placeCaptionText(cutlinesLayer, matched.displayName, path,
                 CONFIG.captionFont, CONFIG.captionSizePt, CONFIG.captionTracking, CONFIG.captionTextGapMm);
             var capLineCount = _capSplitLines(matched.displayName).length;   // "A | B" -> 2 stacked lines
@@ -203,6 +205,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             // Pipeline 2 seats + cuts + half-cuts it via the same machinery as captions.
             setStrokeStyle(path, CONFIG.cutlineStrokePt, blackRgb());
             path.name = matched.displayName + " outline";
+            artTargets.push({ name: matched.displayName, register: path });
             if (_placeDefaultTab(cutlinesLayer, matched.displayName, path)) {
                 named++;
             } else {
@@ -211,11 +214,49 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
         }
     }
 
+    // ── 7. Place review art on the Stickers layer ─────────────────────────────
+    // Show each element's art beneath the cutlines so the artist reviews captions
+    // against the real sticker. Art is EMBEDDED here (survives the save -> Deepnest ->
+    // reopen gap) and Step 7B rides these same items to their nested pose — it does NOT
+    // re-import. Missing PNG is a warn (review aid), not a gate — the element still has
+    // its cutline + caption.
+    var artPlaced = 0;
+    if (!CONFIG.dryRun) {
+        var artFolder     = _artFolderFromElementsPath(elementsFilePath);
+        var stickersLayer = findLayer(doc, CONFIG.stickersLayerName);
+        var artFactor     = artFactorFromData(elementsData, CONFIG.sourceDPI);
+        if (!stickersLayer) {
+            log("[step6] WARN | Stickers layer not found — review art not placed.");
+        } else if (!artFolder || !artFolder.exists) {
+            log("[step6] WARN | art folder not found ("
+                + (artFolder ? artFolder.fsName : "null") + ") — review art not placed.");
+        } else if (artFactor <= 0) {
+            log("[step6] WARN | unusable art factor — review art not placed.");
+        } else {
+            var at;
+            for (at = 0; at < artTargets.length; at++) {
+                if (placeArtEmbedded(doc, stickersLayer, artFolder,
+                        artTargets[at].name, artTargets[at].register, artFactor)) {
+                    artPlaced++;
+                }
+            }
+        }
+        log("[step6] review art | placed " + artPlaced + " / " + artTargets.length + " element(s)");
+    }
+
     var droppedJunk = droppedBackground + droppedFragment;
     log("[step6] done | named=" + named + " unmatched=" + unmatched
         + " dropped=" + droppedJunk);
     return { named: named, unmatched: unmatched, dropped: droppedJunk,
-             traceTuning: traceTuning };
+             artPlaced: artPlaced, traceTuning: traceTuning };
+}
+
+// Derives the per-element art PNG folder ({base}_elements) that sits beside the sidecar
+// (written by PS exportElementPngs). Returns a Folder (may not exist — caller checks).
+function _artFolderFromElementsPath(elementsFilePath) {
+    var f    = new File(elementsFilePath);
+    var base = f.name.replace(/_elements\.json$/i, "").replace(/\.json$/i, "");
+    return new Folder(f.parent.fsName + "/" + base + "_elements");
 }
 
 
