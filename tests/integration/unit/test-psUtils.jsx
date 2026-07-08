@@ -184,8 +184,12 @@ assert("LM exact: 500->690",  scalePercent(500, 690),  138);
 var summary = "psUtils tests: " + _passed + " passed, " + _failed + " failed.";
 testLog("[psUtils-test] " + summary);
 
-if (_failed > 0) {
-    alert(summary + "\n\nSee log for details:\n" + _logPath);
-} else {
-    alert(summary + "\n\nLog: " + _logPath);
+// Honor suppressAlerts so headless/osascript runs don't hang on a modal (results
+// are already written to the log above).
+if (!CONFIG.suppressAlerts) {
+    if (_failed > 0) {
+        alert(summary + "\n\nSee log for details:\n" + _logPath);
+    } else {
+        alert(summary + "\n\nLog: " + _logPath);
+    }
 }
