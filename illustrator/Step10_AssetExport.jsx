@@ -245,6 +245,7 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
         _s10AddCaptionMembers(grp, entry.cutline, tmpLayer);   // native caption (text+pill+plate), in front of art
         cutDupe.moveToBeginning(grp);   // re-assert the mask at pageItems[0]
         _s10ClipGroup(doc, grp);
+        _s10RotateUpright(doc, grp, entry);   // upright for export (per-element PNG only)
     } else {
         // Stamp: no vector clipping path available. Use a white-filled bounding
         // rectangle as backing — the stamp artwork defines its own visible extent.
@@ -327,6 +328,42 @@ function _s10AddCaptionMembers(grp, cutlineItem, tmpLayer) {
             dup.move(grp, ElementPlacement.PLACEATBEGINNING);
         }
     }
+}
+
+// Rotates the temp clip group `grp` to the element's upright design orientation before
+// the per-element PNG export: the caption reference (plate, else peel-tab cutline) is
+// laid horizontal and below the art — the Step-6 orientation, regardless of nesting or
+// the artist's manual rotation. Angle comes from the reference GEOMETRY on the live
+// cutline (matrix-independent, so it dodges the embed() sign-flip and reflects manual
+// rotation). Falls back to the u<deg> note stamp, then to a no-op + WARN. The sheet
+// JPEG previews do NOT call this — they must keep the nested layout.
+function _s10RotateUpright(doc, grp, entry) {
+    var cut = entry.cutline, theta = null;
+    if (cut && cut.typename === "GroupItem") {
+        var ref = findGroupMember(cut, " plate");
+        if (!ref) ref = findGroupMember(cut, " tab cutline");
+        var art = findGroupMember(cut, " outline");
+        if (ref) theta = _uprightRotationDeg(_pathAnchors(ref), art ? _pathAnchors(art) : null);
+    }
+    if (theta === null && cut) {
+        var u = noteReadRotStamp(cut.note);     // nest-time deviation; last resort
+        if (u !== null) theta = -u;
+    }
+    if (theta === null) {
+        log("[step10] WARN | no upright reference for '" + entry.displayName
+            + "' — exported in nest orientation");
+        return;
+    }
+    theta = _aiNormalizeDeg(theta);
+    if (Math.abs(theta) < 0.05) {
+        log("[step10] upright | " + entry.displayName + " | already upright");
+        return;
+    }
+    var gb = grp.geometricBounds;               // [left, top, right, bottom]
+    var cx = (gb[0] + gb[2]) / 2, cy = (gb[1] + gb[3]) / 2;
+    grp.transform(pivotRotationMatrix(theta, cx, cy),
+        true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
+    log("[step10] upright | " + entry.displayName + " | rotated " + Math.round(theta) + "°");
 }
 
 // Recursively applies white fill and removes stroke on all path items within item.

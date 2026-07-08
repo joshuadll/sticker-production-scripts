@@ -119,6 +119,34 @@ function _uprightRotationDeg(refPts, artPts) {
     return theta;
 }
 
+// Flat array of {x,y} anchor points of a PathItem or CompoundPathItem (all sub-paths);
+// [] for any other type. DOM-only (not unit-tested).
+function _pathAnchors(item) {
+    var out = [], i, j, pts;
+    if (!item) return out;
+    if (item.typename === "CompoundPathItem") {
+        for (i = 0; i < item.pathItems.length; i++) {
+            pts = item.pathItems[i].pathPoints;
+            for (j = 0; j < pts.length; j++) out.push({ x: pts[j].anchor[0], y: pts[j].anchor[1] });
+        }
+    } else if (item.typename === "PathItem") {
+        pts = item.pathPoints;
+        for (j = 0; j < pts.length; j++) out.push({ x: pts[j].anchor[0], y: pts[j].anchor[1] });
+    }
+    return out;
+}
+
+// Rotation-about-pivot matrix (mirrors Step 7B's _nestPivotMatrix; kept here so Step 10,
+// which does not #include Step 7B, can rotate its export group in the same +CCW,
+// DOCUMENTORIGIN convention). Apply with item.transform(m, true,true,true,true,1,
+// Transformation.DOCUMENTORIGIN).
+function pivotRotationMatrix(angleDeg, px, py) {
+    var m = app.getTranslationMatrix(-px, -py);
+    m = app.concatenateRotationMatrix(m, angleDeg);
+    m = app.concatenateTranslationMatrix(m, px, py);
+    return m;
+}
+
 // Returns true if a path item is a caption path (name ends with " caption").
 // NOTE: Step 6 does not produce separate caption paths — caption is part of the
 // element silhouette. This helper is retained for potential use in Steps 8b/9.
