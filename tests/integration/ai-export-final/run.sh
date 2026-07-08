@@ -38,9 +38,11 @@ LOG="/tmp/AI_ExportFinal.log"
 WORKDIR="$HOME/.ai-export-final-test"
 TEMP_FIXTURE="$WORKDIR/${STEP}-fixture.ai"
 STK="${STEP}-fixture"                       # stkCode = filename up to first space
-FINAL_AI="$WORKDIR/${STK}_final.ai"
-PREVIEW_WHITE="$WORKDIR/${STK}_preview_white.jpg"
-PREVIEW_GREEN="$WORKDIR/${STK}_preview_green.jpg"
+# Deliverables now land in an organized export tree: {STK}_export/{,previews/,elements/}.
+EXPORT_ROOT="$WORKDIR/${STK}_export"
+FINAL_AI="$EXPORT_ROOT/${STK}_final.ai"
+PREVIEW_WHITE="$EXPORT_ROOT/previews/${STK}_preview_white.jpg"
+PREVIEW_GREEN="$EXPORT_ROOT/previews/${STK}_preview_green.jpg"
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 
@@ -147,7 +149,7 @@ PNG_LOG=$(grep -oE "pngCount=[0-9]+" "$LOG" | grep -oE "[0-9]+$" | head -1 || ec
 # find (not ls-glob): a no-match glob makes ls exit non-zero, which under
 # `set -euo pipefail` aborts the script at this assignment — precisely in the
 # zero-PNG failure case this check exists to report. find exits 0 on no match.
-PNG_DISK=$(find "$WORKDIR" -maxdepth 1 -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
+PNG_DISK=$(find "$EXPORT_ROOT/elements" -maxdepth 1 -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
 if [ "${PNG_DISK:-0}" -gt 0 ] && [ "${PNG_DISK}" = "${PNG_LOG:-0}" ]; then
     echo "PASS [$STEP]: $PNG_DISK per-element PNG(s) on disk (matches log pngCount)."
 else
