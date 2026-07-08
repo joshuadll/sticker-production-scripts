@@ -7,7 +7,7 @@
 [step8c] collected 26 cut line(s).
 [step8c] margin | 190x267mm safe area.
 [step8c] overlay | drew flags on "Layout QA" layer | 0 halo(s), 0 spacing badge(s), 0 margin arrow(s), 0 sliver(s), 0 seat-review badge(s)
-[timing] step8c | sample=51 spacing=2102 margin=1 overlay=1 (ms)
+[timing] step8c | sample=5197 spacing=2205 margin=1 overlay=1 (ms)
 [step8c] done | checked=26 flagged=0 (spacing: 0 pair(s); margin: 0)
 [pipeline] spacing/margin guard complete | 26 path(s) checked, 0 flagged.
 [pipeline] --- Step 9A: Half-cut ---
@@ -101,31 +101,57 @@
 [step10] JPEG white saved.
 [step10] JPEG green saved.
 [step10] JPEG export done.
+[step10] upright | National Flower | rotated -112°
 [step10] PNG | National Flower
+[step10] upright | Slovakia Map | rotated -165°
 [step10] PNG | Slovakia Map
+[step10] upright | Šúľance s Makom | rotated -46°
 [step10] PNG | Šúľance s Makom
+[step10] upright | Bryndzové halušky | rotated 66°
 [step10] PNG | Bryndzové halušky
+[step10] upright | Kraslice | rotated 74°
 [step10] PNG | Kraslice
+[step10] upright | Tram | rotated -24°
 [step10] PNG | Tram
+[step10] upright | Tatra chamois | rotated -2°
 [step10] PNG | Tatra chamois
+[step10] upright | Bratislava(text) | rotated 89°
 [step10] PNG | Bratislava(text)
+[step10] upright | Pirohy | rotated 43°
 [step10] PNG | Pirohy
+[step10] upright | Kroje | rotated 59°
 [step10] PNG | Kroje
+[step10] upright | Fujara | rotated 107°
 [step10] PNG | Fujara
+[step10] upright | UFO Observation Deck, Bridge SNP | already upright
 [step10] PNG | UFO Observation Deck, Bridge SNP
+[step10] upright | Čumil Statue | rotated 92°
 [step10] PNG | Čumil Statue
+[step10] upright | Old Town Hall (Bratislava) | rotated -1°
 [step10] PNG | Old Town Hall (Bratislava)
+[step10] upright | Štrbské Pleso | rotated -88°
 [step10] PNG | Štrbské Pleso
+[step10] upright | Slovak Paradise National Park | rotated 0°
 [step10] PNG | Slovak Paradise National Park
+[step10] upright | Devín Castle | rotated 91°
 [step10] PNG | Devín Castle
+[step10] upright | Bojnice Castle | rotated -179°
 [step10] PNG | Bojnice Castle
+[step10] upright | St. Martin's Cathedral | rotated 1°
 [step10] PNG | St. Martin's Cathedral
+[step10] upright | Spiš Castle | rotated 90°
 [step10] PNG | Spiš Castle
+[step10] upright | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | rotated 89°
 [step10] PNG | St Elizabeth's Cathedral | (Dóm Svätej Alzbety)
+[step10] upright | Orava Castle | rotated 1°
 [step10] PNG | Orava Castle
+[step10] upright | The Blue Church | Church of St. Elizabeth | rotated 1°
 [step10] PNG | The Blue Church | Church of St. Elizabeth
+[step10] upright | Carpathian Wooden Churches | rotated -180°
 [step10] PNG | Carpathian Wooden Churches
+[step10] upright | Michael's Gate | rotated 3°
 [step10] PNG | Michael's Gate
+[step10] upright | Bratislava Castle | rotated -178°
 [step10] PNG | Bratislava Castle
 [step10] done | pngCount=26 flags=0
 [pipeline] step 10 complete | 26 PNG(s) exported.
