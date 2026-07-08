@@ -174,7 +174,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             // Native caption: name the outline + place review text. The PILL/PLATE/cut are built in
             // Pipeline 2 (AI_BuildAndExportCutlines) after the artist reviews the text. The sidecar
             // no longer carries a caption object — caption presence is decided by styleCode.
-            setStrokeStyle(path, CONFIG.cutlineStrokePt, blackCmyk());
+            setStrokeStyle(path, CONFIG.cutlineStrokePt, blackRgb());
             path.name = matched.displayName + " outline";
             var capTf = _placeCaptionText(cutlinesLayer, matched.displayName, path,
                 CONFIG.captionFont, CONFIG.captionSizePt, CONFIG.captionTracking, CONFIG.captionTextGapMm);
@@ -198,7 +198,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             // Uncaptioned element: name the trace as a separable outline, then place a loose
             // default peel tab (PEEL HERE or semi-circle) for the artist to review/reposition.
             // Pipeline 2 seats + cuts + half-cuts it via the same machinery as captions.
-            setStrokeStyle(path, CONFIG.cutlineStrokePt, blackCmyk());
+            setStrokeStyle(path, CONFIG.cutlineStrokePt, blackRgb());
             path.name = matched.displayName + " outline";
             if (_placeDefaultTab(cutlinesLayer, matched.displayName, path)) {
                 named++;
@@ -355,7 +355,7 @@ function _placeCaptionText(layer, displayName, outline, font, sizePt, tracking, 
     try { tf.textRange.characterAttributes.size     = sizePt; } catch (e1) {}
     try { tf.textRange.characterAttributes.textFont = app.textFonts.getByName(font); } catch (e2) {}
     try { tf.textRange.characterAttributes.tracking = tracking; } catch (e3) {}
-    try { tf.textRange.characterAttributes.fillColor = blackCmyk(); } catch (e4) {}
+    try { tf.textRange.characterAttributes.fillColor = blackRgb(); } catch (e4) {}
     try { tf.textRange.paragraphAttributes.justification = Justification.CENTER; } catch (e5) {}
 
     var ob = outline.geometricBounds;                 // [l,t,r,b] y-up

@@ -181,8 +181,12 @@ function buildWorkingDocument() {
     var SHEET_H_MM = 297;
     var GRID_MM    = 25.4;  // 1 inch
 
+    // RGB working space — the source art is sRGB and the target is an RGB inkjet
+    // (Canon PIXMA iX6780 + a custom RGB ICC profile applied at PRINT time). Staying
+    // in RGB keeps the art at full gamut; a CMYK document would clip saturated colours
+    // (greens/blues/oranges) irreversibly before the ICC profile ever runs.
     var doc = app.documents.add(
-        DocumentColorSpace.CMYK,
+        DocumentColorSpace.RGB,
         mmToPoints(SHEET_W_MM),
         mmToPoints(SHEET_H_MM)
     );
@@ -223,7 +227,7 @@ function buildWorkingDocument() {
     // (touching allowed); nesting and QA both reference its inner rectangle.
     _bwdMarginBand(doc);
 
-    log("[aiutils] built working document | A4 CMYK | Margin > Stickers > Grid > Color Block");
+    log("[aiutils] built working document | A4 RGB | Margin > Stickers > Grid > Color Block");
     return doc;
 }
 
@@ -281,7 +285,7 @@ function _bwdMarginBand(doc) {
     var rects = [outer, inner], ri;
     for (ri = 0; ri < rects.length; ri++) {
         rects[ri].filled     = true;
-        rects[ri].fillColor  = blackCmyk();
+        rects[ri].fillColor  = blackRgb();
         rects[ri].stroked    = false;
     }
 
@@ -310,7 +314,7 @@ function _bwdMarginBand(doc) {
     // selection, so paint the compound itself black too (belt-and-suspenders with
     // the per-rect styling above) — otherwise the band could render invisible.
     cp.filled    = true;
-    cp.fillColor = blackCmyk();
+    cp.fillColor = blackRgb();
     cp.stroked   = false;
     cp.evenodd   = true;   // inner rect reads as a hole
     cp.opacity   = 30;     // 30% black band — container opacity (applies to the whole compound)
@@ -320,17 +324,19 @@ function _bwdMarginBand(doc) {
     return margin;
 }
 
-// CMYK(55,0,100,0) — the template's Color Block green (Step 10 green preview).
+// The Color Block green — the Step 10 green-preview background (mimics the green
+// backing sheet). sRGB equivalent of the old CMYK(55,0,100,0). Preview only; not
+// printed art. Adjust here if the artist wants a specific brand green.
 function _bwdGreen() {
-    var c = new CMYKColor();
-    c.cyan = 55; c.magenta = 0; c.yellow = 100; c.black = 0;
+    var c = new RGBColor();
+    c.red = 133; c.green = 184; c.blue = 68;
     return c;
 }
 
 // Light grey for the reference grid — subtle, non-printing visual aid.
 function _bwdGridColor() {
-    var c = new CMYKColor();
-    c.cyan = 0; c.magenta = 0; c.yellow = 0; c.black = 20;
+    var c = new RGBColor();
+    c.red = 204; c.green = 204; c.blue = 204;   // was CMYK K=20
     return c;
 }
 
@@ -355,34 +361,37 @@ function findPathInLayer(layer, name) {
 }
 
 // ─── COLOUR HELPERS ───────────────────────────────────────────────────────────
+// RGB (sRGB) throughout — the working document is RGB (see buildWorkingDocument).
+// Cut lines stay pure black; the RGB values below are the sRGB equivalents of the
+// former CMYK definitions (comments record the original CMYK for reference).
 
-// Returns a CMYKColor set to 100% black.
-function blackCmyk() {
-    var c = new CMYKColor();
-    c.cyan = 0; c.magenta = 0; c.yellow = 0; c.black = 100;
+// Returns an RGBColor set to pure black (cut/half-cut lines).
+function blackRgb() {
+    var c = new RGBColor();
+    c.red = 0; c.green = 0; c.blue = 0;   // was CMYK K=100
     return c;
 }
 
-// Returns a CMYKColor set to 0% ink (white).
-function whiteCmyk() {
-    var c = new CMYKColor();
-    c.cyan = 0; c.magenta = 0; c.yellow = 0; c.black = 0;
+// Returns an RGBColor set to white (caption pills, stamp backing).
+function whiteRgb() {
+    var c = new RGBColor();
+    c.red = 255; c.green = 255; c.blue = 255;   // was CMYK 0/0/0/0
     return c;
 }
 
-// Returns a CMYKColor set to 100% red (used for QA stroke).
-function redCmyk() {
-    var c = new CMYKColor();
-    c.cyan = 0; c.magenta = 100; c.yellow = 100; c.black = 0;
+// Returns an RGBColor set to pure red (#ff0000) — QA spacing stroke.
+function redRgb() {
+    var c = new RGBColor();
+    c.red = 255; c.green = 0; c.blue = 0;   // was CMYK 0/100/100/0
     return c;
 }
 
 // Warm amber/orange — the QA colour for MARGIN overflow, distinct at a glance from
 // the red used for spacing pinches. Reads clearly over the grey margin band where
 // the overhang fill sits.
-function amberCmyk() {
-    var c = new CMYKColor();
-    c.cyan = 0; c.magenta = 55; c.yellow = 100; c.black = 0;
+function amberRgb() {
+    var c = new RGBColor();
+    c.red = 255; c.green = 115; c.blue = 0;   // was CMYK 0/55/100/0
     return c;
 }
 
@@ -390,25 +399,25 @@ function amberCmyk() {
 // not red/amber so an element with BOTH a spacing and a margin issue isn't forced
 // into one type-colour: the halo just says "look here" (visible at full-sheet zoom
 // as a tint over the sticker), while the red/amber badges carry the problem type.
-function haloCmyk() {
-    var c = new CMYKColor();
-    c.cyan = 70; c.magenta = 30; c.yellow = 0; c.black = 0;
+function haloRgb() {
+    var c = new RGBColor();
+    c.red = 76; c.green = 178; c.blue = 255;   // was CMYK 70/30/0/0
     return c;
 }
 
 // Strong blue — the CAPTION-SEAT review badge (Step 3B's conform flagged an uneven
 // seat via the note "…|R"). Distinct from the warm red/amber problem badges; says
 // "eyeball this caption". Advisory only — it does NOT gate export.
-function seatReviewCmyk() {
-    var c = new CMYKColor();
-    c.cyan = 90; c.magenta = 60; c.yellow = 0; c.black = 0;
+function seatReviewRgb() {
+    var c = new RGBColor();
+    c.red = 26; c.green = 102; c.blue = 255;   // was CMYK 90/60/0/0
     return c;
 }
 
 // ─── PATH STYLE HELPERS ───────────────────────────────────────────────────────
 
 // Applies stroke style to a PathItem or CompoundPathItem.
-// colorObj must be a CMYKColor (or RGBColor) instance.
+// colorObj must be an RGBColor (or CMYKColor) instance.
 function setStrokeStyle(path, weightPt, colorObj) {
     path.stroked    = true;
     path.strokeWidth = weightPt;
@@ -878,7 +887,7 @@ function buildCaptionPill(layer, textFrame, opts) {
         }
     }
     var pill = buildCapsuleFromSpine(layer, spine, radius);   // existing helper
-    pill.filled = true; pill.fillColor = whiteCmyk();
+    pill.filled = true; pill.fillColor = whiteRgb();
     pill.stroked = false;
     return { pill: pill, spine: spine, radius: radius };
 }
@@ -1080,7 +1089,7 @@ function buildCaption(doc, layer, textFrame, outline, opts) {
 
     // Unite outline + pill into the fused cut; bundle the separable members.
     var cut = deriveCutline(outline, pill);
-    strokeRecursive(cut, (opts.strokePt != null ? opts.strokePt : 0.25), blackCmyk());
+    strokeRecursive(cut, (opts.strokePt != null ? opts.strokePt : 0.25), blackRgb());
     var group = assembleElementGroup(layer, name, outline, pill, cut);
 
     // PRINTED caption rides the cut group: pill stays VISIBLE (white background), and the text
@@ -1154,7 +1163,7 @@ function buildDefaultTab(doc, layer, tabGroup, outline, opts) {
 
     // Unite outline + tab cutline into the fused cut; bundle the separable members.
     var cut = deriveCutline(outline, cutline);
-    strokeRecursive(cut, (opts.strokePt != null ? opts.strokePt : 0.25), blackCmyk());
+    strokeRecursive(cut, (opts.strokePt != null ? opts.strokePt : 0.25), blackRgb());
     var group = assembleElementGroup(layer, name, outline, cutline, cut);
 
     // The fill is a PRINTED ride-along member (never part of the cut). Move it into the group and
@@ -1289,7 +1298,7 @@ function reuniteCutline(group, outline, plate, strokePt) {
     var oldCutline = findGroupMember(group, "");
 
     var newCutline = deriveCutline(outline, plate);
-    strokeRecursive(newCutline, strokePt, blackCmyk());
+    strokeRecursive(newCutline, strokePt, blackRgb());
 
     if (oldCutline) oldCutline.remove();
     newCutline.name = group.name;
@@ -1861,7 +1870,7 @@ function drawHalfcutPath(layer, pts, baseName) {
     }
     line.closed = false;
     if (baseName) line.name = baseName + " halfcut";
-    setStrokeStyle(line, CONFIG.halfcutStrokePt, blackCmyk());
+    setStrokeStyle(line, CONFIG.halfcutStrokePt, blackRgb());
     return line;
 }
 
@@ -1990,9 +1999,9 @@ function _spacingBufferOffsetMm() {
 // background so it reads strongly there (a cyan/teal just muddies into the green under
 // Multiply). The slight cyan component pushes it toward violet so it's clearly NOT the pure
 // red of the spacing flags / amber of the margin overhang on the Layout QA layer.
-function _spacingBufferCmyk() {
-    var c = new CMYKColor();
-    c.cyan = 30; c.magenta = 90; c.yellow = 0; c.black = 0;
+function _spacingBufferRgb() {
+    var c = new RGBColor();
+    c.red = 179; c.green = 26; c.blue = 255;   // violet-magenta; was CMYK 30/90/0/0
     return c;
 }
 
@@ -2040,7 +2049,7 @@ function syncSpacingBuffer(doc, group, opts) {
     // two pieces' bands still meet at the 2mm gap + overlap-darken when closer. scaleLineWidth off
     // (set above) keeps BOTH the offset and the stroke a true physical size under resize.
     var H = _spacingBufferOffsetMm();
-    strokeRecursive(dup, mmToPoints(H), _spacingBufferCmyk());   // stroked band; clears fill
+    strokeRecursive(dup, mmToPoints(H), _spacingBufferRgb());   // stroked band; clears fill
 
     var ofstPt = mmToPoints(H / 2);
     var xml = '<LiveEffect name="Adobe Offset Path"><Dict data="R mlim 4 R ofst '

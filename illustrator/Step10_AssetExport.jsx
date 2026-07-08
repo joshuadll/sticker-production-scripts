@@ -250,7 +250,7 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
             Math.abs(wb[3] - wb[1])
         );
         whiteRect.filled    = true;
-        whiteRect.fillColor = whiteCmyk();
+        whiteRect.fillColor = whiteRgb();
         whiteRect.stroked   = false;
         whiteRect.zOrder(ZOrderMethod.SENDTOBACK);
     }
@@ -326,7 +326,7 @@ function _s10AddCaptionMembers(grp, cutlineItem, tmpLayer) {
 
 // Recursively applies white fill and removes stroke on all path items within item.
 function _s10SetWhiteFill(item) {
-    var w = whiteCmyk(), i, tn = item.typename;
+    var w = whiteRgb(), i, tn = item.typename;
     if (tn === "PathItem" || tn === "CompoundPathItem") {
         item.filled    = true;
         item.fillColor = w;

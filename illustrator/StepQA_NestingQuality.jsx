@@ -560,7 +560,7 @@ function _qa_quadrantLabel(xMm, yMm, sheetW, sheetH) {
 function _qa_drawOverlay(doc, pockets, artLeft, artTop, PT, gridW) {
     var overlayLayer = getOrCreateQALayer(doc, CONFIG.qaLayerName, false);
 
-    var red    = redCmyk();
+    var red    = redRgb();
     var cellMm = CONFIG.cellSizeMm;
     var i, pocket;
     var rectCount = 0;

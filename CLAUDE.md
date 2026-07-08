@@ -240,7 +240,7 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
   wrapStampsInGroups / unwrapStampGroups (working-phase wrap of bare stamp cutlines into "ST|0"
     groups so they can host a spacing halo; unwrapped back to bare paths before export),
   removeAllSpacingBuffers (drops all "{name} buffer" halos from the Cutlines groups before export),
-  buildWorkingDocument (builds A4/CMYK doc + Margin/Stickers/Grid/Color Block layers, no template),
+  buildWorkingDocument (builds A4/RGB doc + Margin/Stickers/Grid/Color Block layers, no template),
   marginRect (shared safe-area rect: documented 190×267mm working area),
   log, scriptAlert, findLayer, findPathInLayer
 
@@ -504,7 +504,7 @@ function handOffToIllustrator(doc) {
 // Returns a JSON status string (parsed by PSAI's onResult) so the PS-side completion
 // alert reflects the real Illustrator outcome instead of always saying "Done".
 function buildDocAndImport(silhPngPath, elementsFilePath) {
-    var doc = buildWorkingDocument();   // aiUtils — builds A4/CMYK doc + layers, no template
+    var doc = buildWorkingDocument();   // aiUtils — builds A4/RGB doc + layers, no template
     var result = runCreateCutlines(doc, silhPngPath, elementsFilePath);
     // Saves the working doc next to the sidecar (so Step 7A's doc.fullName resolves),
     // then: halts if result.unmatched > 0 (artist renames paths, re-runs directly);
@@ -515,10 +515,12 @@ function buildDocAndImport(silhPngPath, elementsFilePath) {
 ```
 
 **The AI pipeline has no template-file dependency.** `buildWorkingDocument()` in
-aiUtils.jsx creates the working document from scratch — A4 (210×297mm) CMYK, with
-layers (top→bottom) Margin (30%-black even-odd band, outer=artboard + inner=safe
-area, locked) > Stickers (empty) > Grid (vector 1-inch lines, locked) >
-Color Block (full-sheet rect, fill CMYK(55,0,100,0), locked). Cutlines/Halfcut are
+aiUtils.jsx creates the working document from scratch — A4 (210×297mm) RGB (sRGB;
+source art is RGB and the target is an RGB inkjet with a custom ICC profile applied
+at print time — never CMYK, which would clip the gamut), with layers (top→bottom)
+Margin (30%-black even-odd band, outer=artboard + inner=safe area, locked) >
+Stickers (empty) > Grid (vector 1-inch lines, locked) >
+Color Block (full-sheet rect, fill sRGB green ~133,184,68, locked). Cutlines/Halfcut are
 added later by their steps, above Stickers. `assets/Production_File_Template.ai` is
 no longer used.
 
