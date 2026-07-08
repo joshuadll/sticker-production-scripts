@@ -318,15 +318,19 @@ function _s10FirstClipPath(item) {
     return null;
 }
 
-// Duplicates a native caption's VISIBLE printed members (decorative plate raster, white pill,
-// text) from the element's cutline group into the temp clip group `grp`, placing each at the
-// FRONT so the final stack is text > pill > plate > art > white-backing. The caller re-asserts
-// the clip mask at pageItems[0] afterward. The caption lives inside the cut boundary, so it is
-// clipped cleanly with the rest. No-op for stamps (PlacedItem cutline) / missing members.
+// Duplicates a native element's VISIBLE printed members from its cutline group into the temp
+// clip group `grp`, placing each at the FRONT so the final stack is text > pill > plate > art >
+// white-backing. Covers BOTH captioned elements (decorative plate raster, white pill, text) AND
+// default-tab/uncaptioned elements, whose printed "PEEL HERE"/semi-circle decoration is the
+// separate " tab fill" ride-along member (the " plate" member there is the hidden tab cutline, so
+// it is skipped by the !hidden guard). Without " tab fill" the tab art vanished from the export.
+// The caller re-asserts the clip mask at pageItems[0] afterward. These members live inside the
+// cut boundary, so they clip cleanly with the rest. No-op for stamps (PlacedItem cutline) /
+// missing members.
 function _s10AddCaptionMembers(grp, cutlineItem, tmpLayer) {
     if (!cutlineItem || cutlineItem.typename !== "GroupItem") return;
-    // Back-to-front insertion (each moved to the front): plate, then pill, then text.
-    var order = [" caption plate", " plate", " caption text"];
+    // Back-to-front insertion (each moved to the front): plate, pill, tab fill, then text.
+    var order = [" caption plate", " plate", " tab fill", " caption text"];
     var k, member, dup;
     for (k = 0; k < order.length; k++) {
         member = findGroupMember(cutlineItem, order[k]);
