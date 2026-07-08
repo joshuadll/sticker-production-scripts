@@ -263,7 +263,14 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
 
     var pngOpts       = new ExportOptionsPNG24();
     pngOpts.transparency = true;
-    pngOpts.resolution   = CONFIG.pngExportScale;
+    // ExportOptionsPNG24 has NO honored `resolution` property — like ExportOptionsJPEG it
+    // scales by percent of 72 DPI via horizontal/verticalScale. Setting `.resolution` is a
+    // silent no-op → the PNG exported at 72 DPI (~4x too few px, pixelated). Drive the scale
+    // from CONFIG.pngExportScale (the target DPI = sourceDPI, fallback 300) the same way the
+    // JPEG sheet preview does, so a 2.3in element lands at 2.3*DPI px instead of 2.3*72.
+    var _pngScale = (CONFIG.pngExportScale / 72) * 100;
+    pngOpts.horizontalScale = _pngScale;
+    pngOpts.verticalScale   = _pngScale;
     pngOpts.antiAliasing = true;
     var safeName = entry.displayName.replace(/[\/\\:*?"<>|]/g, "_");
     doc.exportFile(
