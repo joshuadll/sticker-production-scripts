@@ -144,7 +144,10 @@ else
 fi
 
 PNG_LOG=$(grep -oE "pngCount=[0-9]+" "$LOG" | grep -oE "[0-9]+$" | head -1 || echo "0")
-PNG_DISK=$(ls "$WORKDIR"/*.png 2>/dev/null | wc -l | tr -d ' ')
+# find (not ls-glob): a no-match glob makes ls exit non-zero, which under
+# `set -euo pipefail` aborts the script at this assignment — precisely in the
+# zero-PNG failure case this check exists to report. find exits 0 on no match.
+PNG_DISK=$(find "$WORKDIR" -maxdepth 1 -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
 if [ "${PNG_DISK:-0}" -gt 0 ] && [ "${PNG_DISK}" = "${PNG_LOG:-0}" ]; then
     echo "PASS [$STEP]: $PNG_DISK per-element PNG(s) on disk (matches log pngCount)."
 else
