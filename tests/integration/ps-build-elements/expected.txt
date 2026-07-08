@@ -1,8 +1,9 @@
-[pipeline] created new template document (42 x 59.4 cm, 300 DPI).
 [pipeline] === PS_BuildElements start ===
 [pipeline] dryRun: false
-[pipeline] template: Production Template
 [pipeline] source folder: source-psds
+[pipeline] detected source DPI: 300 (from 3 readable PSD(s) of 3)
+[pipeline] created new template document (42 x 59.4 cm, 300 DPI).
+[pipeline] template: Production Template | working DPI 300
 [pipeline] --- Step 1: Combine ---
 [step1] found | 3 PSD file(s) in source folder.
 [step1] clearing element layers from template...
