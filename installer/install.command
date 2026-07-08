@@ -76,9 +76,9 @@ if [ -n "$AI_APP" ]; then
     sudo find "$AI_SCRIPTS" -maxdepth 1 -name "Noteworthie*.jsx" -delete 2>/dev/null
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 2 - Build & Export Cutlines" "AI_BuildAndExportCutlines.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 3 - Import Nesting"  "AI_ImportNesting.jsx"
-    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 4 - Export Final"    "AI_ExportFinal.jsx"
+    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 4 - Normalise Captions" "AI_NormaliseCaptions.jsx"
     install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 5 - Layout QA"       "AI_LayoutQA.jsx"
-    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 6 - Normalise Captions" "AI_NormaliseCaptions.jsx"
+    install_entry "$AI_SCRIPTS" "illustrator" "Noteworthie 6 - Export Final"    "AI_ExportFinal.jsx"
     echo "  ✓ Illustrator — 5 scripts"
 else
     echo "  ✗ Illustrator not found — skipped"
