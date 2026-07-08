@@ -283,6 +283,10 @@ function _bwdMarginBand(doc) {
         rects[ri].filled     = true;
         rects[ri].fillColor  = blackCmyk();
         rects[ri].stroked    = false;
+        rects[ri].evenodd    = true;   // even-odd lives on PathItem (NOT CompoundPathItem);
+                                       // set on the members so the inner rect reads as a hole.
+                                       // Winding-independent, so the frame punches regardless of
+                                       // which direction pathItems.rectangle() winds the rects.
     }
 
     // Build the compound path natively via the DOM — NOT executeMenuCommand,
@@ -309,10 +313,13 @@ function _bwdMarginBand(doc) {
     // A DOM-created compound does NOT inherit appearance from a Make-Compound-Path
     // selection, so paint the compound itself black too (belt-and-suspenders with
     // the per-rect styling above) — otherwise the band could render invisible.
+    // NOTE: the hole comes from evenodd set on the MEMBER PathItems above, not here —
+    // CompoundPathItem has no evenodd property, so setting it on `cp` was a silent
+    // no-op that left the band a solid slab (default non-zero winding, same-direction
+    // rects → no hole). Do not re-add cp.evenodd.
     cp.filled    = true;
     cp.fillColor = blackCmyk();
     cp.stroked   = false;
-    cp.evenodd   = true;   // inner rect reads as a hole
     cp.opacity   = 30;     // 30% black band — container opacity (applies to the whole compound)
 
     margin.zOrder(ZOrderMethod.BRINGTOFRONT);
