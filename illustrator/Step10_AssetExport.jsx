@@ -331,17 +331,21 @@ function _s10AddCaptionMembers(grp, cutlineItem, tmpLayer) {
 }
 
 // Rotates the temp clip group `grp` to the element's upright design orientation before
-// the per-element PNG export: the caption reference (plate, else peel-tab cutline) is
-// laid horizontal and below the art — the Step-6 orientation, regardless of nesting or
-// the artist's manual rotation. Angle comes from the reference GEOMETRY on the live
-// cutline (matrix-independent, so it dodges the embed() sign-flip and reflects manual
-// rotation). Falls back to the u<deg> note stamp, then to a no-op + WARN. The sheet
-// JPEG previews do NOT call this — they must keep the nested layout.
+// the per-element PNG export: the caption reference (the " plate" member) is laid
+// horizontal and below the art — the Step-6 orientation, regardless of nesting or the
+// artist's manual rotation. The " plate" member covers GC/WC captions AND default-tab/ST
+// elements: assembleElementGroup names a default tab's cutline "<name> plate" too (the
+// bare " tab cutline" name is transient and never survives assembly), so " plate" is the
+// single reference for every element type; " tab cutline" is a defensive no-op fallback.
+// Angle comes from the reference GEOMETRY on the live cutline (matrix-independent, so it
+// dodges the embed() sign-flip and reflects manual rotation). Falls back to the u<deg>
+// note stamp, then to a no-op + WARN. The sheet JPEG previews do NOT call this — they
+// must keep the nested layout.
 function _s10RotateUpright(doc, grp, entry) {
     var cut = entry.cutline, theta = null;
     if (cut && cut.typename === "GroupItem") {
-        var ref = findGroupMember(cut, " plate");
-        if (!ref) ref = findGroupMember(cut, " tab cutline");
+        var ref = findGroupMember(cut, " plate");        // GC/WC pill AND ST/default-tab cutline
+        if (!ref) ref = findGroupMember(cut, " tab cutline");   // defensive; not on assembled groups
         var art = findGroupMember(cut, " outline");
         if (ref) theta = _uprightRotationDeg(_pathAnchors(ref), art ? _pathAnchors(art) : null);
     }

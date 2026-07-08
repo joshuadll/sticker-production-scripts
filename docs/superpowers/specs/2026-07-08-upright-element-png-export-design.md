@@ -43,7 +43,11 @@ Asks:
 - **The caption geometry IS a reliable, manual-rotation-proof reference.** Every
   real element carries a bottom feature authored **horizontal** at design time:
   - GC/WC captioned → `" plate"` member (the pill). (`aiUtils.jsx:1264`)
-  - ST/uncaptioned → `" tab"` group with a `" tab cutline"`. (`aiUtils.jsx:2896`)
+  - ST/uncaptioned (default peel tab) → **also** a `" plate"` member:
+    `assembleElementGroup` renames the tab's cutline to `"<name> plate"`
+    (`aiUtils.jsx:1252` passes it as the `plate` arg → `:1345` renames it). The
+    bare `" tab cutline"` name is transient and does not survive assembly, so
+    `" plate"` is the single reference for **every** element type at Step 10.
   These are vector paths whose coordinates bake in nesting **and every manual
   rotation**, so their current orientation is the element's true current
   orientation — independent of any matrix bookkeeping.
@@ -58,8 +62,10 @@ For each element, after the temp clip group is assembled and before
 `doc.exportFile`:
 
 1. **Find the reference path** on the element's live cutline group
-   (`entry.cutline`): `findGroupMember(cutline, " plate")` if present, else
-   `findGroupMember(cutline, " tab cutline")`.
+   (`entry.cutline`): `findGroupMember(cutline, " plate")` — this covers GC/WC
+   pills AND ST/default-tab cutlines (both named `"<name> plate"` after
+   assembly). A `findGroupMember(cutline, " tab cutline")` lookup is kept only as
+   a defensive fallback and does not match an assembled group.
 2. **Measure its long-axis angle φ** via the **farthest-apart anchor pair** of
    the reference path (sample anchors; O(n²) max-distance pair; `φ = atan2(dy,
    dx)` of that pair). The two ends of a pill/tab are its farthest points, so the
