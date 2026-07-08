@@ -30,22 +30,36 @@ function parseLayerName(name) {
     };
 }
 
-// Returns target pixel size from CONFIG.sizeTable, or null if unrecognised.
-// Stamps use styleCode "ST" directly — no catCode in their name.
-// sizeHint "+" uses sizeTableLarge; "-" uses sizeTableSmall; null uses sizeTable midpoints.
+// Returns finished-size pixels for an element = inches (from CONFIG.sizeTable) ×
+// working resolution. Resolution is CONFIG.sourceDPI, falling back to templateDPI/300
+// so callers are safe before detection runs. null for an unrecognised category.
+// Stamps use styleCode "ST" directly; sizeHint "+"/"-" pick the large/small table.
 function getTargetPx(parsed) {
     if (!parsed) return null;
-    if (parsed.styleCode === "ST") return CONFIG.sizeTable["ST"];
-    if (!parsed.catCode) return null;
-    var cat = parsed.catCode;
-    if (parsed.sizeHint === "+" && CONFIG.sizeTableLarge && CONFIG.sizeTableLarge[cat] !== undefined) {
-        return CONFIG.sizeTableLarge[cat];
+    var dpi = CONFIG.sourceDPI || CONFIG.templateDPI || 300;
+    var inches = null;
+    if (parsed.styleCode === "ST") {
+        inches = CONFIG.sizeTable["ST"];
+    } else if (parsed.catCode) {
+        var cat = parsed.catCode;
+        if (parsed.sizeHint === "+" && CONFIG.sizeTableLarge && CONFIG.sizeTableLarge[cat] !== undefined) {
+            inches = CONFIG.sizeTableLarge[cat];
+        } else if (parsed.sizeHint === "-" && CONFIG.sizeTableSmall && CONFIG.sizeTableSmall[cat] !== undefined) {
+            inches = CONFIG.sizeTableSmall[cat];
+        } else if (CONFIG.sizeTable[cat] !== undefined) {
+            inches = CONFIG.sizeTable[cat];
+        }
     }
-    if (parsed.sizeHint === "-" && CONFIG.sizeTableSmall && CONFIG.sizeTableSmall[cat] !== undefined) {
-        return CONFIG.sizeTableSmall[cat];
-    }
-    if (CONFIG.sizeTable[cat] !== undefined) return CONFIG.sizeTable[cat];
-    return null;
+    if (inches === null || inches === undefined) return null;
+    return Math.round(inches * dpi);
+}
+
+// Physical millimetres → pixels at the working resolution. Used for the white edge
+// and smooth radius so they stay a constant physical width at any source DPI.
+function mmToPx(mm) {
+    if (mm === null || mm === undefined) return 0;
+    var dpi = CONFIG.sourceDPI || CONFIG.templateDPI || 300;
+    return Math.round(mm / 25.4 * dpi);
 }
 
 // Loads a layer's transparency channel as the active selection without rasterising.

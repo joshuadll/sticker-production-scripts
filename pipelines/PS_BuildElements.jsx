@@ -16,7 +16,8 @@ var CONFIG = {
 
     templateWidthCm:  42,
     templateHeightCm: 59.4,
-    templateDPI:      300,
+    templateDPI:      300,   // fallback when no source resolution can be detected
+    sourceDPI:        0,     // resolved at runtime from the source PSDs / adopted doc
 
     // For automated testing only — leave empty ("") for normal interactive use.
     // When set, skips the folder-picker dialog.
@@ -34,58 +35,34 @@ var CONFIG = {
 
     logPath: "", // resolved below — same folder as this script
 
-    // Pixel targets at 300 DPI (longest edge) — midpoints for range categories.
-    // These are the FINISHED element size (art + white edge). Step 2A resizes the
-    // art smaller by 2×whiteEdgePx so that after Step 2B adds the edge, the element
-    // measures to the target. Append + to the category code in the layer name for
-    // the large end, - for the small end: e.g. "Eiffel Tower [WC-LM+]", "Small Snack [WC-FD-]"
+    // FINISHED element size in INCHES (art + white edge). getTargetPx multiplies by
+    // the working resolution, so these hold at any DPI. Append + / - to the category
+    // code for the large / small end (e.g. "Eiffel Tower [WC-LM+]").
     sizeTable: {
-        "TL": 900,  // Location names              3 in     (fixed)
-        "LM": 615,  // Landmarks & attractions     2.05 in  (midpoint 1.8–2.3)
-        "MP": 570,  // Maps / station signs        1.9 in   (midpoint 1.8–2)
-        "TR": 570,  // Transportation              1.9 in   (midpoint 1.8–2)
-        "IC": 495,  // Cultural symbols & icons    1.65 in  (midpoint 1.5–1.8)
-        "FD": 525,  // Food & local cuisine        1.75 in  (midpoint 1.5–2)
-        "ST": 450   // Stamps                      1.5 in   (fixed)
+        "TL": 3.0,  "LM": 2.05, "MP": 1.9, "TR": 1.9, "IC": 1.65, "FD": 1.75, "ST": 1.5
     },
-
-    // Large-end targets — used when category code has + suffix.
-    sizeTableLarge: {
-        "LM": 690,  // 2.3 in
-        "MP": 600,  // 2.0 in
-        "TR": 600,  // 2.0 in
-        "IC": 540,  // 1.8 in
-        "FD": 600   // 2.0 in
-    },
-
-    // Small-end targets — used when category code has - suffix.
-    sizeTableSmall: {
-        "LM": 540,  // 1.8 in
-        "MP": 540,  // 1.8 in
-        "TR": 540,  // 1.8 in
-        "IC": 450,  // 1.5 in
-        "FD": 450   // 1.5 in
-    },
+    sizeTableLarge: { "LM": 2.3, "MP": 2.0, "TR": 2.0, "IC": 1.8, "FD": 2.0 },
+    sizeTableSmall: { "LM": 1.8, "MP": 1.8, "TR": 1.8, "IC": 1.5, "FD": 1.5 },
 
     // ── Step 2A: Grid layout (after resize) ───────────────────────────────────
-    // Padding on each side of a grid cell, in pixels.
-    // Cell size = largest category (TL = 900px) + 2 × gridPaddingPx.
-    gridPaddingPx: 60,
+    // Padding on each side of a grid cell, in millimetres.
+    // Cell size = largest category (TL) + 2 × gridPaddingMm.
+    gridPaddingMm:            5.08,  // review-grid cell padding (= 60px @300 DPI)
 
     // ── Step 3: White edge ────────────────────────────────────────────────────
-    // Default 20px (≈ 1.7mm at 300 DPI) confirmed by artist as the majority case.
+    // Default width confirmed by artist as the majority case, in millimetres.
     // To adjust a single element: delete its White Base_Cutline layer, change this
     // value, re-run — the re-run guard skips all elements that still have their layer.
-    whiteEdgePx:        20,
+    whiteEdgeMm:             1.7,    // white border width (= 20px @300 DPI)
     // Select>Modify>Smooth radius applied to the white-edge band's outer edge
     // (Step 2B, after expand, before fill). This is the contour Step 5
     // silhouettes and Step 6 traces, so smoothing it here yields clean cutlines
     // without an Illustrator-side RDP pass. ⚠️ Tune with artist on a real SKU:
-    // too large relative to whiteEdgePx (20) rounds away genuine corners, and
+    // too large relative to whiteEdgeMm rounds away genuine corners, and
     // because it acts after the expand it can marginally shift finished bounds
-    // at sharp corners (relevant to Step 2A's 2×whiteEdgePx size compensation).
-    // 0 disables smoothing. Landed at 20 on a real watercolor SKU (2026-06-12).
-    whiteEdgeSmoothRadiusPx: 20,
+    // at sharp corners (relevant to Step 2A's 2×whiteEdgeMm size compensation).
+    // 0 disables smoothing. Landed at 1.7mm on a real watercolor SKU (2026-06-12).
+    whiteEdgeSmoothRadiusMm: 1.7,    // Smooth radius on the band (= 20px @300 DPI)
     whiteEdgeLayerName: "White Base_Cutline", // name given to the created layer
 
     // Captions are NO LONGER authored in Photoshop — they are placed + built natively in
