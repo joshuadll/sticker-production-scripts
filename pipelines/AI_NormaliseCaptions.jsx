@@ -24,8 +24,11 @@ var CONFIG = {
     stickersLayerName: "Sticker",   // placed art + caption PNGs live here (Step 7B)
     cutlineStrokePt:   0.25,
 
-    // Absolute PSD→AI scale: a caption/art PNG at spec sits at 72/sourceDPI pt per px
-    // (the factor Step 7B placed it at). MUST match the import pipeline's sourceDPI.
+    // NOTE: Step 8b (caption normalise) does NOT use sourceDPI — it normalises via the spec
+    // pill-area ratio in group.note, not a 72/sourceDPI pt/px factor. This value is currently
+    // unused; kept only as a defensive default. If a future DPI-dependent calc is added here,
+    // read `sourceDPI` from the `_elements.json` sidecar (as Step 6/7B do) — do NOT trust this
+    // hardcoded 300, which is wrong for a non-300-DPI SKU.
     sourceDPI: 300,
 
     // ── Caption vector seat (aiUtils.seatPlateToOutline) ─────────────────────

@@ -91,7 +91,7 @@ function runResize(doc) {
 // Cell size = largest target px + gridPaddingMm (in px) on each side.
 // Rows wrap when the next cell would exceed the canvas width.
 function runGridLayout(doc) {
-    var padding  = CONFIG.gridPaddingMm !== undefined ? mmToPx(CONFIG.gridPaddingMm) : 60;
+    var padding  = mmToPx(CONFIG.gridPaddingMm !== undefined ? CONFIG.gridPaddingMm : 5.08); // DPI-scaled (5.08mm ≈ 60px @300)
     var cellSize = getTargetPx({ styleCode: "WC", catCode: "TL", sizeHint: null }) + padding * 2; // TL largest
     var canvasW  = doc.width.as("px");
 

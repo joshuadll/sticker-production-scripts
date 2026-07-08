@@ -107,22 +107,30 @@ function createTemplateDoc(dpi) {
     return doc;
 }
 
-// Scans the source folder's PSDs and returns the HIGHEST resolution found (DPI),
+// Scans the source folder's ELEMENT PSDs and returns the HIGHEST resolution found (DPI),
 // warning on any mismatch. Returns 0 when no PSD is readable (caller falls back to
 // templateDPI). Opens + closes each file read-only.
+// Caption_Plate.psd is EXCLUDED: it's a separately-supplied caption backing asset (Step 1
+// imports it by name), not element art, so its resolution must not drive element sizing.
 function detectSourceDpi(folder) {
-    var files = folder.getFiles("*.psd");
-    if (!files || files.length === 0) return 0;
+    var allFiles = folder.getFiles("*.psd"), files = [], fi;
+    for (fi = 0; fi < allFiles.length; fi++) {
+        if (String(allFiles[fi].name).toLowerCase() === "caption_plate.psd") continue;
+        files.push(allFiles[fi]);
+    }
+    if (files.length === 0) return 0;
     var maxDpi = 0, seen = [], i, d, r;
     for (i = 0; i < files.length; i++) {
+        d = null;
         try {
             d = app.open(files[i]);
             r = Math.round(d.resolution);
-            d.close(SaveOptions.DONOTSAVECHANGES);
         } catch (e) {
             log("[pipeline] WARN | could not read resolution of " + files[i].name + ": " + e.message);
+            if (d) { try { d.close(SaveOptions.DONOTSAVECHANGES); } catch (eC) {} }  // don't leak an open doc
             continue;
         }
+        try { d.close(SaveOptions.DONOTSAVECHANGES); } catch (eC2) {}
         seen.push(files[i].name + "=" + r + "dpi");
         if (r > maxDpi) maxDpi = r;
     }
@@ -234,6 +242,21 @@ function main() {
     }
     log("[pipeline] source folder: " + folder.name);
 
+    // ── Config sanity: size tables are in INCHES ───────────────────
+    // A stale px-scale value (e.g. 570 instead of 1.9) would compute a 300x target silently.
+    // Fail loudly — no real sticker is > 20 inches on its longest edge.
+    var _tbls = [CONFIG.sizeTable, CONFIG.sizeTableLarge, CONFIG.sizeTableSmall], _ti, _k;
+    for (_ti = 0; _ti < _tbls.length; _ti++) {
+        for (_k in _tbls[_ti]) {
+            if (_tbls[_ti].hasOwnProperty(_k) && _tbls[_ti][_k] > 20) {
+                scriptAlert("Config error: size table value \"" + _k + "\" = " + _tbls[_ti][_k]
+                    + " looks like PIXELS, not inches.\nThe size tables must be in INCHES"
+                    + " (e.g. LM = 2.05). Fix CONFIG and re-run.");
+                return;
+            }
+        }
+    }
+
     // ── Determine working resolution + document ────────────────────
     // Adopted doc's own resolution wins; otherwise the highest source-PSD resolution.
     var doc;
@@ -241,8 +264,32 @@ function main() {
         doc = app.activeDocument;
         CONFIG.sourceDPI = Math.round(doc.resolution) || CONFIG.templateDPI;
         log("[pipeline] adopted open template | resolution " + CONFIG.sourceDPI + " DPI");
+        // Cross-check the adopted doc against the actual source PSDs: if the sources are a
+        // DIFFERENT resolution, the adopted doc's DPI silently governs sizing (higher-res
+        // source art gets downsampled). Warn/alert instead of silently defeating the feature.
+        var adoptedSrc = detectSourceDpi(folder);
+        if (adoptedSrc > 0 && adoptedSrc !== CONFIG.sourceDPI) {
+            var mm = "Open template is " + CONFIG.sourceDPI + " DPI but the source PSDs are "
+                + adoptedSrc + " DPI";
+            log("[pipeline] WARN | " + mm + " — the template's DPI governs sizing.");
+            if (adoptedSrc > CONFIG.sourceDPI) {
+                scriptAlert("⚠️ Resolution mismatch\n\n" + mm
+                    + ".\n\nThe higher-resolution source art will be DOWNSAMPLED to the "
+                    + "template's DPI.\nClose the open template and re-run to author at the "
+                    + "source resolution,\nor continue if the template DPI is intended.");
+            }
+        }
     } else {
         var detected = detectSourceDpi(folder);
+        if (detected === 0) {
+            log("[pipeline] WARN | could not detect source resolution; falling back to "
+                + CONFIG.templateDPI + " DPI.");
+            scriptAlert("⚠️ Couldn't read the source PSD resolution\n\n"
+                + "Falling back to " + CONFIG.templateDPI + " DPI. If your source art is a "
+                + "different resolution,\nthe exported element sizes may be wrong.\n\n"
+                + "Check the source folder is accessible (not iCloud-offline) and that the "
+                + "PSDs open cleanly, then re-run.");
+        }
         CONFIG.sourceDPI = detected || CONFIG.templateDPI;
         doc = createTemplateDoc(CONFIG.sourceDPI);
     }
