@@ -58,7 +58,10 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
     // scale (not workingAreaWidthMm); Step 7B sizes artwork by the same factor so the
     // art and cutlines stay twins. A 72-dpi silhouette places at psdWidth pt, so this
     // resolves to a flat 72/sourceDPI scale, but is written to tolerate other embeds.
-    var targetWidthPt = elementsData.psdWidth * (72.0 / CONFIG.sourceDPI);
+    var srcDpi = (elementsData.sourceDPI && elementsData.sourceDPI > 0)
+        ? elementsData.sourceDPI : CONFIG.sourceDPI;
+    if (!elementsData.sourceDPI) log("[step6] WARN | sidecar has no sourceDPI; falling back to " + srcDpi);
+    var targetWidthPt = elementsData.psdWidth * (72.0 / srcDpi);
     var scalePct = (targetWidthPt / placed.width) * 100;
     placed.resize(scalePct, scalePct);
 

@@ -860,8 +860,12 @@ function _nestMaxUpwardShift(regCuts, irrCuts, spacingPt) {
 // art and cutlines twins at true physical size.) Returns 0 when the sidecar is
 // missing/unusable (caller falls back to height-fit).
 function _nestArtFactor(elementsData) {
-    if (!elementsData || !elementsData.psdWidth || !CONFIG.sourceDPI) return 0;
-    var factor = 72.0 / CONFIG.sourceDPI;
+    if (!elementsData || !elementsData.psdWidth) return 0;
+    var dpi = (elementsData.sourceDPI && elementsData.sourceDPI > 0)
+        ? elementsData.sourceDPI : CONFIG.sourceDPI;
+    if (!dpi) return 0;
+    if (!elementsData.sourceDPI) log("[step-nest] WARN | sidecar has no sourceDPI; falling back to " + dpi);
+    var factor = 72.0 / dpi;
     return factor > 0 ? factor : 0;
 }
 
