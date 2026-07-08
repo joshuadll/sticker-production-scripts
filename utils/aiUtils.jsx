@@ -69,6 +69,56 @@ function boundsCenter(bounds) {
     };
 }
 
+// Centroid ({x,y}) of an array of {x,y} points, or null when empty.
+function _anchorCentroid(pts) {
+    if (!pts || !pts.length) return null;
+    var sx = 0, sy = 0, i;
+    for (i = 0; i < pts.length; i++) { sx += pts[i].x; sy += pts[i].y; }
+    return { x: sx / pts.length, y: sy / pts.length };
+}
+
+// Long-axis angle (degrees, +CCW, y-up) of a point cloud = the direction of its
+// farthest-apart pair. The two ends of a pill/tab are its farthest points, so the
+// pair direction is the long axis (robust on warped WC capsules: the end tips define
+// the chord). Returns null for < 2 points or a degenerate (coincident) cloud. O(n^2)
+// on the small reference-path anchor set.
+function _longAxisAngleDeg(pts) {
+    if (!pts || pts.length < 2) return null;
+    var bi = 0, bj = 1, bd = -1, i, j, dx, dy, d;
+    for (i = 0; i < pts.length; i++) {
+        for (j = i + 1; j < pts.length; j++) {
+            dx = pts[j].x - pts[i].x; dy = pts[j].y - pts[i].y;
+            d = dx * dx + dy * dy;
+            if (d > bd) { bd = d; bi = i; bj = j; }
+        }
+    }
+    if (bd <= 0) return null;
+    return Math.atan2(pts[bj].y - pts[bi].y, pts[bj].x - pts[bi].x) * 180 / Math.PI;
+}
+
+// Degrees (+CCW) to rotate an element into its upright design orientation for export:
+// makes the reference feature's long axis horizontal AND places the reference BELOW the
+// art. refPts = reference (plate/tab) anchors; artPts = outline (art) anchors, may be
+// null (then the up/down resolution is skipped). Returns null when refPts has < 2
+// points (caller falls back). Pure geometry — reflects the element's CURRENT orientation
+// (nest + any manual rotation), independent of any item matrix.
+function _uprightRotationDeg(refPts, artPts) {
+    var phi = _longAxisAngleDeg(refPts);
+    if (phi === null) return null;
+    var theta = -phi;                              // long axis -> horizontal
+    var cRef = _anchorCentroid(refPts);
+    var cArt = _anchorCentroid(artPts);
+    if (cRef && cArt) {
+        // Rotate (cRef - cArt) by theta; in upright the reference sits BELOW the art
+        // (negative y, y-up). If it lands above (y > 0), the element is upside down.
+        var vx = cRef.x - cArt.x, vy = cRef.y - cArt.y;
+        var r  = theta * Math.PI / 180, cs = Math.cos(r), sn = Math.sin(r);
+        var ry = vx * sn + vy * cs;
+        if (ry > 0) theta += 180;
+    }
+    return theta;
+}
+
 // Returns true if a path item is a caption path (name ends with " caption").
 // NOTE: Step 6 does not produce separate caption paths — caption is part of the
 // element silhouette. This helper is retained for potential use in Steps 8b/9.
