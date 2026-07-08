@@ -317,7 +317,11 @@ function copyLogBeside(folderFsName, niceName) {
 function ensureExportFolders(baseFolder, stkCode) {
     function ensure(path) {
         var f = new Folder(path);
-        if (!f.exists) f.create();
+        // Verify creation succeeded — Folder.create() returns false (rather than throwing)
+        // on a read-only/permission-restricted volume; returning the fsName anyway would
+        // surface later as a confusing exportFile error with no hint at the real cause.
+        if (!f.exists && !f.create())
+            throw new Error("Could not create export folder: " + path);
         return f.fsName;
     }
     var root = ensure(baseFolder + "/" + stkCode + "_export");
