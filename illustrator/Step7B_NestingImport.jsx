@@ -49,12 +49,17 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     var cutlinesLayer = findLayer(doc, CONFIG.cutlinesLayerName);
     if (!cutlinesLayer) {
         log("[step-nest] ERROR | Cutlines layer not found.");
+        var _cutFolder = null;
+        try { _cutFolder = doc.fullName.parent.fsName; } catch (eCut) {}
+        scriptAlert("❌ Import failed — Cutlines layer not found.\n\n"
+            + "Make sure Step 6 has been run on this document.\n\n"
+            + "Send this to Josh:\n" + copyLogBeside(_cutFolder, "Noteworthie_ERROR.log"));
         return null;
     }
 
     // The one number art sizing needs. The pipeline guarantees a valid sidecar (it
     // halts otherwise), so this is always > 0.
-    var artFactor = _nestArtFactor(elementsData);
+    var artFactor = artFactorFromData(elementsData, CONFIG.sourceDPI);
     var _srcDpi = (elementsData.sourceDPI && elementsData.sourceDPI > 0)
         ? elementsData.sourceDPI : CONFIG.sourceDPI;
     log("[step-nest] art sizing: factor=" + artFactor.toFixed(5)
@@ -66,26 +71,10 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
         log("[step-nest] WARN | Stickers layer not found — artwork will not be placed.");
     }
 
-    // Re-run safety: clear any previously placed artwork so it doesn't stack. Art is now
-    // EMBEDDED at placement (rasterItems) for a portable handoff, so the clear must sweep
-    // BOTH collections: rasterItems (embedded art, the norm) AND placedItems (a stray
-    // linked item from an older run or a partial embed). Clearing only placedItems would
-    // let embedded art DUPLICATE on every re-run.
-    if (stickersLayer && !CONFIG.dryRun) {
-        var cleared = 0;
-        var pi;
-        for (pi = stickersLayer.placedItems.length - 1; pi >= 0; pi--) {
-            stickersLayer.placedItems[pi].remove();
-            cleared++;
-        }
-        for (pi = stickersLayer.rasterItems.length - 1; pi >= 0; pi--) {
-            stickersLayer.rasterItems[pi].remove();
-            cleared++;
-        }
-        if (cleared > 0) {
-            log("[step-nest] cleared " + cleared + " previously placed art item(s) (re-run).");
-        }
-    }
+    // Art is placed + embedded once at Step 6; Step 7B RIDES it to the nested pose (it does
+    // NOT clear or re-import). Re-run safety comes from the transform being convergent — the
+    // rotation is a delta from the cutline's current orientation (see _nestComputeRotation)
+    // and the same matrix is applied to cut and art, so a second run leaves both in place.
 
     // Re-run safety: strip any prior spacing-buffer halos BEFORE the cutline math runs, so a
     // stale halo (offset outward past the cut) can never skew matching, placement, or the overlap
@@ -98,6 +87,24 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     var k;
     for (k in cutlineMap) { totalCutlines++; }
     log("[step-nest] found " + totalCutlines + " cutline(s) in working file.");
+
+    // Precondition: Step 6 embedded each element's art on the Stickers layer. Verify every
+    // cutline has its art BEFORE any transform runs, so a missing item is a clean hard error
+    // rather than a half-nested sheet. No fallback re-import (see the review-art design).
+    if (!CONFIG.dryRun && stickersLayer) {
+        var missingArt = [], mk;
+        for (mk in cutlineMap) {
+            if (!findArtByName(stickersLayer, mk)) missingArt.push(mk);
+        }
+        if (missingArt.length > 0) {
+            log("[step-nest] ERROR | art missing on Stickers for: " + missingArt.join(", "));
+            scriptAlert("❌ Nesting import aborted — art is missing for "
+                + missingArt.length + " element(s):\n\n  • " + missingArt.join("\n  • ")
+                + "\n\nThese should have been placed in Pipeline 1 (Step 6). Re-run Pipeline 1"
+                + " to regenerate the art, then try again.");
+            return null;
+        }
+    }
 
     // Bake all caption warps NOW, while every cutline is still upright — one batched
     // Expand Appearance for the whole sheet (vs one selection-redraw per element in the
@@ -444,16 +451,15 @@ function _nestProcessSingleSvg(doc, svgFile, cutlineMap, stickersLayer, artFolde
 
         rotation = _nestComputeRotation(svgItem, cutlineItem);
 
-        // Bind artwork to the cutline WHILE IT IS STILL UPRIGHT — centre + scale only,
-        // no rotation, so the alignment is exact (no angle to get wrong). The pair is
-        // then moved to the nest pose together by _nestApplyPairTransform.
+        // Art was placed + embedded at Step 6 and verified present above. Find it and pair it
+        // AS-IS: it is already in the correct relative position to the cut (registered at Step 6,
+        // moved only WITH the cut since), so the shared transform matrix keeps them aligned and
+        // re-run-convergent — no re-import, no upright reset. (The native caption is a cutline-
+        // group member, so it rides the cut automatically.)
         artItem = null;
-        if (stickersLayer && artFolder) {
-            artItem = _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFactor);
+        if (stickersLayer) {
+            artItem = findArtByName(stickersLayer, cutlineItem.name);
             if (artItem) artPlaced++;
-            // The native caption (white pill + text + GC plate) is a MEMBER of the cutline
-            // group now, so it rides every nest transform automatically with the cut — no
-            // separate placement/binding needed (Pipeline 2 built it into the group).
         }
 
         // Caption warps were already baked to static outlines in ONE batch pass at §2 (before any
@@ -856,20 +862,6 @@ function _nestMaxUpwardShift(regCuts, irrCuts, spacingPt) {
 
 
 // ── Private helpers ────────────────────────────────────────────────────────────
-
-// AI points per PSD pixel = 72 / sourceDPI — the SAME scale Step 6 applied when it
-// placed the silhouette at the source DPI. (Placing pixels at their source DPI makes
-// art and cutlines twins at true physical size.) Returns 0 when the sidecar is
-// missing/unusable (caller falls back to height-fit).
-function _nestArtFactor(elementsData) {
-    if (!elementsData || !elementsData.psdWidth) return 0;
-    var dpi = (elementsData.sourceDPI && elementsData.sourceDPI > 0)
-        ? elementsData.sourceDPI : CONFIG.sourceDPI;
-    if (!dpi) return 0;
-    if (!elementsData.sourceDPI) log("[step-nest] WARN | sidecar has no sourceDPI; falling back to " + dpi);
-    var factor = 72.0 / dpi;
-    return factor > 0 ? factor : 0;
-}
 
 // Builds {displayName: pageItem} from direct children of the Cutlines layer.
 // GroupItems = WC/GC elements; direct PathItems/CompoundPathItems = stamps.
@@ -1360,92 +1352,4 @@ function _nestRefineRotation(clPath, coarseRot, targetBounds) {
         if (err < bestErr) { bestErr = err; bestRot = a; }
     }
     return bestRot;
-}
-
-// Places {displayName}.png on its cutline WHILE THE CUTLINE IS STILL UPRIGHT — scaled by
-// the absolute PSD→AI factor and centred — so the art-to-cutline alignment is set with no
-// rotation. The caller then moves the {cut, art} pair to the nest pose as a rigid unit, so
-// the art never needs an independent rotation (where the raster Y-flip caused drift).
-//
-// Sizing: the art and cutline are twins from the same PSD at the same pixel scale, so the
-// art needs no fitting — Deepnest only rotates/translates. resize by artFactor×100 lands
-// the 72-dpi PNG at its true AI size (element_px × factor); uniform scale keeps its aspect.
-// Returns the placed PageItem, or null if the PNG is missing / placement failed.
-function _nestPlaceArtUpright(doc, stickersLayer, artFolder, cutlineItem, artFactor) {
-    var displayName = cutlineItem.name;
-    var safeName    = displayName.replace(/[\/\\:*?"<>|]/g, "_");
-    var pngFile     = new File(artFolder.fsName + "/" + safeName + ".png");
-
-    if (!pngFile.exists) {
-        log("[step-nest] WARN | art PNG not found for: " + displayName);
-        return null;
-    }
-    if (CONFIG.dryRun) {
-        log("[step-nest] [DRY RUN] would place art | " + displayName);
-        return null;
-    }
-
-    doc.activeLayer = stickersLayer;
-
-    var placed = null;
-    try {
-        // Add via the Stickers layer's own collection, NOT doc.placedItems.add(): the
-        // latter targets the topmost layer (the locked Margin band from
-        // buildWorkingDocument), which throws "Target layer cannot be modified".
-        // Layer-scoped add lands the item directly on Stickers.
-        placed = stickersLayer.placedItems.add();
-        placed.file = pngFile;
-        placed.name = displayName;
-
-        // Defensive: ensure the item actually lives in the Stickers layer (a no-op when
-        // the layer-scoped add already placed it there).
-        if (placed.layer !== stickersLayer) {
-            placed.move(stickersLayer, ElementPlacement.PLACEATBEGINNING);
-        }
-
-        // Size to true AI size = element_px × factor; for a 72-dpi PNG that's just
-        // resize by factor×100 (placed.width == element_px, so the px term cancels).
-        // Centre on the element-art trace — the cutline's " outline" member — NOT the
-        // full cutline. The cutline = Unite(outline, plate), so its bbox includes the
-        // caption/plate region; the art PNG is now caption-free (the caption is placed
-        // separately), so registering it to the full cutline would drift it toward the
-        // empty plate area. Stamps (PathItem, no members) fall back to full bounds.
-        var artBoundsItem = (cutlineItem.typename === "GroupItem")
-            ? findGroupMember(cutlineItem, " outline") : null;
-        var cgb = artBoundsItem ? artBoundsItem.geometricBounds : cutlineItem.geometricBounds;
-        placed.resize(artFactor * 100, artFactor * 100);
-
-        var cc = boundsCenter(cgb);
-        placed.translate(cc.x - (placed.position[0] + placed.width  / 2),
-                         cc.y - (placed.position[1] - placed.height / 2));
-
-        // Objective fit check (upright, before the nest transform): the art and the
-        // outline trace are the same element-art shape, so their bounding boxes should
-        // closely agree (residual = trace inset vs render). A large mismatch flags a
-        // sizing/centering regression.
-        var agb = placed.geometricBounds;
-        var aW = Math.abs(agb[2] - agb[0]), aH = Math.abs(agb[1] - agb[3]);
-        var cW = Math.abs(cgb[2] - cgb[0]), cHb = Math.abs(cgb[1] - cgb[3]);
-        log("[step-nest] ART-FIT | " + displayName
-            + " art=" + Math.round(aW) + "x" + Math.round(aH)
-            + " outline=" + Math.round(cW) + "x" + Math.round(cHb)
-            + " dW=" + Math.round(aW - cW) + " dH=" + Math.round(aH - cHb));
-
-        // Return the PlacedItem UNCHANGED — the nest transform (_nestApplyPairTransform) +
-        // cluster moves must run on the live placed item. Embedding happens LATER, in a
-        // single final pass (see runNestingImport §5d), once all transforms are done — embed()
-        // detaches the original reference (leaves it a phantom), so it must never be embedded
-        // while a caller still holds it for transforming.
-        return placed;
-
-    } catch (e) {
-        // Don't leak a half-placed orphan: if add() succeeded but a later move/resize/
-        // translate threw, the PlacedItem is still in the doc (often stranded on the
-        // Cutlines layer) where the Stickers-only re-run cleaner never sees it and it
-        // accumulates run-over-run. Remove it so failure is clean.
-        if (placed) { try { placed.remove(); } catch (e2) {} }
-        log("[step-nest] WARN | art placement failed for: " + displayName
-            + " — line " + e.line + ": " + e.message);
-        return null;
-    }
 }

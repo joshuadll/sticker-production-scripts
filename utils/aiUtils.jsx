@@ -147,6 +147,93 @@ function pivotRotationMatrix(angleDeg, px, py) {
     return m;
 }
 
+// AI points per PSD pixel = 72 / sourceDPI — the SAME scale Step 6 uses to place the
+// silhouette at its source DPI, so art and cutlines are twins at true physical size.
+// Reads elementsData.sourceDPI; falls back to fallbackDpi (CONFIG.sourceDPI) when the
+// sidecar omits it. Returns 0 when unusable (no psdWidth / no positive DPI). Pure — no
+// logging — so it is node-unit-testable.
+function artFactorFromData(elementsData, fallbackDpi) {
+    if (!elementsData || !elementsData.psdWidth) return 0;
+    var dpi = (elementsData.sourceDPI && elementsData.sourceDPI > 0)
+        ? elementsData.sourceDPI : fallbackDpi;
+    if (!dpi || dpi <= 0) return 0;
+    var factor = 72.0 / dpi;
+    return factor > 0 ? factor : 0;
+}
+
+// Returns the art item on the Stickers layer whose name === displayName, or null.
+// Art is EMBEDDED at Step 6 (a RasterItem); a stray linked item (PlacedItem) from an
+// older run is matched too. Direct children only — never reaches into a nested group.
+function findArtByName(stickersLayer, displayName) {
+    if (!stickersLayer) return null;
+    var i, it;
+    for (i = 0; i < stickersLayer.rasterItems.length; i++) {
+        it = stickersLayer.rasterItems[i];
+        if (it.parent === stickersLayer && it.name === displayName) return it;
+    }
+    for (i = 0; i < stickersLayer.placedItems.length; i++) {
+        it = stickersLayer.placedItems[i];
+        if (it.parent === stickersLayer && it.name === displayName) return it;
+    }
+    return null;
+}
+
+// Places {displayName}.png from artFolder onto the Stickers layer, sized to true physical
+// size (artFactor × 100 %), centred on registerItem's geometricBounds, then EMBEDDED so it
+// survives the save -> close -> Deepnest -> reopen gap independent of the PNG folder. Names
+// it displayName. Returns the embedded RasterItem, or null (logged) when the PNG is missing
+// or placement throws. registerItem is the element-art bounds reference (Step 6: the
+// "{name} outline" path; Step 7B fallback would use the group's " outline" member).
+function placeArtEmbedded(doc, stickersLayer, artFolder, displayName, registerItem, artFactor) {
+    var safeName = displayName.replace(/[\/\\:*?"<>|]/g, "_");
+    var pngFile  = new File(artFolder.fsName + "/" + safeName + ".png");
+    if (!pngFile.exists) {
+        log("[aiutils] WARN | art PNG not found for: " + displayName + " (" + pngFile.fsName + ")");
+        return null;
+    }
+
+    var prevLayer = doc.activeLayer;
+    doc.activeLayer = stickersLayer;
+    var placed = null;
+    try {
+        // Layer-scoped add (NOT doc.placedItems.add(), which targets the locked Margin band).
+        placed = stickersLayer.placedItems.add();
+        placed.file = pngFile;
+        placed.name = displayName;
+        if (placed.layer !== stickersLayer) {
+            placed.move(stickersLayer, ElementPlacement.PLACEATBEGINNING);
+        }
+
+        // Size to true AI size = element_px × factor (for a 72-dpi PNG this is a flat
+        // factor×100 resize since placed.width == element_px). Centre on the reference bounds.
+        placed.resize(artFactor * 100, artFactor * 100);
+        var rb = registerItem.geometricBounds;
+        var rc = boundsCenter(rb);
+        placed.translate(rc.x - (placed.position[0] + placed.width  / 2),
+                         rc.y - (placed.position[1] - placed.height / 2));
+
+        var agb = placed.geometricBounds;
+        var aW = Math.abs(agb[2] - agb[0]), aH = Math.abs(agb[1] - agb[3]);
+        var rW = Math.abs(rb[2] - rb[0]),   rH = Math.abs(rb[1] - rb[3]);
+        log("[aiutils] ART-FIT | " + displayName
+            + " art=" + Math.round(aW) + "x" + Math.round(aH)
+            + " ref=" + Math.round(rW) + "x" + Math.round(rH)
+            + " dW=" + Math.round(aW - rW) + " dH=" + Math.round(aH - rH));
+
+        // Embed now: at Step 6 nothing transforms this item afterwards, so the phantom-ref
+        // hazard (embed() detaches the PlacedItem ref) does not apply — we do not reuse `placed`.
+        placed.embed();
+        doc.activeLayer = prevLayer;
+        return findArtByName(stickersLayer, displayName);   // the embedded RasterItem
+    } catch (e) {
+        if (placed) { try { placed.remove(); } catch (e2) {} }
+        doc.activeLayer = prevLayer;
+        log("[aiutils] WARN | art placement failed for: " + displayName
+            + " — line " + e.line + ": " + e.message);
+        return null;
+    }
+}
+
 // Returns true if a path item is a caption path (name ends with " caption").
 // NOTE: Step 6 does not produce separate caption paths — caption is part of the
 // element silhouette. This helper is retained for potential use in Steps 8b/9.

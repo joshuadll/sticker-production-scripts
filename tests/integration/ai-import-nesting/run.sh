@@ -215,27 +215,12 @@ else
         echo "PASS [$STEP]: regular group rotated −90° (bbox transposed)."
     fi
 
-    # Art-fit (the actual bug under test): art and cutline are the SAME element, so
-    # their bounding boxes must agree closely once art is at its true size. Under the
-    # old height-fit, height matched but width could be far off; the absolute factor
-    # makes both agree (residual = Image-Trace inset + plate-vs-render). Print every
-    # element so the layout can be eyeballed, and fail on any gross divergence.
-    echo "[$STEP] --- per-element art-vs-cutline fit (dW/dH in pt) ---"
-    grep "ART-FIT |" "$LOG" || echo "  (no ART-FIT lines)"
-    WORST=$(grep "ART-FIT |" "$LOG" | grep -oE "dW=-?[0-9]+ dH=-?[0-9]+" \
-        | grep -oE -- "-?[0-9]+" \
-        | awk '{a=($1<0?-$1:$1); if(a>m)m=a} END{print m+0}')
-    echo "[$STEP] worst |dW or dH| = ${WORST}pt"
-    # Tolerance 10pt: comfortably above the observed worst (a ~5pt caption-height
-    # residual on long-caption WC elements, the known plate-vs-render gap) yet well
-    # below a sizing regression (height-fit mis-scales by tens of pt).
-    ARTFIT_TOL=10
-    if [ "${WORST:-9999}" -le "$ARTFIT_TOL" ]; then
-        echo "PASS [$STEP]: art fits cutline within ${ARTFIT_TOL}pt for all elements."
-    else
-        echo "FAIL [$STEP]: art/cutline mismatch exceeds ${ARTFIT_TOL}pt (worst ${WORST}pt)."
-        FAIL=1
-    fi
+    # Art sizing (ART-FIT) is now asserted in Pipeline 1: Step 6 places + embeds the art at
+    # its true absolute size (see the ps-build-elements test's "review art" assertion). Step 7B
+    # only RIDES that embedded art to the nest pose — it emits no ART-FIT here. Ride-time
+    # correctness is covered above: art-pos-check (co-location catches a mis-sized/detached art)
+    # and the per-element rotation VERIFY (cutline bbox matches the SVG part).
+    echo "[$STEP] art sizing verified upstream (Step 6 / ps-build); Step 7B rides art (no ART-FIT here)."
 fi
 
 # ── Golden diff ──────────────────────────────────────────────────────────────
