@@ -84,7 +84,7 @@ function writeElementsFile(doc) {
 
     var psdW = Math.round(doc.width.as("px"));
     var psdH = Math.round(doc.height.as("px"));
-    var data = { psdWidth: psdW, psdHeight: psdH, elements: [] };
+    var data = { psdWidth: psdW, psdHeight: psdH, sourceDPI: Math.round(doc.resolution), elements: [] };
 
     var i;
     for (i = 0; i < elementsGroup.layerSets.length; i++) {

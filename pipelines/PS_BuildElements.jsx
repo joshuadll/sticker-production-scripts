@@ -79,13 +79,13 @@ CONFIG.aiPipelinePath = _root + "/pipelines/AI_BuildCutlines.jsx";
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-function createTemplateDoc() {
+function createTemplateDoc(dpi) {
     var w = new UnitValue(CONFIG.templateWidthCm, "cm");
     var h = new UnitValue(CONFIG.templateHeightCm, "cm");
     // RGB (sRGB) — source art is RGB and the target is an RGB inkjet with a custom ICC
     // profile applied at print time. A CMYK template would clip the art's gamut before
     // it ever reaches Illustrator; keeping RGB preserves full saturation end-to-end.
-    var doc = app.documents.add(w, h, CONFIG.templateDPI, "Production Template",
+    var doc = app.documents.add(w, h, dpi, "Production Template",
         NewDocumentMode.RGB, DocumentFill.WHITE);
 
     // Fill Background with 50% gray so white edges are visible during review.
@@ -103,8 +103,40 @@ function createTemplateDoc() {
 
     log("[pipeline] created new template document ("
         + CONFIG.templateWidthCm + " x " + CONFIG.templateHeightCm + " cm, "
-        + CONFIG.templateDPI + " DPI).");
+        + dpi + " DPI).");
     return doc;
+}
+
+// Scans the source folder's PSDs and returns the HIGHEST resolution found (DPI),
+// warning on any mismatch. Returns 0 when no PSD is readable (caller falls back to
+// templateDPI). Opens + closes each file read-only.
+function detectSourceDpi(folder) {
+    var files = folder.getFiles("*.psd");
+    if (!files || files.length === 0) return 0;
+    var maxDpi = 0, seen = [], i, d, r;
+    for (i = 0; i < files.length; i++) {
+        try {
+            d = app.open(files[i]);
+            r = Math.round(d.resolution);
+            d.close(SaveOptions.DONOTSAVECHANGES);
+        } catch (e) {
+            log("[pipeline] WARN | could not read resolution of " + files[i].name + ": " + e.message);
+            continue;
+        }
+        seen.push(files[i].name + "=" + r + "dpi");
+        if (r > maxDpi) maxDpi = r;
+    }
+    // Warn on any mismatch (warn-on-all); the highest wins.
+    var mixed = false, j;
+    for (j = 0; j < seen.length; j++) {
+        if (seen[j].indexOf("=" + maxDpi + "dpi") === -1) { mixed = true; break; }
+    }
+    if (mixed) {
+        log("[pipeline] WARN | source PSDs have mixed resolutions, using highest ("
+            + maxDpi + " DPI): " + seen.join(", "));
+    }
+    log("[pipeline] detected source DPI: " + maxDpi + " (from " + seen.length + " PSD(s))");
+    return maxDpi;
 }
 
 // Builds the "N element(s) NOT imported" warning block for the completion alert
@@ -183,26 +215,11 @@ function handOffToIllustrator(doc) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 function main() {
-    // ── Get or create template document ───────────────────────────
-    var doc;
-    if (app.documents.length > 0 && isValidTemplate(app.activeDocument)) {
-        doc = app.activeDocument;
-    } else {
-        doc = createTemplateDoc();
-    }
-
     // ── Init log ───────────────────────────────────────────────────
     log("[pipeline] === PS_BuildElements start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
-    log("[pipeline] template: " + doc.name);
 
-    if (doc.resolution !== CONFIG.templateDPI) {
-        log("[pipeline] WARN: resolution is " + doc.resolution
-            + " DPI, expected " + CONFIG.templateDPI
-            + ". Pixel targets may be inaccurate.");
-    }
-
-    // ── Resolve source folder ──────────────────────────────────────
+    // ── Resolve source folder (needed to detect source DPI) ────────
     var folder;
     if (CONFIG.sourceFolderPath) {
         folder = new Folder(CONFIG.sourceFolderPath);
@@ -216,6 +233,20 @@ function main() {
         if (!folder) { log("[pipeline] cancelled."); return; }
     }
     log("[pipeline] source folder: " + folder.name);
+
+    // ── Determine working resolution + document ────────────────────
+    // Adopted doc's own resolution wins; otherwise the highest source-PSD resolution.
+    var doc;
+    if (app.documents.length > 0 && isValidTemplate(app.activeDocument)) {
+        doc = app.activeDocument;
+        CONFIG.sourceDPI = Math.round(doc.resolution) || CONFIG.templateDPI;
+        log("[pipeline] adopted open template | resolution " + CONFIG.sourceDPI + " DPI");
+    } else {
+        var detected = detectSourceDpi(folder);
+        CONFIG.sourceDPI = detected || CONFIG.templateDPI;
+        doc = createTemplateDoc(CONFIG.sourceDPI);
+    }
+    log("[pipeline] template: " + doc.name + " | working DPI " + CONFIG.sourceDPI);
 
     // ── Dry run: inspect only, no changes ─────────────────────────
     if (CONFIG.dryRun) {
