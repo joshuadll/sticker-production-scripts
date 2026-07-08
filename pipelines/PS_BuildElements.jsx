@@ -105,18 +105,20 @@ CONFIG.aiPipelinePath = _root + "/pipelines/AI_BuildCutlines.jsx";
 function createTemplateDoc() {
     var w = new UnitValue(CONFIG.templateWidthCm, "cm");
     var h = new UnitValue(CONFIG.templateHeightCm, "cm");
+    // RGB (sRGB) — source art is RGB and the target is an RGB inkjet with a custom ICC
+    // profile applied at print time. A CMYK template would clip the art's gamut before
+    // it ever reaches Illustrator; keeping RGB preserves full saturation end-to-end.
     var doc = app.documents.add(w, h, CONFIG.templateDPI, "Production Template",
-        NewDocumentMode.CMYK, DocumentFill.WHITE);
+        NewDocumentMode.RGB, DocumentFill.WHITE);
 
     // Fill Background with 50% gray so white edges are visible during review.
     var bgLayer = doc.backgroundLayer;
     bgLayer.isBackgroundLayer = false;
     doc.activeLayer = bgLayer;
     var gray = new SolidColor();
-    gray.cmyk.cyan    = 0;
-    gray.cmyk.magenta = 0;
-    gray.cmyk.yellow  = 0;
-    gray.cmyk.black   = 50;
+    gray.rgb.red   = 128;
+    gray.rgb.green = 128;
+    gray.rgb.blue  = 128;
     doc.selection.selectAll();
     doc.selection.fill(gray);
     doc.selection.deselect();

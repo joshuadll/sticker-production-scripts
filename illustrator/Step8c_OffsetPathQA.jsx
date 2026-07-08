@@ -100,7 +100,7 @@ function runOffsetPathQA(doc) {
     // only clears stale red from a prior run. Stamps (PlacedItem) can't be
     // recolored, so they're skipped here just as they are when flagging.
     var resetPt = CONFIG.cutlineStrokePt || 0.25;
-    var black   = blackCmyk();
+    var black   = blackRgb();
     for (i = 0; i < records.length; i++) {
         if (records[i].kind === "path") {
             strokeRecursive(records[i].item, resetPt, black);
@@ -197,9 +197,9 @@ function runOffsetPathQA(doc) {
 //   gets one halo + a red disc at its pinch + an amber arrow at its margin edge.
 // Stamps (PlacedItem) can't be filled; their halo + overhang use the bounding box.
 function _drawFlagOverlay(qaLayer, records, spacingMarks, marginRect) {
-    var red       = redCmyk();
-    var amber      = amberCmyk();
-    var halo       = haloCmyk();
+    var red       = redRgb();
+    var amber      = amberRgb();
+    var halo       = haloRgb();
     var connPt     = CONFIG.flagStrokePt;
     var discR      = mmToPoints(2.5);  // spacing badge disc radius (~5mm dia)
     var arrowPt    = mmToPoints(6);    // margin arrow length
@@ -251,7 +251,7 @@ function _drawFlagOverlay(qaLayer, records, spacingMarks, marginRect) {
 
     // Channel 3 — caption-seat review badge (advisory; does NOT gate export). A blue
     // disc at the top of each element whose PS conform flagged an uneven seat ("…|R").
-    var reviewBlue = seatReviewCmyk();
+    var reviewBlue = seatReviewRgb();
     var reviews = 0;
     for (i = 0; i < records.length; i++) {
         if (!records[i].reviewFlag) continue;

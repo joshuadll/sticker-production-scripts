@@ -57,7 +57,7 @@ Script automates steps 1, 3–10. Artist still positions/sizes if needed after.
 
 | Parameter | Value |
 |---|---|
-| Cut line stroke | 0.25pt black (CMYK 0,0,0,100), no fill |
+| Cut line stroke | 0.25pt black (RGB 0,0,0), no fill |
 | Cutlines layer | Above "Stickers" layer |
 | Offset path | 1mm (Step 8b) |
 | Working area | 190 × 267 mm (A4 minus margins) |

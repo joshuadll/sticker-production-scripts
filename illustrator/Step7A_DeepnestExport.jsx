@@ -199,7 +199,7 @@ function _exportSvgGroup(doc, keepNames, outputPath) {
     var ab = doc.artboards[0].artboardRect; // [left, top, right, bottom]
     var abW = Math.abs(ab[2] - ab[0]);
     var abH = Math.abs(ab[1] - ab[3]);
-    var tmp = app.documents.add(DocumentColorSpace.CMYK, abW, abH);
+    var tmp = app.documents.add(DocumentColorSpace.RGB, abW, abH);   // match RGB working doc
     var tmpLayer = tmp.layers[0];
 
     var copied = 0;
