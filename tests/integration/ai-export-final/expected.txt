@@ -1,6 +1,7 @@
 [pipeline] === AI_ExportFinal start ===
 [pipeline] dryRun: false
 [pipeline] document: ai-export-final-fixture.ai
+[pipeline] WARN | no sourceDPI in sidecar; per-element PNGs at CONFIG default 300 DPI
 [buffer] stripped 26 spacing buffer(s) before export.
 [pipeline] --- Spacing + Margin QA guard ---
 [step8c] collected 26 cut line(s).

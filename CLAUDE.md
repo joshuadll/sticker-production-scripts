@@ -258,6 +258,12 @@ Category resize targets:
   TL: 3 in / 900px | LM: 2.3 in / 690px | MP: 1.8–2 in / ~570px
   TR: 1.8–2 in / ~570px | IC: 1.8 in / 540px | FD: 1.5–2 in / ~525px | ST: 1.5 in / 450px
 
+Sizes above are stored in INCHES (`CONFIG.sizeTable`/`sizeTableLarge`/`sizeTableSmall` in
+pipelines/PS_BuildElements.jsx) — `getTargetPx(parsed)` returns `Math.round(inches × sourceDPI)`,
+where `sourceDPI` is detected at runtime (see the Illustrator layer-stack section below). White
+edge width is stored in mm (`CONFIG.whiteEdgeMm`, resolved via `mmToPx()`). This keeps element and
+edge physical size constant at any working resolution — 300 DPI stays 300, 600 DPI stays 600.
+
 ## Photoshop layer stack — state handed off to Illustrator (after Step 5)
 The saved PSD has exactly one meaningful top-level layer after Step 5:
   Elements           ← LayerSet containing all [Display Name] [STYLE-CAT] element groups
@@ -282,7 +288,7 @@ PSAI_BuildAndExportCutlines exports (written before BridgeTalk handoff, sibling 
   {name}_silhouette.png   ← element-art-only flat black PNG (captions excluded; Step 6 adds them back)
   {name}_elements.json    ← JSON sidecar (json2.jsx polyfill; ExtendScript has no native
                             JSON). Shape:
-                              { psdWidth, psdHeight, elements: [
+                              { psdWidth, psdHeight, sourceDPI, elements: [
                                   { displayName, styleCode, left, top, right, bottom,
                                     caption: null | { lines, left, top, right, bottom,
                                                       radius?, spine?: [{x,y}, …],
@@ -299,7 +305,13 @@ PSAI_BuildAndExportCutlines exports (written before BridgeTalk handoff, sibling 
                             the AI junction fillet, was reverted.) PSAI always runs
                             Step 3B in-session, so every WC caption carries a spine (Step 6
                             relies on this). JSON (vs the old pipe-delimited text) prevents
-                            delimiter collisions with caption display names.
+                            delimiter collisions with caption display names. sourceDPI (top-level
+                            integer) is the detected working resolution — Step 6 / Step 7B derive
+                            the `72/sourceDPI` placement scale from it, and AI_ExportFinal sets
+                            `pngExportScale = sourceDPI` so per-element PNG export matches the
+                            source resolution instead of always normalizing to 300. Missing/zero
+                            sourceDPI in the sidecar → each reader falls back to 300 DPI and logs
+                            a WARN.
   {name}_elements/        ← per-element trimmed PNGs (one per element group, transparent background)
                             used by AI_ImportNesting / Step7B to populate the Stickers layer after Deepnest
 
@@ -472,7 +484,7 @@ try {
 
 Before sending, PSAI_BuildAndExportCutlines exports two sidecar files next to the PSD:
 - `{name}_silhouette.png` — element-art-only flat black PNG (captions excluded)
-- `{name}_elements.json`  — JSON: `{ psdWidth, psdHeight, elements: [{ displayName, styleCode, left, top, right, bottom, caption }] }`, where `caption` is `null` or `{ lines, left, top, right, bottom, radius?, spine? }` (WC captions carry `radius`+`spine` = real capsule geometry; see the layer-stack section). Uses the json2.jsx polyfill.
+- `{name}_elements.json`  — JSON: `{ psdWidth, psdHeight, sourceDPI, elements: [{ displayName, styleCode, left, top, right, bottom, caption }] }`, where `caption` is `null` or `{ lines, left, top, right, bottom, radius?, spine? }` (WC captions carry `radius`+`spine` = real capsule geometry; see the layer-stack section). `sourceDPI` is the detected working resolution — Step 6/Step 7B placement scale (`72/sourceDPI`) and `AI_ExportFinal`'s `pngExportScale` read it, falling back to 300 with a WARN if absent. Uses the json2.jsx polyfill.
 
 Then sends both sidecar paths to AI_BuildCutlines.jsx via BridgeTalk. No template
 file is passed — the AI side builds its own working document (see below).

@@ -46,12 +46,12 @@ function runResize(doc) {
             }
 
             // The category target is the FINISHED element size (art + white edge).
-            // Step 2B later expands each side by CONFIG.whiteEdgePx, growing the
-            // longest edge by 2×whiteEdgePx. Resize the art smaller by that amount
+            // Step 2B later expands each side by whiteEdgeMm (in px), growing the
+            // longest edge by 2×edgePx. Resize the art smaller by that amount
             // so the final white-edged element lands on the category target.
             // Stamps (ST) don't get white edge — resize to the full target directly.
-            var edgePx = (CONFIG.whiteEdgePx !== undefined && parsed.styleCode !== "ST")
-                ? CONFIG.whiteEdgePx : 0;
+            var edgePx = (CONFIG.whiteEdgeMm !== undefined && parsed.styleCode !== "ST")
+                ? mmToPx(CONFIG.whiteEdgeMm) : 0;
             var artTargetPx = targetPx - 2 * edgePx;
             if (artTargetPx < 1) {
                 log("[step2] SKIP | \"" + layer.name + "\" — target " + targetPx
@@ -88,11 +88,11 @@ function runResize(doc) {
 }
 
 // Arranges all element layers in a left-to-right grid with uniform cell size.
-// Cell size = largest target px + CONFIG.gridPaddingPx on each side.
+// Cell size = largest target px + gridPaddingMm (in px) on each side.
 // Rows wrap when the next cell would exceed the canvas width.
 function runGridLayout(doc) {
-    var padding  = CONFIG.gridPaddingPx !== undefined ? CONFIG.gridPaddingPx : 60;
-    var cellSize = CONFIG.sizeTable["TL"] + padding * 2; // TL is largest category (900px)
+    var padding  = mmToPx(CONFIG.gridPaddingMm !== undefined ? CONFIG.gridPaddingMm : 5.08); // DPI-scaled (5.08mm ≈ 60px @300)
+    var cellSize = getTargetPx({ styleCode: "WC", catCode: "TL", sizeHint: null }) + padding * 2; // TL largest
     var canvasW  = doc.width.as("px");
 
     var cols     = Math.floor(canvasW / cellSize);

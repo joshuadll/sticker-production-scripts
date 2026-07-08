@@ -10,29 +10,16 @@
 var CONFIG = {
     suppressAlerts: true,
     logPath:        Folder.desktop.fsName + "/test-psUtils.log",
+    sourceDPI:      300,
+    templateDPI:    300,
+    whiteEdgeMm:            1.7,
+    whiteEdgeSmoothRadiusMm: 1.7,
+    gridPaddingMm:          5.08,
     sizeTable: {
-        "TL": 900,
-        "LM": 615,
-        "MP": 570,
-        "TR": 570,
-        "IC": 495,
-        "FD": 525,
-        "ST": 450
+        "TL": 3.0, "LM": 2.05, "MP": 1.9, "TR": 1.9, "IC": 1.65, "FD": 1.75, "ST": 1.5
     },
-    sizeTableLarge: {
-        "LM": 690,
-        "MP": 600,
-        "TR": 600,
-        "IC": 540,
-        "FD": 600
-    },
-    sizeTableSmall: {
-        "LM": 540,
-        "MP": 540,
-        "TR": 540,
-        "IC": 450,
-        "FD": 450
-    }
+    sizeTableLarge: { "LM": 2.3, "MP": 2.0, "TR": 2.0, "IC": 1.8, "FD": 2.0 },
+    sizeTableSmall: { "LM": 1.8, "MP": 1.8, "TR": 1.8, "IC": 1.5, "FD": 1.5 }
 };
 
 #include "../../../utils/psUtils.jsx"
@@ -154,6 +141,16 @@ assert("unrecognised catCode: null",
 assert("null input: null",
     String(getTargetPx(null)),                                  "null");
 
+// --- DPI scaling (resolution-aware pipeline) ---
+CONFIG.sourceDPI = 600;
+assert("getTargetPx LM @600", getTargetPx(parseLayerName("X [WC-LM]")), 1230);
+assert("getTargetPx TL @600", getTargetPx(parseLayerName("X [WC-TL]")), 1800);
+assert("getTargetPx LM+ @600", getTargetPx(parseLayerName("X [WC-LM+]")), 1380);
+assert("mmToPx whiteEdge @600", mmToPx(CONFIG.whiteEdgeMm), 40);
+CONFIG.sourceDPI = 300;
+assert("getTargetPx LM @300", getTargetPx(parseLayerName("X [WC-LM]")), 615);
+assert("mmToPx whiteEdge @300", mmToPx(CONFIG.whiteEdgeMm), 20);
+
 // ─── needsCaption ─────────────────────────────────────────────────────────────
 
 testLog("[psUtils-test] --- needsCaption ---");
@@ -187,8 +184,12 @@ assert("LM exact: 500->690",  scalePercent(500, 690),  138);
 var summary = "psUtils tests: " + _passed + " passed, " + _failed + " failed.";
 testLog("[psUtils-test] " + summary);
 
-if (_failed > 0) {
-    alert(summary + "\n\nSee log for details:\n" + _logPath);
-} else {
-    alert(summary + "\n\nLog: " + _logPath);
+// Honor suppressAlerts so headless/osascript runs don't hang on a modal (results
+// are already written to the log above).
+if (!CONFIG.suppressAlerts) {
+    if (_failed > 0) {
+        alert(summary + "\n\nSee log for details:\n" + _logPath);
+    } else {
+        alert(summary + "\n\nLog: " + _logPath);
+    }
 }

@@ -1,5 +1,6 @@
 #target illustrator
 #include "../utils/aiUtils.jsx"
+#include "../utils/json2.jsx"
 #include "../illustrator/Step8c_OffsetPathQA.jsx"
 #include "../illustrator/Step9A_Halfcut.jsx"
 #include "../illustrator/Step10_AssetExport.jsx"
@@ -43,8 +44,12 @@ var CONFIG = {
     stickersLayerName:     "Sticker",      // exact (built in code by buildWorkingDocument)
     colorBlockLayerName:   "Color Block",  // exact (built in code by buildWorkingDocument)
     jpegQuality:           8,              // 0-100
-    // ⚠️  pngExportScale: pending artist confirmation — assumed 150 DPI for now.
-    pngExportScale:        150,            // DPI
+    jpegPreviewDpi:        300,            // sheet-preview raster DPI (ExportOptionsJPEG defaults
+                                           // to 72 → pixelated; scale = dpi/72*100 applied in Step 10)
+    // pngExportScale — per-element PNG raster DPI. Set to the HIGHEST source DPI you use:
+    // exporting BELOW the source downsamples (loses detail), exporting above just upsamples
+    // (larger files, no gain). 300 = print standard; bump to 600 for a 600-DPI-source SKU.
+    pngExportScale:        300,            // DPI
 
     // ── Step 11: Final File ───────────────────────────────────────────────────
     finalHalfcutLayerName: "Halfcut/Peeling Tab",  // standardised output name
@@ -58,6 +63,24 @@ var CONFIG = {
 CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
     : Folder.desktop.fsName) + "/AI_ExportFinal.log";
+
+// Reads sourceDPI from {base}_elements.json beside the working .ai. Returns 0 when the
+// sidecar is absent/unreadable/lacks the field (caller falls back to the CONFIG default).
+function _readSourceDpi(doc) {
+    var base;
+    try { base = doc.fullName.fsName.replace(/\.ai$/i, ""); } catch (e) { return 0; }
+    if (!base) return 0;
+    var f = new File(base + "_elements.json");
+    if (!f.exists) return 0;
+    f.encoding = "UTF-8";
+    if (!f.open("r")) return 0;
+    var text = f.read();
+    f.close();
+    if (!text) return 0;
+    var data;
+    try { data = JSON.parse(text); } catch (e) { return 0; }
+    return (data && data.sourceDPI && data.sourceDPI > 0) ? data.sourceDPI : 0;
+}
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
@@ -73,6 +96,16 @@ function main() {
     log("[pipeline] === AI_ExportFinal start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
+
+    // Export PNGs at the source resolution so a 600-DPI SKU stays native/lossless.
+    var srcDpi = _readSourceDpi(doc);
+    if (srcDpi > 0) {
+        CONFIG.pngExportScale = srcDpi;
+        log("[pipeline] per-element PNG export DPI = sourceDPI " + srcDpi + " (from sidecar)");
+    } else {
+        log("[pipeline] WARN | no sourceDPI in sidecar; per-element PNGs at CONFIG default "
+            + CONFIG.pngExportScale + " DPI");
+    }
 
     // Tear down the working-phase spacing aids before any export step runs (Step 10 clips
     // per-element art, Step 11 ships the file): drop the halos, then unwrap the stamp groups

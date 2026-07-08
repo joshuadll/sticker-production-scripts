@@ -12,9 +12,9 @@ Playbook 1 (White Edge + SO) → `photoshop/Step2B_WhiteEdge.jsx` (`runWhiteEdge
 ## Per element (`applyWhiteEdge`)
 
 1. Load the SO's transparency as a selection (no rasterising).
-2. **Expand** by `CONFIG.whiteEdgePx` → the border band.
+2. **Expand** by `mmToPx(CONFIG.whiteEdgeMm)` → the border band.
 3. **Smooth** the band's outer edge with `Select > Modify > Smooth`
-   (`CONFIG.whiteEdgeSmoothRadiusPx`, via `smoothSelection()` in psUtils — the
+   (`mmToPx(CONFIG.whiteEdgeSmoothRadiusMm)`, via `smoothSelection()` in psUtils — the
    Selection DOM has no `smooth()`, so it's driven by Action Manager event
    `Smth`, radius key `Rds ` in pixels). `0` disables smoothing.
 4. Fill a new pixel layer `White Base_Cutline` with white, below the SO.
@@ -41,8 +41,8 @@ construction. This removes the need for the former Illustrator-side RDP pass
 
 | CONFIG (in `PS_BuildElements.jsx`) | Default | Notes |
 |---|---|---|
-| `whiteEdgePx` | 20 | Border width (px). ≈1.7mm at 300 DPI. Step 2A shrinks art by 2×this so finished size hits the category target. |
-| `whiteEdgeSmoothRadiusPx` | 20 | Smooth Sample Radius (px). Landed at 20 on a real watercolor SKU (2026-06-12). ⚠️ Re-tune if cornered elements (stamps/buildings) soften; too large vs `whiteEdgePx` rounds away genuine corners and, acting after the expand, can marginally shift finished bounds at sharp corners. `0` disables. |
+| `whiteEdgeMm` | 1.7 | Border width in **mm** (DPI-relative; = 20px @300 DPI via `mmToPx`). Step 2A shrinks art by 2×this so finished size hits the category target. |
+| `whiteEdgeSmoothRadiusMm` | 1.7 | Smooth Sample Radius in **mm** (= 20px @300 DPI). Landed at 20px on a real watercolor SKU (2026-06-12). ⚠️ Re-tune if cornered elements (stamps/buildings) soften; too large vs `whiteEdgeMm` rounds away genuine corners and, acting after the expand, can marginally shift finished bounds at sharp corners. `0` disables. |
 | `whiteEdgeLayerName` | `White Base_Cutline` | Created band layer name. |
 
 ## Files

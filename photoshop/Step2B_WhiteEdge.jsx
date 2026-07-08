@@ -7,14 +7,14 @@
 //
 // For each top-level SO that matches the element naming convention, the script:
 //   1. Loads the SO's transparency as a selection
-//   2. Expands the selection by CONFIG.whiteEdgePx to form the border
+//   2. Expands the selection by whiteEdgeMm (in px) to form the border
 //   3. Creates a white-filled pixel layer named "White Base_Cutline" below the SO
 //
 // No action file dependency — fully self-contained.
 //
 // CONFIG values used:
-//   whiteEdgePx:             border width in pixels  ⚠️ confirm with artist
-//   whiteEdgeSmoothRadiusPx: Select>Modify>Smooth radius applied to the band's
+//   whiteEdgeMm:             border width in millimetres  ⚠️ confirm with artist
+//   whiteEdgeSmoothRadiusMm: Select>Modify>Smooth radius (mm) applied to the band's
 //                            outer edge before fill, so the traced cutline is
 //                            clean (0 → skip smoothing)  ⚠️ tune with artist
 //   whiteEdgeLayerName:      "White Base_Cutline"    — name of the created layer
@@ -25,7 +25,7 @@ function runWhiteEdge(doc) {
     var processed = 0;
     var skipped   = [];
 
-    log("[step2B] smooth radius | " + CONFIG.whiteEdgeSmoothRadiusPx + "px");
+    log("[step2B] smooth radius | " + mmToPx(CONFIG.whiteEdgeSmoothRadiusMm) + "px");
 
     var origUnits = app.preferences.rulerUnits;
     app.preferences.rulerUnits = Units.PIXELS;
@@ -79,7 +79,7 @@ function runWhiteEdge(doc) {
 
 // Creates a white-filled border layer below soLayer by:
 //   1. Loading the SO's transparency as a selection
-//   2. Expanding by CONFIG.whiteEdgePx to form the border
+//   2. Expanding by whiteEdgeMm (in px) to form the border
 //   3. Filling a new layer with white
 //   4. Moving it to just below the SO
 //
@@ -103,14 +103,14 @@ function applyWhiteEdge(doc, soLayer) {
     loadLayerTransparency(soLayer);
 
     // Expand to create border width.
-    doc.selection.expand(CONFIG.whiteEdgePx);
+    doc.selection.expand(mmToPx(CONFIG.whiteEdgeMm));
 
     // Smooth the expanded band's outer edge (Select > Modify > Smooth) BEFORE
     // filling. This is the contour Step 5 silhouettes and Step 6 traces, so a
     // clean band here yields clean cutlines without any Illustrator-side RDP
     // (former Step 8a). The printed white edge and the cutline both derive from
     // this one smoothed raster, so they stay consistent. radius 0 → no-op.
-    smoothSelection(CONFIG.whiteEdgeSmoothRadiusPx);
+    smoothSelection(mmToPx(CONFIG.whiteEdgeSmoothRadiusMm));
 
     // Harden the smoothed band to a CRISP 1-bit edge before filling. smooth (and the
     // SO's own anti-aliasing) leave a soft fringe; the caption seat (Step3B) reads its

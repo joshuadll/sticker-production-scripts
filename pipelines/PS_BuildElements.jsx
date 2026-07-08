@@ -16,7 +16,8 @@ var CONFIG = {
 
     templateWidthCm:  42,
     templateHeightCm: 59.4,
-    templateDPI:      300,
+    templateDPI:      300,   // fallback when no source resolution can be detected
+    sourceDPI:        0,     // resolved at runtime from the source PSDs / adopted doc
 
     // For automated testing only — leave empty ("") for normal interactive use.
     // When set, skips the folder-picker dialog.
@@ -34,58 +35,34 @@ var CONFIG = {
 
     logPath: "", // resolved below — same folder as this script
 
-    // Pixel targets at 300 DPI (longest edge) — midpoints for range categories.
-    // These are the FINISHED element size (art + white edge). Step 2A resizes the
-    // art smaller by 2×whiteEdgePx so that after Step 2B adds the edge, the element
-    // measures to the target. Append + to the category code in the layer name for
-    // the large end, - for the small end: e.g. "Eiffel Tower [WC-LM+]", "Small Snack [WC-FD-]"
+    // FINISHED element size in INCHES (art + white edge). getTargetPx multiplies by
+    // the working resolution, so these hold at any DPI. Append + / - to the category
+    // code for the large / small end (e.g. "Eiffel Tower [WC-LM+]").
     sizeTable: {
-        "TL": 900,  // Location names              3 in     (fixed)
-        "LM": 615,  // Landmarks & attractions     2.05 in  (midpoint 1.8–2.3)
-        "MP": 570,  // Maps / station signs        1.9 in   (midpoint 1.8–2)
-        "TR": 570,  // Transportation              1.9 in   (midpoint 1.8–2)
-        "IC": 495,  // Cultural symbols & icons    1.65 in  (midpoint 1.5–1.8)
-        "FD": 525,  // Food & local cuisine        1.75 in  (midpoint 1.5–2)
-        "ST": 450   // Stamps                      1.5 in   (fixed)
+        "TL": 3.0,  "LM": 2.05, "MP": 1.9, "TR": 1.9, "IC": 1.65, "FD": 1.75, "ST": 1.5
     },
-
-    // Large-end targets — used when category code has + suffix.
-    sizeTableLarge: {
-        "LM": 690,  // 2.3 in
-        "MP": 600,  // 2.0 in
-        "TR": 600,  // 2.0 in
-        "IC": 540,  // 1.8 in
-        "FD": 600   // 2.0 in
-    },
-
-    // Small-end targets — used when category code has - suffix.
-    sizeTableSmall: {
-        "LM": 540,  // 1.8 in
-        "MP": 540,  // 1.8 in
-        "TR": 540,  // 1.8 in
-        "IC": 450,  // 1.5 in
-        "FD": 450   // 1.5 in
-    },
+    sizeTableLarge: { "LM": 2.3, "MP": 2.0, "TR": 2.0, "IC": 1.8, "FD": 2.0 },
+    sizeTableSmall: { "LM": 1.8, "MP": 1.8, "TR": 1.8, "IC": 1.5, "FD": 1.5 },
 
     // ── Step 2A: Grid layout (after resize) ───────────────────────────────────
-    // Padding on each side of a grid cell, in pixels.
-    // Cell size = largest category (TL = 900px) + 2 × gridPaddingPx.
-    gridPaddingPx: 60,
+    // Padding on each side of a grid cell, in millimetres.
+    // Cell size = largest category (TL) + 2 × gridPaddingMm.
+    gridPaddingMm:            5.08,  // review-grid cell padding (= 60px @300 DPI)
 
     // ── Step 3: White edge ────────────────────────────────────────────────────
-    // Default 20px (≈ 1.7mm at 300 DPI) confirmed by artist as the majority case.
+    // Default width confirmed by artist as the majority case, in millimetres.
     // To adjust a single element: delete its White Base_Cutline layer, change this
     // value, re-run — the re-run guard skips all elements that still have their layer.
-    whiteEdgePx:        20,
+    whiteEdgeMm:             1.7,    // white border width (= 20px @300 DPI)
     // Select>Modify>Smooth radius applied to the white-edge band's outer edge
     // (Step 2B, after expand, before fill). This is the contour Step 5
     // silhouettes and Step 6 traces, so smoothing it here yields clean cutlines
     // without an Illustrator-side RDP pass. ⚠️ Tune with artist on a real SKU:
-    // too large relative to whiteEdgePx (20) rounds away genuine corners, and
+    // too large relative to whiteEdgeMm rounds away genuine corners, and
     // because it acts after the expand it can marginally shift finished bounds
-    // at sharp corners (relevant to Step 2A's 2×whiteEdgePx size compensation).
-    // 0 disables smoothing. Landed at 20 on a real watercolor SKU (2026-06-12).
-    whiteEdgeSmoothRadiusPx: 20,
+    // at sharp corners (relevant to Step 2A's 2×whiteEdgeMm size compensation).
+    // 0 disables smoothing. Landed at 1.7mm on a real watercolor SKU (2026-06-12).
+    whiteEdgeSmoothRadiusMm: 1.7,    // Smooth radius on the band (= 20px @300 DPI)
     whiteEdgeLayerName: "White Base_Cutline", // name given to the created layer
 
     // Captions are NO LONGER authored in Photoshop — they are placed + built natively in
@@ -102,13 +79,13 @@ CONFIG.aiPipelinePath = _root + "/pipelines/AI_BuildCutlines.jsx";
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-function createTemplateDoc() {
+function createTemplateDoc(dpi) {
     var w = new UnitValue(CONFIG.templateWidthCm, "cm");
     var h = new UnitValue(CONFIG.templateHeightCm, "cm");
     // RGB (sRGB) — source art is RGB and the target is an RGB inkjet with a custom ICC
     // profile applied at print time. A CMYK template would clip the art's gamut before
     // it ever reaches Illustrator; keeping RGB preserves full saturation end-to-end.
-    var doc = app.documents.add(w, h, CONFIG.templateDPI, "Production Template",
+    var doc = app.documents.add(w, h, dpi, "Production Template",
         NewDocumentMode.RGB, DocumentFill.WHITE);
 
     // Fill Background with 50% gray so white edges are visible during review.
@@ -126,8 +103,48 @@ function createTemplateDoc() {
 
     log("[pipeline] created new template document ("
         + CONFIG.templateWidthCm + " x " + CONFIG.templateHeightCm + " cm, "
-        + CONFIG.templateDPI + " DPI).");
+        + dpi + " DPI).");
     return doc;
+}
+
+// Scans the source folder's ELEMENT PSDs and returns the HIGHEST resolution found (DPI),
+// warning on any mismatch. Returns 0 when no PSD is readable (caller falls back to
+// templateDPI). Opens + closes each file read-only.
+// Caption_Plate.psd is EXCLUDED: it's a separately-supplied caption backing asset (Step 1
+// imports it by name), not element art, so its resolution must not drive element sizing.
+function detectSourceDpi(folder) {
+    var allFiles = folder.getFiles("*.psd"), files = [], fi;
+    for (fi = 0; fi < allFiles.length; fi++) {
+        if (String(allFiles[fi].name).toLowerCase() === "caption_plate.psd") continue;
+        files.push(allFiles[fi]);
+    }
+    if (files.length === 0) return 0;
+    var maxDpi = 0, seen = [], i, d, r;
+    for (i = 0; i < files.length; i++) {
+        d = null;
+        try {
+            d = app.open(files[i]);
+            r = Math.round(d.resolution);
+        } catch (e) {
+            log("[pipeline] WARN | could not read resolution of " + files[i].name + ": " + e.message);
+            if (d) { try { d.close(SaveOptions.DONOTSAVECHANGES); } catch (eC) {} }  // don't leak an open doc
+            continue;
+        }
+        try { d.close(SaveOptions.DONOTSAVECHANGES); } catch (eC2) {}
+        seen.push(files[i].name + "=" + r + "dpi");
+        if (r > maxDpi) maxDpi = r;
+    }
+    // Warn on any mismatch (warn-on-all); the highest wins.
+    var mixed = false, j;
+    for (j = 0; j < seen.length; j++) {
+        if (seen[j].indexOf("=" + maxDpi + "dpi") === -1) { mixed = true; break; }
+    }
+    if (mixed) {
+        log("[pipeline] WARN | source PSDs have mixed resolutions, using highest ("
+            + maxDpi + " DPI): " + seen.join(", "));
+    }
+    log("[pipeline] detected source DPI: " + maxDpi + " (from " + seen.length + " readable PSD(s) of " + files.length + ")");
+    return maxDpi;
 }
 
 // Builds the "N element(s) NOT imported" warning block for the completion alert
@@ -206,26 +223,11 @@ function handOffToIllustrator(doc) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 function main() {
-    // ── Get or create template document ───────────────────────────
-    var doc;
-    if (app.documents.length > 0 && isValidTemplate(app.activeDocument)) {
-        doc = app.activeDocument;
-    } else {
-        doc = createTemplateDoc();
-    }
-
     // ── Init log ───────────────────────────────────────────────────
     log("[pipeline] === PS_BuildElements start ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
-    log("[pipeline] template: " + doc.name);
 
-    if (doc.resolution !== CONFIG.templateDPI) {
-        log("[pipeline] WARN: resolution is " + doc.resolution
-            + " DPI, expected " + CONFIG.templateDPI
-            + ". Pixel targets may be inaccurate.");
-    }
-
-    // ── Resolve source folder ──────────────────────────────────────
+    // ── Resolve source folder (needed to detect source DPI) ────────
     var folder;
     if (CONFIG.sourceFolderPath) {
         folder = new Folder(CONFIG.sourceFolderPath);
@@ -239,6 +241,59 @@ function main() {
         if (!folder) { log("[pipeline] cancelled."); return; }
     }
     log("[pipeline] source folder: " + folder.name);
+
+    // ── Config sanity: size tables are in INCHES ───────────────────
+    // A stale px-scale value (e.g. 570 instead of 1.9) would compute a 300x target silently.
+    // Fail loudly — no real sticker is > 20 inches on its longest edge.
+    var _tbls = [CONFIG.sizeTable, CONFIG.sizeTableLarge, CONFIG.sizeTableSmall], _ti, _k;
+    for (_ti = 0; _ti < _tbls.length; _ti++) {
+        for (_k in _tbls[_ti]) {
+            if (_tbls[_ti].hasOwnProperty(_k) && _tbls[_ti][_k] > 20) {
+                scriptAlert("Config error: size table value \"" + _k + "\" = " + _tbls[_ti][_k]
+                    + " looks like PIXELS, not inches.\nThe size tables must be in INCHES"
+                    + " (e.g. LM = 2.05). Fix CONFIG and re-run.");
+                return;
+            }
+        }
+    }
+
+    // ── Determine working resolution + document ────────────────────
+    // Adopted doc's own resolution wins; otherwise the highest source-PSD resolution.
+    var doc;
+    if (app.documents.length > 0 && isValidTemplate(app.activeDocument)) {
+        doc = app.activeDocument;
+        CONFIG.sourceDPI = Math.round(doc.resolution) || CONFIG.templateDPI;
+        log("[pipeline] adopted open template | resolution " + CONFIG.sourceDPI + " DPI");
+        // Cross-check the adopted doc against the actual source PSDs: if the sources are a
+        // DIFFERENT resolution, the adopted doc's DPI silently governs sizing (higher-res
+        // source art gets downsampled). Warn/alert instead of silently defeating the feature.
+        var adoptedSrc = detectSourceDpi(folder);
+        if (adoptedSrc > 0 && adoptedSrc !== CONFIG.sourceDPI) {
+            var mm = "Open template is " + CONFIG.sourceDPI + " DPI but the source PSDs are "
+                + adoptedSrc + " DPI";
+            log("[pipeline] WARN | " + mm + " — the template's DPI governs sizing.");
+            if (adoptedSrc > CONFIG.sourceDPI) {
+                scriptAlert("⚠️ Resolution mismatch\n\n" + mm
+                    + ".\n\nThe higher-resolution source art will be DOWNSAMPLED to the "
+                    + "template's DPI.\nClose the open template and re-run to author at the "
+                    + "source resolution,\nor continue if the template DPI is intended.");
+            }
+        }
+    } else {
+        var detected = detectSourceDpi(folder);
+        if (detected === 0) {
+            log("[pipeline] WARN | could not detect source resolution; falling back to "
+                + CONFIG.templateDPI + " DPI.");
+            scriptAlert("⚠️ Couldn't read the source PSD resolution\n\n"
+                + "Falling back to " + CONFIG.templateDPI + " DPI. If your source art is a "
+                + "different resolution,\nthe exported element sizes may be wrong.\n\n"
+                + "Check the source folder is accessible (not iCloud-offline) and that the "
+                + "PSDs open cleanly, then re-run.");
+        }
+        CONFIG.sourceDPI = detected || CONFIG.templateDPI;
+        doc = createTemplateDoc(CONFIG.sourceDPI);
+    }
+    log("[pipeline] template: " + doc.name + " | working DPI " + CONFIG.sourceDPI);
 
     // ── Dry run: inspect only, no changes ─────────────────────────
     if (CONFIG.dryRun) {
