@@ -245,6 +245,7 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
         _s10AddCaptionMembers(grp, entry.cutline, tmpLayer);   // native caption (text+pill+plate), in front of art
         cutDupe.moveToBeginning(grp);   // re-assert the mask at pageItems[0]
         _s10ClipGroup(doc, grp);
+        _s10RotateUpright(doc, grp, entry);   // upright for export (per-element PNG only)
     } else {
         // Stamp: no vector clipping path available. Use a white-filled bounding
         // rectangle as backing — the stamp artwork defines its own visible extent.
@@ -262,7 +263,14 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
 
     var pngOpts       = new ExportOptionsPNG24();
     pngOpts.transparency = true;
-    pngOpts.resolution   = CONFIG.pngExportScale;
+    // ExportOptionsPNG24 has NO honored `resolution` property — like ExportOptionsJPEG it
+    // scales by percent of 72 DPI via horizontal/verticalScale. Setting `.resolution` is a
+    // silent no-op → the PNG exported at 72 DPI (~4x too few px, pixelated). Drive the scale
+    // from CONFIG.pngExportScale (the target DPI = sourceDPI, fallback 300) the same way the
+    // JPEG sheet preview does, so a 2.3in element lands at 2.3*DPI px instead of 2.3*72.
+    var _pngScale = (CONFIG.pngExportScale / 72) * 100;
+    pngOpts.horizontalScale = _pngScale;
+    pngOpts.verticalScale   = _pngScale;
     pngOpts.antiAliasing = true;
     var safeName = entry.displayName.replace(/[\/\\:*?"<>|]/g, "_");
     doc.exportFile(
@@ -310,15 +318,19 @@ function _s10FirstClipPath(item) {
     return null;
 }
 
-// Duplicates a native caption's VISIBLE printed members (decorative plate raster, white pill,
-// text) from the element's cutline group into the temp clip group `grp`, placing each at the
-// FRONT so the final stack is text > pill > plate > art > white-backing. The caller re-asserts
-// the clip mask at pageItems[0] afterward. The caption lives inside the cut boundary, so it is
-// clipped cleanly with the rest. No-op for stamps (PlacedItem cutline) / missing members.
+// Duplicates a native element's VISIBLE printed members from its cutline group into the temp
+// clip group `grp`, placing each at the FRONT so the final stack is text > pill > plate > art >
+// white-backing. Covers BOTH captioned elements (decorative plate raster, white pill, text) AND
+// default-tab/uncaptioned elements, whose printed "PEEL HERE"/semi-circle decoration is the
+// separate " tab fill" ride-along member (the " plate" member there is the hidden tab cutline, so
+// it is skipped by the !hidden guard). Without " tab fill" the tab art vanished from the export.
+// The caller re-asserts the clip mask at pageItems[0] afterward. These members live inside the
+// cut boundary, so they clip cleanly with the rest. No-op for stamps (PlacedItem cutline) /
+// missing members.
 function _s10AddCaptionMembers(grp, cutlineItem, tmpLayer) {
     if (!cutlineItem || cutlineItem.typename !== "GroupItem") return;
-    // Back-to-front insertion (each moved to the front): plate, then pill, then text.
-    var order = [" caption plate", " plate", " caption text"];
+    // Back-to-front insertion (each moved to the front): plate, pill, tab fill, then text.
+    var order = [" caption plate", " plate", " tab fill", " caption text"];
     var k, member, dup;
     for (k = 0; k < order.length; k++) {
         member = findGroupMember(cutlineItem, order[k]);
@@ -327,6 +339,46 @@ function _s10AddCaptionMembers(grp, cutlineItem, tmpLayer) {
             dup.move(grp, ElementPlacement.PLACEATBEGINNING);
         }
     }
+}
+
+// Rotates the temp clip group `grp` to the element's upright design orientation before
+// the per-element PNG export: the caption reference (the " plate" member) is laid
+// horizontal and below the art — the Step-6 orientation, regardless of nesting or the
+// artist's manual rotation. The " plate" member covers GC/WC captions AND default-tab/ST
+// elements: assembleElementGroup names a default tab's cutline "<name> plate" too (the
+// bare " tab cutline" name is transient and never survives assembly), so " plate" is the
+// single reference for every element type; " tab cutline" is a defensive no-op fallback.
+// Angle comes from the reference GEOMETRY on the live cutline (matrix-independent, so it
+// dodges the embed() sign-flip and reflects manual rotation). Falls back to the u<deg>
+// note stamp, then to a no-op + WARN. The sheet JPEG previews do NOT call this — they
+// must keep the nested layout.
+function _s10RotateUpright(doc, grp, entry) {
+    var cut = entry.cutline, theta = null;
+    if (cut && cut.typename === "GroupItem") {
+        var ref = findGroupMember(cut, " plate");        // GC/WC pill AND ST/default-tab cutline
+        if (!ref) ref = findGroupMember(cut, " tab cutline");   // defensive; not on assembled groups
+        var art = findGroupMember(cut, " outline");
+        if (ref) theta = _uprightRotationDeg(_pathAnchors(ref), art ? _pathAnchors(art) : null);
+    }
+    if (theta === null && cut) {
+        var u = noteReadRotStamp(cut.note);     // nest-time deviation; last resort
+        if (u !== null) theta = -u;
+    }
+    if (theta === null) {
+        log("[step10] WARN | no upright reference for '" + entry.displayName
+            + "' — exported in nest orientation");
+        return;
+    }
+    theta = _aiNormalizeDeg(theta);
+    if (Math.abs(theta) < 0.05) {
+        log("[step10] upright | " + entry.displayName + " | already upright");
+        return;
+    }
+    var gb = grp.geometricBounds;               // [left, top, right, bottom]
+    var cx = (gb[0] + gb[2]) / 2, cy = (gb[1] + gb[3]) / 2;
+    grp.transform(pivotRotationMatrix(theta, cx, cy),
+        true, true, true, true, 1, Transformation.DOCUMENTORIGIN);
+    log("[step10] upright | " + entry.displayName + " | rotated " + Math.round(theta) + "°");
 }
 
 // Recursively applies white fill and removes stroke on all path items within item.
