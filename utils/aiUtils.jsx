@@ -306,6 +306,28 @@ function copyLogBeside(folderFsName, niceName) {
     } catch (e) { return CONFIG.logPath; }
 }
 
+// Resolves and creates the organized export tree beside the working file:
+//   {baseFolder}/{stkCode}_export/
+//     ├── {stkCode}_final.ai         (root)
+//     ├── previews/                  (the two sheet JPEGs)
+//     └── elements/                  (per-element PNGs)
+// So the deliverables no longer mix with the working .ai + sidecars in one flat dir.
+// Returns { root, previews, elements } as fsName strings. Idempotent — Folder.create
+// no-ops on an existing dir, so re-running the export pipeline just reuses the tree.
+function ensureExportFolders(baseFolder, stkCode) {
+    function ensure(path) {
+        var f = new Folder(path);
+        if (!f.exists) f.create();
+        return f.fsName;
+    }
+    var root = ensure(baseFolder + "/" + stkCode + "_export");
+    return {
+        root:     root,
+        previews: ensure(root + "/previews"),
+        elements: ensure(root + "/elements")
+    };
+}
+
 // Per-phase wall-timer for profiling slow runs. `lap()` returns the ms elapsed
 // since the last lap (or since creation) and resets, so a phase is timed with one
 // call: `var t = _newPhaseTimer(); … phaseA(); var msA = t.lap(); phaseB(); …`.

@@ -1,9 +1,11 @@
 // Step10_AssetExport.jsx — Phase function only.
 // #included by AI_ExportFinal.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
-// Exports JPEG sheet previews (white + green BG) and per-element PNGs.
-// Temporary clip groups are built per-export and immediately discarded —
-// no persistent layer is left in the working file.
+// Exports JPEG sheet previews (white + green BG) and per-element PNGs into the
+// organized export tree beside the working file: {stkCode}_export/previews/ for the
+// two sheet JPEGs and {stkCode}_export/elements/ for the per-element PNGs (Step 11
+// drops {stkCode}_final.ai at the export root). Temporary clip groups are built
+// per-export and immediately discarded — no persistent layer is left in the working file.
 //
 // GC/WC elements: clipped to fused cutline.
 // ST/unnamed elements: clipped to cutline.
@@ -39,6 +41,9 @@ function runAssetExport(doc) {
     try { removeAllSpacingBuffers(doc); unwrapStampGroups(doc); } catch (eBuf) {}
 
     var stkCode  = doc.name.replace(/\.[^.]+$/, "").split(" ")[0];
+    // Organized export tree beside the working file: {stkCode}_export/{previews,elements}.
+    var folders  = ensureExportFolders(outFolder, stkCode);
+    log("[step10] export folder | " + folders.root);
     var built    = _s10BuildClipData(stickersLayer, cutlinesLayer);
     var clipData = built.clipData;
     var flags    = built.flags;
@@ -46,12 +51,12 @@ function runAssetExport(doc) {
     log("[step10] " + clipData.length + " element(s) to export; "
         + flags.length + " unmatched.");
 
-    _s10ExportJpegs(doc, clipData, outFolder, stkCode);
+    _s10ExportJpegs(doc, clipData, folders.previews, stkCode);
 
     var pngCount = 0, i;
     for (i = 0; i < clipData.length; i++) {
         try {
-            _s10ExportElementPng(doc, clipData[i], outFolder, stkCode);
+            _s10ExportElementPng(doc, clipData[i], folders.elements, stkCode);
             pngCount++;
             log("[step10] PNG | " + clipData[i].displayName);
         } catch (e) {

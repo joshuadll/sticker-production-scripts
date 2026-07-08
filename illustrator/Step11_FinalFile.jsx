@@ -1,8 +1,9 @@
 // Step11_FinalFile.jsx — Phase function only.
 // #included by AI_ExportFinal.jsx. Requires: aiUtils.jsx, CONFIG in scope.
 //
-// Saves the working .ai file as {STK_CODE}_final.ai (sibling on disk), then
-// strips all non-production layers and standardises the halfcut layer name.
+// Saves the working .ai file as {STK_CODE}_export/{STK_CODE}_final.ai (in the
+// organized export tree beside the working file), then strips all non-production
+// layers and standardises the halfcut layer name.
 //
 // The working file is untouched on disk — saveAs creates a new file and all
 // layer edits apply only to the final copy.
@@ -23,7 +24,10 @@ function runFinalFile(doc) {
     }
 
     var stkCode   = doc.name.replace(/\.[^.]+$/, "").split(" ")[0];
-    var finalFile = new File(parentFolder + "/" + stkCode + "_final.ai");
+    // Ship the final file into the organized export tree (same {stkCode}_export/ root as
+    // Step 10's previews/elements), not flat beside the working .ai.
+    var exportRoot = ensureExportFolders(parentFolder, stkCode).root;
+    var finalFile  = new File(exportRoot + "/" + stkCode + "_final.ai");
 
     log("[step11] saving final file: " + finalFile.fsName);
     // Ship a SELF-CONTAINED final file: embed every linked asset so {STK}_final.ai survives

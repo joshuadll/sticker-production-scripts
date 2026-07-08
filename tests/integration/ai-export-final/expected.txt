@@ -96,6 +96,7 @@
 [step9a] done | placed=26 flagged=0
 [pipeline] step 9a complete | 26 half-cut(s) placed.
 [pipeline] --- Step 10: Asset Export ---
+[step10] export folder | <out>/ai-export-final-fixture_export
 [step10] 26 element(s) to export; 0 unmatched.
 [step10] building temp clip groups for JPEG...
 [step10] JPEG white saved.
@@ -156,19 +157,19 @@
 [step10] done | pngCount=26 flags=0
 [pipeline] step 10 complete | 26 PNG(s) exported.
 [pipeline] --- Step 11: Final File ---
-[step11] saving final file: <out>/ai-export-final-fixture_final.ai
+[step11] saving final file: <out>/ai-export-final-fixture_export/ai-export-final-fixture_final.ai
 [step11] halfcut layer → "Halfcut/Peeling Tab"
 [step11] removing layer: Color Block
 [step11] removing layer: Grid
 [step11] removing layer: Margin
 [step11] removing layer: Layout QA
 [step11] WARN | expected 3 layers in final file, found 4 — check final file manually.
-[step11] done | <out>/ai-export-final-fixture_final.ai | layers=4
-[pipeline] step 11 complete | <out>/ai-export-final-fixture_final.ai
+[step11] done | <out>/ai-export-final-fixture_export/ai-export-final-fixture_final.ai | layers=4
+[pipeline] step 11 complete | <out>/ai-export-final-fixture_export/ai-export-final-fixture_final.ai
 [pipeline] === AI_ExportFinal done ===
 ✅ Final file ready.
 
   26 path(s) checked · 26 half-cut(s) · 26 PNG(s) exported.
-  Final file: <out>/ai-export-final-fixture_final.ai
+  Final file: <out>/ai-export-final-fixture_export/ai-export-final-fixture_final.ai
   WARNING: final file has 4 layer(s) — expected 3. Check manually.
 
