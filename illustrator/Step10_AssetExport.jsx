@@ -192,6 +192,11 @@ function _s10ExportJpegs(doc, clipData, outFolder, stkCode) {
     var opts          = new ExportOptionsJPEG();
     opts.qualitySetting = CONFIG.jpegQuality;
     opts.antiAliasing = true;
+    // ExportOptionsJPEG scale is a % of 72 DPI; unset → 72 DPI → pixelated sheet preview.
+    // Drive it from CONFIG.jpegPreviewDpi (fallback 300) so previews render at print-ish density.
+    var _previewScale = ((CONFIG.jpegPreviewDpi || 300) / 72) * 100;
+    opts.horizontalScale = _previewScale;
+    opts.verticalScale   = _previewScale;
 
     doc.exportFile(new File(outFolder + "/" + stkCode + "_preview_white.jpg"),
                    ExportType.JPEG, opts);
