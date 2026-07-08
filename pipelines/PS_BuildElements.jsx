@@ -135,7 +135,7 @@ function detectSourceDpi(folder) {
         log("[pipeline] WARN | source PSDs have mixed resolutions, using highest ("
             + maxDpi + " DPI): " + seen.join(", "));
     }
-    log("[pipeline] detected source DPI: " + maxDpi + " (from " + seen.length + " PSD(s))");
+    log("[pipeline] detected source DPI: " + maxDpi + " (from " + seen.length + " readable PSD(s) of " + files.length + ")");
     return maxDpi;
 }
 

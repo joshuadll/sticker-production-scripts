@@ -55,9 +55,11 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     // The one number art sizing needs. The pipeline guarantees a valid sidecar (it
     // halts otherwise), so this is always > 0.
     var artFactor = _nestArtFactor(elementsData);
+    var _srcDpi = (elementsData.sourceDPI && elementsData.sourceDPI > 0)
+        ? elementsData.sourceDPI : CONFIG.sourceDPI;
     log("[step-nest] art sizing: factor=" + artFactor.toFixed(5)
         + " pt/px (psdWidth=" + elementsData.psdWidth
-        + ", sourceDPI=" + CONFIG.sourceDPI + ")");
+        + ", sourceDPI=" + _srcDpi + ")");
 
     var stickersLayer = findLayer(doc, CONFIG.stickersLayerName);
     if (!stickersLayer) {
