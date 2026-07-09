@@ -332,8 +332,9 @@ function main() {
     // survivors. Triggers on runCombine's recorded failures (folder / duplicate name /
     // invalid name). The rarer placement-time SKIP stays log-only by design.
     if (combineResult.notImported.length > 0) {
+        doc.activeHistoryState = snapshotA;   // revert the partial combine (clear + placements)
         log("[pipeline] HALT | " + combineResult.notImported.length
-            + " element(s) failed to import — stopping before Step 2.");
+            + " element(s) failed to import — stopping before Step 2 (rolled back to pre-combine state).");
         scriptAlert(notImportedWarning(combineResult.notImported)
             + "Pipeline stopped — nothing was handed to Illustrator.\n"
             + "Fix the source PSD and re-run Pipeline 1.");
