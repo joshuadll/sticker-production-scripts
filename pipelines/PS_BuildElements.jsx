@@ -326,6 +326,20 @@ function main() {
     log("[pipeline] step 1 complete | " + combineResult.placed + " element(s) from "
         + combineResult.fileCount + " file(s).");
 
+    // ── HARD STOP: any failed import aborts before Step 2 ──────────
+    // A partial set is useless — the artist must fix the source PSD and re-run the whole
+    // pipeline anyway, so there is no value in resizing / building / handing off the
+    // survivors. Triggers on runCombine's recorded failures (folder / duplicate name /
+    // invalid name). The rarer placement-time SKIP stays log-only by design.
+    if (combineResult.notImported.length > 0) {
+        log("[pipeline] HALT | " + combineResult.notImported.length
+            + " element(s) failed to import — stopping before Step 2.");
+        scriptAlert(notImportedWarning(combineResult.notImported)
+            + "Pipeline stopped — nothing was handed to Illustrator.\n"
+            + "Fix the source PSD and re-run Pipeline 1.");
+        return;
+    }
+
     // ── Step 2: Resize ─────────────────────────────────────────────
     log("[pipeline] --- Step 2: Resize ---");
     var snapshotB = doc.activeHistoryState;
@@ -443,9 +457,6 @@ function main() {
         msg += "\n\n⚠️ Couldn't group " + groupResult.skipped.length + " element(s):";
         for (var c = 0; c < groupResult.skipped.length; c++) msg += "\n   • " + groupResult.skipped[c];
     }
-
-    // Failed imports go at the TOP — most important, and the artist must fix + re-run.
-    msg = notImportedWarning(combineResult.notImported) + msg;
 
     scriptAlert(msg);
 }
