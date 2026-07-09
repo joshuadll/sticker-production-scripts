@@ -326,6 +326,21 @@ function main() {
     log("[pipeline] step 1 complete | " + combineResult.placed + " element(s) from "
         + combineResult.fileCount + " file(s).");
 
+    // ── HARD STOP: any failed import aborts before Step 2 ──────────
+    // A partial set is useless — the artist must fix the source PSD and re-run the whole
+    // pipeline anyway, so there is no value in resizing / building / handing off the
+    // survivors. Triggers on runCombine's recorded failures (folder / duplicate name /
+    // invalid name). The rarer placement-time SKIP stays log-only by design.
+    if (combineResult.notImported.length > 0) {
+        doc.activeHistoryState = snapshotA;   // revert the partial combine (clear + placements)
+        log("[pipeline] HALT | " + combineResult.notImported.length
+            + " element(s) failed to import — stopping before Step 2 (rolled back to pre-combine state).");
+        scriptAlert(notImportedWarning(combineResult.notImported)
+            + "Pipeline stopped — nothing was handed to Illustrator.\n"
+            + "Fix the source PSD and re-run Pipeline 1.");
+        return;
+    }
+
     // ── Step 2: Resize ─────────────────────────────────────────────
     log("[pipeline] --- Step 2: Resize ---");
     var snapshotB = doc.activeHistoryState;
@@ -424,7 +439,10 @@ function main() {
     if (aiStatus && aiStatus.ok) {
         msg = "✅ Elements built + cut traced.\n\n  " + summary + "\n\n"
             + "Illustrator has traced the cut and placed native caption text.\n"
-            + "Review/reshape the captions in Illustrator, then run Pipeline 2 (Build and Export Cutlines).";
+            + "Review/reshape the captions in Illustrator, then run Pipeline 2 (Build and Export Cutlines)."
+            + (savedPath
+                ? "\n\nPhotoshop will now close — continue in Illustrator."
+                : "\n\n⚠️ Auto-save failed — save this file manually. Photoshop will stay open.");
     } else if (aiStatus && aiStatus.error) {
         var errLog = aiStatus.errorLog || copyLogBeside(folder.fsName, "Noteworthie_ERROR.log");
         msg = "❌ Couldn't finish tracing the cut in Illustrator.\n\n"
@@ -444,10 +462,25 @@ function main() {
         for (var c = 0; c < groupResult.skipped.length; c++) msg += "\n   • " + groupResult.skipped[c];
     }
 
-    // Failed imports go at the TOP — most important, and the artist must fix + re-run.
-    msg = notImportedWarning(combineResult.notImported) + msg;
-
     scriptAlert(msg);
+
+    // ── Work has moved to Illustrator — quit Photoshop ─────────────
+    // Only when the working PSD was actually persisted this run (savedPath — its save is
+    // WARN-only, so a failed save must NOT trigger a discard-and-quit), the handoff
+    // EXPLICITLY succeeded (aiStatus.ok), the run is interactive (suppressAlerts false —
+    // tests/headless never quit the app they drive), and it is not a dry run. A
+    // null/timeout/error handoff, or an unsaved doc, leaves PS open so the artist can save /
+    // retry. Because the PSD is saved, closing it DONOTSAVECHANGES discards only the
+    // transient dirtiness from the PNG/silhouette exports.
+    if (savedPath && !CONFIG.dryRun && !CONFIG.suppressAlerts && aiStatus && aiStatus.ok) {
+        log("[pipeline] handoff confirmed OK — closing Photoshop.");
+        try { doc.close(SaveOptions.DONOTSAVECHANGES); } catch (eClose) {
+            log("[pipeline] WARN | could not close working doc: " + eClose.message);
+        }
+        try { app.quit(); } catch (eQuit) {
+            log("[pipeline] WARN | app.quit() failed: " + eQuit.message);
+        }
+    }
 }
 
 // Dispatch: artist double-click runs main(). A test sets $.global.__psBuildElementsNoAuto = true
