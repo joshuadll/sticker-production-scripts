@@ -438,8 +438,10 @@ function main() {
     if (aiStatus && aiStatus.ok) {
         msg = "✅ Elements built + cut traced.\n\n  " + summary + "\n\n"
             + "Illustrator has traced the cut and placed native caption text.\n"
-            + "Review/reshape the captions in Illustrator, then run Pipeline 2 (Build and Export Cutlines).\n\n"
-            + "Photoshop will now close — continue in Illustrator.";
+            + "Review/reshape the captions in Illustrator, then run Pipeline 2 (Build and Export Cutlines)."
+            + (savedPath
+                ? "\n\nPhotoshop will now close — continue in Illustrator."
+                : "\n\n⚠️ Auto-save failed — save this file manually. Photoshop will stay open.");
     } else if (aiStatus && aiStatus.error) {
         var errLog = aiStatus.errorLog || copyLogBeside(folder.fsName, "Noteworthie_ERROR.log");
         msg = "❌ Couldn't finish tracing the cut in Illustrator.\n\n"
@@ -462,12 +464,14 @@ function main() {
     scriptAlert(msg);
 
     // ── Work has moved to Illustrator — quit Photoshop ─────────────
-    // Only when the handoff EXPLICITLY succeeded (aiStatus.ok), the run is interactive
-    // (suppressAlerts false — tests/headless never quit the app they drive), and it is not
-    // a dry run. A null/timeout/error handoff leaves PS open so the artist can retry. The
-    // working PSD was already saved to disk before the handoff (saveWorkingDoc); closing it
-    // DONOTSAVECHANGES discards only the transient dirtiness from the PNG/silhouette exports.
-    if (!CONFIG.dryRun && !CONFIG.suppressAlerts && aiStatus && aiStatus.ok) {
+    // Only when the working PSD was actually persisted this run (savedPath — its save is
+    // WARN-only, so a failed save must NOT trigger a discard-and-quit), the handoff
+    // EXPLICITLY succeeded (aiStatus.ok), the run is interactive (suppressAlerts false —
+    // tests/headless never quit the app they drive), and it is not a dry run. A
+    // null/timeout/error handoff, or an unsaved doc, leaves PS open so the artist can save /
+    // retry. Because the PSD is saved, closing it DONOTSAVECHANGES discards only the
+    // transient dirtiness from the PNG/silhouette exports.
+    if (savedPath && !CONFIG.dryRun && !CONFIG.suppressAlerts && aiStatus && aiStatus.ok) {
         log("[pipeline] handoff confirmed OK — closing Photoshop.");
         try { doc.close(SaveOptions.DONOTSAVECHANGES); } catch (eClose) {
             log("[pipeline] WARN | could not close working doc: " + eClose.message);
