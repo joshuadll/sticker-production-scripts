@@ -316,7 +316,7 @@ function main() {
     try {
         combineResult = runCombine(doc, folder);
     } catch (e) {
-        doc.activeHistoryState = snapshotA;
+        safeRevert(doc, snapshotA, "step 1");
         log("[pipeline] ERROR | step 1 line " + e.line + ": " + e.message
             + " — rolled back to initial template state.");
         scriptAlert("ERROR in Step 1 (Combine).\nLine " + e.line + ": " + e.message
@@ -332,12 +332,24 @@ function main() {
     // survivors. Triggers on runCombine's recorded failures (folder / duplicate name /
     // invalid name). The rarer placement-time SKIP stays log-only by design.
     if (combineResult.notImported.length > 0) {
-        doc.activeHistoryState = snapshotA;   // revert the partial combine (clear + placements)
+        // Surface exactly which layer(s) failed and why FIRST. The rollback below
+        // can throw on a real SKU (the pre-combine snapshot scrolls off the History
+        // States list after ~26 placements → Error 8007), so it must run guarded and
+        // AFTER the diagnostic — a failed undo must not crash over the top of the
+        // message that tells the artist what to fix. Re-running Pipeline 1 clears the
+        // element layers up front anyway, so a partial combine left behind is harmless.
         log("[pipeline] HALT | " + combineResult.notImported.length
-            + " element(s) failed to import — stopping before Step 2 (rolled back to pre-combine state).");
+            + " element(s) failed to import — stopping before Step 2.");
+        var haltLog  = copyLogBeside(folder.fsName, "Noteworthie_ERROR.log");
+        var reverted = safeRevert(doc, snapshotA, "halt (partial combine)");
         scriptAlert(notImportedWarning(combineResult.notImported)
             + "Pipeline stopped — nothing was handed to Illustrator.\n"
-            + "Fix the source PSD and re-run Pipeline 1.");
+            + "Fix the source PSD and re-run Pipeline 1.\n\n"
+            + (reverted
+                ? "The template was rolled back to its pre-combine state."
+                : "⚠️ Couldn't auto-undo the partial import — just close the template\n"
+                    + "WITHOUT saving (or re-run Pipeline 1, which clears it first).")
+            + "\n\nSend this to Josh:\n" + haltLog);
         return;
     }
 
@@ -349,7 +361,7 @@ function main() {
     try {
         resizeResult = runResize(doc);
     } catch (e) {
-        doc.activeHistoryState = snapshotB;
+        safeRevert(doc, snapshotB, "step 2");
         log("[pipeline] ERROR | step 2 line " + e.line + ": " + e.message
             + " — rolled back to post-combine state. All elements preserved.");
         scriptAlert("ERROR in Step 2 (Resize).\nLine " + e.line + ": " + e.message
@@ -367,7 +379,7 @@ function main() {
     try {
         whiteEdgeResult = runWhiteEdge(doc);
     } catch (e) {
-        doc.activeHistoryState = snapshotC;
+        safeRevert(doc, snapshotC, "step 3");
         log("[pipeline] ERROR | step 3 line " + e.line + ": " + e.message
             + " — rolled back to post-resize state.");
         scriptAlert("ERROR in Step 3 (White edge).\nLine " + e.line + ": " + e.message
@@ -384,7 +396,7 @@ function main() {
     try {
         groupResult = runCaptionWhite(doc);   // slimmed: groups SO + white edge per element
     } catch (e) {
-        doc.activeHistoryState = snapshotD;
+        safeRevert(doc, snapshotD, "step 3B");
         log("[pipeline] ERROR | step 3B line " + e.line + ": " + e.message + " — rolled back.");
         scriptAlert("ERROR in Step 3B (Group elements).\nLine " + e.line + ": " + e.message
             + "\n\nRolled back to post-white-edge state.\n\nSend this to Josh:\n"
@@ -399,7 +411,7 @@ function main() {
     try {
         runSilhouette(doc);
     } catch (e) {
-        doc.activeHistoryState = snapshotE;
+        safeRevert(doc, snapshotE, "step 5");
         log("[pipeline] ERROR | step 5 line " + e.line + ": " + e.message + " — rolled back.");
         scriptAlert("ERROR in Step 5 (Finalize Elements).\nLine " + e.line + ": " + e.message
             + "\n\nSend this to Josh:\n" + copyLogBeside(folder.fsName, "Noteworthie_ERROR.log"));
