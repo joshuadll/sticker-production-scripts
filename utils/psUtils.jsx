@@ -174,6 +174,36 @@ function copyLogBeside(folderFsName, niceName) {
     } catch (e) { return CONFIG.logPath; }
 }
 
+// Reverts a document to a captured history snapshot, GUARDED. Assigning
+// doc.activeHistoryState can itself throw (Error 8007 "user cancelled the
+// operation") when the snapshot has scrolled off the History States list —
+// e.g. after ~26 element placements the pre-combine snapshot is no longer
+// available. A failed rollback must NEVER crash over the top of the caller's
+// real message (the "here's what to fix" alert has to reach the artist), so we
+// swallow the failure, log a WARN, and report success/failure via the return.
+//
+// We also force displayDialogs = NO for the duration of the assignment. When it
+// fails, Photoshop otherwise pops a native modal ("The command 'Select' is not
+// currently available") BEFORE the exception reaches this catch — the artist has
+// to click it, and dismissing it is itself what turns the error into 8007. NO
+// suppresses that modal so the revert just fails silently into the catch.
+function safeRevert(doc, snapshot, label) {
+    var prevDialogs = app.displayDialogs;
+    try {
+        app.displayDialogs = DialogModes.NO;
+        doc.activeHistoryState = snapshot;
+        return true;
+    } catch (e) {
+        log("[pipeline] WARN | history rollback failed"
+            + (label ? " (" + label + ")" : "")
+            + " line " + e.line + ": " + e.message
+            + " — leaving the doc as-is so the real message still shows.");
+        return false;
+    } finally {
+        app.displayDialogs = prevDialogs;
+    }
+}
+
 // Returns true if doc matches expected template dimensions.
 function isValidTemplate(doc) {
     return Math.round(doc.width.as("cm")) === CONFIG.templateWidthCm;
