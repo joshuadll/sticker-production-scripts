@@ -2290,7 +2290,12 @@ function validateHalfcut(doc, group) {
     if (!hc) return { ok: false, reason: "missing" };
 
     var cutPoly = _halfcutCutPolyForGroup(group, steps);
-    if (!cutPoly) return { ok: true, reason: null };   // can't sample the cut → don't false-fail
+    if (!cutPoly) {
+        // Fail OPEN (don't false-block a valid element) but leave a breadcrumb — a genuinely
+        // broken cut member would otherwise pass the hard gate with no trace.
+        log("[halfcut] WARN | " + group.name + " | cut contour unsampleable — half-cut not verified");
+        return { ok: true, reason: null };
+    }
 
     var pts = hc.pathPoints, ends = [];
     if (pts && pts.length >= 2) {
