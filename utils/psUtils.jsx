@@ -471,8 +471,10 @@ function readVersionStatus(rootPath) {
         if (!res.installedSha) { res.state = "unknown"; return res; }
         var nowEpoch = Math.floor((new Date()).getTime() / 1000);
         var age = nowEpoch - res.checkedEpoch;
+        // Pure auto-sync: update.sh always converges installed==latest on ok=1, so the only
+        // meaningful states are current vs. updater-not-working. ok=0 (offline / failed sync)
+        // or an old check => stale; otherwise up to date.
         if (!res.ok || res.checkedEpoch === 0 || age > 10800) { res.state = "stale"; }
-        else if (res.latestSha && res.installedSha !== res.latestSha) { res.state = "updateAvailable"; }
         else { res.state = "upToDate"; }
     } catch (e) { res.state = "unknown"; }
     return res;
@@ -481,12 +483,9 @@ function readVersionStatus(rootPath) {
 // Formats the one-line signal for a completion alert. "" when unknown.
 function formatVersionStatus(status) {
     if (!status || status.state === "unknown" || !status.installedSha) { return ""; }
-    var v = "  ·  version " + status.installedSha.substring(0, 7);
+    var v = "version " + status.installedSha.substring(0, 7);
     if (status.state === "stale") {
-        return "⚠ Update check is stale — reconnect to the internet" + v;
+        return "⚠ " + v + " — updates aren't reaching this Mac";
     }
-    if (status.state === "updateAvailable") {
-        return "⚠ Update available — double-click \"Update Noteworthie\" on your Desktop, then re-run" + v;
-    }
-    return "✓ Up to date" + v;
+    return "✓ " + v;
 }

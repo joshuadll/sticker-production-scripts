@@ -615,7 +615,7 @@ artwork as the top-level group (L/C/R sub-layers), which Step 3B elongates per e
 [STK_CODE]_final.ai — parse STK code as everything before first space in working filename
 
 ## Version signal and auto-update
-Pipelines print a four-state version signal at the start of the log banner and end of the completion alert: `✓ Up to date` / `⚠ Update available` / `⚠ Update check is stale` / omitted (when version status cannot be determined). Sourced from `~/Library/Application Support/Noteworthie/update-status.txt` (written by `installer/update.sh`). Helper functions `readVersionStatus` (returns status object) and `formatVersionStatus` (formats for display) in psUtils.jsx and aiUtils.jsx.
+Pipelines print a two-state version signal at the start of the log banner and end of the completion alert: `✓ version <sha>` (current) / `⚠ version <sha> — updates aren't reaching this Mac` (auto-updater offline or not running) / omitted (unknown — before the first sync). There is no separate "update available" state: `installer/update.sh` auto-syncs `main` hourly via a curl GitHub-API SHA precheck, so `installed` always equals `latest` whenever a sync reports `ok=1` — the only meaningful distinction left is whether syncing is happening at all. Sourced from `~/Library/Application Support/Noteworthie/update-status.txt` (written by `installer/update.sh`). Helper functions `readVersionStatus` (returns status object) and `formatVersionStatus` (formats for display) in psUtils.jsx and aiUtils.jsx.
 
 ## Notion references
 Manual playbook (source of truth for what each step does):

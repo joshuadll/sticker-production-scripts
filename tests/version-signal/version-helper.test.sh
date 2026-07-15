@@ -33,17 +33,15 @@ JSX
 
 printf 'installed=aaaa1112222\nlatest=aaaa1112222\nchecked=%s\nok=1\n' "$NOW" > "$SUP/update-status.txt"
 run_state; check "upToDate state" "$(grep '^state=' "$OUT" | cut -d= -f2)" "upToDate"
-check "upToDate line" "$(grep '^line=' "$OUT" | cut -d= -f2-)" "✓ Up to date  ·  version aaaa111"
-
-printf 'installed=aaaa1112222\nlatest=bbbb999\nchecked=%s\nok=1\n' "$NOW" > "$SUP/update-status.txt"
-run_state; check "updateAvailable state" "$(grep '^state=' "$OUT" | cut -d= -f2)" "updateAvailable"
+check "upToDate line" "$(grep '^line=' "$OUT" | cut -d= -f2-)" "✓ version aaaa111"
 
 OLD=$((NOW - 20000))
 printf 'installed=aaaa1112222\nlatest=aaaa1112222\nchecked=%s\nok=1\n' "$OLD" > "$SUP/update-status.txt"
 run_state; check "stale state" "$(grep '^state=' "$OUT" | cut -d= -f2)" "stale"
+check "stale line" "$(grep '^line=' "$OUT" | cut -d= -f2-)" "⚠ version aaaa111 — updates aren't reaching this Mac"
 
 rm -f "$SUP/update-status.txt"
 run_state; check "unknown state" "$(grep '^state=' "$OUT" | cut -d= -f2)" "unknown"
 check "unknown empty line" "$(grep '^line=' "$OUT" | cut -d= -f2-)" ""
 
-echo ""; echo "PASS=$PASS FAIL=$FAIL"; rm -rf "$SB"; [ "$FAIL" -eq 0 ]
+echo ""; echo "PASS=$PASS FAIL=$FAIL (8 checks)"; rm -rf "$SB"; [ "$FAIL" -eq 0 ]
