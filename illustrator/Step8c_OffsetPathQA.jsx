@@ -398,10 +398,6 @@ function _collectCutlines(container) {
     // never recurse into groups, we treat them as units).
     if (container.layers) {
         for (i = 0; i < container.layers.length; i++) {
-            // Skip the spacing-buffer sublayer entirely: its halos are offset OUTSIDE the real
-            // cut and overlap by design, so measuring them as cutlines throws false spacing/margin
-            // failures. (aiUtils strips this sublayer before export anyway.)
-            if (container.layers[i].name === spacingBufferLayerName()) continue;
             inner = _collectCutlines(container.layers[i]);
             for (j = 0; j < inner.length; j++) out.push(inner[j]);
         }

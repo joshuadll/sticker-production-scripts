@@ -2166,14 +2166,17 @@ function syncHalfcut(doc, group, opts) {
 // translucent "keep-out" halo offset OUTWARD by HALF the min spacing — so two pieces'
 // halos meeting == exactly the min gap, and OVERLAPPING halos == under spec.
 //
-// WHERE THEY LIVE: all halos sit in ONE dedicated sublayer, "Spacing Buffer" (see
-// spacingBufferLayerName), pinned to the TOP of the Cutlines layer — NOT as children of the
-// cutline groups. This gives the artist a single Layers-panel eyeball to hide/show every halo
-// at once while hand-nesting (the original ask). The sublayer is kept UNLOCKED + visible so a
-// marquee/shift-click over a piece still grabs its halo — Illustrator selection is CROSS-LAYER,
-// so the halo rides the artist's manual drag/scale exactly like the art (in the Sticker layer)
-// does, even though it is no longer a group child. Locking the sublayer would drop the halos
-// from that selection, so it stays unlocked; the artist toggles VISIBILITY only.
+// WHERE THEY LIVE: all halos sit in ONE dedicated TOP-LEVEL layer, "Spacing Buffer" (see
+// spacingBufferLayerName), at the top of the document layer stack — NOT as children of the
+// cutline groups, and NOT a sublayer of Cutlines. This gives the artist a single Layers-panel
+// eyeball to hide/show every halo at once while hand-nesting (the original ask). A top-level
+// layer (vs a Cutlines sublayer) also keeps the halos naturally OUT of the QA collectors, which
+// scope into the Cutlines layer only — so Step 8c / StepQA never see a halo and need no skip
+// guard. The layer is kept UNLOCKED + visible so a marquee/shift-click over a piece still grabs
+// its halo — Illustrator selection is CROSS-LAYER, so the halo rides the artist's manual
+// drag/scale exactly like the art (in the Sticker layer) does, even though it is not a group
+// child. Locking the layer would drop the halos from that selection, so it stays unlocked; the
+// artist toggles VISIBILITY only.
 //
 // Drawn with a MULTIPLY blend so two overlapping halos visibly DARKEN in the danger band —
 // Illustrator has no live collision test, so the darkening IS the signal. The authoritative
@@ -2185,45 +2188,41 @@ function syncHalfcut(doc, group, opts) {
 // ring would scale with the art and drift off-spec. syncSpacingBuffer sets that preference
 // off defensively on every call.
 //
-// Idempotent: clears this element's prior "{name} buffer" from the sublayer first (re-run
-// loops: Step 7B on re-import, Step 8b repeatedly). GC/WC captioned groups AND bare stamp
-// cutlines (a traced PathItem/CompoundPathItem directly on Cutlines) get a halo; uncaptioned
-// PlacedItem stamps and other types skip. Step 8c and StepQA SKIP the whole "Spacing Buffer"
-// sublayer by name so the halos are never read as real cutlines (they overlap by design — a
-// false spacing/margin failure otherwise). removeAllSpacingBuffers drops the sublayer before
-// export (AI_ExportFinal + Step 10 + Step 11).
+// Idempotent: clears this element's prior "{name} buffer" from the layer first (re-run loops:
+// Step 7B on re-import, Step 8b repeatedly). GC/WC captioned groups AND bare stamp cutlines (a
+// traced PathItem/CompoundPathItem directly on Cutlines) get a halo; uncaptioned PlacedItem
+// stamps and other types skip. removeAllSpacingBuffers drops the whole layer before export
+// (AI_ExportFinal + Step 10 + Step 11).
 
-// The name of the dedicated sublayer that holds every spacing-buffer halo, at the top of the
-// Cutlines layer. Single source of truth — Step 8c / StepQA reference it to skip the sublayer.
-// Overridable via CONFIG.spacingBufferLayerName; defaults to "Spacing Buffer".
+// The name of the dedicated top-level layer that holds every spacing-buffer halo.
+// Single source of truth. Overridable via CONFIG.spacingBufferLayerName; defaults to
+// "Spacing Buffer".
 function spacingBufferLayerName() {
     return (CONFIG.spacingBufferLayerName != null) ? CONFIG.spacingBufferLayerName : "Spacing Buffer";
 }
 
-// Find (create optional) the "Spacing Buffer" sublayer at the top of the Cutlines layer.
-// Always returns it UNLOCKED (so we can add/remove halos and the artist's marquee can grab
-// them); visibility is set true only on creation, so a re-run never overrides the artist's
-// manual hide. Returns null if the Cutlines layer itself is missing (or create=false + absent).
+// Find (create optional) the top-level "Spacing Buffer" layer at the top of the document stack.
+// Always returns it UNLOCKED (so we can add/remove halos and the artist's marquee can grab them);
+// visibility is set true only on creation, so a re-run never overrides the artist's manual hide.
+// Returns null when create=false and the layer is absent.
 function _getSpacingBufferLayer(doc, create) {
-    var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
-    if (!cutLayer) return null;
     var want = spacingBufferLayerName(), i, ly;
-    for (i = 0; i < cutLayer.layers.length; i++) {
-        if (cutLayer.layers[i].name === want) {
-            ly = cutLayer.layers[i];
+    for (i = 0; i < doc.layers.length; i++) {
+        if (doc.layers[i].name === want) {
+            ly = doc.layers[i];
             try { ly.locked = false; } catch (eLk) {}   // ensure writable; artist toggles visibility only
             return ly;
         }
     }
     if (!create) return null;
-    ly = cutLayer.layers.add();          // new sublayer lands at the TOP of the Cutlines stack
+    ly = doc.layers.add();               // new layer lands at the TOP of the document stack
     ly.name = want;
     try { ly.locked = false; } catch (eLk2) {}
     try { ly.visible = true; } catch (eVis) {}
     return ly;
 }
 
-// Removes any "{name} buffer" halo(s) from the given buffer sublayer. Snapshots refs first —
+// Removes any "{name} buffer" halo(s) from the given buffer layer. Snapshots refs first —
 // the live pageItems collection re-indexes on remove. Returns count. No-op on a null layer.
 function _removeNamedBuffer(bufLayer, name) {
     if (!bufLayer) return 0;
@@ -2323,16 +2322,14 @@ function syncSpacingBuffer(doc, item, opts) {
 
 // Strips every spacing-buffer halo before export (Step 10 clips/exports, Step 11 ships —
 // neither may see the working-phase halo). LOCATION-AGNOSTIC by contract ("no halo ever reaches
-// print"): (a) removes the whole "Spacing Buffer" sublayer (the current home), AND (b) sweeps any
-// stray "{name} buffer" child still sitting inside a cutline group — a doc authored before the
-// 2026-07-15 sublayer move (an artist's in-flight working file) keeps its halos as group children,
-// and those must be stripped too. Idempotent. Returns the total number of halos removed.
+// print"): (a) removes the whole top-level "Spacing Buffer" layer (the current home), AND (b)
+// sweeps any stray "{name} buffer" child still sitting inside a cutline group — a doc authored
+// before the 2026-07-15 move (an artist's in-flight working file) keeps its halos as group
+// children, and those must be stripped too. Idempotent. Returns the total number of halos removed.
 function removeAllSpacingBuffers(doc) {
-    var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
-    if (!cutLayer) return 0;
     var removed = 0, i;
 
-    // (a) Current structure — the dedicated sublayer.
+    // (a) Current structure — the dedicated top-level layer.
     var bufLayer = _getSpacingBufferLayer(doc, false);
     if (bufLayer) {
         removed += bufLayer.pageItems.length;
@@ -2340,7 +2337,7 @@ function removeAllSpacingBuffers(doc) {
         try {
             bufLayer.remove();
         } catch (eRm) {
-            // Fallback: if the sublayer can't be removed, empty it (snapshot refs — live re-index).
+            // Fallback: if the layer can't be removed, empty it (snapshot refs — live re-index).
             var items = [];
             try {
                 for (i = 0; i < bufLayer.pageItems.length; i++) items.push(bufLayer.pageItems[i]);
@@ -2350,16 +2347,19 @@ function removeAllSpacingBuffers(doc) {
     }
 
     // (b) Legacy / belt-and-suspenders — a "{group.name} buffer" child left inside a cutline group.
-    var gi, g, j, want, doomed;
-    for (gi = 0; gi < cutLayer.groupItems.length; gi++) {
-        g = cutLayer.groupItems[gi];
-        if (g.parent !== cutLayer) continue;
-        want = g.name + " buffer";
-        doomed = [];
-        for (j = 0; j < g.pageItems.length; j++) {
-            if (g.pageItems[j].name === want) doomed.push(g.pageItems[j]);
+    var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
+    if (cutLayer) {
+        var gi, g, j, want, doomed;
+        for (gi = 0; gi < cutLayer.groupItems.length; gi++) {
+            g = cutLayer.groupItems[gi];
+            if (g.parent !== cutLayer) continue;
+            want = g.name + " buffer";
+            doomed = [];
+            for (j = 0; j < g.pageItems.length; j++) {
+                if (g.pageItems[j].name === want) doomed.push(g.pageItems[j]);
+            }
+            for (j = 0; j < doomed.length; j++) { try { doomed[j].remove(); removed++; } catch (eD) {} }
         }
-        for (j = 0; j < doomed.length; j++) { try { doomed[j].remove(); removed++; } catch (eD) {} }
     }
 
     if (removed > 0) log("[buffer] stripped " + removed + " spacing buffer(s) before export.");
