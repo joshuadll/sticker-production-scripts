@@ -101,13 +101,21 @@ function main() {
         + result.atSpec + " already at spec, " + result.skipped + " skipped.");
     log("[pipeline] === AI_NormaliseCaptions done ===");
 
-    var _vline = formatVersionStatus(_ver);
-    scriptAlert("✅ Captions normalised.\n\n"
+    var msg = "✅ Captions normalised.\n\n"
         + "  " + result.reset + " reset to spec, " + result.atSpec
         + " already on spec, " + result.skipped + " skipped (stamps / uncaptioned).\n\n"
         + "Re-run after each manual resize pass. When nesting is final, make pencil\n"
-        + "refinements, then run AI_ExportFinal."
-        + (_vline ? "\n\n" + _vline : ""));
+        + "refinements, then run AI_ExportFinal.";
+
+    var _seatReview = collectSeatReviewNames(doc);
+    if (_seatReview.length > 0) {
+        msg += "\n⚠ " + _seatReview.length + " caption(s) may need a seating check:\n  "
+            + _seatReview.join(", ") + "\n";
+    }
+
+    var _vline = formatVersionStatus(_ver);
+    if (_vline) { msg += "\n\n" + _vline; }
+    scriptAlert(msg);
 }
 
 main();

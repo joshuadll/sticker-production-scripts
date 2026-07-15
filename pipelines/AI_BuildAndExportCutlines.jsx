@@ -138,10 +138,18 @@ function main() {
         }
         log("[ai-pipeline] === AI_BuildAndExportCutlines done ===");
         var svgs = (r.exportResult && r.exportResult.regularPath) ? "both SVGs exported" : "SVG export — see log";
+        var msg = "✅ Cut lines built (" + r.built + ") + " + svgs + ".\n\n"
+            + "Review both SVGs, run Deepnest, then run AI_ImportNesting.";
+
+        var _seatReview = collectSeatReviewNames(doc);
+        if (_seatReview.length > 0) {
+            msg += "\n⚠ " + _seatReview.length + " caption(s) may need a seating check:\n  "
+                + _seatReview.join(", ") + "\n";
+        }
+
         var _vline = formatVersionStatus(_ver);
-        scriptAlert("✅ Cut lines built (" + r.built + ") + " + svgs + ".\n\n"
-            + "Review both SVGs, run Deepnest, then run AI_ImportNesting."
-            + (_vline ? "\n" + _vline : ""));
+        if (_vline) { msg += "\n" + _vline; }
+        scriptAlert(msg);
     } catch (e) {
         scriptAlert("ERROR (line " + e.line + "): " + e.message + "\nLog: " + CONFIG.logPath);
     }

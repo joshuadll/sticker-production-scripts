@@ -603,12 +603,11 @@ function haloRgb() {
     return c;
 }
 
-// Strong blue — the CAPTION-SEAT review badge (Step 3B's conform flagged an uneven
-// seat via the note "…|R"). Distinct from the warm red/amber problem badges; says
-// "eyeball this caption". Advisory only — it does NOT gate export.
-function seatReviewRgb() {
+// The half-cut QA flag colour — a medium blue, distinct from red (spacing) and amber
+// (margin) on the shared Layout QA overlay, and readable on the green Color Block.
+function halfcutFlagRgb() {
     var c = new RGBColor();
-    c.red = 26; c.green = 102; c.blue = 255;   // was CMYK 90/60/0/0
+    c.red = 26; c.green = 102; c.blue = 255;
     return c;
 }
 
@@ -2076,23 +2075,53 @@ function parseNote(note) {
     };
 }
 
+// Display names of every Cutlines-group element whose note carries the seat-review flag
+// ("|R"). Consumed by the seating pipelines' completion dialogs (the seat-review badge was
+// removed from the QA overlay). Returns [] when none.
+function collectSeatReviewNames(doc) {
+    var out = [], layer = findLayer(doc, CONFIG.cutlinesLayerName);
+    if (!layer) return out;
+    var i, g, note;
+    for (i = 0; i < layer.pageItems.length; i++) {
+        g = layer.pageItems[i];
+        if (g.parent !== layer || g.typename !== "GroupItem") continue;
+        note = parseNote(g.note);
+        if (note && note.needsReview) out.push(g.name);
+    }
+    return out;
+}
+
+// Read-only case-insensitive lookup of the halfcut layer (CONFIG.halfcutLayerName); null if
+// absent. Used by the verify/QA path (validateHalfcut) so an advisory pass never creates a layer.
+function _findHalfcutLayer(doc) {
+    var name = CONFIG.halfcutLayerName, i;
+    for (i = 0; i < doc.layers.length; i++) {
+        if (doc.layers[i].name.toLowerCase() === name.toLowerCase()) return doc.layers[i];
+    }
+    return null;
+}
+
+// Read-only lookup of a named PathItem directly on a layer; null if absent.
+function _findHalfcutPathItem(hcLayer, name) {
+    var i;
+    for (i = 0; i < hcLayer.pathItems.length; i++) {
+        if (hcLayer.pathItems[i].name === name) return hcLayer.pathItems[i];
+    }
+    return null;
+}
+
 // Returns the halfcut layer (case-insensitive match on CONFIG.halfcutLayerName).
 // Creates it above the Cutlines layer if absent.
 function getOrCreateHalfcutLayer(doc) {
-    var name = CONFIG.halfcutLayerName;
-    var i;
-    for (i = 0; i < doc.layers.length; i++) {
-        if (doc.layers[i].name.toLowerCase() === name.toLowerCase()) {
-            return doc.layers[i];
-        }
-    }
+    var existing = _findHalfcutLayer(doc);
+    if (existing) return existing;
     var newLayer = doc.layers.add();
-    newLayer.name = name;
+    newLayer.name = CONFIG.halfcutLayerName;
     var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
     if (cutLayer) {
         newLayer.move(cutLayer, ElementPlacement.PLACEBEFORE);
     }
-    log("[step9] created halfcut layer: " + name);
+    log("[step9] created halfcut layer: " + CONFIG.halfcutLayerName);
     return newLayer;
 }
 
@@ -2205,6 +2234,127 @@ function syncHalfcut(doc, group, opts) {
         + " endN=(" + _r1(eN.x) + "," + _r1(eN.y) + ")"
         + (curved ? " curved" : " straight"));
     return { ok: true, curved: curved };
+}
+
+// ─── HALF-CUT VALIDATION (export gate + Layout QA; no re-derivation) ───────────
+// Nearest point ON segment a-b to p (clamped projection; all {x,y}); pure.
+function _nearestPointOnSegment(p, a, b) {
+    var vx = b.x - a.x, vy = b.y - a.y;
+    var len2 = vx * vx + vy * vy;
+    var t = len2 > 0 ? ((p.x - a.x) * vx + (p.y - a.y) * vy) / len2 : 0;
+    if (t < 0) t = 0; else if (t > 1) t = 1;
+    return { x: a.x + t * vx, y: a.y + t * vy };
+}
+
+// Distance from point p to segment a-b (all {x,y}); pure.
+function _distPointToSegment(p, a, b) {
+    var q = _nearestPointOnSegment(p, a, b);
+    var dx = p.x - q.x, dy = p.y - q.y;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Nearest point ON the polygon's edges (closed ring) to p; pure. (The connector target for
+// an undershoot flag — the true nearest cut-contour point, not just the nearest vertex.)
+function _nearestPointOnPolygon(p, poly) {
+    var best = poly[0], bd = 1e15, i, j, q, dx, dy, d;
+    for (i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        q = _nearestPointOnSegment(p, poly[j], poly[i]);
+        dx = q.x - p.x; dy = q.y - p.y; d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = q; }
+    }
+    return best;
+}
+
+// Min distance from p to the polygon's edges (closed ring); pure.
+function _distPointToPolygon(p, poly) {
+    var best = 1e15, i, j, d;
+    for (i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        d = _distPointToSegment(p, poly[j], poly[i]);
+        if (d < best) best = d;
+    }
+    return best;
+}
+
+// True if a half-cut endpoint fails to reach the cut contour: non-finite, or inside the
+// contour by >= minGap. The single undershoot definition shared by the export gate
+// (validateHalfcut) and the Layout QA overlay (_qaHalfcutUndershoot).
+function _isEndpointShort(p, cutPoly, minGap) {
+    if (!p || !isFinite(p.x) || !isFinite(p.y)) return true;
+    return pointInPolygon(p, cutPoly) && _distPointToPolygon(p, cutPoly) >= minGap;
+}
+
+// Do BOTH endpoints of a half-cut reach the element's cut contour? endPts = the two
+// end anchors [{x,y},{x,y}]; cutPoly = the largest sampled polygon of the cut contour;
+// minGapPt = max tolerated shortfall (mmToPoints(1)). An end CONNECTS when it is on/outside
+// the contour OR inside it by < minGapPt. An end inside by >= minGapPt is a short end
+// (undershoot). < 2 finite endpoints → undershoot. Pure — unit-tested with plain arrays.
+function _halfcutEndsReachCut(endPts, cutPoly, minGapPt) {
+    if (!endPts || endPts.length < 2 || !cutPoly || cutPoly.length < 3) {
+        return { ok: false, reason: "undershoot" };
+    }
+    var i;
+    for (i = 0; i < endPts.length; i++) {
+        if (_isEndpointShort(endPts[i], cutPoly, minGapPt)) return { ok: false, reason: "undershoot" };
+    }
+    return { ok: true, reason: null };
+}
+
+// Largest sampled polygon of a Cutlines group's cut contour (the member named group.name).
+// samplePathToPolygons already recurses a Pathfinder-Unite wrapper GroupItem, so no manual
+// drill is needed. null if the cut member is missing or samples empty.
+function _halfcutCutPolyForGroup(group, steps) {
+    var cut = findGroupMember(group, "");
+    if (!cut) return null;
+    return _largestPoly(samplePathToPolygons(cut, steps));
+}
+
+// Verify (never derive) one element's half-cut. Returns { ok, reason, hc, cutPoly }:
+//   reason "missing"    — no "{group.name} halfcut" path on the Halfcut layer.
+//   reason "undershoot" — an endpoint falls short of the element's cut line by >= 1mm.
+//   reason null         — a valid half-cut exists and both ends reach the cut line.
+// hc/cutPoly are the resolved half-cut path + sampled cut polygon (either may be null); the
+// Layout QA drawer reuses them so it never re-fetches. The layer lookup is READ-ONLY (never
+// creates a layer), so calling this from the advisory Layout QA pass mutates nothing.
+function validateHalfcut(doc, group) {
+    var steps = CONFIG.halfcutSeamSteps || 16;
+    var hcLayer = _findHalfcutLayer(doc);
+    var hc = hcLayer ? _findHalfcutPathItem(hcLayer, group.name + " halfcut") : null;
+    if (!hc) return { ok: false, reason: "missing", hc: null, cutPoly: null };
+
+    var cutPoly = _halfcutCutPolyForGroup(group, steps);
+    if (!cutPoly) {
+        // Fail OPEN (don't false-block a valid element) but leave a breadcrumb — a genuinely
+        // broken cut member would otherwise pass the hard gate with no trace.
+        log("[halfcut] WARN | " + group.name + " | cut contour unsampleable — half-cut not verified");
+        return { ok: true, reason: null, hc: hc, cutPoly: null };
+    }
+
+    var pts = hc.pathPoints, ends = [];
+    if (pts && pts.length >= 2) {
+        ends.push({ x: pts[0].anchor[0], y: pts[0].anchor[1] });
+        ends.push({ x: pts[pts.length - 1].anchor[0], y: pts[pts.length - 1].anchor[1] });
+    }
+    var r = _halfcutEndsReachCut(ends, cutPoly, mmToPoints(1));
+    return { ok: r.ok, reason: r.reason, hc: hc, cutPoly: cutPoly };
+}
+
+// Returns all top-level GroupItems in the Cutlines layer whose note identifies
+// them as GC or WC (the elements that have a caption plate seam). Shared by
+// Step9A_Halfcut's runHalfcut (export gate) and StepQA_Halfcut (Layout QA).
+function _collectHalfcutItems(cutlinesLayer) {
+    var out = [], i, item, note;
+    for (i = 0; i < cutlinesLayer.pageItems.length; i++) {
+        item = cutlinesLayer.pageItems[i];
+        if (item.parent !== cutlinesLayer) continue;
+        if (item.typename !== "GroupItem") continue;
+        note = parseNote(item.note);
+        var isCapStyle = note && (note.styleCode === "GC" || note.styleCode === "WC");
+        var isTab = note && note.styleCode === "ST" && findGroupMember(item, " plate") !== null;
+        if (isCapStyle || isTab) {
+            out.push({ name: item.name, group: item });
+        }
+    }
+    return out;
 }
 
 // ─── SPACING BUFFER (live 2mm keep-out halo; Step 7B birth + Step 8b refresh) ─────
