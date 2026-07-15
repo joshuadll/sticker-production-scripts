@@ -123,7 +123,9 @@ function runBuildAndExport(doc) {
 // ── main(): resolve the working doc, run the build, surface the outcome ──────────
 function main() {
     try {
-        log("[ai-pipeline] === AI_BuildAndExportCutlines start ===");
+        var _ver = readVersionStatus(_root);
+        var _vshort = _ver.installedSha ? _ver.installedSha.substring(0, 7) : "unknown";
+        log("[ai-pipeline] === AI_BuildAndExportCutlines start (version " + _vshort + ") ===");
         var doc = _resolveWorkingDoc();
         if (!doc) { scriptAlert("No working document with a Cutlines layer is open.\nRun Pipeline 1 (Build Elements) first."); return; }
 
@@ -136,8 +138,10 @@ function main() {
         }
         log("[ai-pipeline] === AI_BuildAndExportCutlines done ===");
         var svgs = (r.exportResult && r.exportResult.regularPath) ? "both SVGs exported" : "SVG export — see log";
+        var _vline = formatVersionStatus(_ver);
         scriptAlert("✅ Cut lines built (" + r.built + ") + " + svgs + ".\n\n"
-            + "Review both SVGs, run Deepnest, then run AI_ImportNesting.");
+            + "Review both SVGs, run Deepnest, then run AI_ImportNesting."
+            + (_vline ? "\n" + _vline : ""));
     } catch (e) {
         scriptAlert("ERROR (line " + e.line + "): " + e.message + "\nLog: " + CONFIG.logPath);
     }

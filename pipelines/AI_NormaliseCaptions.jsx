@@ -63,6 +63,7 @@ var CONFIG = {
     logPath: ""  // resolved below
 };
 
+var _root = $.fileName ? new File($.fileName).parent.parent.fsName : Folder.desktop.fsName;
 CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
     : Folder.desktop.fsName) + "/AI_NormaliseCaptions.log";
@@ -78,7 +79,9 @@ function main() {
     var filesFolder = null;
     try { filesFolder = doc.fullName.parent.fsName; } catch (eFolder) {}
 
-    log("[pipeline] === AI_NormaliseCaptions start ===");
+    var _ver = readVersionStatus(_root);
+    var _vshort = _ver.installedSha ? _ver.installedSha.substring(0, 7) : "unknown";
+    log("[pipeline] === AI_NormaliseCaptions start (version " + _vshort + ") ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
@@ -98,11 +101,13 @@ function main() {
         + result.atSpec + " already at spec, " + result.skipped + " skipped.");
     log("[pipeline] === AI_NormaliseCaptions done ===");
 
+    var _vline = formatVersionStatus(_ver);
     scriptAlert("✅ Captions normalised.\n\n"
         + "  " + result.reset + " reset to spec, " + result.atSpec
         + " already on spec, " + result.skipped + " skipped (stamps / uncaptioned).\n\n"
         + "Re-run after each manual resize pass. When nesting is final, make pencil\n"
-        + "refinements, then run AI_ExportFinal.");
+        + "refinements, then run AI_ExportFinal."
+        + (_vline ? "\n\n" + _vline : ""));
 }
 
 main();

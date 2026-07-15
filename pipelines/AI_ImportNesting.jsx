@@ -70,7 +70,9 @@ CONFIG.logPath = _root + "/pipelines/AI_ImportNesting.log";
 function main() {
     try {
 
-        log("[pipeline] === AI_ImportNesting start ===");
+        var _ver = readVersionStatus(_root);
+        var _vshort = _ver.installedSha ? _ver.installedSha.substring(0, 7) : "unknown";
+        log("[pipeline] === AI_ImportNesting start (version " + _vshort + ") ===");
         log("[pipeline] dryRun: " + CONFIG.dryRun);
         var filesFolder = null;   // job folder — set once the working doc resolves (below)
 
@@ -161,6 +163,9 @@ function main() {
         msg += "Review the cutline layout, then nest the elements. Run\n"
             + "AI_NormaliseCaptions during the resize loop and AI_LayoutQA to\n"
             + "check spacing; run AI_ExportFinal when the layout is done.";
+
+        var _vline = formatVersionStatus(_ver);
+        if (_vline) { msg += "\n\n" + _vline; }
 
         scriptAlert(msg);
 

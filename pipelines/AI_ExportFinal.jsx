@@ -61,6 +61,7 @@ var CONFIG = {
     logPath: ""  // resolved below
 };
 
+var _root = $.fileName ? new File($.fileName).parent.parent.fsName : Folder.desktop.fsName;
 CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
     : Folder.desktop.fsName) + "/AI_ExportFinal.log";
@@ -94,7 +95,9 @@ function main() {
     var filesFolder = null;
     try { filesFolder = doc.fullName.parent.fsName; } catch (eFolder) {}
 
-    log("[pipeline] === AI_ExportFinal start ===");
+    var _ver = readVersionStatus(_root);
+    var _vshort = _ver.installedSha ? _ver.installedSha.substring(0, 7) : "unknown";
+    log("[pipeline] === AI_ExportFinal start (version " + _vshort + ") ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
@@ -219,6 +222,9 @@ function main() {
                 + ": " + allFlags[fi].reason + "\n";
         }
     }
+
+    var _vline = formatVersionStatus(_ver);
+    if (_vline) { summaryMsg += "\n" + _vline; }
 
     scriptAlert(summaryMsg);
 }
