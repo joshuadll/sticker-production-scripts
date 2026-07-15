@@ -3545,3 +3545,45 @@ function clipPolygonToHalfPlane(poly, axis, value, keepGreater) {
     }
     return out;
 }
+
+// ── Version status (reads update-status.txt written by installer/update.sh) ──
+// rootPath = pipeline _root (the scripts folder). SUPPORT_DIR = its parent.
+function readVersionStatus(rootPath) {
+    var res = { installedSha: "", latestSha: "", checkedEpoch: 0, ok: false, state: "unknown" };
+    try {
+        var f = new File(new File(rootPath).parent.fsName + "/update-status.txt");
+        if (!f.exists) { return res; }
+        f.open("r"); var txt = f.read(); f.close();
+        var lines = txt.split(/\r\n|\r|\n/);
+        for (var i = 0; i < lines.length; i++) {
+            var eq = lines[i].indexOf("=");
+            if (eq < 0) { continue; }
+            var k = lines[i].substring(0, eq);
+            var v = lines[i].substring(eq + 1);
+            if (k === "installed") { res.installedSha = v; }
+            else if (k === "latest") { res.latestSha = v; }
+            else if (k === "checked") { res.checkedEpoch = parseInt(v, 10) || 0; }
+            else if (k === "ok") { res.ok = (v === "1"); }
+        }
+        if (!res.installedSha) { res.state = "unknown"; return res; }
+        var nowEpoch = Math.floor((new Date()).getTime() / 1000);
+        var age = nowEpoch - res.checkedEpoch;
+        if (!res.ok || res.checkedEpoch === 0 || age > 10800) { res.state = "stale"; }
+        else if (res.latestSha && res.installedSha !== res.latestSha) { res.state = "updateAvailable"; }
+        else { res.state = "upToDate"; }
+    } catch (e) { res.state = "unknown"; }
+    return res;
+}
+
+// Formats the one-line signal for a completion alert. "" when unknown.
+function formatVersionStatus(status) {
+    if (!status || status.state === "unknown" || !status.installedSha) { return ""; }
+    var v = "  ·  version " + status.installedSha.substring(0, 7);
+    if (status.state === "stale") {
+        return "⚠ Update check is stale — reconnect to the internet" + v;
+    }
+    if (status.state === "updateAvailable") {
+        return "⚠ Update available — double-click \"Update Noteworthie\" on your Desktop, then re-run" + v;
+    }
+    return "✓ Up to date" + v;
+}
