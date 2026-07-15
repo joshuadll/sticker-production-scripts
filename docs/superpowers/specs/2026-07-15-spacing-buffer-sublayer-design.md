@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-15
 **Branch:** `worktree-spacing-buffer-sublayer`
-**Status:** approved, implementing
+**Status:** implemented + Illustrator-validated (3 integration tests + structural probe pass); live drag unverified; branch not yet merged
 
 ## Problem
 
