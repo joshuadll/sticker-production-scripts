@@ -145,6 +145,23 @@ else
     FAIL=1
 fi
 
+# ── Verify caption artwork was relocated OFF the Cutlines layer ────────────────
+# The cutter cuts every VISIBLE path in Cutlines/Halfcut, so the printed caption
+# (pill/text/GC raster/tab fill) must be moved to the Stickers layer in the final
+# file. Step 11 logs a relocation summary and an advisory marker if any printed item
+# was wrongly left behind.
+if grep -q "\[step11\] captions relocated to Stickers |" "$LOG"; then
+    echo "PASS [$STEP]: caption artwork relocated to Stickers layer."
+else
+    echo "FAIL [$STEP]: '[step11] captions relocated to Stickers |' not found in log."
+    FAIL=1
+fi
+
+if grep -q "PRINTED ITEM LEFT IN CUTLINES" "$LOG"; then
+    echo "FAIL [$STEP]: a printed item was left on the Cutlines layer (would be cut)."
+    FAIL=1
+fi
+
 PNG_LOG=$(grep -oE "pngCount=[0-9]+" "$LOG" | grep -oE "[0-9]+$" | head -1 || echo "0")
 # find (not ls-glob): a no-match glob makes ls exit non-zero, which under
 # `set -euo pipefail` aborts the script at this assignment — precisely in the
