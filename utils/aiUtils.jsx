@@ -490,7 +490,7 @@ function _bwdMarginBand(doc) {
     // compound paths, so margin.compoundPathItems[0] then throws Error 1302
     // ("No such element") and the whole pipeline dies at document setup. Instead
     // add an empty compound path item and reparent the two styled rects into it
-    // (same move() reparenting idiom as wrapStampsInGroups) — works cold.
+    // (an empty-container + move() reparenting idiom) — works cold.
     var cp = margin.compoundPathItems.add();
     outer.move(cp, ElementPlacement.PLACEATEND);
     inner.move(cp, ElementPlacement.PLACEATEND);
@@ -2162,12 +2162,19 @@ function syncHalfcut(doc, group, opts) {
 }
 
 // ─── SPACING BUFFER (live 2mm keep-out halo; Step 7B birth + Step 8b refresh) ─────
-// A drag-time visual aid for the 2mm minimum-spacing rule. Each GC/WC cutline gets a
+// A drag-time visual aid for the 2mm minimum-spacing rule. Each GC/WC/stamp cutline gets a
 // translucent "keep-out" halo offset OUTWARD by HALF the min spacing — so two pieces'
-// halos meeting == exactly the min gap, and OVERLAPPING halos == under spec. The halo is
-// a child of the cutline GroupItem, so it rides the rigid nest transform (Step 7B) AND any
-// manual move/scale the artist applies to the selected cutline group — no re-run needed to
-// follow a drag (the half-cut, on its own layer, does NOT track a raw drag; this does).
+// halos meeting == exactly the min gap, and OVERLAPPING halos == under spec.
+//
+// WHERE THEY LIVE: all halos sit in ONE dedicated sublayer, "Spacing Buffer" (see
+// spacingBufferLayerName), pinned to the TOP of the Cutlines layer — NOT as children of the
+// cutline groups. This gives the artist a single Layers-panel eyeball to hide/show every halo
+// at once while hand-nesting (the original ask). The sublayer is kept UNLOCKED + visible so a
+// marquee/shift-click over a piece still grabs its halo — Illustrator selection is CROSS-LAYER,
+// so the halo rides the artist's manual drag/scale exactly like the art (in the Sticker layer)
+// does, even though it is no longer a group child. Locking the sublayer would drop the halos
+// from that selection, so it stays unlocked; the artist toggles VISIBILITY only.
+//
 // Drawn with a MULTIPLY blend so two overlapping halos visibly DARKEN in the danger band —
 // Illustrator has no live collision test, so the darkening IS the signal. The authoritative
 // spacing pass stays Step 8c / AI_LayoutQA (the red flags); this is only an early warning.
@@ -2178,12 +2185,56 @@ function syncHalfcut(doc, group, opts) {
 // ring would scale with the art and drift off-spec. syncSpacingBuffer sets that preference
 // off defensively on every call.
 //
-// Idempotent: clears this element's prior "{name} buffer" first (re-run loops: Step 7B on
-// re-import, Step 8b repeatedly). GC/WC only (gated on the cutline note), matching the
-// half-cut; stamps / uncaptioned skip. Buffers are children of the Cutlines groups, so they
-// are EXCLUDED by name (" buffer") from StepQA's occupancy collector and STRIPPED before
-// export by removeAllSpacingBuffers (AI_ExportFinal + Step 11). Step 8c is unaffected — it
-// reads only the named cutline member (findGroupMember), never the buffer.
+// Idempotent: clears this element's prior "{name} buffer" from the sublayer first (re-run
+// loops: Step 7B on re-import, Step 8b repeatedly). GC/WC captioned groups AND bare stamp
+// cutlines (a traced PathItem/CompoundPathItem directly on Cutlines) get a halo; uncaptioned
+// PlacedItem stamps and other types skip. Step 8c and StepQA SKIP the whole "Spacing Buffer"
+// sublayer by name so the halos are never read as real cutlines (they overlap by design — a
+// false spacing/margin failure otherwise). removeAllSpacingBuffers drops the sublayer before
+// export (AI_ExportFinal + Step 10 + Step 11).
+
+// The name of the dedicated sublayer that holds every spacing-buffer halo, at the top of the
+// Cutlines layer. Single source of truth — Step 8c / StepQA reference it to skip the sublayer.
+// Overridable via CONFIG.spacingBufferLayerName; defaults to "Spacing Buffer".
+function spacingBufferLayerName() {
+    return (CONFIG.spacingBufferLayerName != null) ? CONFIG.spacingBufferLayerName : "Spacing Buffer";
+}
+
+// Find (create optional) the "Spacing Buffer" sublayer at the top of the Cutlines layer.
+// Always returns it UNLOCKED (so we can add/remove halos and the artist's marquee can grab
+// them); visibility is set true only on creation, so a re-run never overrides the artist's
+// manual hide. Returns null if the Cutlines layer itself is missing (or create=false + absent).
+function _getSpacingBufferLayer(doc, create) {
+    var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
+    if (!cutLayer) return null;
+    var want = spacingBufferLayerName(), i, ly;
+    for (i = 0; i < cutLayer.layers.length; i++) {
+        if (cutLayer.layers[i].name === want) {
+            ly = cutLayer.layers[i];
+            try { ly.locked = false; } catch (eLk) {}   // ensure writable; artist toggles visibility only
+            return ly;
+        }
+    }
+    if (!create) return null;
+    ly = cutLayer.layers.add();          // new sublayer lands at the TOP of the Cutlines stack
+    ly.name = want;
+    try { ly.locked = false; } catch (eLk2) {}
+    try { ly.visible = true; } catch (eVis) {}
+    return ly;
+}
+
+// Removes any "{name} buffer" halo(s) from the given buffer sublayer. Snapshots refs first —
+// the live pageItems collection re-indexes on remove. Returns count. No-op on a null layer.
+function _removeNamedBuffer(bufLayer, name) {
+    if (!bufLayer) return 0;
+    var want = name + " buffer";
+    var doomed = [], i;
+    for (i = 0; i < bufLayer.pageItems.length; i++) {
+        if (bufLayer.pageItems[i].name === want) doomed.push(bufLayer.pageItems[i]);
+    }
+    for (i = 0; i < doomed.length; i++) { try { doomed[i].remove(); } catch (e) {} }
+    return doomed.length;
+}
 
 // Half of the minimum element spacing, in mm (the per-piece share of the 2mm rule). Reads the
 // SAME knob the QA gate uses (CONFIG.spacingThresholdMm) so the visual band and the export gate
@@ -2203,42 +2254,45 @@ function _spacingBufferRgb() {
     return c;
 }
 
-// Removes any existing spacing-buffer item(s) for one group (named "{name} buffer").
-// Snapshots refs first — the live pageItems collection re-indexes on remove. Returns count.
-function _removeSpacingBufferFor(group) {
-    var want = group.name + " buffer";
-    var doomed = [], i;
-    for (i = 0; i < group.pageItems.length; i++) {
-        if (group.pageItems[i].name === want) doomed.push(group.pageItems[i]);
-    }
-    for (i = 0; i < doomed.length; i++) { try { doomed[i].remove(); } catch (e) {} }
-    return doomed.length;
-}
-
-// (Re)builds ONE element's spacing-buffer band from its CURRENT cutline. Idempotent.
-// GC/WC captioned groups AND wrapped stamps (note "ST|0"); other notes skip. Returns
-// { ok, reason }.
-function syncSpacingBuffer(doc, group, opts) {
+// (Re)builds ONE element's spacing-buffer band from its CURRENT cutline, into the shared
+// "Spacing Buffer" sublayer. Idempotent. Accepts EITHER a captioned GroupItem (GC/WC/ST note;
+// cutline resolved via findGroupMember) OR a bare stamp cutline directly on the Cutlines layer
+// (a traced PathItem/CompoundPathItem — the item IS its own cutline). Other types (e.g. a
+// PlacedItem stamp) skip. Returns { ok, reason }.
+function syncSpacingBuffer(doc, item, opts) {
     opts = opts || {};
-    if (!group || group.typename !== "GroupItem") {
-        return { ok: false, reason: "stamp / non-group (no buffer)" };
-    }
-    var note = parseNote(group.note);
-    if (!note || (note.styleCode !== "GC" && note.styleCode !== "WC" && note.styleCode !== "ST")) {
-        return { ok: false, reason: "not GC/WC/ST" };
-    }
-    var cutline = findGroupMember(group, "");
-    if (!cutline) return { ok: false, reason: "cutline not found in group" };
+    if (!item) return { ok: false, reason: "no item" };
 
-    _removeSpacingBufferFor(group);
+    var cutline, name;
+    if (item.typename === "GroupItem") {
+        var note = parseNote(item.note);
+        if (!note || (note.styleCode !== "GC" && note.styleCode !== "WC" && note.styleCode !== "ST")) {
+            return { ok: false, reason: "not GC/WC/ST" };
+        }
+        cutline = findGroupMember(item, "");
+        if (!cutline) return { ok: false, reason: "cutline not found in group" };
+        name = item.name;
+    } else if (item.typename === "PathItem" || item.typename === "CompoundPathItem") {
+        // Bare stamp cutline sitting directly on the Cutlines layer (no group, no plate).
+        if (!item.name) return { ok: false, reason: "unnamed bare path (no buffer)" };
+        cutline = item;
+        name = item.name;
+    } else {
+        return { ok: false, reason: "unsupported type " + item.typename + " (no buffer)" };
+    }
+
+    var bufLayer = _getSpacingBufferLayer(doc, true);
+    if (!bufLayer) return { ok: false, reason: "Cutlines layer missing (no buffer sublayer)" };
+    _removeNamedBuffer(bufLayer, name);
 
     // Keep the halo a true fixed offset under manual resize: the +offset is a live-effect
     // parameter, so it only stays constant when effects are NOT scaled with the art.
     try { app.preferences.setBooleanPreference("scaleLineWidth", false); } catch (ePref) {}
 
-    var dup = cutline.duplicate(group, ElementPlacement.PLACEATEND);   // behind the cutline stroke
-    dup.name = group.name + " buffer";
-    try { dup.note = ""; } catch (eNote) {}   // don't let group iterators treat the halo as a cutline
+    // Duplicate the cutline INTO the buffer sublayer (top of Cutlines) at its absolute position.
+    var dup = cutline.duplicate(bufLayer, ElementPlacement.PLACEATBEGINNING);
+    dup.name = name + " buffer";
+    try { dup.note = ""; } catch (eNote) {}   // never let a QA collector treat the halo as a cutline
 
     // Render the keep-out as a thin BAND just outside the cut, NOT a filled shape — a fill tinted
     // the whole sticker (the art showed through pink). H = the per-piece keep-out (half the min
@@ -2263,89 +2317,31 @@ function syncSpacingBuffer(doc, group, opts) {
     var op = (CONFIG.spacingBufferOpacity != null) ? CONFIG.spacingBufferOpacity : 60;
     try { dup.opacity = op; } catch (eOp) {}
 
-    log("[buffer] " + group.name + " | band 0..+" + H + "mm");
+    log("[buffer] " + name + " | band 0..+" + H + "mm");
     return { ok: true };
 }
 
-// Wraps each bare stamp cutline — a PathItem/CompoundPathItem named "[Display Name]" sitting
-// DIRECTLY on the Cutlines layer — into a GroupItem so it can host a spacing-buffer halo that
-// rides the drag. Stamps have no caption plate (no Unite), so Step 6 leaves them ungrouped; the
-// pipeline's own convention is "any direct-child bare path on Cutlines == a stamp" (see
-// _nestBuildCutlineMap). The wrapper uses the SAME {name}==cutline-member structure as a captioned
-// element, with note "ST|0" → Step 9A skips its half-cut (stamps hide the peel tab manually, per
-// the playbook) while syncSpacingBuffer still finds it. Idempotent: an already-wrapped stamp is no
-// longer a direct child, so it is left alone. Returns the number wrapped.
-function wrapStampsInGroups(cutlinesLayer) {
-    // Snapshot direct-child bare paths first — adding a group + moving items into it re-indexes
-    // the live pathItems/compoundPathItems collections mid-loop.
-    // NOTE: a default-tab element is a GroupItem (not a bare path), so it is naturally skipped
-    // here — only genuinely bare stamp cutlines (no tab) are wrapped for a halo.
-    var bare = [], i, it;
-    for (i = 0; i < cutlinesLayer.pathItems.length; i++) {
-        it = cutlinesLayer.pathItems[i];
-        if (it.parent === cutlinesLayer && it.name) bare.push(it);
-    }
-    for (i = 0; i < cutlinesLayer.compoundPathItems.length; i++) {
-        it = cutlinesLayer.compoundPathItems[i];
-        if (it.parent === cutlinesLayer && it.name) bare.push(it);
-    }
-    var wrapped = 0, p, grp;
-    for (i = 0; i < bare.length; i++) {
-        p = bare[i];
-        grp = cutlinesLayer.groupItems.add();
-        grp.name = p.name;
-        grp.note = "ST|0";
-        p.move(grp, ElementPlacement.PLACEATBEGINNING);
-        // p keeps name === grp.name, so findGroupMember(grp, "") returns it (the cutline member).
-        wrapped++;
-        log("[buffer] wrapped stamp for halo | " + grp.name);
-    }
-    return wrapped;
-}
-
-// Strips every spacing-buffer halo from the Cutlines layer (call before export — Step 10
-// clips/exports and Step 11 ships, neither should see the working-phase halo). Idempotent.
-// Returns the number removed.
+// Strips every spacing-buffer halo (call before export — Step 10 clips/exports and Step 11
+// ships, neither should see the working-phase halo). Removes the whole "Spacing Buffer"
+// sublayer in one shot (unlocking first — layer.remove() throws on a locked layer). Idempotent.
+// Returns the number of halos removed.
 function removeAllSpacingBuffers(doc) {
-    var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
-    if (!cutLayer) return 0;
-    var removed = 0, gi, g;
-    for (gi = 0; gi < cutLayer.groupItems.length; gi++) {
-        g = cutLayer.groupItems[gi];
-        if (g.parent !== cutLayer) continue;
-        removed += _removeSpacingBufferFor(g);
+    var bufLayer = _getSpacingBufferLayer(doc, false);
+    if (!bufLayer) return 0;
+    var removed = bufLayer.pageItems.length;
+    try { bufLayer.locked = false; } catch (eLk) {}
+    try {
+        bufLayer.remove();
+    } catch (eRm) {
+        // Fallback: if the sublayer can't be removed, empty it (snapshot refs — live re-index).
+        var items = [], i;
+        try {
+            for (i = 0; i < bufLayer.pageItems.length; i++) items.push(bufLayer.pageItems[i]);
+            for (i = 0; i < items.length; i++) { try { items[i].remove(); } catch (e2) {} }
+        } catch (e3) {}
     }
     if (removed > 0) log("[buffer] stripped " + removed + " spacing buffer(s) before export.");
     return removed;
-}
-
-// Reverses wrapStampsInGroups: for each top-level "ST|0" group, moves its cutline member back
-// onto the Cutlines layer as a bare path and removes the now-empty wrapper — restoring the EXACT
-// pre-halo stamp structure before export, so Step 10 / Step 11 and the shipped file see stamps
-// exactly as they did before this feature (the grouping is a working-phase aid only, never a
-// deliverable change). Call AFTER removeAllSpacingBuffers so only the cutline remains. Idempotent.
-// Returns the number unwrapped.
-function unwrapStampGroups(doc) {
-    var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
-    if (!cutLayer) return 0;
-    var groups = [], i, g, note;
-    for (i = 0; i < cutLayer.groupItems.length; i++) {
-        g = cutLayer.groupItems[i];
-        if (g.parent !== cutLayer) continue;
-        note = parseNote(g.note);
-        // Only unwrap HALO-ONLY wrappers (no plate member). A real default-tab group has a
-        // "{name} plate" member (the tab cutline) and must ship as a group — never unwrap it.
-        if (note && note.styleCode === "ST" && findGroupMember(g, " plate") === null) groups.push(g);
-    }
-    var unwrapped = 0, member;
-    for (i = 0; i < groups.length; i++) {
-        g = groups[i];
-        member = findGroupMember(g, "");
-        if (member) { member.move(cutLayer, ElementPlacement.PLACEATEND); unwrapped++; }
-        try { g.remove(); } catch (e) {}
-    }
-    if (unwrapped > 0) log("[buffer] unwrapped " + unwrapped + " stamp group(s) for export.");
-    return unwrapped;
 }
 
 // Rounds to 0.1 for compact log coordinates.

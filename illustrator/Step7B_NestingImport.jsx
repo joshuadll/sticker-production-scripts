@@ -215,24 +215,19 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
     // The half-cut tracks the caption seam; nesting only rotated/translated each cutline
     // group, so re-derive it on the new pose (idempotent — clears its own prior output).
     if (!CONFIG.dryRun) {
-        // Wrap bare stamp cutlines in groups first, so they too can host a halo that rides the
-        // drag (a stamp's cut line is a first-class cutline in Illustrator — same 2mm rule). The
-        // half-cut still skips them (note "ST|0"); only the spacing buffer covers stamps.
-        var stampsWrapped = wrapStampsInGroups(cutlinesLayer);
-        if (stampsWrapped > 0) log("[step-nest] wrapped " + stampsWrapped + " stamp(s) in groups for halo");
-
         var hcSynced = 0, sbSynced = 0, gi, gItem, gNote;
+        // Pass 1 — captioned groups (GC/WC) + ST tab groups: half-cut for captions/tabs, halo for all.
         for (gi = 0; gi < cutlinesLayer.groupItems.length; gi++) {
             gItem = cutlinesLayer.groupItems[gi];
             if (gItem.parent !== cutlinesLayer) continue;
             gNote = parseNote(gItem.note);
             if (!gNote) continue;
             var isCaptioned = (gNote.styleCode === "GC" || gNote.styleCode === "WC");
-            // A default-tab group is note "ST" WITH a " plate" member (the tab cutline); a bare
-            // stamp wrapper is note "ST" with no plate. Tabs get a half-cut like captions.
+            // A default-tab group is note "ST" WITH a " plate" member (the tab cutline); other ST
+            // groups have no plate. Tabs get a half-cut like captions.
             var isTab       = (gNote.styleCode === "ST" && findGroupMember(gItem, " plate") !== null);
-            var isStamp     = (gNote.styleCode === "ST");
-            if (!isCaptioned && !isStamp) continue;
+            var isStampGrp  = (gNote.styleCode === "ST");
+            if (!isCaptioned && !isStampGrp) continue;
             // Half-cut: GC/WC + default tabs. syncHalfcut clears the prior tab BEFORE re-deriving,
             // so a re-sync that fails to re-seat leaves NO half-cut — name the element rather than
             // silently undercount. (Without this, a tab's half-cut stays at its pre-nest pose until
@@ -243,12 +238,31 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
                 else log("[step-nest] half-cut SKIP | " + gItem.name + " — " + hcRes.reason
                     + " (peel tab missing; AI_ExportFinal will hard-error until the seat is fixed)");
             }
-            // Spacing-buffer halo (live drag-time 2mm keep-out aid) — GC/WC AND stamps. Built here
-            // so it rides the nested pose + the artist's manual repositioning; refreshed by Step 8b;
-            // stripped before export. Advisory, so a failure only logs — it never blocks the import.
+            // Spacing-buffer halo (live drag-time 2mm keep-out aid). Built into the shared
+            // "Spacing Buffer" sublayer (top of Cutlines) so the artist can hide/show all halos with
+            // one eyeball while still dragging each piece + its halo together (cross-layer select);
+            // refreshed by Step 8b; stripped before export. Advisory — a failure only logs.
             var sbRes = syncSpacingBuffer(doc, gItem, {});
             if (sbRes.ok) sbSynced++;
             else log("[step-nest] spacing-buffer SKIP | " + gItem.name + " — " + sbRes.reason);
+        }
+        // Pass 2 — bare stamp cutlines (traced PathItem/CompoundPathItem directly on Cutlines, no
+        // group): build a halo straight into the sublayer — no group wrapping needed anymore. Snapshot
+        // direct children first (layer.pathItems recurses into groups; guard on parent). Halo paths
+        // live in the "Spacing Buffer" child SUBLAYER, so they never appear in cutlinesLayer.pathItems.
+        var bareStamps = [], bi, bit;
+        for (bi = 0; bi < cutlinesLayer.pathItems.length; bi++) {
+            bit = cutlinesLayer.pathItems[bi];
+            if (bit.parent === cutlinesLayer && bit.name) bareStamps.push(bit);
+        }
+        for (bi = 0; bi < cutlinesLayer.compoundPathItems.length; bi++) {
+            bit = cutlinesLayer.compoundPathItems[bi];
+            if (bit.parent === cutlinesLayer && bit.name) bareStamps.push(bit);
+        }
+        for (bi = 0; bi < bareStamps.length; bi++) {
+            var sbRes2 = syncSpacingBuffer(doc, bareStamps[bi], {});
+            if (sbRes2.ok) sbSynced++;
+            else log("[step-nest] spacing-buffer SKIP | " + bareStamps[bi].name + " — " + sbRes2.reason);
         }
         log("[step-nest] half-cut sync | " + hcSynced + " GC/WC/tab element(s) re-synced to nested pose");
         log("[step-nest] spacing-buffer | " + sbSynced + " keep-out halo(s) built (GC/WC + stamps)");

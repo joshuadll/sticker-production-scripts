@@ -237,6 +237,10 @@ function _qa_collectPaths(container) {
     // so this branch only fires for Layer containers.
     if (container.layers) {
         for (i = 0; i < container.layers.length; i++) {
+            // Skip the spacing-buffer sublayer: its halos are transient drag-time aids offset
+            // OUTSIDE the real cut, so counting them inflates occupancy and erases real pockets.
+            // (The per-item " buffer" name-guard below is a second line of defence.)
+            if (container.layers[i].name === spacingBufferLayerName()) continue;
             inner = _qa_collectPaths(container.layers[i]);
             for (j = 0; j < inner.length; j++) result.push(inner[j]);
         }
