@@ -101,6 +101,8 @@ cat > "$PLIST_PATH" << EOF
     </array>
     <key>RunAtLoad</key>
     <true/>
+    <key>StartInterval</key>
+    <integer>3600</integer>
     <key>StandardErrorPath</key>
     <string>${SUPPORT_DIR}/update-error.log</string>
 </dict>
@@ -109,6 +111,28 @@ EOF
 
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
 launchctl load "$PLIST_PATH"
+
+# ── Desktop "Update Noteworthie" force-update command ─────────────────────────
+DESKTOP_CMD="$HOME/Desktop/Update Noteworthie.command"
+cat > "$DESKTOP_CMD" <<EOF
+#!/bin/bash
+echo "Updating Noteworthie scripts..."
+bash "$UPDATE_SCRIPT"
+S="$SUPPORT_DIR/update-status.txt"
+if [ -f "\$S" ]; then
+    inst=\$(grep '^installed=' "\$S" | cut -d= -f2 | cut -c1-7)
+    ok=\$(grep '^ok=' "\$S" | cut -d= -f2)
+    if [ "\$ok" = "1" ]; then
+        echo "Up to date — version \$inst"
+        echo "Now re-run your step from File > Scripts (no need to restart the app)."
+    else
+        echo "Could not reach the internet. Check your connection and try again."
+    fi
+fi
+read -r -p "Press Enter to close..." _
+EOF
+chmod +x "$DESKTOP_CMD"
+echo "  ✓ Desktop      — Update Noteworthie.command"
 
 # ── Done ───────────────────────────────────────────────────────────────────────
 echo ""
