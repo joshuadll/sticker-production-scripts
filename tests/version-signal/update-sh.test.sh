@@ -57,4 +57,24 @@ check "offline ok=0" "$(grep '^ok=' "$S" | cut -d= -f2)" "0"
 check "offline untouched" "$(cat "$PJSX")" "KEEP"
 check "offline keeps installed" "$(grep '^installed=' "$S" | cut -d= -f2)" "bbbb222"
 
-echo ""; echo "PASS=$PASS FAIL=$FAIL"; rm -rf "$SB"; [ "$FAIL" -eq 0 ]
+# 5. Establish a healthy baseline (ok=1) first, so this test actually exercises the bug:
+#    a stale ok=1 from a PRIOR successful sync must not survive a later failed one.
+export FAKE_SHA="dddd444"; bash "$UPDATE_SH"
+check "baseline installed" "$(grep '^installed=' "$S" | cut -d= -f2)" "dddd444"
+check "baseline ok" "$(grep '^ok=' "$S" | cut -d= -f2)" "1"
+
+# precheck succeeds (new sha) but download fails (curl) -> ok=0, installed UNCHANGED
+# (stays the previous good sha, since the new version did not land), and the
+# previously-synced script file survives untouched.
+cat > "$BIN/curl" <<'EOF'
+#!/bin/bash
+exit 1
+EOF
+chmod +x "$BIN/curl"
+echo "MARKER5" > "$PJSX"
+export FAKE_SHA="eeee555"; bash "$UPDATE_SH" || true
+check "download-fail ok=0" "$(grep '^ok=' "$S" | cut -d= -f2)" "0"
+check "download-fail keeps installed" "$(grep '^installed=' "$S" | cut -d= -f2)" "dddd444"
+check "download-fail scripts survive" "$(cat "$PJSX")" "MARKER5"
+
+echo ""; echo "PASS=$PASS FAIL=$FAIL (15 checks)"; rm -rf "$SB"; [ "$FAIL" -eq 0 ]

@@ -36,7 +36,10 @@ if [ "$latest" = "$installed" ] && [ -d "$INSTALL_DIR" ]; then
     exit 0
 fi
 
-# Changed (or first run): full sync.
+# Changed (or first run): full sync. If any download/sync step fails here, record
+# ok=0 while KEEPING the previous installed SHA (the new version did not land), so
+# the status never misreports a failed or partial sync as healthy.
+trap 'write_status "$installed" "$latest" "0"' ERR
 mkdir -p "$INSTALL_DIR"
 curl -fsSL "$REPO_ZIP" -o "$TMP_DIR/scripts.zip"
 ditto -xk "$TMP_DIR/scripts.zip" "$TMP_DIR"
@@ -45,5 +48,6 @@ rsync -a --delete \
     --exclude='docs/' \
     --exclude='installer/' \
     "$TMP_DIR/sticker-production-scripts-main/" "$INSTALL_DIR/"
+trap - ERR
 
 write_status "$latest" "$latest" "1"
