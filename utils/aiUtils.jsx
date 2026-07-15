@@ -2167,12 +2167,13 @@ function syncHalfcut(doc, group, opts) {
 // halos meeting == exactly the min gap, and OVERLAPPING halos == under spec.
 //
 // WHERE THEY LIVE: all halos sit in ONE dedicated TOP-LEVEL layer, "Spacing Buffer" (see
-// spacingBufferLayerName), at the top of the document layer stack — NOT as children of the
-// cutline groups, and NOT a sublayer of Cutlines. This gives the artist a single Layers-panel
-// eyeball to hide/show every halo at once while hand-nesting (the original ask). A top-level
-// layer (vs a Cutlines sublayer) also keeps the halos naturally OUT of the QA collectors, which
-// scope into the Cutlines layer only — so Step 8c / StepQA never see a halo and need no skip
-// guard. The layer is kept UNLOCKED + visible so a marquee/shift-click over a piece still grabs
+// spacingBufferLayerName), positioned directly ABOVE the Cutlines layer (→ between Cutlines and
+// Halfcut in the working stack) — NOT as children of the cutline groups, and NOT a sublayer of
+// Cutlines. This gives the artist a single Layers-panel eyeball to hide/show every halo at once
+// while hand-nesting (the original ask). A top-level layer (vs a Cutlines sublayer) also keeps the
+// halos naturally OUT of the QA collectors, which scope into the Cutlines layer only — so Step 8c /
+// StepQA never see a halo and need no skip guard. The layer is kept UNLOCKED + visible so a
+// marquee/shift-click over a piece still grabs
 // its halo — Illustrator selection is CROSS-LAYER, so the halo rides the artist's manual
 // drag/scale exactly like the art (in the Sticker layer) does, even though it is not a group
 // child. Locking the layer would drop the halos from that selection, so it stays unlocked; the
@@ -2201,10 +2202,12 @@ function spacingBufferLayerName() {
     return (CONFIG.spacingBufferLayerName != null) ? CONFIG.spacingBufferLayerName : "Spacing Buffer";
 }
 
-// Find (create optional) the top-level "Spacing Buffer" layer at the top of the document stack.
-// Always returns it UNLOCKED (so we can add/remove halos and the artist's marquee can grab them);
-// visibility is set true only on creation, so a re-run never overrides the artist's manual hide.
-// Returns null when create=false and the layer is absent.
+// Find (create optional) the top-level "Spacing Buffer" layer. On creation it is positioned
+// directly ABOVE the Cutlines layer (→ between Cutlines and Halfcut in the working stack), so the
+// translucent band renders under the halfcut lines + the Margin overlay rather than on top of
+// everything. Always returns it UNLOCKED (so we can add/remove halos and the artist's marquee can
+// grab them); visibility + position are set only on creation, so a re-run never overrides the
+// artist's manual hide/reorder. Returns null when create=false and the layer is absent.
 function _getSpacingBufferLayer(doc, create) {
     var want = spacingBufferLayerName(), i, ly;
     for (i = 0; i < doc.layers.length; i++) {
@@ -2215,8 +2218,12 @@ function _getSpacingBufferLayer(doc, create) {
         }
     }
     if (!create) return null;
-    ly = doc.layers.add();               // new layer lands at the TOP of the document stack
+    ly = doc.layers.add();               // new layer lands at the top of the stack…
     ly.name = want;
+    // …then move it directly above Cutlines (PLACEBEFORE = higher in the stack). Cutlines always
+    // exists by the time a halo is built; if it somehow doesn't, leave the layer at the top.
+    var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
+    if (cutLayer) { try { ly.move(cutLayer, ElementPlacement.PLACEBEFORE); } catch (eMv) {} }
     try { ly.locked = false; } catch (eLk2) {}
     try { ly.visible = true; } catch (eVis) {}
     return ly;

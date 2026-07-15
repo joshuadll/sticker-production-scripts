@@ -220,9 +220,10 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
     bridged and a cap-wrap seam is kept; short spans allowed; returns null = not seated
     → error, no flat-cut fallback),
   syncSpacingBuffer (per-element live 2mm keep-out halo named "{name} buffer" = the cutline
-    duplicated INTO a dedicated top-level "Spacing Buffer" layer at the TOP of the document stack
-    (NOT a child of the cutline group, NOT a Cutlines sublayer — moved 2026-07-15 per artist
-    feedback so ONE Layers-panel eyeball hides/shows every halo at once during hand-nesting), then
+    duplicated INTO a dedicated top-level "Spacing Buffer" layer positioned directly ABOVE Cutlines
+    (between Cutlines and Halfcut) (NOT a child of the cutline group, NOT a Cutlines sublayer — moved
+    2026-07-15 per artist feedback so ONE Layers-panel eyeball hides/shows every halo at once during
+    hand-nesting), then
     rendered as a thin magenta/violet Multiply BAND (NOT a fill — a fill tinted the whole sticker
     pink; the band sits just OUTSIDE the cut so the art's true colours show) via a STROKE of width
     H + a LIVE Adobe Offset Path effect of +H/2, H = HALF the min spacing → band spans the cut line
@@ -325,7 +326,9 @@ Exceptions (case-insensitive search, consistent standard):
 - **Halfcut layer**: Step 9A searches case-insensitively via `getOrCreateHalfcutLayer()` in aiUtils (seen as "Half cut", "Halfcut", "halfcut lines"); creates as "Halfcut" if absent. Step 11 standardises to `"Halfcut/Peeling Tab"` when saving the final file.
 - **Stickers layer**: `"Sticker"` (singular) everywhere. Built in code by `buildWorkingDocument` and found by exact `findLayer(doc, CONFIG.stickersLayerName)` — all pipeline CONFIGs use the same name, so no case-insensitive/plural fallback (the doc is always code-built, never from a template, so there's no naming variety to tolerate).
 - **Asset layer**: NOT created by the automated pipeline. Step 10 builds temporary clip groups per-export and discards them — the working file stays clean. (The manual workflow created a persistent Asset layer; the script does not.)
-Working file stack: Margin > Offset Path > Halfcut > Cutlines > Stickers > Grid > Color Block
+Working file stack: Margin > Offset Path > Halfcut > [Spacing Buffer] > Cutlines > Stickers > Grid > Color Block
+  ([Spacing Buffer] = the transient keep-out halo layer, between Halfcut and Cutlines during the
+  working phase only; unlocked+visible, removed before export — see syncSpacingBuffer.)
 Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
 
 Step 8c does **pure-geometry QA** — no Offset Path layer is created. It measures
