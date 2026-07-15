@@ -614,6 +614,9 @@ artwork as the top-level group (L/C/R sub-layers), which Step 3B elongates per e
 ## Final file naming
 [STK_CODE]_final.ai — parse STK code as everything before first space in working filename
 
+## Version signal and auto-update
+Pipelines print a four-state version signal at the start of the log banner and end of the completion alert: `✓ Up to date` / `⚠ Update available` / `⚠ Update check is stale` / omitted (when version status cannot be determined). Sourced from `~/Library/Application Support/Noteworthie/update-status.txt` (written by `installer/update.sh`). Helper functions `readVersionStatus` (returns status object) and `formatVersionStatus` (formats for display) in psUtils.jsx and aiUtils.jsx.
+
 ## Notion references
 Manual playbook (source of truth for what each step does):
   https://www.notion.so/2c60fc586739806cbf25ec60a90416be
