@@ -2228,6 +2228,14 @@ function _distPointToPolygon(p, poly) {
     return best;
 }
 
+// True if a half-cut endpoint fails to reach the cut contour: non-finite, or inside the
+// contour by >= minGap. The single undershoot definition shared by the export gate
+// (validateHalfcut) and the Layout QA overlay (_qaHalfcutUndershoot).
+function _isEndpointShort(p, cutPoly, minGap) {
+    if (!p || !isFinite(p.x) || !isFinite(p.y)) return true;
+    return pointInPolygon(p, cutPoly) && _distPointToPolygon(p, cutPoly) >= minGap;
+}
+
 // Do BOTH endpoints of a half-cut reach the element's cut contour? endPts = the two
 // end anchors [{x,y},{x,y}]; cutPoly = the largest sampled polygon of the cut contour;
 // minGapPt = max tolerated shortfall (mmToPoints(1)). An end CONNECTS when it is on/outside
@@ -2237,13 +2245,9 @@ function _halfcutEndsReachCut(endPts, cutPoly, minGapPt) {
     if (!endPts || endPts.length < 2 || !cutPoly || cutPoly.length < 3) {
         return { ok: false, reason: "undershoot" };
     }
-    var i, p;
+    var i;
     for (i = 0; i < endPts.length; i++) {
-        p = endPts[i];
-        if (!p || !isFinite(p.x) || !isFinite(p.y)) return { ok: false, reason: "undershoot" };
-        if (pointInPolygon(p, cutPoly) && _distPointToPolygon(p, cutPoly) >= minGapPt) {
-            return { ok: false, reason: "undershoot" };
-        }
+        if (_isEndpointShort(endPts[i], cutPoly, minGapPt)) return { ok: false, reason: "undershoot" };
     }
     return { ok: true, reason: null };
 }

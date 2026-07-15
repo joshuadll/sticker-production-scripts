@@ -63,7 +63,8 @@ function _qaHalfcutUndershoot(doc, overlay, group, blue, steps) {
     var e;
     for (e = 0; e < ends.length; e++) {
         var p = ends[e];
-        if (!(pointInPolygon(p, cutPoly) && _distPointToPolygon(p, cutPoly) >= minGap)) continue;
+        if (!_isEndpointShort(p, cutPoly, minGap)) continue;
+        if (!isFinite(p.x) || !isFinite(p.y)) continue;   // short but undrawable
         var near = _qaNearestPolyVertex(p, cutPoly);
         qaDrawSegment(overlay, p.x, p.y, near.x, near.y, blue, mmToPoints(0.35), 100);
         qaDrawDot(overlay, p.x, p.y, mmToPoints(1.2), blue, 90);
