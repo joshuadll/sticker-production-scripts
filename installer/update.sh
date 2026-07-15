@@ -1,13 +1,43 @@
 #!/bin/bash
 set -e
 
-SUPPORT_DIR="$HOME/Library/Application Support/Noteworthie"
+SUPPORT_DIR="${NOTEWORTHIE_SUPPORT_DIR:-$HOME/Library/Application Support/Noteworthie}"
 INSTALL_DIR="$SUPPORT_DIR/scripts"
-REPO_ZIP="https://github.com/joshuadll/sticker-production-scripts/archive/refs/heads/main.zip"
+REPO_SLUG="joshuadll/sticker-production-scripts"
+REPO_ZIP="https://github.com/$REPO_SLUG/archive/refs/heads/main.zip"
+REPO_GIT="https://github.com/$REPO_SLUG.git"
+STATUS_FILE="$SUPPORT_DIR/update-status.txt"
 TMP_DIR=$(mktemp -d)
-
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+mkdir -p "$SUPPORT_DIR"
+
+# Previously-installed commit SHA (empty on first run)
+installed=""
+[ -f "$STATUS_FILE" ] && installed=$(grep '^installed=' "$STATUS_FILE" | head -1 | cut -d= -f2)
+
+# Cheap precheck: latest main SHA (~1 KB, no full download). Empty on failure/offline.
+latest=$(git ls-remote "$REPO_GIT" main 2>/dev/null | head -1 | cut -f1)
+
+now=$(date +%s)
+write_status() {   # $1 installed  $2 latest  $3 ok
+    { echo "installed=$1"; echo "latest=$2"; echo "checked=$now"; echo "ok=$3"; } > "$STATUS_FILE"
+}
+
+# Offline / fetch failed: leave scripts + installed SHA intact, mark not-ok.
+if [ -z "$latest" ]; then
+    write_status "$installed" "$installed" "0"
+    exit 0
+fi
+
+# Already current: skip the download entirely.
+if [ "$latest" = "$installed" ] && [ -d "$INSTALL_DIR" ]; then
+    write_status "$installed" "$latest" "1"
+    exit 0
+fi
+
+# Changed (or first run): full sync.
+mkdir -p "$INSTALL_DIR"
 curl -fsSL "$REPO_ZIP" -o "$TMP_DIR/scripts.zip"
 ditto -xk "$TMP_DIR/scripts.zip" "$TMP_DIR"
 rsync -a --delete \
@@ -16,5 +46,4 @@ rsync -a --delete \
     --exclude='installer/' \
     "$TMP_DIR/sticker-production-scripts-main/" "$INSTALL_DIR/"
 
-# Write last-synced timestamp
-echo "$(date '+%Y-%m-%d %H:%M')" > "$SUPPORT_DIR/last-synced.txt"
+write_status "$latest" "$latest" "1"
