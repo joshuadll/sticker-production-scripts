@@ -2254,13 +2254,7 @@ function _halfcutEndsReachCut(endPts, cutPoly, minGapPt) {
 function _halfcutCutPolyForGroup(group, steps) {
     var cut = findGroupMember(group, "");
     if (!cut) return null;
-    // Drill a GroupItem cut member down to its first path (the united contour).
-    var probe = cut, guard = 0;
-    while (probe && probe.typename === "GroupItem" && guard < 8) {
-        probe = probe.pageItems.length ? probe.pageItems[0] : null; guard++;
-    }
-    if (!probe || (probe.typename !== "PathItem" && probe.typename !== "CompoundPathItem")) return null;
-    return _largestPoly(samplePathToPolygons(probe, steps));
+    return _largestPoly(samplePathToPolygons(cut, steps));
 }
 
 // Verify (never derive) one element's half-cut. Returns { ok, reason }:
