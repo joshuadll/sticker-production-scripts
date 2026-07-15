@@ -105,11 +105,20 @@ validateHalfcut(group) -> { ok, reason }   // reason: null | "missing" | "unders
 
 (No "fix the seating in Photoshop" text.)
 
-### 3. Layout QA — advisory overlay flag
+### 3. `StepQA_Halfcut.jsx` — advisory overlay flag (new step file)
 
-Add a half-cut pass to `AI_LayoutQA` (and/or `Step8c`'s QA producer) that draws onto the
-existing toggleable **`"Layout QA"`** overlay layer, in a **blue** hue distinct from the
-red (spacing) and amber (margin) flags and readable on the green Color Block:
+A new step file `illustrator/StepQA_Halfcut.jsx` exporting `runHalfcutQA(doc)`, mirroring
+`StepQA_NestingQuality` exactly: it is `#include`d and called by `AI_LayoutQA` (not by
+`AI_ExportFinal`), calls `validateHalfcut` per peel-tab element, and **appends** its marks
+to the shared toggleable **`"Layout QA"`** overlay layer (Step 8c runs first and resets the
+layer; StepQA passes append). It draws in a **blue** hue distinct from the red (spacing) and
+amber (margin) flags and readable on the green Color Block:
+
+*Not folded into `Step8c_OffsetPathQA`:* Step 8c owns the spacing/margin concern and doubles
+as `AI_ExportFinal`'s spacing gate; the half-cut check is a separate concern with a separate
+gate (Step 9A), so it gets its own advisory step file, exactly as NQI does.
+
+Marks:
 
 - **Missing** → blue **dashed echo** of the element's cut contour + a small blue badge (the
   same "echo the offending element" grammar spacing/margin use).
