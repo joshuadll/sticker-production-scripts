@@ -2207,6 +2207,86 @@ function syncHalfcut(doc, group, opts) {
     return { ok: true, curved: curved };
 }
 
+// ─── HALF-CUT VALIDATION (export gate + Layout QA; no re-derivation) ───────────
+// Distance from point p to segment a-b (all {x,y}); pure.
+function _distPointToSegment(p, a, b) {
+    var vx = b.x - a.x, vy = b.y - a.y;
+    var wx = p.x - a.x, wy = p.y - a.y;
+    var len2 = vx * vx + vy * vy;
+    var t = len2 > 0 ? (wx * vx + wy * vy) / len2 : 0;
+    if (t < 0) t = 0; else if (t > 1) t = 1;
+    var dx = p.x - (a.x + t * vx), dy = p.y - (a.y + t * vy);
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Min distance from p to the polygon's edges (closed ring); pure.
+function _distPointToPolygon(p, poly) {
+    var best = 1e15, i, j, d;
+    for (i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        d = _distPointToSegment(p, poly[j], poly[i]);
+        if (d < best) best = d;
+    }
+    return best;
+}
+
+// Do BOTH endpoints of a half-cut reach the element's cut contour? endPts = the two
+// end anchors [{x,y},{x,y}]; cutPoly = the largest sampled polygon of the cut contour;
+// minGapPt = max tolerated shortfall (mmToPoints(1)). An end CONNECTS when it is on/outside
+// the contour OR inside it by < minGapPt. An end inside by >= minGapPt is a short end
+// (undershoot). < 2 finite endpoints → undershoot. Pure — unit-tested with plain arrays.
+function _halfcutEndsReachCut(endPts, cutPoly, minGapPt) {
+    if (!endPts || endPts.length < 2 || !cutPoly || cutPoly.length < 3) {
+        return { ok: false, reason: "undershoot" };
+    }
+    var i, p;
+    for (i = 0; i < endPts.length; i++) {
+        p = endPts[i];
+        if (!p || !isFinite(p.x) || !isFinite(p.y)) return { ok: false, reason: "undershoot" };
+        if (pointInPolygon(p, cutPoly) && _distPointToPolygon(p, cutPoly) >= minGapPt) {
+            return { ok: false, reason: "undershoot" };
+        }
+    }
+    return { ok: true, reason: null };
+}
+
+// Largest sampled polygon of a Cutlines group's cut contour (the member named group.name),
+// drilling through the Pathfinder-Unite wrapper group like Step 10 does. null if unresolved.
+function _halfcutCutPolyForGroup(group, steps) {
+    var cut = findGroupMember(group, "");
+    if (!cut) return null;
+    // Drill a GroupItem cut member down to its first path (the united contour).
+    var probe = cut, guard = 0;
+    while (probe && probe.typename === "GroupItem" && guard < 8) {
+        probe = probe.pageItems.length ? probe.pageItems[0] : null; guard++;
+    }
+    if (!probe || (probe.typename !== "PathItem" && probe.typename !== "CompoundPathItem")) return null;
+    return _largestPoly(samplePathToPolygons(probe, steps));
+}
+
+// Verify (never derive) one element's half-cut. Returns { ok, reason }:
+//   reason "missing"    — no "{group.name} halfcut" path on the Halfcut layer.
+//   reason "undershoot" — an endpoint falls short of the element's cut line by >= 1mm.
+//   reason null         — a valid half-cut exists and both ends reach the cut line.
+function validateHalfcut(doc, group) {
+    var steps = CONFIG.halfcutSeamSteps || 16;
+    var hcLayer = getOrCreateHalfcutLayer(doc);
+    var want = group.name + " halfcut", hc = null, i;
+    for (i = 0; i < hcLayer.pathItems.length; i++) {
+        if (hcLayer.pathItems[i].name === want) { hc = hcLayer.pathItems[i]; break; }
+    }
+    if (!hc) return { ok: false, reason: "missing" };
+
+    var cutPoly = _halfcutCutPolyForGroup(group, steps);
+    if (!cutPoly) return { ok: true, reason: null };   // can't sample the cut → don't false-fail
+
+    var pts = hc.pathPoints, ends = [];
+    if (pts && pts.length >= 2) {
+        ends.push({ x: pts[0].anchor[0], y: pts[0].anchor[1] });
+        ends.push({ x: pts[pts.length - 1].anchor[0], y: pts[pts.length - 1].anchor[1] });
+    }
+    return _halfcutEndsReachCut(ends, cutPoly, mmToPoints(1));
+}
+
 // ─── SPACING BUFFER (live 2mm keep-out halo; Step 7B birth + Step 8b refresh) ─────
 // A drag-time visual aid for the 2mm minimum-spacing rule. Each GC/WC cutline gets a
 // translucent "keep-out" halo offset OUTWARD by HALF the min spacing — so two pieces'
