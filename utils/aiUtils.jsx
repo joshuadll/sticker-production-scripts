@@ -2321,25 +2321,47 @@ function syncSpacingBuffer(doc, item, opts) {
     return { ok: true };
 }
 
-// Strips every spacing-buffer halo (call before export — Step 10 clips/exports and Step 11
-// ships, neither should see the working-phase halo). Removes the whole "Spacing Buffer"
-// sublayer in one shot (unlocking first — layer.remove() throws on a locked layer). Idempotent.
-// Returns the number of halos removed.
+// Strips every spacing-buffer halo before export (Step 10 clips/exports, Step 11 ships —
+// neither may see the working-phase halo). LOCATION-AGNOSTIC by contract ("no halo ever reaches
+// print"): (a) removes the whole "Spacing Buffer" sublayer (the current home), AND (b) sweeps any
+// stray "{name} buffer" child still sitting inside a cutline group — a doc authored before the
+// 2026-07-15 sublayer move (an artist's in-flight working file) keeps its halos as group children,
+// and those must be stripped too. Idempotent. Returns the total number of halos removed.
 function removeAllSpacingBuffers(doc) {
+    var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
+    if (!cutLayer) return 0;
+    var removed = 0, i;
+
+    // (a) Current structure — the dedicated sublayer.
     var bufLayer = _getSpacingBufferLayer(doc, false);
-    if (!bufLayer) return 0;
-    var removed = bufLayer.pageItems.length;
-    try { bufLayer.locked = false; } catch (eLk) {}
-    try {
-        bufLayer.remove();
-    } catch (eRm) {
-        // Fallback: if the sublayer can't be removed, empty it (snapshot refs — live re-index).
-        var items = [], i;
+    if (bufLayer) {
+        removed += bufLayer.pageItems.length;
+        try { bufLayer.locked = false; } catch (eLk) {}
         try {
-            for (i = 0; i < bufLayer.pageItems.length; i++) items.push(bufLayer.pageItems[i]);
-            for (i = 0; i < items.length; i++) { try { items[i].remove(); } catch (e2) {} }
-        } catch (e3) {}
+            bufLayer.remove();
+        } catch (eRm) {
+            // Fallback: if the sublayer can't be removed, empty it (snapshot refs — live re-index).
+            var items = [];
+            try {
+                for (i = 0; i < bufLayer.pageItems.length; i++) items.push(bufLayer.pageItems[i]);
+                for (i = 0; i < items.length; i++) { try { items[i].remove(); } catch (e2) {} }
+            } catch (e3) {}
+        }
     }
+
+    // (b) Legacy / belt-and-suspenders — a "{group.name} buffer" child left inside a cutline group.
+    var gi, g, j, want, doomed;
+    for (gi = 0; gi < cutLayer.groupItems.length; gi++) {
+        g = cutLayer.groupItems[gi];
+        if (g.parent !== cutLayer) continue;
+        want = g.name + " buffer";
+        doomed = [];
+        for (j = 0; j < g.pageItems.length; j++) {
+            if (g.pageItems[j].name === want) doomed.push(g.pageItems[j]);
+        }
+        for (j = 0; j < doomed.length; j++) { try { doomed[j].remove(); removed++; } catch (eD) {} }
+    }
+
     if (removed > 0) log("[buffer] stripped " + removed + " spacing buffer(s) before export.");
     return removed;
 }
