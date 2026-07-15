@@ -37,6 +37,20 @@ echo "// fake" > "$tmp/sticker-production-scripts-main/pipelines/PS_BuildElement
 rm -rf "$tmp"
 EOF
 chmod +x "$BIN/curl"
+
+# stubs: fail ditto/rsync on demand ($FAIL_DITTO/$FAIL_RSYNC); otherwise delegate to the real binary
+cat > "$BIN/ditto" <<'EOF'
+#!/bin/bash
+[ -n "$FAIL_DITTO" ] && exit 1
+exec /usr/bin/ditto "$@"
+EOF
+chmod +x "$BIN/ditto"
+cat > "$BIN/rsync" <<'EOF'
+#!/bin/bash
+[ -n "$FAIL_RSYNC" ] && exit 1
+exec /usr/bin/rsync "$@"
+EOF
+chmod +x "$BIN/rsync"
 export PATH="$BIN:$PATH"
 
 S="$NOTEWORTHIE_SUPPORT_DIR/update-status.txt"
@@ -86,4 +100,23 @@ check "download-fail ok=0" "$(grep '^ok=' "$S" | cut -d= -f2)" "0"
 check "download-fail keeps installed" "$(grep '^installed=' "$S" | cut -d= -f2)" "$SHA_D"
 check "download-fail scripts survive" "$(cat "$PJSX")" "MARKER5"
 
-echo ""; echo "PASS=$PASS FAIL=$FAIL (15 checks)"; rm -rf "$SB"; [ "$FAIL" -eq 0 ]
+# 6. ditto fails after a good precheck+download -> ok=0, installed unchanged (SHA_D)
+export FAKE_SHA="ffffffffffffffffffffffffffffffffffffffff"; export FAIL_DITTO=1
+bash "$UPDATE_SH" || true; unset FAIL_DITTO
+check "ditto-fail ok=0" "$(grep '^ok=' "$S" | cut -d= -f2)" "0"
+check "ditto-fail keeps installed" "$(grep '^installed=' "$S" | cut -d= -f2)" "$SHA_D"
+
+# 7. rsync fails after a good precheck+download -> ok=0, installed unchanged (SHA_D)
+export FAKE_SHA="1111111111111111111111111111111111111111"; export FAIL_RSYNC=1
+bash "$UPDATE_SH" || true; unset FAIL_RSYNC
+check "rsync-fail ok=0" "$(grep '^ok=' "$S" | cut -d= -f2)" "0"
+check "rsync-fail keeps installed" "$(grep '^installed=' "$S" | cut -d= -f2)" "$SHA_D"
+
+# 8. FIRST-INSTALL fallback: API precheck empty but the zip works, nothing installed yet -> still download
+rm -rf "$NOTEWORTHIE_SUPPORT_DIR/scripts" "$S"
+export FAKE_SHA=""
+bash "$UPDATE_SH"
+check "first-install-offline synced" "$(cat "$PJSX")" "// fake"
+check "first-install-offline ok=1" "$(grep '^ok=' "$S" | cut -d= -f2)" "1"
+
+echo ""; echo "PASS=$PASS FAIL=$FAIL (21 checks)"; rm -rf "$SB"; [ "$FAIL" -eq 0 ]

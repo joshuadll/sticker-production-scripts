@@ -452,7 +452,7 @@ function addLayerToSelectionById(layer) {
 // ── Version status (reads update-status.txt written by installer/update.sh) ──
 // rootPath = pipeline _root (the scripts folder). SUPPORT_DIR = its parent.
 function readVersionStatus(rootPath) {
-    var res = { installedSha: "", latestSha: "", checkedEpoch: 0, ok: false, state: "unknown" };
+    var res = { installedSha: "", checkedEpoch: 0, ok: false, state: "unknown" };
     try {
         var f = new File(new File(rootPath).parent.fsName + "/update-status.txt");
         if (!f.exists) { return res; }
@@ -464,7 +464,6 @@ function readVersionStatus(rootPath) {
             var k = lines[i].substring(0, eq);
             var v = lines[i].substring(eq + 1);
             if (k === "installed") { res.installedSha = v; }
-            else if (k === "latest") { res.latestSha = v; }
             else if (k === "checked") { res.checkedEpoch = parseInt(v, 10) || 0; }
             else if (k === "ok") { res.ok = (v === "1"); }
         }

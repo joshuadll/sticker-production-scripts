@@ -44,4 +44,7 @@ rm -f "$SUP/update-status.txt"
 run_state; check "unknown state" "$(grep '^state=' "$OUT" | cut -d= -f2)" "unknown"
 check "unknown empty line" "$(grep '^line=' "$OUT" | cut -d= -f2-)" ""
 
-echo ""; echo "PASS=$PASS FAIL=$FAIL (8 checks)"; rm -rf "$SB"; [ "$FAIL" -eq 0 ]
+printf 'installed=aaaa1112222\nlatest=aaaa1112222\nchecked=%s\nok=0\n' "$NOW" > "$SUP/update-status.txt"
+run_state; check "stale via ok=0 state" "$(grep '^state=' "$OUT" | cut -d= -f2)" "stale"
+
+echo ""; echo "PASS=$PASS FAIL=$FAIL (9 checks)"; rm -rf "$SB"; [ "$FAIL" -eq 0 ]
