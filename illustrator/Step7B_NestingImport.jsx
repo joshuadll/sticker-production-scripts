@@ -238,18 +238,19 @@ function runNestingImport(doc, svgFiles, artFolder, elementsData) {
                 else log("[step-nest] half-cut SKIP | " + gItem.name + " — " + hcRes.reason
                     + " (peel tab missing; AI_ExportFinal will hard-error until the seat is fixed)");
             }
-            // Spacing-buffer halo (live drag-time 2mm keep-out aid). Built into the shared
-            // "Spacing Buffer" sublayer (top of Cutlines) so the artist can hide/show all halos with
-            // one eyeball while still dragging each piece + its halo together (cross-layer select);
+            // Spacing-buffer halo (live drag-time 2mm keep-out aid). Built into the shared top-level
+            // "Spacing Buffer" layer (above Cutlines) so the artist can hide/show all halos with one
+            // eyeball while still dragging each piece + its halo together (cross-layer select);
             // refreshed by Step 8b; stripped before export. Advisory — a failure only logs.
             var sbRes = syncSpacingBuffer(doc, gItem, {});
             if (sbRes.ok) sbSynced++;
             else log("[step-nest] spacing-buffer SKIP | " + gItem.name + " — " + sbRes.reason);
         }
         // Pass 2 — bare stamp cutlines (traced PathItem/CompoundPathItem directly on Cutlines, no
-        // group): build a halo straight into the sublayer — no group wrapping needed anymore. Snapshot
-        // direct children first (layer.pathItems recurses into groups; guard on parent). Halo paths
-        // live in the "Spacing Buffer" child SUBLAYER, so they never appear in cutlinesLayer.pathItems.
+        // group): build a halo straight into the buffer layer — no group wrapping needed anymore.
+        // Snapshot direct children first (layer.pathItems recurses into groups; guard on parent). Halo
+        // paths live in the top-level "Spacing Buffer" layer (a SIBLING of Cutlines, not a child), so
+        // they never appear in cutlinesLayer.pathItems.
         var bareStamps = [], bi, bit;
         for (bi = 0; bi < cutlinesLayer.pathItems.length; bi++) {
             bit = cutlinesLayer.pathItems[bi];

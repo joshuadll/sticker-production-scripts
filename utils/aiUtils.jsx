@@ -2206,8 +2206,11 @@ function spacingBufferLayerName() {
 // directly ABOVE the Cutlines layer (→ between Cutlines and Halfcut in the working stack), so the
 // translucent band renders under the halfcut lines + the Margin overlay rather than on top of
 // everything. Always returns it UNLOCKED (so we can add/remove halos and the artist's marquee can
-// grab them); visibility + position are set only on creation, so a re-run never overrides the
-// artist's manual hide/reorder. Returns null when create=false and the layer is absent.
+// grab them); visibility + position are set only when the layer is CREATED — so a same-doc re-run
+// that finds the existing layer (Step 8b / AI_LayoutQA) preserves the artist's manual hide/reorder.
+// (A full Step 7B re-import first calls removeAllSpacingBuffers, which deletes the layer, so that
+// path does rebuild it fresh — visible and back above Cutlines.) Returns null only when
+// create=false and the layer is absent; when create=true it always returns the layer it adds.
 function _getSpacingBufferLayer(doc, create) {
     var want = spacingBufferLayerName(), i, ly;
     for (i = 0; i < doc.layers.length; i++) {
@@ -2260,8 +2263,8 @@ function _spacingBufferRgb() {
     return c;
 }
 
-// (Re)builds ONE element's spacing-buffer band from its CURRENT cutline, into the shared
-// "Spacing Buffer" sublayer. Idempotent. Accepts EITHER a captioned GroupItem (GC/WC/ST note;
+// (Re)builds ONE element's spacing-buffer band from its CURRENT cutline, into the shared top-level
+// "Spacing Buffer" layer. Idempotent. Accepts EITHER a captioned GroupItem (GC/WC/ST note;
 // cutline resolved via findGroupMember) OR a bare stamp cutline directly on the Cutlines layer
 // (a traced PathItem/CompoundPathItem — the item IS its own cutline). Other types (e.g. a
 // PlacedItem stamp) skip. Returns { ok, reason }.
@@ -2287,15 +2290,15 @@ function syncSpacingBuffer(doc, item, opts) {
         return { ok: false, reason: "unsupported type " + item.typename + " (no buffer)" };
     }
 
+    // _getSpacingBufferLayer(create=true) always returns the layer it creates — never null.
     var bufLayer = _getSpacingBufferLayer(doc, true);
-    if (!bufLayer) return { ok: false, reason: "Cutlines layer missing (no buffer sublayer)" };
     _removeNamedBuffer(bufLayer, name);
 
     // Keep the halo a true fixed offset under manual resize: the +offset is a live-effect
     // parameter, so it only stays constant when effects are NOT scaled with the art.
     try { app.preferences.setBooleanPreference("scaleLineWidth", false); } catch (ePref) {}
 
-    // Duplicate the cutline INTO the buffer sublayer (top of Cutlines) at its absolute position.
+    // Duplicate the cutline INTO the buffer layer at its absolute position.
     var dup = cutline.duplicate(bufLayer, ElementPlacement.PLACEATBEGINNING);
     dup.name = name + " buffer";
     try { dup.note = ""; } catch (eNote) {}   // never let a QA collector treat the halo as a cutline
