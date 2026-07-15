@@ -49,13 +49,17 @@ cut-safe there and needs no relocation (unlike the caption).
 2. **Two defects, flagged at two places:**
    - **Missing** — an element that needs a peel tab (GC / WC / default-tab) has no
      `{name} halfcut` path.
-   - **Undershoot** — a half-cut endpoint fails to reach its own element's cut contour
-     with ≥ 1 mm of overlap (a gap that would leave the tab attached).
+   - **Undershoot** — a half-cut endpoint falls **short** of its own element's cut contour
+     by **≥ 1 mm** (a gap that would leave the tab attached). An endpoint that *reaches* the
+     cut line — on it or crossing it — passes.
    - **Undershoot only** — a wild *overshoot* is not a defect (it matches the automated
      1 mm tail and is harmless).
 3. **`halfcutExtendMm = 1.0`** is the existing "playbook spec" the automated half-cut
-   already uses to attach itself (`_extendHalfcutEndsToCutline`). The validation reuses the
-   same 1 mm, so a hand-drawn half-cut is held to the same standard as the machine's.
+   already uses to attach itself. Critically, that attach lays a 1 mm tail *along* the cut
+   contour, so an automated half-cut's endpoints sit **on** the cut line, not 1 mm past it.
+   The validator therefore flags a **short** end (gap ≥ 1 mm), NOT "must be 1 mm past the
+   line" — the latter would false-flag every machine-made half-cut. Sub-1 mm slop passes
+   (it closes under the cutter).
 4. **Remedy is to draw.** The export error tells the artist to *draw* the half-cut; it does
    not mention deriving. (To regenerate one automatically, the artist re-runs normalize —
    the last derive step — but that is workflow, not part of the error text.)
@@ -75,14 +79,16 @@ validateHalfcut(group) -> { ok, reason }   // reason: null | "missing" | "unders
   (drill through the Unite group like `_s10GetCutlinePath` does).
 - Resolve the half-cut by name: `{group.name} halfcut` on the Halfcut layer. Absent →
   `{ ok:false, reason:"missing" }`.
-- Sample the cut contour to polygon(s) (`samplePathToPolygons`) and the half-cut to a
-  polyline. For **each** of the half-cut's two endpoints, the end is *connected* when the
-  half-cut crosses the cut contour with ≥ 1 mm of the terminal run on the outside of the
-  contour (mirrors `_extendHalfcutEndsToCutline`; uses `segmentsIntersect` / `pointInPolygon`).
-  Any end that falls short → `{ ok:false, reason:"undershoot" }`.
+- Sample the cut contour to polygon(s) (`samplePathToPolygons`) and read the half-cut's two
+  endpoints (`pathPoints[0]` / last `.anchor`). The geometry test is a **pure inner
+  function** `_halfcutEndsReachCut(endPts, cutPoly, minGapPt)` (unit-testable with plain
+  arrays, no DOM): for **each** endpoint, `connected` = the endpoint is on/outside `cutPoly`
+  (`pointInPolygon` false) **or** inside it by less than `minGapPt` (nearest-edge distance).
+  An endpoint inside by ≥ `minGapPt` (= `mmToPoints(1)`) → **undershoot**. `validateHalfcut`
+  wraps it with the DOM lookups and returns the reason.
 - The check needs **only** the half-cut and the cut contour — **no pill/plate** — so it is
   independent of where the caption lives.
-- Pure geometry, side-effect free. Unit-testable in isolation.
+- Pure geometry, side-effect free. The inner function is unit-testable in isolation.
 
 ### 2. `Step9A_Halfcut.jsx` — verify, don't derive
 
@@ -111,8 +117,10 @@ A new step file `illustrator/StepQA_Halfcut.jsx` exporting `runHalfcutQA(doc)`, 
 `StepQA_NestingQuality` exactly: it is `#include`d and called by `AI_LayoutQA` (not by
 `AI_ExportFinal`), calls `validateHalfcut` per peel-tab element, and **appends** its marks
 to the shared toggleable **`"Layout QA"`** overlay layer (Step 8c runs first and resets the
-layer; StepQA passes append). It draws in a **blue** hue distinct from the red (spacing) and
-amber (margin) flags and readable on the green Color Block:
+layer; StepQA passes append). It draws in **blue** — distinct from red (spacing) and amber
+(margin), readable on the green Color Block. Blue is available because Component 4 removes
+the only other blue overlay mark (the seat-review badge); the half-cut flag **reuses**
+`seatReviewRgb()` (RGB 26,102,255), renamed to `halfcutFlagRgb()`:
 
 *Not folded into `Step8c_OffsetPathQA`:* Step 8c owns the spacing/margin concern and doubles
 as `AI_ExportFinal`'s spacing gate; the half-cut check is a separate concern with a separate
@@ -130,6 +138,31 @@ Advisory only — Layout QA never blocks (like NQI). It surfaces missing / short
 during the nest-refine loop; **export is the hard gate.** Marker sizes are in mm
 (scale-invariant), added to the QA legend. Step 11 already strips `"layout qa"` by name, so
 none of this reaches print.
+
+### 4. Remove the seat-review QA badge; relocate the signal to the seating pipelines
+
+The caption **seat-review** flag (`needsReview` → note `|R`) is unrelated to half-cuts but
+currently paints a blue badge on the same QA overlay (`Step8c` "Channel 3"). Per decision,
+the QA overlay is for the *manual nest* quality; caption seating is something the artist
+reviews regardless and whose final placement we trust. So the badge is **removed** and the
+signal moves to the pipelines that actually compute the seat.
+
+**Remove (visualization only — the seater still stamps `|R`):**
+- `Step8c_OffsetPathQA.jsx:90` — the `reviewFlag` field on each record.
+- `Step8c_OffsetPathQA.jsx:252–261` — "Channel 3," the blue-disc drawing loop.
+- `Step8c_OffsetPathQA.jsx:266` — the "seat-review badge(s)" count in the overlay log line.
+- `aiUtils.seatReviewRgb()` — **renamed** `halfcutFlagRgb()` and reused by Component 3 (its
+  one caller in Step8c is deleted above).
+
+**Relocate (advisory, no gate):** a shared helper `aiUtils.collectSeatReviewNames(doc)`
+scans the Cutlines groups' notes and returns the display names carrying `|R`. It is called
+from **both** completion dialogs where the seat is computed:
+- `AI_BuildAndExportCutlines` (birth seat) — earliest heads-up.
+- `AI_NormaliseCaptions` (re-seat; runs every nest loop, re-stamps `|R`) — the current,
+  complete set.
+Each appends one advisory line when the list is non-empty:
+*"⚠ N caption(s) may need a seating check: [names]"*. `import-nesting` is **not** a home
+(it never seats).
 
 ## Data flow
 
@@ -163,10 +196,17 @@ none of this reaches print.
 
 ## Testing
 
-- **Unit** (`validateHalfcut`): synthetic cut contour + half-cut fixtures — both ends
-  connected (ok), one end short (undershoot), no half-cut (missing), degenerate half-cut.
+- **Unit** (`_halfcutEndsReachCut`, pure): plain-array cases — both ends on/outside the cut
+  (ok), one end inside by ≥ 1 mm (undershoot), one end inside by < 1 mm (ok, slop), < 2
+  endpoints (undershoot). No DOM/fixture needed.
 - **Integration** (`ai-export-final`): fixture with (a) all half-cuts valid → export
-  proceeds; (b) one element's half-cut endpoint pulled short → export halts naming it.
-  Regenerate the golden for the new verify-not-derive log lines.
-- **Layout QA**: fixture asserting the blue overlay is produced for a missing and an
-  undershooting half-cut, and that the real half-cut/cut geometry is untouched.
+  proceeds; (b) one element's half-cut endpoint pulled ≥ 1 mm short → export halts naming
+  it. Regenerate the golden for the new verify-not-derive `[step9a]` log lines.
+- **Integration** (`ai-layout-qa`): the golden must still pass with `Step8c`'s seat-review
+  badge removed (badge count gone from the log) and gain the `[stepQA-halfcut]` advisory
+  lines; assert a missing and an undershooting half-cut each produce a blue overlay mark and
+  the real half-cut/cut geometry is untouched.
+- **Seat-review relocation**: assert `collectSeatReviewNames` returns the `|R` names, and
+  that `AI_NormaliseCaptions` / `AI_BuildAndExportCutlines` completion text lists them (unit
+  on the helper; the pipeline line is covered by their existing integration goldens, which
+  must be regenerated).
