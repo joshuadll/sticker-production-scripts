@@ -1,7 +1,17 @@
 # Version Visibility & Update Signal — Design
 
 **Date:** 2026-07-15
-**Status:** Design — pending review
+**Status:** Implemented, with two amendments — see below.
+
+> **⚠ Superseded in part by the shipped code (commits 905aa88, d928d1c).** This
+> document still describes (a) a `git ls-remote` SHA precheck and (b) a four-state
+> signal including `updateAvailable`. Neither shipped. The SHA precheck uses **curl
+> against the GitHub API** (no git dependency — macOS has no git by default), and the
+> signal is **two-state** (`✓ version <sha>` / `⚠ version <sha> — updates aren't
+> reaching this Mac`, plus omitted-when-unknown): pure auto-sync makes `updateAvailable`
+> unreachable, so it was dropped. Trust `CLAUDE.md` (§"Version signal and auto-update")
+> and the code for shipped behavior; read the rest of this doc as the original design
+> rationale.
 
 ## Problem
 

@@ -4,6 +4,8 @@
 
 **Goal:** Make artist-run pipeline scripts self-report their installed commit SHA and a four-state up-to-date signal, so the developer can identify exactly what code ran during debugging.
 
+> **⚠ Superseded in part (commits 905aa88, d928d1c).** As shipped: the SHA precheck uses **curl against the GitHub API**, not `git ls-remote` (no git dependency); and the signal is **two-state** (`updateAvailable` was dropped — pure auto-sync makes it unreachable). Task 1's `git ls-remote` and Task 3/4's `updateAvailable` wording below are the original plan; see `CLAUDE.md` §"Version signal and auto-update" for shipped behavior.
+
 **Architecture:** `update.sh` (LaunchAgent, login + hourly) does a cheap SHA precheck against `main`, syncs only on change, and writes `update-status.txt` (installed SHA, latest SHA, check epoch, ok flag) into the SUPPORT_DIR that `rsync --delete` never touches. A shared read-only ExtendScript helper in both util files parses that file into one of four states and formats a one-line signal that every pipeline prints in its completion alert and log banner. A Desktop `.command` force-runs `update.sh` for live-debug "pull my fix now" moments.
 
 **Tech Stack:** Bash (installer/updater), ExtendScript ES3 (Photoshop + Illustrator), macOS launchd, osascript for live test harnesses.
