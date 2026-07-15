@@ -603,12 +603,11 @@ function haloRgb() {
     return c;
 }
 
-// Strong blue — the CAPTION-SEAT review badge (Step 3B's conform flagged an uneven
-// seat via the note "…|R"). Distinct from the warm red/amber problem badges; says
-// "eyeball this caption". Advisory only — it does NOT gate export.
-function seatReviewRgb() {
+// The half-cut QA flag colour — a medium blue, distinct from red (spacing) and amber
+// (margin) on the shared Layout QA overlay, and readable on the green Color Block.
+function halfcutFlagRgb() {
     var c = new RGBColor();
-    c.red = 26; c.green = 102; c.blue = 255;   // was CMYK 90/60/0/0
+    c.red = 26; c.green = 102; c.blue = 255;
     return c;
 }
 

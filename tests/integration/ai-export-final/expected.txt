@@ -6,8 +6,8 @@
 [pipeline] --- Spacing + Margin QA guard ---
 [step8c] collected 26 cut line(s).
 [step8c] margin | 190x267mm safe area.
-[step8c] overlay | drew flags on "Layout QA" layer | 0 halo(s), 0 spacing badge(s), 0 margin arrow(s), 0 sliver(s), 0 seat-review badge(s)
-[timing] step8c | sample=5636 spacing=2150 margin=2 overlay=1 (ms)
+[step8c] overlay | drew flags on "Layout QA" layer | 0 halo(s), 0 spacing badge(s), 0 margin arrow(s), 0 sliver(s)
+[timing] step8c | sample=6051 spacing=2173 margin=2 overlay=1 (ms)
 [step8c] done | checked=26 flagged=0 (spacing: 0 pair(s); margin: 0)
 [pipeline] spacing/margin guard complete | 26 path(s) checked, 0 flagged.
 [pipeline] --- Step 9A: Half-cut ---

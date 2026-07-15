@@ -16,8 +16,8 @@
 [step8c] margin | 190x267mm safe area.
 [step8c] FLAG | cut line exceeds margin | Bratislava Castle
 [step8c] FLAG | cut line exceeds margin | Tram
-[step8c] overlay | drew flags on "Layout QA" layer | 16 halo(s), 10 spacing badge(s), 2 margin arrow(s), 2 sliver(s), 0 seat-review badge(s)
-[timing] step8c | sample=55 spacing=2512 margin=1 overlay=34 (ms)
+[step8c] overlay | drew flags on "Layout QA" layer | 16 halo(s), 10 spacing badge(s), 2 margin arrow(s), 2 sliver(s)
+[timing] step8c | sample=5937 spacing=2668 margin=2 overlay=815 (ms)
 [step8c] done | checked=26 flagged=16 (spacing: 10 pair(s); margin: 2)
 [pipeline] spacing/margin complete | 26 checked, 16 flagged.
 [pipeline] --- Nesting Quality (NQI) ---
@@ -68,7 +68,7 @@
 [stepQA] pocket | Left edge | area=92 mm2 | center=(15.3,273.7)mm | bbox=[5,132 9x7]mm
 [stepQA] NQI=94 | pass=true | utilization=81.8% | recoverableCells=730/12730
 [stepQA] overlay drawn on "Layout QA" layer | 144 rect(s)
-[timing] stepQA | setup+collect=123 raster=428 dilate=532 marginMask=15 pockets=333 overlay=10 (ms)
+[timing] stepQA | setup+collect=127 raster=463 dilate=516 marginMask=16 pockets=315 overlay=14 (ms)
 [pipeline] === AI_LayoutQA done ===
 Layout QA
 
