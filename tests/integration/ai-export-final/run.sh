@@ -150,10 +150,14 @@ fi
 # (pill/text/GC raster/tab fill) must be moved to the Stickers layer in the final
 # file. Step 11 logs a relocation summary and an advisory marker if any printed item
 # was wrongly left behind.
-if grep -q "\[step11\] captions relocated to Stickers |" "$LOG"; then
-    echo "PASS [$STEP]: caption artwork relocated to Stickers layer."
+# Gate on the element COUNT, not just the line's presence — the summary line is logged
+# even for a 0-element no-op, so a regression that relocates nothing would pass a bare
+# presence grep. This fixture has 26 captioned elements, so require > 0.
+RELOC_ELEMS=$(grep -oE "captions relocated to Stickers \| [0-9]+ element" "$LOG" | grep -oE "[0-9]+" | head -1 || echo "0")
+if [ "${RELOC_ELEMS:-0}" -gt 0 ]; then
+    echo "PASS [$STEP]: caption artwork relocated to Stickers layer ($RELOC_ELEMS element(s))."
 else
-    echo "FAIL [$STEP]: '[step11] captions relocated to Stickers |' not found in log."
+    echo "FAIL [$STEP]: 0 elements relocated (expected > 0) — captions may still be in Cutlines."
     FAIL=1
 fi
 

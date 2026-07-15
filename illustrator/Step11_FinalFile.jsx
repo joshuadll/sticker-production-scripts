@@ -178,6 +178,12 @@ function _s11MoveCaptionsToStickers(fd) {
             var child = group.pageItems[c];
             if (child === cutPath) continue;
             if (child.hidden) continue;
+            // A spacing-buffer halo ("{name} buffer") is a VISIBLE child of the cut group
+            // that must never print. It is normally removed upstream (removeAllSpacingBuffers);
+            // if one survives, do NOT sweep it onto Stickers (it would print a magenta band).
+            // Skip it — it stays in Cutlines and _s11AssertNoPrintedInCutlines flags it loudly.
+            var cn = String(child.name);
+            if (cn.substring(cn.length - 7) === " buffer") continue;
             movers.push(child);
         }
         if (!movers.length) continue;
@@ -198,19 +204,20 @@ function _s11MoveCaptionsToStickers(fd) {
 
     // Advisory post-move check (warn-on-all): every remaining visible item in a Cutlines
     // group must be its cut path. A leftover visible non-cut child is a printed item the
-    // cutter would cut — surface it (does not abort).
-    _s11AssertNoPrintedInCutlines(cutlinesLayer);
+    // cutter would cut — surface it (does not abort). Reuse the groups already collected —
+    // moving children onto Stickers does not change which groups exist on Cutlines.
+    _s11AssertNoPrintedInCutlines(groups);
 
     log("[step11] captions relocated to Stickers | " + elementsMoved
         + " element(s), " + itemsMoved + " item(s)");
     return { elements: elementsMoved, items: itemsMoved };
 }
 
-// Walks each Cutlines GroupItem (recursing sublayers) and logs any VISIBLE child that is
-// not the group's cut path (the member named === group.name). A group missing its cut
-// path is itself surfaced. Advisory — logs a marker, does not throw. Returns offender count.
-function _s11AssertNoPrintedInCutlines(cutlinesLayer) {
-    var groups = _s11CollectCutlineGroups(cutlinesLayer);
+// Given the Cutlines GroupItems (already collected by _s11CollectCutlineGroups), logs any
+// VISIBLE child that is not the group's cut path (the member named === group.name). A group
+// missing its cut path is itself surfaced. Advisory — logs a marker, does not throw. Returns
+// offender count. Takes the pre-collected groups to avoid a second full tree traversal.
+function _s11AssertNoPrintedInCutlines(groups) {
     var offenders = [], g, c;
     for (g = 0; g < groups.length; g++) {
         var it = groups[g];
