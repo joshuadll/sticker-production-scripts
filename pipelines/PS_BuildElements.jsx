@@ -224,7 +224,9 @@ function handOffToIllustrator(doc) {
 
 function main() {
     // ── Init log ───────────────────────────────────────────────────
-    log("[pipeline] === PS_BuildElements start ===");
+    var _ver = readVersionStatus(_root);
+    var _vshort = _ver.installedSha ? _ver.installedSha.substring(0, 7) : "unknown";
+    log("[pipeline] === PS_BuildElements start (version " + _vshort + ") ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
 
     // ── Resolve source folder (needed to detect source DPI) ────────
@@ -472,6 +474,13 @@ function main() {
     if (groupResult.skipped.length > 0) {
         msg += "\n\n⚠️ Couldn't group " + groupResult.skipped.length + " element(s):";
         for (var c = 0; c < groupResult.skipped.length; c++) msg += "\n   • " + groupResult.skipped[c];
+    }
+
+    // Version status only belongs on the clean success path (aiStatus.ok) — error/pending
+    // alerts already end with their own Log: path and should not carry it.
+    if (aiStatus && aiStatus.ok) {
+        var _vline = formatVersionStatus(_ver);
+        if (_vline) { msg += "\n\n" + _vline; }
     }
 
     scriptAlert(msg);

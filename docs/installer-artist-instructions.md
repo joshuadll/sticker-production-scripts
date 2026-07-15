@@ -29,6 +29,15 @@ message. That's normal for our in-house tool. To allow it (you only do this per 
    enough — the app has to actually quit), then reopen them.
 2. Run a step from **File > Scripts** — the **"Noteworthie 1–6"** items.
 
+## Automatic updates
+
+The scripts check for updates every hour and install them automatically in the background.
+To force an update right now, double-click **Update Noteworthie** on the Desktop, then
+re-run the step you were working on. No app restart is needed.
+
+When reporting a problem to Joshua, please read him the `version …` line shown at the end
+of the completion dialog (after the script finishes).
+
 ## When do I need to re-run this?
 
 Almost never. The scripts update themselves automatically every time you log in. You only

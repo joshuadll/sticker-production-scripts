@@ -85,6 +85,7 @@ var CONFIG = {
     halfcutSeamSteps: 16    // bezier→polygon sampling density for the cut-contour poly
 };
 
+var _root = $.fileName ? new File($.fileName).parent.parent.fsName : Folder.desktop.fsName;
 CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
     : Folder.desktop.fsName) + "/AI_LayoutQA.log";
@@ -100,7 +101,9 @@ function main() {
     var filesFolder = null;
     try { filesFolder = doc.fullName.parent.fsName; } catch (eFolder) {}
 
-    log("[pipeline] === AI_LayoutQA start ===");
+    var _ver = readVersionStatus(_root);
+    var _vshort = _ver.installedSha ? _ver.installedSha.substring(0, 7) : "unknown";
+    log("[pipeline] === AI_LayoutQA start (version " + _vshort + ") ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
@@ -206,6 +209,9 @@ function main() {
     } else {
         msg += "\nLayout looks good — continue with AI_ExportFinal.";
     }
+
+    var _vline = formatVersionStatus(_ver);
+    if (_vline) { msg += "\n\n" + _vline; }
 
     scriptAlert(msg);
 }

@@ -26,6 +26,12 @@ if ! bash "$UPDATE_SCRIPT"; then
     read -r -p "Press Enter to close..." _
     exit 1
 fi
+if [ ! -d "$INSTALL_DIR/pipelines" ] || [ -z "$(ls -A "$INSTALL_DIR/pipelines" 2>/dev/null)" ]; then
+    echo ""
+    echo "Download failed — no scripts were installed. Check your internet connection and run this installer again."
+    read -r -p "Press Enter to close..." _
+    exit 1
+fi
 echo "  ↓ Downloaded latest scripts"
 echo "  (enter your Mac password if prompted)"
 
@@ -101,6 +107,8 @@ cat > "$PLIST_PATH" << EOF
     </array>
     <key>RunAtLoad</key>
     <true/>
+    <key>StartInterval</key>
+    <integer>3600</integer>
     <key>StandardErrorPath</key>
     <string>${SUPPORT_DIR}/update-error.log</string>
 </dict>
@@ -109,6 +117,28 @@ EOF
 
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
 launchctl load "$PLIST_PATH"
+
+# ── Desktop "Update Noteworthie" force-update command ─────────────────────────
+DESKTOP_CMD="$HOME/Desktop/Update Noteworthie.command"
+cat > "$DESKTOP_CMD" <<EOF
+#!/bin/bash
+echo "Updating Noteworthie scripts..."
+bash "$UPDATE_SCRIPT"
+S="$SUPPORT_DIR/update-status.txt"
+if [ -f "\$S" ]; then
+    inst=\$(grep '^installed=' "\$S" | cut -d= -f2 | cut -c1-7)
+    ok=\$(grep '^ok=' "\$S" | cut -d= -f2)
+    if [ "\$ok" = "1" ]; then
+        echo "Up to date — version \$inst"
+        echo "Now re-run your step from File > Scripts (no need to restart the app)."
+    else
+        echo "Updates aren't reaching this Mac. Check your connection, then try again."
+    fi
+fi
+read -r -p "Press Enter to close..." _
+EOF
+chmod +x "$DESKTOP_CMD"
+echo "  ✓ Desktop      — Update Noteworthie.command"
 
 # ── Done ───────────────────────────────────────────────────────────────────────
 echo ""

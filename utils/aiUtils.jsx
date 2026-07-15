@@ -3695,3 +3695,43 @@ function clipPolygonToHalfPlane(poly, axis, value, keepGreater) {
     }
     return out;
 }
+
+// ── Version status (reads update-status.txt written by installer/update.sh) ──
+// rootPath = pipeline _root (the scripts folder). SUPPORT_DIR = its parent.
+function readVersionStatus(rootPath) {
+    var res = { installedSha: "", checkedEpoch: 0, ok: false, state: "unknown" };
+    try {
+        var f = new File(new File(rootPath).parent.fsName + "/update-status.txt");
+        if (!f.exists) { return res; }
+        f.open("r"); var txt = f.read(); f.close();
+        var lines = txt.split(/\r\n|\r|\n/);
+        for (var i = 0; i < lines.length; i++) {
+            var eq = lines[i].indexOf("=");
+            if (eq < 0) { continue; }
+            var k = lines[i].substring(0, eq);
+            var v = lines[i].substring(eq + 1);
+            if (k === "installed") { res.installedSha = v; }
+            else if (k === "checked") { res.checkedEpoch = parseInt(v, 10) || 0; }
+            else if (k === "ok") { res.ok = (v === "1"); }
+        }
+        if (!res.installedSha) { res.state = "unknown"; return res; }
+        var nowEpoch = Math.floor((new Date()).getTime() / 1000);
+        var age = nowEpoch - res.checkedEpoch;
+        // Pure auto-sync: update.sh always converges installed==latest on ok=1, so the only
+        // meaningful states are current vs. updater-not-working. ok=0 (offline / failed sync)
+        // or an old check => stale; otherwise up to date.
+        if (!res.ok || res.checkedEpoch === 0 || age > 10800) { res.state = "stale"; }
+        else { res.state = "upToDate"; }
+    } catch (e) { res.state = "unknown"; }
+    return res;
+}
+
+// Formats the one-line signal for a completion alert. "" when unknown.
+function formatVersionStatus(status) {
+    if (!status || status.state === "unknown" || !status.installedSha) { return ""; }
+    var v = "version " + status.installedSha.substring(0, 7);
+    if (status.state === "stale") {
+        return "⚠ " + v + " — updates aren't reaching this Mac";
+    }
+    return "✓ " + v;
+}

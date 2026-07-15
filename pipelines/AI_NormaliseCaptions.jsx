@@ -63,6 +63,7 @@ var CONFIG = {
     logPath: ""  // resolved below
 };
 
+var _root = $.fileName ? new File($.fileName).parent.parent.fsName : Folder.desktop.fsName;
 CONFIG.logPath = ($.fileName
     ? new File($.fileName).parent.fsName
     : Folder.desktop.fsName) + "/AI_NormaliseCaptions.log";
@@ -78,7 +79,9 @@ function main() {
     var filesFolder = null;
     try { filesFolder = doc.fullName.parent.fsName; } catch (eFolder) {}
 
-    log("[pipeline] === AI_NormaliseCaptions start ===");
+    var _ver = readVersionStatus(_root);
+    var _vshort = _ver.installedSha ? _ver.installedSha.substring(0, 7) : "unknown";
+    log("[pipeline] === AI_NormaliseCaptions start (version " + _vshort + ") ===");
     log("[pipeline] dryRun: " + CONFIG.dryRun);
     log("[pipeline] document: " + doc.name);
 
@@ -110,6 +113,8 @@ function main() {
             + _seatReview.join(", ") + "\n";
     }
 
+    var _vline = formatVersionStatus(_ver);
+    if (_vline) { msg += "\n\n" + _vline; }
     scriptAlert(msg);
 }
 
