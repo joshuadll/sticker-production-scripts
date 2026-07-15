@@ -2281,6 +2281,25 @@ function validateHalfcut(doc, group) {
     return _halfcutEndsReachCut(ends, cutPoly, mmToPoints(1));
 }
 
+// Returns all top-level GroupItems in the Cutlines layer whose note identifies
+// them as GC or WC (the elements that have a caption plate seam). Shared by
+// Step9A_Halfcut's runHalfcut (export gate) and StepQA_Halfcut (Layout QA).
+function _collectHalfcutItems(cutlinesLayer) {
+    var out = [], i, item, note;
+    for (i = 0; i < cutlinesLayer.pageItems.length; i++) {
+        item = cutlinesLayer.pageItems[i];
+        if (item.parent !== cutlinesLayer) continue;
+        if (item.typename !== "GroupItem") continue;
+        note = parseNote(item.note);
+        var isCapStyle = note && (note.styleCode === "GC" || note.styleCode === "WC");
+        var isTab = note && note.styleCode === "ST" && findGroupMember(item, " plate") !== null;
+        if (isCapStyle || isTab) {
+            out.push({ name: item.name, group: item });
+        }
+    }
+    return out;
+}
+
 // ─── SPACING BUFFER (live 2mm keep-out halo; Step 7B birth + Step 8b refresh) ─────
 // A drag-time visual aid for the 2mm minimum-spacing rule. Each GC/WC cutline gets a
 // translucent "keep-out" halo offset OUTWARD by HALF the min spacing — so two pieces'

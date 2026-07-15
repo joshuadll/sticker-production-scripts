@@ -149,21 +149,25 @@ function main() {
             + "\n\nSend this to Josh:\n" + copyLogBeside(filesFolder, "Noteworthie_ERROR.log"));
         return;
     }
-    log("[pipeline] step 9a complete | " + halfcutResult.placed + " half-cut(s) placed.");
+    log("[pipeline] step 9a complete | " + halfcutResult.checked + " half-cut(s) verified.");
 
-    // Half-cut is a hard gate: a flagged element means a caption could not produce a half-cut
-    // (not seated into the art — not connected, or fully inside it). Abort BEFORE Steps 10/11
-    // so no final file ships with a missing/broken peel tab; the artist fixes the seat and re-runs.
+    // Half-cut is a hard gate: a flagged element means the half-cut is missing or an endpoint
+    // falls short of the cut line. This pass VERIFIES only (never re-derives), so a manually
+    // fixed half-cut is never clobbered. Abort BEFORE Steps 10/11 so no final file ships with
+    // a missing/broken peel tab; the artist fixes the half-cut and re-runs.
     if (halfcutResult.flagged > 0) {
-        var hcMsg = "Half-cut ERROR — export halted.\n\n"
-            + halfcutResult.flagged + " caption(s) could not produce a half-cut:\n";
+        var hcMsg = "Half-cut check failed — export halted.\n\n"
+            + halfcutResult.flagged + " element(s) need attention:\n";
         var hi;
         for (hi = 0; hi < halfcutResult.flags.length; hi++) {
-            hcMsg += "  - " + halfcutResult.flags[hi].name
-                + ": " + halfcutResult.flags[hi].reason + "\n";
+            var f = halfcutResult.flags[hi];
+            var tail = (f.reason === "missing")
+                ? ": no half-cut line — draw it"
+                : ": half-cut doesn't reach the cut line — extend it";
+            hcMsg += "  - " + f.name + tail + "\n";
         }
-        hcMsg += "\nThe caption plate must overlap the element art. Fix the seating in "
-            + "Photoshop, then re-run.\nNo final file was written.\n\nSend this to Josh:\n"
+        hcMsg += "\nDraw / fix the half-cut(s), then re-run export.\n"
+            + "No final file was written.\n\nSend this to Josh:\n"
             + copyLogBeside(filesFolder, "Noteworthie_ERROR.log");
         log("[pipeline] HALT | step 9a flagged " + halfcutResult.flagged + " element(s) — aborting before export.");
         scriptAlert(hcMsg);
@@ -202,8 +206,8 @@ function main() {
     log("[pipeline] === AI_ExportFinal done ===");
 
     var summaryMsg = "✅ Final file ready.\n\n"
-        + "  " + qaResult.checked + " path(s) checked · " + halfcutResult.placed
-        + " half-cut(s) · " + assetResult.pngCount + " PNG(s) exported.\n"
+        + "  " + qaResult.checked + " path(s) checked · " + halfcutResult.checked
+        + " half-cut(s) verified · " + assetResult.pngCount + " PNG(s) exported.\n"
         + "  Final file: " + finalResult.outputPath + "\n";
     if (finalResult.layerCount !== 3) {
         summaryMsg += "  WARNING: final file has " + finalResult.layerCount
