@@ -112,15 +112,17 @@ function applyWhiteEdge(doc, soLayer) {
     // this one smoothed raster, so they stay consistent. radius 0 → no-op.
     smoothSelection(mmToPx(CONFIG.whiteEdgeSmoothRadiusMm));
 
-    // Harden the smoothed band to a CRISP 1-bit edge before filling. smooth (and the
-    // SO's own anti-aliasing) leave a soft fringe; the caption seat (Step3B) reads its
-    // OUTERMOST pixel while Illustrator's Image Trace (Step6) cuts the ~50% contour
-    // ~3px inside — that mismatch silently eats the caption<->art overlap and detaches
-    // the caption cutline on flat-bottomed elements. Hardening at the 50% contour makes
-    // both readers agree, so the seat's overlap survives into the traced cutline (and
-    // can be small). Keeps the smoothed SHAPE; only crisps the EDGE. See
-    // memory: caption_overlap_translation_bug.
-    hardenSelection(doc);
+    // NB: the smoothed selection keeps its natural anti-aliased edge — we deliberately do NOT
+    // harden it to a 1-bit crisp edge. Hardening (psUtils.hardenSelection) was added 2026-06-15
+    // to align the OLD Photoshop caption-seat probe (which read the outermost covered pixel) with
+    // Illustrator's Image Trace (which cuts the ~50% contour), so the caption<->art overlap
+    // survived into the traced cutline. The native-caption rewrite removed that PS probe — caption
+    // seating now runs in Illustrator against the TRACED vector cutline, not the PS raster — so the
+    // hard edge no longer serves any reader; it only showed up as a JAGGED white edge in the
+    // exported per-element PNGs. Removing it restores an anti-aliased (smooth) white edge.
+    // Validated live 2026-07-15: soft edge (0 -> ~6k partial-alpha px), trace clean (28 named,
+    // 0 unmatched), flat-bottom Tatra chamois caption still seats. See memory:
+    // caption_overlap_translation_bug (superseded) + white_edge_antialias_fix.
 
     // Create white layer, fill, deselect.
     var wbcLayer  = doc.artLayers.add();
