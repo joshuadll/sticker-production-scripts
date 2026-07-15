@@ -31,3 +31,7 @@ check("inside-over-1mm",
 // Fewer than 2 endpoints → undershoot (cannot connect two ends).
 check("too-few-points",
     _halfcutEndsReachCut([{x:-5,y:20}], sq, mm1).reason, "undershoot");
+
+// collectSeatReviewNames: parseNote must treat "WC|1|a10|R" as review, "WC|1|a10" as not.
+check("note-R-is-review",   parseNote("WC|1|a10|R").needsReview, true);
+check("note-noR-not-review", parseNote("WC|1|a10").needsReview,   false);

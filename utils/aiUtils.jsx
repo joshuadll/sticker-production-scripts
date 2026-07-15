@@ -2075,6 +2075,22 @@ function parseNote(note) {
     };
 }
 
+// Display names of every Cutlines-group element whose note carries the seat-review flag
+// ("|R"). Consumed by the seating pipelines' completion dialogs (the seat-review badge was
+// removed from the QA overlay). Returns [] when none.
+function collectSeatReviewNames(doc) {
+    var out = [], layer = findLayer(doc, CONFIG.cutlinesLayerName);
+    if (!layer) return out;
+    var i, g, note;
+    for (i = 0; i < layer.pageItems.length; i++) {
+        g = layer.pageItems[i];
+        if (g.parent !== layer || g.typename !== "GroupItem") continue;
+        note = parseNote(g.note);
+        if (note && note.needsReview) out.push(g.name);
+    }
+    return out;
+}
+
 // Returns the halfcut layer (case-insensitive match on CONFIG.halfcutLayerName).
 // Creates it above the Cutlines layer if absent.
 function getOrCreateHalfcutLayer(doc) {
