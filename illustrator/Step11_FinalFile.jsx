@@ -116,6 +116,26 @@ function _s11InList(val, arr) {
     return false;
 }
 
+// Gathers every element GroupItem in a Cutlines container, recursing into SUBLAYERS
+// (artists tuck groups/stamps into a Cutlines sublayer — mirrors Step8c _collectCutlines
+// and StepQA). layer.pageItems recurses into GROUPS (hence the item.parent guard for
+// direct children) but NOT into sublayers (hence the explicit container.layers recursion).
+function _s11CollectCutlineGroups(container) {
+    var out = [], i, j, inner;
+    if (container.layers) {
+        for (i = 0; i < container.layers.length; i++) {
+            inner = _s11CollectCutlineGroups(container.layers[i]);
+            for (j = 0; j < inner.length; j++) out.push(inner[j]);
+        }
+    }
+    for (i = 0; i < container.pageItems.length; i++) {
+        var item = container.pageItems[i];
+        if (item.parent !== container) continue;   // direct children only (pageItems recurses groups)
+        if (item.typename === "GroupItem") out.push(item);
+    }
+    return out;
+}
+
 // Relocates each element's VISIBLE printed caption/tab artwork (white pill, text, GC
 // raster, default-tab fill) out of the Cutlines groups and onto the Stickers layer, so
 // the cutter (which cuts every VISIBLE path in Cutlines/Halfcut) never cuts it. Runs on
@@ -137,18 +157,20 @@ function _s11MoveCaptionsToStickers(fd) {
         return { elements: 0, items: 0 };
     }
 
-    // Snapshot groups first — moving items mutates the live pageItems collection.
-    var groups = [], i;
-    for (i = 0; i < cutlinesLayer.pageItems.length; i++) {
-        if (cutlinesLayer.pageItems[i].typename === "GroupItem") {
-            groups.push(cutlinesLayer.pageItems[i]);
-        }
-    }
+    // Collect element groups across the Cutlines layer AND its sublayers. Snapshot up
+    // front — moving a group's children never changes which groups exist.
+    var groups = _s11CollectCutlineGroups(cutlinesLayer);
 
     var elementsMoved = 0, itemsMoved = 0, g, c;
     for (g = 0; g < groups.length; g++) {
         var group   = groups[g];
         var cutPath = findGroupMember(group, "");   // member named exactly group.name
+        if (!cutPath) {
+            // Malformed group: can't tell which child is the cut, so relocate NOTHING
+            // (never silently sweep real cut geometry). Surface it loudly.
+            log("[step11] SKIP | group has no cut path | " + group.name);
+            continue;
+        }
 
         // Collect VISIBLE, non-cut children (front-to-back). Hidden helpers stay put.
         var movers = [];
@@ -184,15 +206,19 @@ function _s11MoveCaptionsToStickers(fd) {
     return { elements: elementsMoved, items: itemsMoved };
 }
 
-// Walks each Cutlines GroupItem and logs any VISIBLE child that is not the group's cut
-// path (the member named === group.name). Advisory — logs a marker, does not throw.
-// Returns the offender count.
+// Walks each Cutlines GroupItem (recursing sublayers) and logs any VISIBLE child that is
+// not the group's cut path (the member named === group.name). A group missing its cut
+// path is itself surfaced. Advisory — logs a marker, does not throw. Returns offender count.
 function _s11AssertNoPrintedInCutlines(cutlinesLayer) {
-    var offenders = [], i, c;
-    for (i = 0; i < cutlinesLayer.pageItems.length; i++) {
-        var it = cutlinesLayer.pageItems[i];
-        if (it.typename !== "GroupItem") continue;
+    var groups = _s11CollectCutlineGroups(cutlinesLayer);
+    var offenders = [], g, c;
+    for (g = 0; g < groups.length; g++) {
+        var it = groups[g];
         var cutPath = findGroupMember(it, "");
+        if (!cutPath) {
+            offenders.push((it.name || "(group)") + "/(no cut path — not relocated)");
+            continue;
+        }
         for (c = 0; c < it.pageItems.length; c++) {
             var m = it.pageItems[c];
             if (m === cutPath) continue;
