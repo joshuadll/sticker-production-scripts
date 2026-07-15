@@ -21,7 +21,8 @@ var CONFIG = {
     marginLayerName:      "Margin",
     qaLayerName:          QA_LAYER_NAME,  // shared constant in aiUtils; stripped by Step 11
 
-    spacingThresholdMm:   2,
+    spacingThresholdMm:   1.9,    // hard-error gate (relaxed from 2mm per artist request); the
+                                  // spacing-buffer halo still aims at 2mm (spacingBufferBasisMm)
     qaSpacingSampleSteps: 12,
     flagStrokePt:         1.0,
     cutlineStrokePt:      0.25,   // reset target for the idempotent QA guard
