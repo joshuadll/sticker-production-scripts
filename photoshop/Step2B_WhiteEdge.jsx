@@ -122,7 +122,7 @@ function applyWhiteEdge(doc, soLayer) {
     // exported per-element PNGs. Removing it restores an anti-aliased (smooth) white edge.
     // Validated live 2026-07-15: soft edge (0 -> ~6k partial-alpha px), trace clean (28 named,
     // 0 unmatched), flat-bottom Tatra chamois caption still seats. See memory:
-    // caption_overlap_translation_bug (superseded) + white_edge_antialias_fix.
+    // white_edge_antialias_fix.
 
     // Create white layer, fill, deselect.
     var wbcLayer  = doc.artLayers.add();

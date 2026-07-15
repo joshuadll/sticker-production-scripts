@@ -108,6 +108,42 @@ else
     echo "FAIL [$STEP]: sidecars missing -- cannot drive Phase 2 ($SILH / $ELEM)."; exit 1
 fi
 
+# White-edge ANTI-ALIASING guard (pixel-level; the PS log golden is deliberately pixel-blind).
+# The exported element PNGs must carry a SOFT (anti-aliased) alpha edge -- partial-alpha pixels
+# (alpha 1..254). Re-introducing Step2B hardenSelection() would binarise the edge to 0 partial-
+# alpha (the jagged-edge regression fixed in PR #18) and NOTHING else in the suite would catch it.
+# Skips (does not fail) if Python/PIL is unavailable so the guard is best-effort off dev machines.
+ELEMENTS_DIR="$SOURCE_FIXTURE/${BASE}_elements"
+# `if COND` exempts the assignment from `set -e`, so a non-zero python exit reaches the else
+# branch (where we read its code) instead of aborting the script at the assignment.
+if AA_OUT=$(python3 - "$ELEMENTS_DIR" <<'PY'
+import sys, os, glob
+try:
+    from PIL import Image
+except Exception:
+    print("no PIL -- guard skipped"); sys.exit(3)
+d = sys.argv[1]
+pngs = [p for p in glob.glob(os.path.join(d, "*.png")) if "_caption" not in os.path.basename(p)]
+if not pngs:
+    print("no element PNGs in " + d); sys.exit(3)
+total = 0
+checked = sorted(pngs)[:8]
+for p in checked:
+    total += sum(Image.open(p).convert("RGBA").split()[3].histogram()[1:255])
+print("%d partial-alpha px across %d element(s)" % (total, len(checked)))
+sys.exit(0 if total > 500 else 1)
+PY
+); then
+    echo "  PASS: white edge anti-aliased ($AA_OUT)."
+else
+    AA_RC=$?
+    if [ "$AA_RC" -eq 3 ]; then
+        echo "  WARN [$STEP]: white-edge AA guard skipped ($AA_OUT)."
+    else
+        echo "FAIL [$STEP]: white edge is HARD ($AA_OUT) -- Step2B hardenSelection regression? (PR #18)"; exit 1
+    fi
+fi
+
 # === PHASE 2 -- Illustrator ==================================================
 # Drive the genuine handoff entry on Phase 1's sidecars. Inject the handoff flag so the
 # bottom dispatch does NOT auto-run main(); suppress alerts; log to /tmp.
