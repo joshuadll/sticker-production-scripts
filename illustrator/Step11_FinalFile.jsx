@@ -72,6 +72,12 @@ function runFinalFile(doc) {
         }
     }
 
+    // Move VISIBLE printed caption/tab artwork out of the Cutlines groups onto the
+    // Stickers layer. The cutter cuts every visible path in Cutlines/Halfcut, so the
+    // printed pill/text/GC-raster/tab-fill must not live there. Final copy only; move()
+    // preserves absolute position, so each caption stays exactly inside its cut.
+    _s11MoveCaptionsToStickers(fd);
+
     var layerCount = fd.layers.length;
     if (layerCount !== 3) {
         log("[step11] WARN | expected 3 layers in final file, found " + layerCount
@@ -107,4 +113,128 @@ function _s11InList(val, arr) {
         if (arr[i] === val) return true;
     }
     return false;
+}
+
+// Gathers every element GroupItem in a Cutlines container, recursing into SUBLAYERS
+// (artists tuck groups/stamps into a Cutlines sublayer — mirrors Step8c _collectCutlines
+// and StepQA). layer.pageItems recurses into GROUPS (hence the item.parent guard for
+// direct children) but NOT into sublayers (hence the explicit container.layers recursion).
+function _s11CollectCutlineGroups(container) {
+    var out = [], i, j, inner;
+    if (container.layers) {
+        for (i = 0; i < container.layers.length; i++) {
+            inner = _s11CollectCutlineGroups(container.layers[i]);
+            for (j = 0; j < inner.length; j++) out.push(inner[j]);
+        }
+    }
+    for (i = 0; i < container.pageItems.length; i++) {
+        var item = container.pageItems[i];
+        if (item.parent !== container) continue;   // direct children only (pageItems recurses groups)
+        if (item.typename === "GroupItem") out.push(item);
+    }
+    return out;
+}
+
+// Relocates each element's VISIBLE printed caption/tab artwork (white pill, text, GC
+// raster, default-tab fill) out of the Cutlines groups and onto the Stickers layer, so
+// the cutter (which cuts every VISIBLE path in Cutlines/Halfcut) never cuts it. Runs on
+// the FINAL-FILE copy only, after all transforms — move() preserves absolute artwork
+// coordinates, so each caption stays exactly inside the cut that traces it. The fused
+// cut path (the one member named === group.name) and hidden helpers stay in Cutlines.
+// Returns { elements: N, items: M }.
+function _s11MoveCaptionsToStickers(fd) {
+    var stickersLayer = findLayer(fd, CONFIG.stickersLayerName);
+    if (!stickersLayer) {
+        // Hard error, no fallback: printed art needs a home layer that isn't cut.
+        throw new Error("Stickers layer '" + CONFIG.stickersLayerName
+            + "' not found — cannot relocate printed caption artwork.");
+    }
+    var cutlinesLayer = findLayer(fd, CONFIG.cutlinesLayerName);
+    if (!cutlinesLayer) {
+        log("[step11] WARN | Cutlines layer '" + CONFIG.cutlinesLayerName
+            + "' not found — no caption relocation.");
+        return { elements: 0, items: 0 };
+    }
+
+    // Collect element groups across the Cutlines layer AND its sublayers. Snapshot up
+    // front — moving a group's children never changes which groups exist.
+    var groups = _s11CollectCutlineGroups(cutlinesLayer);
+
+    var elementsMoved = 0, itemsMoved = 0, g, c;
+    for (g = 0; g < groups.length; g++) {
+        var group   = groups[g];
+        var cutPath = findGroupMember(group, "");   // member named exactly group.name
+        if (!cutPath) {
+            // Malformed group: can't tell which child is the cut, so relocate NOTHING
+            // (never silently sweep real cut geometry). Surface it loudly.
+            log("[step11] SKIP | group has no cut path | " + group.name);
+            continue;
+        }
+
+        // Collect VISIBLE, non-cut children (front-to-back). Hidden helpers stay put.
+        var movers = [];
+        for (c = 0; c < group.pageItems.length; c++) {
+            var child = group.pageItems[c];
+            if (child === cutPath) continue;
+            if (child.hidden) continue;
+            // A spacing-buffer halo ("{name} buffer") is a VISIBLE child of the cut group
+            // that must never print. It is normally removed upstream (removeAllSpacingBuffers);
+            // if one survives, do NOT sweep it onto Stickers (it would print a magenta band).
+            // Skip it — it stays in Cutlines and _s11AssertNoPrintedInCutlines flags it loudly.
+            var cn = String(child.name);
+            if (cn.substring(cn.length - 7) === " buffer") continue;
+            movers.push(child);
+        }
+        if (!movers.length) continue;
+
+        // Wrap in a "{name} caption" group at the TOP of Stickers (above all art),
+        // preserving the movers' relative z-order.
+        var capGroup = stickersLayer.groupItems.add();
+        capGroup.name = group.name + " caption";
+        capGroup.move(stickersLayer, ElementPlacement.PLACEATBEGINNING);
+        // Iterate back-to-front, each move to the FRONT, so the original front-most item
+        // ends up front-most (moving front-to-back to the end would reverse the order).
+        for (c = movers.length - 1; c >= 0; c--) {
+            movers[c].move(capGroup, ElementPlacement.PLACEATBEGINNING);
+            itemsMoved++;
+        }
+        elementsMoved++;
+    }
+
+    // Advisory post-move check (warn-on-all): every remaining visible item in a Cutlines
+    // group must be its cut path. A leftover visible non-cut child is a printed item the
+    // cutter would cut — surface it (does not abort). Reuse the groups already collected —
+    // moving children onto Stickers does not change which groups exist on Cutlines.
+    _s11AssertNoPrintedInCutlines(groups);
+
+    log("[step11] captions relocated to Stickers | " + elementsMoved
+        + " element(s), " + itemsMoved + " item(s)");
+    return { elements: elementsMoved, items: itemsMoved };
+}
+
+// Given the Cutlines GroupItems (already collected by _s11CollectCutlineGroups), logs any
+// VISIBLE child that is not the group's cut path (the member named === group.name). A group
+// missing its cut path is itself surfaced. Advisory — logs a marker, does not throw. Returns
+// offender count. Takes the pre-collected groups to avoid a second full tree traversal.
+function _s11AssertNoPrintedInCutlines(groups) {
+    var offenders = [], g, c;
+    for (g = 0; g < groups.length; g++) {
+        var it = groups[g];
+        var cutPath = findGroupMember(it, "");
+        if (!cutPath) {
+            offenders.push((it.name || "(group)") + "/(no cut path — not relocated)");
+            continue;
+        }
+        for (c = 0; c < it.pageItems.length; c++) {
+            var m = it.pageItems[c];
+            if (m === cutPath) continue;
+            if (!m.hidden) {
+                offenders.push((it.name || "(group)") + "/" + (m.name || "(unnamed)"));
+            }
+        }
+    }
+    if (offenders.length) {
+        log("[step11] *** PRINTED ITEM LEFT IN CUTLINES *** | " + offenders.join(", "));
+    }
+    return offenders.length;
 }
