@@ -2291,12 +2291,15 @@ function _removeNamedBuffer(bufLayer, name) {
     return doomed.length;
 }
 
-// Half of the minimum element spacing, in mm (the per-piece share of the 2mm rule). Reads the
-// SAME knob the QA gate uses (CONFIG.spacingThresholdMm) so the visual band and the export gate
-// can never disagree about what "2mm" is — a single source of truth. Defaults to 2mm / 2.
+// Half of the SPACING-BUFFER BASIS, in mm (the per-piece share of the drag-time keep-out band).
+// Reads CONFIG.spacingBufferBasisMm — DELIBERATELY SEPARATE from the QA hard-error gate
+// (CONFIG.spacingThresholdMm): the artist wants the visual band to keep aiming at the aspirational
+// 2mm target while the export gate tolerates down to 1.9mm. So two pieces' bands meeting still
+// reads as "2mm", but a gap between 1.9 and 2.0 (bands slightly overlapping/darkening) no longer
+// hard-fails. Defaults to 2mm / 2.
 function _spacingBufferOffsetMm() {
-    var minMm = (CONFIG.spacingThresholdMm != null) ? CONFIG.spacingThresholdMm : 2;
-    return minMm / 2;
+    var basisMm = (CONFIG.spacingBufferBasisMm != null) ? CONFIG.spacingBufferBasisMm : 2;
+    return basisMm / 2;
 }
 
 // The halo fill colour — a vivid magenta/violet, the COMPLEMENT of the green Color Block

@@ -26,9 +26,11 @@ var CONFIG = {
     // ── Spacing buffer (live keep-out band; shared aiUtils.syncSpacingBuffer) ──
     // Drag-time aid for the min-spacing rule: each cutline gets a band reaching OUT by half the
     // rule, so overlapping bands == under spec. Built here (rides the nest transform + manual
-    // drags), refreshed by Step 8b, stripped before export. The band uses spacingThresholdMm
-    // (same knob + value as AI_LayoutQA / AI_ExportFinal) so the aid and the QA gate never drift.
-    spacingThresholdMm:   2,     // minimum element spacing (mm); band reaches out half of this
+    // drags), refreshed by Step 8b, stripped before export. The band aims at spacingBufferBasisMm
+    // (2mm — the aspirational target), DELIBERATELY separate from the QA hard-error gate
+    // (spacingThresholdMm 1.9mm in AI_LayoutQA / AI_ExportFinal): the visual band keeps targeting
+    // 2mm while the gate tolerates down to 1.9mm. See aiUtils._spacingBufferOffsetMm.
+    spacingBufferBasisMm: 2,     // spacing target (mm); band reaches out half of this
     spacingBufferOpacity: 60,    // %; Multiply blend so overlapping bands darken (thin band, no art tint)
 
     // ── Art sizing ───────────────────────────────────────────────────────────

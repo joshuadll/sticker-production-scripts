@@ -43,7 +43,10 @@ var CONFIG = {
     qaLayerName:       QA_LAYER_NAME,  // shared constant in aiUtils; Step 11 strips it
 
     // ── Phase 1: Spacing + Margin QA ─────────────────────────────────────────
-    spacingThresholdMm:   2,
+    // 1.9mm hard-error/warning gate (relaxed from 2mm per artist request). The spacing-BUFFER
+    // halo (built by AI_ImportNesting / AI_NormaliseCaptions) still aims at 2mm — see
+    // CONFIG.spacingBufferBasisMm there and aiUtils._spacingBufferOffsetMm.
+    spacingThresholdMm:   1.9,
     qaSpacingSampleSteps: 12,
     flagStrokePt:         1.0,    // red flag stroke weight (echo outline + connector)
     cutlineStrokePt:      0.25,   // canonical cut-line stroke (reset target on re-run)
@@ -65,7 +68,8 @@ var CONFIG = {
     // cells + a smaller dilation kernel) for only NQI +1 and the loss of pockets
     // sitting right on the 90mm^2 gate. See docs/step8c — benchmarked 2026-06-12.
     cellSizeMm:       2,    // grid resolution; must divide gapMm exactly (see note)
-    gapMm:            2,    // inter-sticker spacing band (same constant as spacingThresholdMm)
+    gapMm:            2,    // NQI occupancy dilation (mm); kept at 2 for grid math (see note above),
+                            // NOT the 1.9mm hard gate — this is advisory pocket detection only
     pocketMinAreaMm2: 90,   // a free pocket this large (mm^2) is a reworkable opportunity
     passingNqi:       90,   // NQI >= this is a PASS
     showOverlay:      true  // draw red rects over flagged pockets on "NQI Pockets" layer

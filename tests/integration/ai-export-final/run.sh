@@ -62,13 +62,13 @@ cp "$AI_FIXTURE" "$TEMP_FIXTURE"
 
 # ── Prepare temp script ──────────────────────────────────────────────────────
 
-# NOTE: spacingThresholdMm is relaxed 2 -> 1.7 for THIS TEST ONLY (temp script), so the
+# NOTE: spacingThresholdMm is relaxed 1.9 -> 1.7 for THIS TEST ONLY (temp script), so the
 # tightly-nested fixture clears the QA gate and the run exercises the full export path
-# (Steps 9A -> 10 -> 11) end-to-end. Production stays at 2mm. 1.7 (not 1.8) because the
+# (Steps 9A -> 10 -> 11) end-to-end. Production is 1.9mm. 1.7 (not 1.8) because the
 # fixture's tightest 3 gaps round to "1.8mm" but are actually just under 1.8 — 1.7 clears
-# them all. This trades the "gate halts on sub-2mm spacing" assertion for end-to-end export coverage.
+# them all. This trades the "gate halts on sub-spec spacing" assertion for end-to-end export coverage.
 perl -pe 's|suppressAlerts:\s*false|suppressAlerts: true|;
-          s|spacingThresholdMm:\s*2\b|spacingThresholdMm: 1.7|;
+          s|spacingThresholdMm:\s*1\.9\b|spacingThresholdMm: 1.7|;
           s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
