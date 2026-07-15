@@ -219,27 +219,33 @@ Contain all functions shared across steps. No `#target`, no `CONFIG`, no `main()
     FARTHEST-APART plate∩art crossings; drops only the outer "grab" edge, so notches stay
     bridged and a cap-wrap seam is kept; short spans allowed; returns null = not seated
     → error, no flat-cut fallback),
-  syncSpacingBuffer (per-element live 2mm keep-out halo; a CHILD of the cutline group named
-    "{name} buffer" = the cutline duplicated, then rendered as a thin magenta/violet Multiply BAND
-    (NOT a fill — a fill tinted the whole sticker pink; the band sits just OUTSIDE the cut so the
-    art's true colours show) via a STROKE of width H + a LIVE Adobe Offset Path effect of +H/2,
-    H = HALF the min spacing → band spans the cut line to +H. Magenta is the green Color Block's
-    complement so it reads there (a cyan just muddies in). Drag-time aid for the 2mm rule: two
-    pieces' halos meeting = exactly 2mm, OVERLAPPING halos darken = under spec — Illustrator has
-    no live collision test, the darkening IS the signal. Rides the nest transform + the artist's
-    manual move/scale because it's in the group; stays a true 1mm under resize ONLY with "Scale
-    Strokes & Effects" OFF (set defensively each call). Built at Step 7B, refreshed at Step 8b
-    after each re-Unite. Covers GC/WC AND stamps: a stamp is a bare path with no group to host the
-    halo, so Step 7B first wraps each stamp in a GroupItem (wrapStampsInGroups, note "ST|0" → Step
-    9A still skips its half-cut; stamps hide the peel tab manually per the playbook), then builds
-    the halo. The stamp grouping is a WORKING-PHASE aid only — unwrapStampGroups restores bare-path
-    stamps at export, so Step 10/11 and the shipped file are byte-for-byte unchanged. Advisory only
-    — the export gate stays Step 8c spacing/margin QA. Isolated from every consumer: Step 8c/9A/
-    nesting read findGroupMember (cutline member, not group bounds), StepQA excludes " buffer" by
-    name, parent-guards keep it out of layer-level group/path iterators. NOT yet PS/AI-validated),
-  wrapStampsInGroups / unwrapStampGroups (working-phase wrap of bare stamp cutlines into "ST|0"
-    groups so they can host a spacing halo; unwrapped back to bare paths before export),
-  removeAllSpacingBuffers (drops all "{name} buffer" halos from the Cutlines groups before export),
+  syncSpacingBuffer (per-element live 2mm keep-out halo named "{name} buffer" = the cutline
+    duplicated INTO a dedicated top-level "Spacing Buffer" layer positioned directly ABOVE Cutlines
+    (between Cutlines and Halfcut) (NOT a child of the cutline group, NOT a Cutlines sublayer — moved
+    2026-07-15 per artist feedback so ONE Layers-panel eyeball hides/shows every halo at once during
+    hand-nesting), then
+    rendered as a thin magenta/violet Multiply BAND (NOT a fill — a fill tinted the whole sticker
+    pink; the band sits just OUTSIDE the cut so the art's true colours show) via a STROKE of width
+    H + a LIVE Adobe Offset Path effect of +H/2, H = HALF the min spacing → band spans the cut line
+    to +H. Magenta is the green Color Block's complement so it reads there (a cyan just muddies in).
+    Drag-time aid for the 2mm rule: two pieces' halos meeting = exactly 2mm, OVERLAPPING halos
+    darken = under spec — Illustrator has no live collision test, the darkening IS the signal. The
+    layer is kept UNLOCKED + visible so a marquee/shift-click over a piece still grabs its halo —
+    Illustrator selection is CROSS-LAYER, so the halo rides the artist's manual drag/scale just like
+    the art (Sticker layer) does, even though it is not a group child (locking would drop it from
+    the selection). Stays a true 1mm under resize ONLY with "Scale Strokes & Effects" OFF (set
+    defensively each call). Built at Step 7B, refreshed at Step 8b after each re-Unite. Covers
+    GC/WC captioned groups AND bare stamp cutlines directly — accepts a GroupItem OR a bare
+    PathItem/CompoundPathItem, so stamps no longer need wrapping (wrapStampsInGroups/
+    unwrapStampGroups DELETED 2026-07-15). Advisory only — the export gate stays Step 8c
+    spacing/margin QA. Isolated from every consumer WITHOUT any skip-guards: Step 8c / StepQA scope
+    into the Cutlines layer only, so a TOP-LEVEL buffer layer is never reached (a Cutlines sublayer
+    would have needed explicit skips — the reason for the top-level choice); StepQA also keeps its
+    pre-existing " buffer" name-guard for legacy group-child halos. removeAllSpacingBuffers drops
+    the whole layer before export. AI-VALIDATED (3 integration tests + placement assertion); live
+    DRAG still needs an in-Illustrator eyeball),
+  removeAllSpacingBuffers (removes the whole top-level "Spacing Buffer" layer + sweeps legacy
+    "{name} buffer" group-children before export),
   buildWorkingDocument (builds A4/RGB doc + Margin/Stickers/Grid/Color Block layers, no template),
   marginRect (shared safe-area rect: documented 190×267mm working area),
   log, scriptAlert, findLayer, findPathInLayer
@@ -320,7 +326,9 @@ Exceptions (case-insensitive search, consistent standard):
 - **Halfcut layer**: Step 9A searches case-insensitively via `getOrCreateHalfcutLayer()` in aiUtils (seen as "Half cut", "Halfcut", "halfcut lines"); creates as "Halfcut" if absent. Step 11 standardises to `"Halfcut/Peeling Tab"` when saving the final file.
 - **Stickers layer**: `"Sticker"` (singular) everywhere. Built in code by `buildWorkingDocument` and found by exact `findLayer(doc, CONFIG.stickersLayerName)` — all pipeline CONFIGs use the same name, so no case-insensitive/plural fallback (the doc is always code-built, never from a template, so there's no naming variety to tolerate).
 - **Asset layer**: NOT created by the automated pipeline. Step 10 builds temporary clip groups per-export and discards them — the working file stays clean. (The manual workflow created a persistent Asset layer; the script does not.)
-Working file stack: Margin > Offset Path > Halfcut > Cutlines > Stickers > Grid > Color Block
+Working file stack: Margin > Offset Path > Halfcut > [Spacing Buffer] > Cutlines > Stickers > Grid > Color Block
+  ([Spacing Buffer] = the transient keep-out halo layer, between Halfcut and Cutlines during the
+  working phase only; unlocked+visible, removed before export — see syncSpacingBuffer.)
 Final file stack: Cutlines > Halfcut/Peeling Tab > Stickers
 
 Step 8c does **pure-geometry QA** — no Offset Path layer is created. It measures

@@ -292,6 +292,30 @@ else
         echo "FAIL [$STEP] (re-run): ${NSWAP} art item(s) still unrotated (90° swap)."; FAIL=1
     fi
 fi
+
+# ── Spacing-buffer placement (2026-07-15 top-level-layer move) ───────────────
+# The golden/log lines can't see WHERE a halo lives ("[buffer] … band" is identical for a group
+# child or a separate-layer item), so assert it structurally on the still-open post-import doc:
+# every halo the pipeline reported building must sit in a dedicated top-level "Spacing Buffer"
+# layer, and none may have leaked in as a cutline-group child.
+BUFPROBE="$(cd "$(dirname "$0")" && pwd)/probe-buffer.jsx"
+SB_BUILT=$(grep -oE "spacing-buffer \| [0-9]+ keep-out" "$LOG" | grep -oE "[0-9]+" | head -1)
+BUFRES=$(osascript -e "tell application \"$APP\" to do javascript file (POSIX file \"$BUFPROBE\")" 2>/dev/null || echo "probe-failed")
+echo "[$STEP] spacing-buffer probe: $BUFRES (pipeline built ${SB_BUILT:-?})"
+BUF_LYR=$(echo "$BUFRES"   | grep -oE "layer=[0-9]+"    | grep -oE "[0-9]+")
+BUF_ITEMS=$(echo "$BUFRES" | grep -oE "items=[0-9]+"    | grep -oE "[0-9]+")
+BUF_ABOVE=$(echo "$BUFRES" | grep -oE "aboveCut=[0-9]+" | grep -oE "[0-9]+")
+BUF_STRAY=$(echo "$BUFRES" | grep -oE "strays=[0-9]+"   | grep -oE "[0-9]+")
+if [ "${BUF_LYR:-0}" -eq 1 ] \
+   && [ -n "${SB_BUILT:-}" ] && [ "${BUF_ITEMS:-0}" -eq "$SB_BUILT" ] \
+   && [ "${BUF_ABOVE:-0}" -eq 1 ] \
+   && [ "${BUF_STRAY:-1}" -eq 0 ]; then
+    echo "PASS [$STEP]: all ${BUF_ITEMS} halo(s) in the Spacing Buffer layer (directly above Cutlines), none leaked into groups."
+else
+    echo "FAIL [$STEP]: buffer placement wrong (want layer=1 items=${SB_BUILT:-?} aboveCut=1 strays=0, got: $BUFRES)."
+    FAIL=1
+fi
+
 rm -f "$TEMP_SCRIPT"
 
 if [ "$FAIL" -ne 0 ]; then

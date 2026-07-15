@@ -35,10 +35,10 @@ function runAssetExport(doc) {
         throw new Error("Cutlines layer not found: " + CONFIG.cutlinesLayerName);
     }
 
-    // Safety net (mirrors Step 11): drop any working-phase spacing-buffer bands and unwrap stamp
-    // groups before exporting. AI_ExportFinal already does this up front, but a direct/standalone
-    // runAssetExport must not bake a band into a PNG or clip a stamp as a grouped element.
-    try { removeAllSpacingBuffers(doc); unwrapStampGroups(doc); } catch (eBuf) {}
+    // Safety net (mirrors Step 11): drop the working-phase spacing-buffer sublayer before
+    // exporting. AI_ExportFinal already does this up front, but a direct/standalone runAssetExport
+    // must not bake a keep-out band into a PNG.
+    try { removeAllSpacingBuffers(doc); } catch (eBuf) {}
 
     var stkCode  = doc.name.replace(/\.[^.]+$/, "").split(" ")[0];
     // Organized export tree beside the working file: {stkCode}_export/{previews,elements}.

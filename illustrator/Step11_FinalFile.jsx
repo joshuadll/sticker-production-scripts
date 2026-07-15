@@ -41,10 +41,9 @@ function runFinalFile(doc) {
     // After saveAs, app.activeDocument is now the final file.
     var fd = app.activeDocument;
 
-    // Safety net: drop any spacing-buffer halos and unwrap stamp groups that slipped through
-    // (AI_ExportFinal tears these down up front, but a direct runFinalFile call would not) —
-    // the halo must never print, and stamps must ship as bare paths (pre-feature structure).
-    try { removeAllSpacingBuffers(fd); unwrapStampGroups(fd); } catch (eBuf) {}
+    // Safety net: drop the spacing-buffer sublayer if it slipped through (AI_ExportFinal tears it
+    // down up front, but a direct runFinalFile call would not) — the halo must never print.
+    try { removeAllSpacingBuffers(fd); } catch (eBuf) {}
 
     // Standardise halfcut layer name.
     var halfcutLayer = _s11FindHalfcutLayer(fd);
