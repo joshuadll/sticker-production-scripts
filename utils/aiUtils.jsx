@@ -668,8 +668,9 @@ function buildPlate(layer, aiBounds) {
 
 // Builds a caption-plate capsule PathItem that FOLLOWS a fitted spine (curved or
 // tilted captions), instead of an axis-aligned pill. spinePts is an array of
-// {x,y} in AI points (y-up); radius in points. This is the AI-side twin of
-// Step 3B's _capsulePolygon (Photoshop) — same offset-spine-plus-end-caps math —
+// {x,y} in AI points (y-up); radius in points. The offset-spine sides mirror
+// Step 3B's _capsulePolygon (Photoshop); the rounded ENDS are exact bezier arcs
+// (_capsuleBezierNodes) so they trace true circles, not the old 10-chord facets,
 // so the cutline's caption portion matches the real White pill. Returns a filled,
 // unstroked PathItem ready for deriveCutline's boolean union.
 function buildCapsuleFromSpine(layer, spinePts, radius) {
@@ -692,71 +693,21 @@ function buildCapsuleFromSpine(layer, spinePts, radius) {
     return p;
 }
 
-// Offsets a spine polyline by ±radius into a closed capsule polygon (rounded ends).
-// Returns an array of [x,y] for setEntirePath. Ported from Step3B_CaptionWhite.jsx.
-function _capsulePolygon(spine, r) {
-    var n = spine.length, i;
-    var top = [], bot = [];
-
-    for (i = 0; i < n; i++) {
-        // Local tangent from neighbours (forward/backward diff at the ends).
-        var p0 = spine[i > 0 ? i - 1 : i];
-        var p1 = spine[i < n - 1 ? i + 1 : i];
-        var tx = p1.x - p0.x, ty = p1.y - p0.y;
-        var len = Math.sqrt(tx * tx + ty * ty) || 1;
-        var nx = -ty / len, ny = tx / len;   // unit normal
-        top.push([spine[i].x + r * nx, spine[i].y + r * ny]);
-        bot.push([spine[i].x - r * nx, spine[i].y - r * ny]);
-    }
-
-    var endT   = _capUnit(spine[n - 1].x - spine[n - 2 >= 0 ? n - 2 : 0].x,
-                          spine[n - 1].y - spine[n - 2 >= 0 ? n - 2 : 0].y);
-    var startT = _capUnit(spine[0].x - spine[1 < n ? 1 : 0].x,
-                          spine[0].y - spine[1 < n ? 1 : 0].y);
-
-    var poly = [], k;
-    for (k = 0; k < top.length; k++) poly.push(top[k]);                // one edge
-    _appendCap(poly, spine[n - 1], r, top[n - 1], bot[n - 1], endT);   // end cap
-    for (k = bot.length - 1; k >= 0; k--) poly.push(bot[k]);           // other edge
-    _appendCap(poly, spine[0], r, bot[0], top[0], startT);             // start cap
-    return poly;
-}
-
-// Appends a semicircular arc of points around centre C (radius r), from fromPt to
-// toPt, sweeping through the outward direction `through`.
-function _appendCap(poly, C, r, fromPt, toPt, through) {
-    var steps = 10;
-    var a0 = Math.atan2(fromPt[1] - C.y, fromPt[0] - C.x);
-    var a1 = Math.atan2(toPt[1]   - C.y, toPt[0]   - C.x);
-    var sweep = a1 - a0;
-    while (sweep <= -Math.PI) sweep += 2 * Math.PI;
-    while (sweep > Math.PI)  sweep -= 2 * Math.PI;
-    var midAng = a0 + sweep / 2;
-    if (Math.cos(midAng) * through[0] + Math.sin(midAng) * through[1] < 0) {
-        sweep += (sweep > 0 ? -2 * Math.PI : 2 * Math.PI);
-    }
-    var s;
-    for (s = 1; s < steps; s++) {
-        var ang = a0 + sweep * (s / steps);
-        poly.push([C.x + r * Math.cos(ang), C.y + r * Math.sin(ang)]);
-    }
-}
-
 function _capUnit(x, y) {
     var len = Math.sqrt(x * x + y * y) || 1;
     return [x / len, y / len];
 }
 
 // ─── BEZIER END-CAPS (smooth rounded pill ends — the Live Corners equivalent) ───
-// _appendCap above samples the semicircular end as 10 STRAIGHT chords; those flat facets read
-// as jagged at print zoom. These two helpers rebuild each cap as exact circular-arc CUBIC
-// bezier segments (kappa handles), so the ends are truly round — the scripted twin of manually
-// dragging Illustrator's Live Corners widget to maximum. Node-testable (see
+// The pill's rounded ends were once a 10-STRAIGHT-chord polygon approximation of a semicircle,
+// whose flat facets read as jagged at print zoom. These two helpers rebuild each cap as exact
+// circular-arc CUBIC bezier segments (kappa handles), so the ends are truly round — the scripted
+// twin of manually dragging Illustrator's Live Corners widget to maximum. Node-testable (see
 // tests/integration/unit/test-caption-capend.js).
 
 // Returns the bezier anchor nodes of a circular arc around centre C {x,y}, radius r, sweeping
-// from fromPt [x,y] to toPt [x,y] through the outward direction `through` [x,y] (same sweep
-// disambiguation as _appendCap so the cap bulges away from the pill, not through it). Each node
+// from fromPt [x,y] to toPt [x,y] through the outward direction `through` [x,y] (the sweep is
+// disambiguated so the cap bulges away from the pill, not through it). Each node
 // is { anchor:[x,y], leftDir:[x,y], rightDir:[x,y], ang }. Endpoints are node[0] (=fromPt) and
 // node[k] (=toPt); handles use the exact quarter-arc constant h = r·(4/3)·tan(Δ/4).
 function _capArcNodes(C, r, fromPt, toPt, through) {
@@ -788,7 +739,8 @@ function _capArcNodes(C, r, fromPt, toPt, through) {
     return out;
 }
 
-// AI-side twin of _capsulePolygon, but the two rounded ENDS are exact bezier arcs instead of
+// Builds the capsule outline from a fitted spine: the long sides are offset-spine corner nodes
+// (as in Step 3B's PS _capsulePolygon), but the two rounded ENDS are exact bezier arcs instead of
 // 10-chord polylines. Returns an ordered, CLOSED list of path nodes for setEntirePath + handle
 // assignment: { anchor:[x,y], leftDir:[x,y], rightDir:[x,y], smooth:Bool }. The long sides stay
 // corner nodes at the offset-spine points (unchanged); only the caps curve. smooth=true marks

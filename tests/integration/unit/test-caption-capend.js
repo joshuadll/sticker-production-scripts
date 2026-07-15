@@ -2,9 +2,9 @@
 // Pure-geometry unit test for the caption pill's BEZIER end-caps (aiUtils).
 //
 // The WC capsule (buildCapsuleFromSpine) used to build its rounded ends as a 10-segment
-// STRAIGHT-line polygon approximation of a semicircle (_appendCap / _capsulePolygon). Those
-// flat chords are visibly jagged at print zoom (the artist's "Spiš Castle" complaint). The fix
-// mirrors Illustrator's Live Corners: build the caps as exact circular-arc BEZIER segments.
+// STRAIGHT-line polygon approximation of a semicircle. Those flat chords are visibly jagged
+// at print zoom (the artist's "Spiš Castle" complaint). The fix mirrors Illustrator's Live
+// Corners: build the caps as exact circular-arc BEZIER segments.
 //
 // _capsuleBezierNodes(spine, r) returns an ordered, closed list of path nodes:
 //   { anchor:[x,y], leftDir:[x,y], rightDir:[x,y], smooth:Bool }
@@ -22,10 +22,20 @@ function extract(name) {
     return m[0];
 }
 eval(extract('_capUnit'));
-eval(extract('_appendCap'));       // legacy polygon cap — used as the "before" reference
-eval(extract('_capsulePolygon'));  // legacy full polygon — reference for chord sag
 eval(extract('_capArcNodes'));
 eval(extract('_capsuleBezierNodes'));
+
+// Local reference: the OLD approach — a 10-chord straight-line semicircle. Kept here (not
+// imported from aiUtils, where the polygon cap has been removed) so test 2 can still show the
+// contrast that motivated the bezier fix.
+function chordCap(C, r, a0, a1) {
+    var poly = [], s, steps = 10;
+    for (s = 0; s <= steps; s++) {
+        var ang = a0 + (a1 - a0) * (s / steps);
+        poly.push([C.x + r * Math.cos(ang), C.y + r * Math.sin(ang)]);
+    }
+    return poly;
+}
 
 // Cubic bezier point (mirrors aiUtils _bezierPoint, [x,y] in / {x,y} out).
 function bez(p0, p1, p2, p3, t) {
@@ -74,8 +84,7 @@ function check(cond, msg) { if (!cond) { console.log('FAIL: ' + msg); fails++; }
 // Not testing new code — documents WHY (a chord midpoint sits ~1.2% of r inside the arc).
 (function () {
     var C = { x: 0, y: 0 }, r = 20;
-    var poly = [];
-    _appendCap(poly, C, r, [0, r], [0, -r], [-1, 0]);   // 10-chord semicircle, bulging -x
+    var poly = chordCap(C, r, Math.PI / 2, 3 * Math.PI / 2);   // 10-chord semicircle, bulging -x
     var worst = 0;
     for (var i = 0; i + 1 < poly.length; i++) {
         var mx = (poly[i][0] + poly[i + 1][0]) / 2, my = (poly[i][1] + poly[i + 1][1]) / 2;

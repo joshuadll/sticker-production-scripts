@@ -13,7 +13,7 @@
 #include "../../../utils/aiUtils.jsx"
 
 var LOGPATH = "~/Desktop/test-caption-capend-ai.log";
-function tlog(s) { var f = new File(LOGPATH); f.open("a"); f.writeln(s); f.close(); $.writeln(s); }
+function tlog(s) { var f = new File(LOGPATH); f.open("a"); f.lineFeed = "Unix"; f.writeln(s); f.close(); $.writeln(s); }
 function pass(m) { tlog("[capend-ai] PASS | " + m); }
 function fail(m) { tlog("[capend-ai] FAIL | " + m); }
 
