@@ -1,8 +1,17 @@
-# Spacing buffer → dedicated Cutlines sublayer
+# Spacing buffer → dedicated top-level "Spacing Buffer" layer
 
 **Date:** 2026-07-15
 **Branch:** `worktree-spacing-buffer-sublayer`
-**Status:** implemented + Illustrator-validated (3 integration tests + structural probe pass); live drag unverified; branch not yet merged
+**Status:** implemented + Illustrator-validated (3 integration tests + placement assertion + QA-isolation probe); live drag unverified; branch not yet merged
+
+> **Revision (final):** the halo layer is a **top-level `Spacing Buffer` layer** at the top of the
+> document stack, **not** a sublayer of Cutlines (the first-tried form, commit `babf2fc`). Same
+> one-click hide + cross-layer drag behaviour, but the QA collectors (`Step8c._collectCutlines`,
+> `StepQA._qa_collectPaths`) are scoped to the Cutlines layer and only recurse its sublayers, so a
+> top-level sibling layer is **never reached — no skip-guard needed** (a sublayer required explicit
+> name-skips in both collectors, since the outward-offset halos would otherwise read as cutlines).
+> Proven live: `_collectCutlines` returns 26, not 52, with halos present. Wherever the sections
+> below say "sublayer at the top of the Cutlines layer", read "top-level layer".
 
 ## Problem
 
