@@ -673,10 +673,20 @@ function buildPlate(layer, aiBounds) {
 // so the cutline's caption portion matches the real White pill. Returns a filled,
 // unstroked PathItem ready for deriveCutline's boolean union.
 function buildCapsuleFromSpine(layer, spinePts, radius) {
-    var poly = _capsulePolygon(spinePts, radius);
+    var nodes = _capsuleBezierNodes(spinePts, radius);   // sides = corners, ends = bezier arcs
+    var coords = [], i;
+    for (i = 0; i < nodes.length; i++) coords.push(nodes[i].anchor);
     var p = layer.pathItems.add();
-    p.setEntirePath(poly);
-    p.closed  = true;   // setEntirePath can drop the closed flag
+    p.setEntirePath(coords);
+    p.closed = true;    // setEntirePath can drop the closed flag
+    // Assign the cap bezier handles (setEntirePath lays down straight corners only).
+    var pts = p.pathPoints;
+    for (i = 0; i < nodes.length; i++) {
+        var pp = pts[i], nd = nodes[i];
+        pp.leftDirection  = nd.leftDir;
+        pp.rightDirection = nd.rightDir;
+        pp.pointType = nd.smooth ? PointType.SMOOTH : PointType.CORNER;
+    }
     p.filled  = true;
     p.stroked = false;
     return p;
@@ -735,6 +745,90 @@ function _appendCap(poly, C, r, fromPt, toPt, through) {
 function _capUnit(x, y) {
     var len = Math.sqrt(x * x + y * y) || 1;
     return [x / len, y / len];
+}
+
+// ─── BEZIER END-CAPS (smooth rounded pill ends — the Live Corners equivalent) ───
+// _appendCap above samples the semicircular end as 10 STRAIGHT chords; those flat facets read
+// as jagged at print zoom. These two helpers rebuild each cap as exact circular-arc CUBIC
+// bezier segments (kappa handles), so the ends are truly round — the scripted twin of manually
+// dragging Illustrator's Live Corners widget to maximum. Node-testable (see
+// tests/integration/unit/test-caption-capend.js).
+
+// Returns the bezier anchor nodes of a circular arc around centre C {x,y}, radius r, sweeping
+// from fromPt [x,y] to toPt [x,y] through the outward direction `through` [x,y] (same sweep
+// disambiguation as _appendCap so the cap bulges away from the pill, not through it). Each node
+// is { anchor:[x,y], leftDir:[x,y], rightDir:[x,y], ang }. Endpoints are node[0] (=fromPt) and
+// node[k] (=toPt); handles use the exact quarter-arc constant h = r·(4/3)·tan(Δ/4).
+function _capArcNodes(C, r, fromPt, toPt, through) {
+    var a0 = Math.atan2(fromPt[1] - C.y, fromPt[0] - C.x);
+    var a1 = Math.atan2(toPt[1]   - C.y, toPt[0]   - C.x);
+    var sweep = a1 - a0;
+    while (sweep <= -Math.PI) sweep += 2 * Math.PI;
+    while (sweep > Math.PI)  sweep -= 2 * Math.PI;
+    var midAng = a0 + sweep / 2;
+    if (Math.cos(midAng) * through[0] + Math.sin(midAng) * through[1] < 0) {
+        sweep += (sweep > 0 ? -2 * Math.PI : 2 * Math.PI);
+    }
+    var k = Math.ceil(Math.abs(sweep) / (Math.PI / 2));   // ≤90° per segment for arc accuracy
+    if (k < 2) k = 2;                                      // a 180° cap is always ≥2 segments
+    var d = sweep / k;
+    var h = r * (4 / 3) * Math.tan(d / 4);                // signed: h carries the sweep direction
+    var out = [], s;
+    for (s = 0; s <= k; s++) {
+        var ang = a0 + d * s;
+        var ax = C.x + r * Math.cos(ang), ay = C.y + r * Math.sin(ang);
+        var tx = -Math.sin(ang), ty = Math.cos(ang);      // unit tangent (dir of increasing ang)
+        out.push({
+            anchor:   [ax, ay],
+            rightDir: [ax + h * tx, ay + h * ty],
+            leftDir:  [ax - h * tx, ay - h * ty],
+            ang: ang
+        });
+    }
+    return out;
+}
+
+// AI-side twin of _capsulePolygon, but the two rounded ENDS are exact bezier arcs instead of
+// 10-chord polylines. Returns an ordered, CLOSED list of path nodes for setEntirePath + handle
+// assignment: { anchor:[x,y], leftDir:[x,y], rightDir:[x,y], smooth:Bool }. The long sides stay
+// corner nodes at the offset-spine points (unchanged); only the caps curve. smooth=true marks
+// the arc-interior anchors (collinear handles → PointType.SMOOTH); junction/side anchors are
+// corners with one straight side and one arc-tangent side.
+function _capsuleBezierNodes(spine, r) {
+    var n = spine.length, i;
+    var top = [], bot = [];
+    for (i = 0; i < n; i++) {
+        var p0 = spine[i > 0 ? i - 1 : i];
+        var p1 = spine[i < n - 1 ? i + 1 : i];
+        var tx = p1.x - p0.x, ty = p1.y - p0.y;
+        var len = Math.sqrt(tx * tx + ty * ty) || 1;
+        var nx = -ty / len, ny = tx / len;               // unit normal (same as _capsulePolygon)
+        top.push([spine[i].x + r * nx, spine[i].y + r * ny]);
+        bot.push([spine[i].x - r * nx, spine[i].y - r * ny]);
+    }
+    var endT   = _capUnit(spine[n - 1].x - spine[n - 2 >= 0 ? n - 2 : 0].x,
+                          spine[n - 1].y - spine[n - 2 >= 0 ? n - 2 : 0].y);
+    var startT = _capUnit(spine[0].x - spine[1 < n ? 1 : 0].x,
+                          spine[0].y - spine[1 < n ? 1 : 0].y);
+    var endArc   = _capArcNodes(spine[n - 1], r, top[n - 1], bot[n - 1], endT);
+    var startArc = _capArcNodes(spine[0],     r, bot[0],     top[0],     startT);
+    var ke = endArc.length - 1, ks = startArc.length - 1;
+
+    function corner(a) { return { anchor: a, leftDir: a, rightDir: a, smooth: false }; }
+    var nodes = [];
+    // node[0] = top[0]: closes the ring, so its leftDir carries the start-cap's final tangent.
+    nodes.push({ anchor: top[0], leftDir: startArc[ks].leftDir, rightDir: top[0], smooth: false });
+    for (i = 1; i <= n - 2; i++) nodes.push(corner(top[i]));                 // top side interior
+    // top[n-1]: junction — straight into the side (left), curves into the end cap (right).
+    nodes.push({ anchor: endArc[0].anchor, leftDir: endArc[0].anchor, rightDir: endArc[0].rightDir, smooth: false });
+    for (i = 1; i <= ke - 1; i++) nodes.push({ anchor: endArc[i].anchor, leftDir: endArc[i].leftDir, rightDir: endArc[i].rightDir, smooth: true });
+    // bot[n-1]: junction — curves out of the end cap (left), straight into the side (right).
+    nodes.push({ anchor: endArc[ke].anchor, leftDir: endArc[ke].leftDir, rightDir: endArc[ke].anchor, smooth: false });
+    for (i = n - 2; i >= 1; i--) nodes.push(corner(bot[i]));                 // bot side interior
+    // bot[0]: junction — straight into the side (left), curves into the start cap (right).
+    nodes.push({ anchor: startArc[0].anchor, leftDir: startArc[0].anchor, rightDir: startArc[0].rightDir, smooth: false });
+    for (i = 1; i <= ks - 1; i++) nodes.push({ anchor: startArc[i].anchor, leftDir: startArc[i].leftDir, rightDir: startArc[i].rightDir, smooth: true });
+    return nodes;   // ring closes from the last start-cap interior node back to node[0] (top[0])
 }
 
 // ─── CAPTION SPINE FIT (baseline-based — pure geometry, node-testable) ───
