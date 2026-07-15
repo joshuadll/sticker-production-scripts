@@ -17,7 +17,7 @@
 [step8c] FLAG | cut line exceeds margin | Bratislava Castle
 [step8c] FLAG | cut line exceeds margin | Tram
 [step8c] overlay | drew flags on "Layout QA" layer | 16 halo(s), 10 spacing badge(s), 2 margin arrow(s), 2 sliver(s)
-[timing] step8c | sample=5937 spacing=2668 margin=2 overlay=815 (ms)
+[timing] step8c | sample=2891 spacing=2618 margin=1 overlay=908 (ms)
 [step8c] done | checked=26 flagged=16 (spacing: 10 pair(s); margin: 2)
 [pipeline] spacing/margin complete | 26 checked, 16 flagged.
 [pipeline] --- Nesting Quality (NQI) ---
@@ -68,7 +68,35 @@
 [stepQA] pocket | Left edge | area=92 mm2 | center=(15.3,273.7)mm | bbox=[5,132 9x7]mm
 [stepQA] NQI=94 | pass=true | utilization=81.8% | recoverableCells=730/12730
 [stepQA] overlay drawn on "Layout QA" layer | 144 rect(s)
-[timing] stepQA | setup+collect=127 raster=463 dilate=516 marginMask=16 pockets=315 overlay=14 (ms)
+[timing] stepQA | setup+collect=129 raster=462 dilate=555 marginMask=16 pockets=318 overlay=13 (ms)
+[pipeline] --- Half-cut check ---
+[stepQA-halfcut] ok | Devín Castle
+[stepQA-halfcut] ok | Slovak Paradise National Park
+[stepQA-halfcut] ok | Spiš Castle
+[stepQA-halfcut] FLAG | Bratislava Castle | undershoot
+[stepQA-halfcut] ok | Štrbské Pleso
+[stepQA-halfcut] ok | National Flower
+[stepQA-halfcut] ok | Slovakia Map
+[stepQA-halfcut] ok | St. Martin's Cathedral
+[stepQA-halfcut] ok | UFO Observation Deck, Bridge SNP
+[stepQA-halfcut] ok | Old Town Hall (Bratislava)
+[stepQA-halfcut] ok | Bojnice Castle
+[stepQA-halfcut] ok | Orava Castle
+[stepQA-halfcut] ok | Michael's Gate
+[stepQA-halfcut] ok | The Blue Church | Church of St. Elizabeth
+[stepQA-halfcut] ok | Čumil Statue
+[stepQA-halfcut] ok | Bratislava(text)
+[stepQA-halfcut] ok | Šúľance s Makom
+[stepQA-halfcut] ok | Pirohy
+[stepQA-halfcut] ok | Bryndzové halušky
+[stepQA-halfcut] ok | Kraslice
+[stepQA-halfcut] ok | Kroje
+[stepQA-halfcut] ok | Fujara
+[stepQA-halfcut] FLAG | Tram | undershoot
+[stepQA-halfcut] ok | Tatra chamois
+[stepQA-halfcut] ok | Carpathian Wooden Churches
+[stepQA-halfcut] ok | St Elizabeth's Cathedral | (Dóm Svätej Alzbety)
+[stepQA-halfcut] done | checked=26 flagged=2
 [pipeline] === AI_LayoutQA done ===
 Layout QA
 
@@ -94,6 +122,9 @@ Utilization: 81.8%
   14. Right edge  — 128 mm2
   15. Lower-left  — 128 mm2
   16. Left edge  — 92 mm2
+
+Half-cut: 2 of 26 FLAGGED (blue) — missing or short of the cut line.
+  Fix before exporting — AI_ExportFinal will halt on these.
 All flags + pockets are on the "Layout QA" layer — toggle it to show/hide; it's stripped at export.
 
 Adjust the nesting / pencil, then re-run this script.

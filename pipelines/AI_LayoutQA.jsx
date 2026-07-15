@@ -2,6 +2,7 @@
 #include "../utils/aiUtils.jsx"
 #include "../illustrator/Step8c_OffsetPathQA.jsx"
 #include "../illustrator/StepQA_NestingQuality.jsx"
+#include "../illustrator/StepQA_Halfcut.jsx"
 
 // AI_LayoutQA — independent, on-demand layout QA.
 //
@@ -12,18 +13,21 @@
 // structural — it only (re)applies QA flags and the pocket overlay, both of
 // which are idempotent.
 //
-// Two phases, neither halts the other (the artist wants to see all of it at once):
+// Three phases, none halts another (the artist wants to see all of it at once):
 //   1. Spacing + Margin QA  — runOffsetPathQA  → { checked, flagged }
 //      Cut lines closer than 2mm or outside the safe area are flagged.
 //   2. Nesting Quality (NQI) — runNestingQA    → { nqi, pass, pockets, utilization }
 //      Advisory packing score; reworkable pockets drawn as fills.
+//   3. Half-cut check — runHalfcutQA          → { checked, flagged, flags }
+//      Flags GC/WC/tab elements with a missing or short-of-the-cut half-cut (blue).
+//      Advisory here, but AI_ExportFinal's Step 9A gate WILL halt on these.
 //
-// Both phases draw onto ONE shared "Layout QA" overlay layer (CONFIG.qaLayerName):
-// spacing/margin flag markers + NQI pocket fills. The artist toggles a single layer
-// to show/hide all QA; the cut lines themselves are never recoloured.
+// All three phases draw onto ONE shared "Layout QA" overlay layer (CONFIG.qaLayerName):
+// spacing/margin flag markers + NQI pocket fills + half-cut flags. The artist toggles a
+// single layer to show/hide all QA; the cut lines themselves are never recoloured.
 //
-// Spacing/margin is the manufacturability gate that AI_ExportFinal re-runs before
-// export. NQI is advisory only — it never blocks export.
+// Spacing/margin and the half-cut check are gates AI_ExportFinal re-runs before export.
+// NQI is advisory only — it never blocks export.
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 
@@ -35,6 +39,9 @@ var CONFIG = {
     // Layer that holds the cutline paths (shared by both phases).
     cutlinesLayerName: "Cutlines",
     marginLayerName:   "Margin",
+    // Half-cut layer — case-insensitive search; created as halfcutLayerName if absent
+    // (matches every other pipeline's CONFIG; getOrCreateHalfcutLayer needs it — Phase 3).
+    halfcutLayerName:  "Halfcut",
 
     // Single overlay layer holding ALL QA visuals — spacing/margin flag markers
     // (Step 8c) AND NQI pocket fills (StepQA). The artist toggles this one layer to
@@ -68,7 +75,10 @@ var CONFIG = {
     gapMm:            2,    // inter-sticker spacing band (same constant as spacingThresholdMm)
     pocketMinAreaMm2: 90,   // a free pocket this large (mm^2) is a reworkable opportunity
     passingNqi:       90,   // NQI >= this is a PASS
-    showOverlay:      true  // draw red rects over flagged pockets on "NQI Pockets" layer
+    showOverlay:      true, // draw red rects over flagged pockets on "NQI Pockets" layer
+
+    // ── Phase 3: Half-cut check (advisory) ───────────────────────────────────
+    halfcutSeamSteps: 16    // bezier→polygon sampling density for the cut-contour poly
 };
 
 CONFIG.logPath = ($.fileName
@@ -128,6 +138,16 @@ function main() {
         return;
     }
 
+    // ── Phase 3: Half-cut check (advisory) ─────────────────────────────────────
+    log("[pipeline] --- Half-cut check ---");
+    var hcQaResult;
+    try {
+        hcQaResult = runHalfcutQA(doc);
+    } catch (e) {
+        log("[pipeline] ERROR | half-cut QA line " + e.line + ": " + e.message);
+        hcQaResult = { checked: 0, flagged: 0, flags: [] };
+    }
+
     log("[pipeline] === AI_LayoutQA done ===");
 
     // ── Combined alert ─────────────────────────────────────────────────────────
@@ -161,13 +181,23 @@ function main() {
     } else {
         msg += flagged + " reworkable pocket(s):\n" + pocketLines;
     }
+
+    // Half-cut check.
+    if (hcQaResult.flagged > 0) {
+        msg += "\nHalf-cut: " + hcQaResult.flagged + " of " + hcQaResult.checked
+            + " FLAGGED (blue) — missing or short of the cut line.\n"
+            + "  Fix before exporting — AI_ExportFinal will halt on these.\n";
+    } else {
+        msg += "\nHalf-cut: all " + hcQaResult.checked + " OK.\n";
+    }
+
     if (!CONFIG.dryRun) {
         msg += "All flags + pockets are on the \"" + CONFIG.qaLayerName
             + "\" layer — toggle it to show/hide; it's stripped at export.\n";
     }
 
     // Guidance.
-    if (qaResult.flagged > 0 || !nqiResult.pass) {
+    if (qaResult.flagged > 0 || !nqiResult.pass || hcQaResult.flagged > 0) {
         msg += "\nAdjust the nesting / pencil, then re-run this script.";
     } else {
         msg += "\nLayout looks good — continue with AI_ExportFinal.";
