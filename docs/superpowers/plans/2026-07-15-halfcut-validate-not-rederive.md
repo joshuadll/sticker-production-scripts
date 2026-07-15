@@ -210,13 +210,22 @@ git commit -m "feat(halfcut): add validateHalfcut + pure end-reach check (no re-
 ### Task 2: Step 9A verifies (no re-derive) + export gate + golden
 
 **Files:**
-- Modify: `illustrator/Step9A_Halfcut.jsx` (rewrite `runHalfcut`, lines 16-56; keep `_collectHalfcutItems`)
+- Modify: `illustrator/Step9A_Halfcut.jsx` (rewrite `runHalfcut`, lines 16-56; **move** `_collectHalfcutItems` out to aiUtils — see Step 0)
+- Modify: `utils/aiUtils.jsx` (Step 0: relocate `_collectHalfcutItems` here so `StepQA_Halfcut` in Task 4 can share it — `AI_LayoutQA` does not include `Step9A_Halfcut`)
 - Modify: `pipelines/AI_ExportFinal.jsx:157-171` (gate message)
 - Modify: `tests/integration/ai-export-final/expected.txt` (regenerate)
 
 **Interfaces:**
-- Consumes: `validateHalfcut(doc, group)` (Task 1); `_collectHalfcutItems(cutlinesLayer)` (existing, unchanged).
-- Produces: `runHalfcut(doc) -> { checked, flagged, flags }` where `flags = [{ name, reason }]`, `reason` ∈ `"missing"|"undershoot"`.
+- Consumes: `validateHalfcut(doc, group)` (Task 1).
+- Produces: `_collectHalfcutItems(cutlinesLayer) -> [{ name, group }]` (moved to aiUtils, now shared); `runHalfcut(doc) -> { checked, flagged, flags }` where `flags = [{ name, reason }]`, `reason` ∈ `"missing"|"undershoot"`.
+
+- [ ] **Step 0: Move `_collectHalfcutItems` from `Step9A_Halfcut.jsx` to `utils/aiUtils.jsx`**
+
+Cut the entire `_collectHalfcutItems` function (currently `Step9A_Halfcut.jsx:63-77`) and paste it into `utils/aiUtils.jsx` next to `validateHalfcut` (added in Task 1). It is unchanged. `Step9A_Halfcut.jsx`'s `runHalfcut` (rewritten below) and `StepQA_Halfcut` (Task 4) both resolve it from aiUtils, which every pipeline includes first. Verify no other file defines it:
+```bash
+grep -rn "function _collectHalfcutItems" utils/ illustrator/
+```
+Expected: exactly one match, in `utils/aiUtils.jsx`.
 
 - [ ] **Step 1: Rewrite `runHalfcut` in `illustrator/Step9A_Halfcut.jsx`**
 
@@ -374,7 +383,7 @@ git commit -m "refactor(qa): remove seat-review badge; rename seatReviewRgb -> h
 - Modify: `tests/integration/ai-layout-qa/expected.txt` (regenerate)
 
 **Interfaces:**
-- Consumes: `validateHalfcut(doc, group)` (Task 1); `halfcutFlagRgb()` (Task 3); `getOrCreateQALayer(doc, name, false)`, `qaHaloElement`, `qaDrawDot`, `qaDrawSegment`, `findGroupMember`, `samplePathToPolygons`, `_largestPoly`, `mmToPoints`, `boundsCenter` (existing).
+- Consumes: `validateHalfcut(doc, group)`, `_collectHalfcutItems(cutlinesLayer)`, `_halfcutCutPolyForGroup`, `_distPointToPolygon`, `pointInPolygon` (all in aiUtils after Tasks 1-2); `halfcutFlagRgb()` (Task 3); `getOrCreateQALayer(doc, name, false)`, `qaHaloElement`, `qaDrawDot`, `qaDrawSegment`, `getOrCreateHalfcutLayer`, `findGroupMember`, `mmToPoints` (existing).
 - Produces: `runHalfcutQA(doc) -> { checked, flagged, flags }`.
 
 - [ ] **Step 1: Create `illustrator/StepQA_Halfcut.jsx`**
