@@ -10,5 +10,6 @@ has "StartInterval key present" "<key>StartInterval</key>"
 has "StartInterval is 3600" "<integer>3600</integer>"
 has "Desktop command created" 'Update Noteworthie.command'
 has "Desktop command reads status" "update-status.txt"
+has "install guard: verifies scripts populated" "no scripts were installed"
 
-echo ""; echo "PASS=$PASS FAIL=$FAIL"; [ "$FAIL" -eq 0 ]
+echo ""; echo "PASS=$PASS FAIL=$FAIL (5 checks)"; [ "$FAIL" -eq 0 ]

@@ -5,7 +5,6 @@ SUPPORT_DIR="${NOTEWORTHIE_SUPPORT_DIR:-$HOME/Library/Application Support/Notewo
 INSTALL_DIR="$SUPPORT_DIR/scripts"
 REPO_SLUG="joshuadll/sticker-production-scripts"
 REPO_ZIP="https://github.com/$REPO_SLUG/archive/refs/heads/main.zip"
-REPO_GIT="https://github.com/$REPO_SLUG.git"
 STATUS_FILE="$SUPPORT_DIR/update-status.txt"
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -16,8 +15,12 @@ mkdir -p "$SUPPORT_DIR"
 installed=""
 [ -f "$STATUS_FILE" ] && installed=$(grep '^installed=' "$STATUS_FILE" | head -1 | cut -d= -f2)
 
-# Cheap precheck: latest main SHA (~1 KB, no full download). Empty on failure/offline.
-latest=$(git ls-remote "$REPO_GIT" main 2>/dev/null | head -1 | cut -f1)
+# Cheap precheck: latest main SHA via the GitHub API (pure curl — no git dependency).
+# -f makes curl fail on non-2xx (rate-limit/offline) -> empty. Validate it's a real
+# 40-char hex SHA; anything else is treated as "couldn't check" (offline path).
+latest=$(curl -fsSL -H "Accept: application/vnd.github.sha" \
+    "https://api.github.com/repos/$REPO_SLUG/commits/main" 2>/dev/null || true)
+printf '%s' "$latest" | grep -Eq '^[0-9a-f]{40}$' || latest=""
 
 now=$(date +%s)
 write_status() {   # $1 installed  $2 latest  $3 ok

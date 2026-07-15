@@ -26,6 +26,12 @@ if ! bash "$UPDATE_SCRIPT"; then
     read -r -p "Press Enter to close..." _
     exit 1
 fi
+if [ ! -d "$INSTALL_DIR/pipelines" ] || [ -z "$(ls -A "$INSTALL_DIR/pipelines" 2>/dev/null)" ]; then
+    echo ""
+    echo "Download failed — no scripts were installed. Check your internet connection and run this installer again."
+    read -r -p "Press Enter to close..." _
+    exit 1
+fi
 echo "  ↓ Downloaded latest scripts"
 echo "  (enter your Mac password if prompted)"
 
@@ -126,7 +132,7 @@ if [ -f "\$S" ]; then
         echo "Up to date — version \$inst"
         echo "Now re-run your step from File > Scripts (no need to restart the app)."
     else
-        echo "Could not reach the internet. Check your connection and try again."
+        echo "Updates aren't reaching this Mac. Check your connection, then try again."
     fi
 fi
 read -r -p "Press Enter to close..." _
