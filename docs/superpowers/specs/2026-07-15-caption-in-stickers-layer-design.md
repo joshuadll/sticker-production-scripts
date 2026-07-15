@@ -94,10 +94,12 @@ log "[step11] captions relocated to Stickers | " + elementsMoved + " element(s),
 ```
 
 Notes:
-- **Identification is naming-independent:** keep the one member equal to `group.name`
-  (the fused cut, stroked & unfilled); move every *other visible* child. Survives future
-  caption-member renames. Matches the existing stroked-unfilled/filled convention
-  (`_classifyAssetPaths`, `aiUtils.jsx:3032`).
+- **Identification is by name:** keep the one member equal to `group.name` — the fused
+  cut, found via `findGroupMember(group, "")` — and move every *other visible* child. Name
+  matching (not fill inspection) is the established `findGroupMember` convention and
+  survives future caption-member renames. The fused cut is stroked & unfilled and the
+  printed items are filled (the `_classifyAssetPaths` convention, `aiUtils.jsx:3032`), but
+  the code does not rely on that — it relies only on the name.
 - **Alignment:** `move()` preserves absolute artwork coordinates → each caption stays
   exactly inside the cut that traces it.
 - **Z-order (print only; cutter ignores Stickers):** target print stack is
