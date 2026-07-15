@@ -2091,23 +2091,37 @@ function collectSeatReviewNames(doc) {
     return out;
 }
 
+// Read-only case-insensitive lookup of the halfcut layer (CONFIG.halfcutLayerName); null if
+// absent. Used by the verify/QA path (validateHalfcut) so an advisory pass never creates a layer.
+function _findHalfcutLayer(doc) {
+    var name = CONFIG.halfcutLayerName, i;
+    for (i = 0; i < doc.layers.length; i++) {
+        if (doc.layers[i].name.toLowerCase() === name.toLowerCase()) return doc.layers[i];
+    }
+    return null;
+}
+
+// Read-only lookup of a named PathItem directly on a layer; null if absent.
+function _findHalfcutPathItem(hcLayer, name) {
+    var i;
+    for (i = 0; i < hcLayer.pathItems.length; i++) {
+        if (hcLayer.pathItems[i].name === name) return hcLayer.pathItems[i];
+    }
+    return null;
+}
+
 // Returns the halfcut layer (case-insensitive match on CONFIG.halfcutLayerName).
 // Creates it above the Cutlines layer if absent.
 function getOrCreateHalfcutLayer(doc) {
-    var name = CONFIG.halfcutLayerName;
-    var i;
-    for (i = 0; i < doc.layers.length; i++) {
-        if (doc.layers[i].name.toLowerCase() === name.toLowerCase()) {
-            return doc.layers[i];
-        }
-    }
+    var existing = _findHalfcutLayer(doc);
+    if (existing) return existing;
     var newLayer = doc.layers.add();
-    newLayer.name = name;
+    newLayer.name = CONFIG.halfcutLayerName;
     var cutLayer = findLayer(doc, CONFIG.cutlinesLayerName);
     if (cutLayer) {
         newLayer.move(cutLayer, ElementPlacement.PLACEBEFORE);
     }
-    log("[step9] created halfcut layer: " + name);
+    log("[step9] created halfcut layer: " + CONFIG.halfcutLayerName);
     return newLayer;
 }
 
@@ -2223,15 +2237,32 @@ function syncHalfcut(doc, group, opts) {
 }
 
 // ─── HALF-CUT VALIDATION (export gate + Layout QA; no re-derivation) ───────────
+// Nearest point ON segment a-b to p (clamped projection; all {x,y}); pure.
+function _nearestPointOnSegment(p, a, b) {
+    var vx = b.x - a.x, vy = b.y - a.y;
+    var len2 = vx * vx + vy * vy;
+    var t = len2 > 0 ? ((p.x - a.x) * vx + (p.y - a.y) * vy) / len2 : 0;
+    if (t < 0) t = 0; else if (t > 1) t = 1;
+    return { x: a.x + t * vx, y: a.y + t * vy };
+}
+
 // Distance from point p to segment a-b (all {x,y}); pure.
 function _distPointToSegment(p, a, b) {
-    var vx = b.x - a.x, vy = b.y - a.y;
-    var wx = p.x - a.x, wy = p.y - a.y;
-    var len2 = vx * vx + vy * vy;
-    var t = len2 > 0 ? (wx * vx + wy * vy) / len2 : 0;
-    if (t < 0) t = 0; else if (t > 1) t = 1;
-    var dx = p.x - (a.x + t * vx), dy = p.y - (a.y + t * vy);
+    var q = _nearestPointOnSegment(p, a, b);
+    var dx = p.x - q.x, dy = p.y - q.y;
     return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Nearest point ON the polygon's edges (closed ring) to p; pure. (The connector target for
+// an undershoot flag — the true nearest cut-contour point, not just the nearest vertex.)
+function _nearestPointOnPolygon(p, poly) {
+    var best = poly[0], bd = 1e15, i, j, q, dx, dy, d;
+    for (i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        q = _nearestPointOnSegment(p, poly[j], poly[i]);
+        dx = q.x - p.x; dy = q.y - p.y; d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = q; }
+    }
+    return best;
 }
 
 // Min distance from p to the polygon's edges (closed ring); pure.
@@ -2268,33 +2299,34 @@ function _halfcutEndsReachCut(endPts, cutPoly, minGapPt) {
     return { ok: true, reason: null };
 }
 
-// Largest sampled polygon of a Cutlines group's cut contour (the member named group.name),
-// drilling through the Pathfinder-Unite wrapper group like Step 10 does. null if unresolved.
+// Largest sampled polygon of a Cutlines group's cut contour (the member named group.name).
+// samplePathToPolygons already recurses a Pathfinder-Unite wrapper GroupItem, so no manual
+// drill is needed. null if the cut member is missing or samples empty.
 function _halfcutCutPolyForGroup(group, steps) {
     var cut = findGroupMember(group, "");
     if (!cut) return null;
     return _largestPoly(samplePathToPolygons(cut, steps));
 }
 
-// Verify (never derive) one element's half-cut. Returns { ok, reason }:
+// Verify (never derive) one element's half-cut. Returns { ok, reason, hc, cutPoly }:
 //   reason "missing"    — no "{group.name} halfcut" path on the Halfcut layer.
 //   reason "undershoot" — an endpoint falls short of the element's cut line by >= 1mm.
 //   reason null         — a valid half-cut exists and both ends reach the cut line.
+// hc/cutPoly are the resolved half-cut path + sampled cut polygon (either may be null); the
+// Layout QA drawer reuses them so it never re-fetches. The layer lookup is READ-ONLY (never
+// creates a layer), so calling this from the advisory Layout QA pass mutates nothing.
 function validateHalfcut(doc, group) {
     var steps = CONFIG.halfcutSeamSteps || 16;
-    var hcLayer = getOrCreateHalfcutLayer(doc);
-    var want = group.name + " halfcut", hc = null, i;
-    for (i = 0; i < hcLayer.pathItems.length; i++) {
-        if (hcLayer.pathItems[i].name === want) { hc = hcLayer.pathItems[i]; break; }
-    }
-    if (!hc) return { ok: false, reason: "missing" };
+    var hcLayer = _findHalfcutLayer(doc);
+    var hc = hcLayer ? _findHalfcutPathItem(hcLayer, group.name + " halfcut") : null;
+    if (!hc) return { ok: false, reason: "missing", hc: null, cutPoly: null };
 
     var cutPoly = _halfcutCutPolyForGroup(group, steps);
     if (!cutPoly) {
         // Fail OPEN (don't false-block a valid element) but leave a breadcrumb — a genuinely
         // broken cut member would otherwise pass the hard gate with no trace.
         log("[halfcut] WARN | " + group.name + " | cut contour unsampleable — half-cut not verified");
-        return { ok: true, reason: null };
+        return { ok: true, reason: null, hc: hc, cutPoly: null };
     }
 
     var pts = hc.pathPoints, ends = [];
@@ -2302,7 +2334,8 @@ function validateHalfcut(doc, group) {
         ends.push({ x: pts[0].anchor[0], y: pts[0].anchor[1] });
         ends.push({ x: pts[pts.length - 1].anchor[0], y: pts[pts.length - 1].anchor[1] });
     }
-    return _halfcutEndsReachCut(ends, cutPoly, mmToPoints(1));
+    var r = _halfcutEndsReachCut(ends, cutPoly, mmToPoints(1));
+    return { ok: r.ok, reason: r.reason, hc: hc, cutPoly: cutPoly };
 }
 
 // Returns all top-level GroupItems in the Cutlines layer whose note identifies

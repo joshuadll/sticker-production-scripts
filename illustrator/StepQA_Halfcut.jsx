@@ -18,7 +18,6 @@ function runHalfcutQA(doc) {
     var items = _collectHalfcutItems(cutlinesLayer);   // shared with Step 9A (same file set)
     var overlay = getOrCreateQALayer(doc, CONFIG.qaLayerName, false);   // append, don't reset
     var blue = halfcutFlagRgb();
-    var steps = CONFIG.halfcutSeamSteps || 16;
 
     var flags = [], i;
     for (i = 0; i < items.length; i++) {
@@ -29,7 +28,7 @@ function runHalfcutQA(doc) {
         if (res.reason === "missing") {
             _qaHalfcutMissing(overlay, group, blue);
         } else {
-            _qaHalfcutUndershoot(doc, overlay, group, blue, steps);
+            _qaHalfcutUndershoot(overlay, group, res.hc, res.cutPoly, blue);
         }
         log("[stepQA-halfcut] FLAG | " + items[i].name + " | " + res.reason);
     }
@@ -46,37 +45,26 @@ function _qaHalfcutMissing(overlay, group, blue) {
     qaDrawDot(overlay, (b[0] + b[2]) / 2, b[1], mmToPoints(2.5), blue, 90);
 }
 
-// UNDERSHOOT: dot on each short endpoint + a connector to the nearest cut-contour vertex.
-function _qaHalfcutUndershoot(doc, overlay, group, blue, steps) {
-    var hcLayer = getOrCreateHalfcutLayer(doc);
-    var want = group.name + " halfcut", hc = null, i;
-    for (i = 0; i < hcLayer.pathItems.length; i++) {
-        if (hcLayer.pathItems[i].name === want) { hc = hcLayer.pathItems[i]; break; }
+// UNDERSHOOT: dot on each short endpoint + a connector to the nearest cut-contour point.
+// hc + cutPoly come from validateHalfcut (already resolved — no re-fetch, no layer creation).
+// If no endpoint can be marked (a degenerate / non-finite half-cut), fall back to the
+// whole-element halo so the flagged element is still locatable on the overlay.
+function _qaHalfcutUndershoot(overlay, group, hc, cutPoly, blue) {
+    var drawn = 0;
+    if (hc && hc.pathPoints && hc.pathPoints.length >= 2 && cutPoly) {
+        var pts = hc.pathPoints, minGap = mmToPoints(1);
+        var ends = [ { x: pts[0].anchor[0], y: pts[0].anchor[1] },
+                     { x: pts[pts.length - 1].anchor[0], y: pts[pts.length - 1].anchor[1] } ];
+        var e;
+        for (e = 0; e < ends.length; e++) {
+            var p = ends[e];
+            if (!_isEndpointShort(p, cutPoly, minGap)) continue;
+            if (!isFinite(p.x) || !isFinite(p.y)) continue;   // short but undrawable
+            var near = _nearestPointOnPolygon(p, cutPoly);
+            qaDrawSegment(overlay, p.x, p.y, near.x, near.y, blue, mmToPoints(0.35), 100);
+            qaDrawDot(overlay, p.x, p.y, mmToPoints(1.2), blue, 90);
+            drawn++;
+        }
     }
-    if (!hc || !hc.pathPoints || hc.pathPoints.length < 2) return;
-    var cutPoly = _halfcutCutPolyForGroup(group, steps);
-    if (!cutPoly) return;
-
-    var pts = hc.pathPoints, minGap = mmToPoints(1);
-    var ends = [ { x: pts[0].anchor[0], y: pts[0].anchor[1] },
-                 { x: pts[pts.length - 1].anchor[0], y: pts[pts.length - 1].anchor[1] } ];
-    var e;
-    for (e = 0; e < ends.length; e++) {
-        var p = ends[e];
-        if (!_isEndpointShort(p, cutPoly, minGap)) continue;
-        if (!isFinite(p.x) || !isFinite(p.y)) continue;   // short but undrawable
-        var near = _qaNearestPolyVertex(p, cutPoly);
-        qaDrawSegment(overlay, p.x, p.y, near.x, near.y, blue, mmToPoints(0.35), 100);
-        qaDrawDot(overlay, p.x, p.y, mmToPoints(1.2), blue, 90);
-    }
-}
-
-// Nearest polygon VERTEX to p (a cheap stand-in for the nearest contour point).
-function _qaNearestPolyVertex(p, poly) {
-    var best = poly[0], bd = 1e15, i, dx, dy, d;
-    for (i = 0; i < poly.length; i++) {
-        dx = poly[i].x - p.x; dy = poly[i].y - p.y; d = dx * dx + dy * dy;
-        if (d < bd) { bd = d; best = poly[i]; }
-    }
-    return best;
+    if (drawn === 0) _qaHalfcutMissing(overlay, group, blue);   // couldn't pinpoint — mark the element
 }
