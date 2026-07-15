@@ -62,13 +62,13 @@ cp "$AI_FIXTURE" "$TEMP_FIXTURE"
 
 # ── Prepare temp script ──────────────────────────────────────────────────────
 
-# NOTE: spacingThresholdMm is relaxed 2 -> 1.7 for THIS TEST ONLY (temp script), so the
+# NOTE: spacingThresholdMm is relaxed 1.9 -> 1.7 for THIS TEST ONLY (temp script), so the
 # tightly-nested fixture clears the QA gate and the run exercises the full export path
-# (Steps 9A -> 10 -> 11) end-to-end. Production stays at 2mm. 1.7 (not 1.8) because the
+# (Steps 9A -> 10 -> 11) end-to-end. Production is 1.9mm. 1.7 (not 1.8) because the
 # fixture's tightest 3 gaps round to "1.8mm" but are actually just under 1.8 — 1.7 clears
-# them all. This trades the "gate halts on sub-2mm spacing" assertion for end-to-end export coverage.
+# them all. This trades the "gate halts on sub-spec spacing" assertion for end-to-end export coverage.
 perl -pe 's|suppressAlerts:\s*false|suppressAlerts: true|;
-          s|spacingThresholdMm:\s*2\b|spacingThresholdMm: 1.7|;
+          s|spacingThresholdMm:\s*1\.9\b|spacingThresholdMm: 1.7|;
           s|#include "\.\./|#include "'"$REPO_ROOT"'/|g;
 ' "$SCRIPT" > "$TEMP_SCRIPT"
 
@@ -142,6 +142,27 @@ if grep -q "\[step11\] done |" "$LOG"; then
     echo "PASS [$STEP]: reached Step 11 (final file)."
 else
     echo "FAIL [$STEP]: pipeline did not reach '[step11] done' — export halted early."
+    FAIL=1
+fi
+
+# ── Verify caption artwork was relocated OFF the Cutlines layer ────────────────
+# The cutter cuts every VISIBLE path in Cutlines/Halfcut, so the printed caption
+# (pill/text/GC raster/tab fill) must be moved to the Stickers layer in the final
+# file. Step 11 logs a relocation summary and an advisory marker if any printed item
+# was wrongly left behind.
+# Gate on the element COUNT, not just the line's presence — the summary line is logged
+# even for a 0-element no-op, so a regression that relocates nothing would pass a bare
+# presence grep. This fixture has 26 captioned elements, so require > 0.
+RELOC_ELEMS=$(grep -oE "captions relocated to Stickers \| [0-9]+ element" "$LOG" | grep -oE "[0-9]+" | head -1 || echo "0")
+if [ "${RELOC_ELEMS:-0}" -gt 0 ]; then
+    echo "PASS [$STEP]: caption artwork relocated to Stickers layer ($RELOC_ELEMS element(s))."
+else
+    echo "FAIL [$STEP]: 0 elements relocated (expected > 0) — captions may still be in Cutlines."
+    FAIL=1
+fi
+
+if grep -q "PRINTED ITEM LEFT IN CUTLINES" "$LOG"; then
+    echo "FAIL [$STEP]: a printed item was left on the Cutlines layer (would be cut)."
     FAIL=1
 fi
 
