@@ -244,6 +244,64 @@ if [ "$SPLIT_OK" -eq 1 ]; then
 else
     grep "caption text |" "$LOG_AI" || true; FAIL=1
 fi
+
+# ── Cutline simplify invariants (Step 6, Illustrator side) ────────────────────
+# Deliberately NOT a golden of the per-element counts. The RAW trace is environment-bound: 22 of
+# 28 raw node counts changed between the 2026-07-04 fixture and 2026-07-17 with ZERO code changes
+# (Image Trace engine — most likely an Illustrator update). An exact golden would go red on every
+# Adobe update with ~28 false-alarm lines, which trains people to accept the diff blind and lets a
+# real regression through in the noise. The four checks below are RELATIVE, so they survive engine
+# drift and still catch every simplify defect we have actually shipped.
+SIMP_OK=1
+SIMP_LINES=$(grep -c "\[step6\] simplify |" "$LOG_AI" || true)
+SIMP_DONE=$(grep -cE "\[step6\] simplify \| .* \| [0-9]+ -> [0-9]+ pts" "$LOG_AI" || true)
+
+# (1) the simplify actually ran — catches CONFIG.simplifyCutline flipped off, or a silently
+#     broken CONFIG, which would otherwise pass every other assert in this runner.
+if [ "$SIMP_LINES" -eq 0 ] || [ "$SIMP_DONE" -eq 0 ]; then
+    echo "  FAIL: simplify did not run (log lines=$SIMP_LINES, simplified=$SIMP_DONE)."
+    SIMP_OK=0
+fi
+
+# (2) STAMPS ARE NEVER SIMPLIFIED. Step2B skips the white edge for ST, so a stamp's cut line sits
+#     directly ON the artwork while smoothnessPct budgets drift as a % of whiteEdgeMm -- a margin
+#     stamps do not have. This SHIPPED: National Flower 70->77 @0.49mm drift and UFO 25->15
+#     @0.42mm were cutting into stamp art on every run until 2026-07-17. ST names are derived from
+#     the PS log, not hardcoded, so this keeps working if the fixture SKU changes.
+while IFS= read -r st; do
+    [ -z "$st" ] && continue
+    if grep -qF "[step6] simplify | $st | " "$LOG_AI" \
+       && ! grep -qF "[step6] simplify | $st | SKIP" "$LOG_AI"; then
+        echo "  FAIL: stamp '$st' was SIMPLIFIED -- it has no white edge, so drift cuts into art."
+        SIMP_OK=0
+    fi
+done < <(grep -oE "^\[step2\] layer\[[0-9]+\] = .+ \[ST\]" "$LOG_PS" | sed -E 's/^.*= (.+) \[ST\]$/\1/')
+
+# (3) no densification -- a re-fit needing MORE anchors than the input is worse than the input.
+#     (National Flower went 70 -> 77 under the old `> n * 1.2` allowance.)
+DENS=$(grep -oE "\[step6\] simplify \| .+ \| [0-9]+ -> [0-9]+ pts" "$LOG_AI" \
+       | sed -E 's/.*\| ([0-9]+) -> ([0-9]+) pts.*/\1 \2/' \
+       | awk '$2 > $1 { c++ } END { print c+0 }')
+if [ "$DENS" -ne 0 ]; then
+    echo "  FAIL: $DENS element(s) GAINED nodes -- the re-fit is worse than the input."
+    SIMP_OK=0
+fi
+
+# (4) every accepted drift is inside its budget (Step 6 prints "(N% <= M% budget)").
+OVER=$(grep -oE "\([0-9]+% <= [0-9]+% budget\)" "$LOG_AI" \
+       | sed -E 's/\(([0-9]+)% <= ([0-9]+)% budget\)/\1 \2/' \
+       | awk '$1 > $2 { c++ } END { print c+0 }')
+if [ "$OVER" -ne 0 ]; then
+    echo "  FAIL: $OVER element(s) drifted past the budget."
+    SIMP_OK=0
+fi
+
+if [ "$SIMP_OK" -eq 1 ]; then
+    echo "  PASS: simplify invariants ($SIMP_DONE simplified, stamps skipped, no densification, drift within budget)."
+else
+    grep "\[step6\] simplify |" "$LOG_AI" || true; FAIL=1
+fi
+
 if [ "$FAIL" -ne 0 ]; then echo "  AI log:"; cat "$LOG_AI"; exit 1; fi
 
 # === PHASE 1 golden diff (PS log) ============================================
