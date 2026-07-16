@@ -795,6 +795,42 @@ function _capsuleBezierNodes(spine, r) {
 // y of a fitted quadratic { a, b, c, xm } at px. Coordinate-agnostic (PS y-down / AI y-up).
 function _capYAt(fit, px) { var d = px - fit.xm; return fit.a * d * d + fit.b * d + fit.c; }
 
+// Slope dy/dx of a fitted quadratic { a, b, c, xm } at px. Twin of _capYAt.
+function _capSlopeAt(fit, px) { return 2 * fit.a * (px - fit.xm) + fit.b; }
+
+// The pill spine: M+1 points spanning [x0,x1], following the fitted baseline lifted by halfBody.
+//
+// The subtlety is what happens OUTSIDE the fitted baseline range [fx0,fx1]. The spine must span
+// the full text box, but the quadratic must NOT be extrapolated past its data — a parabola
+// overshoots hard beyond the last sample, which flared the pill ends (worst on a multi-line
+// caption whose bottom line is narrower than the box).
+//
+// The previous guard clamped the VALUE (y = y(fx0) for every sx < fx0), which fixed the overshoot
+// but destroyed the END TANGENT — the thing the caps are built from. buildCapsuleFromSpine takes
+// each cap's orientation from spine[0]->spine[1] (and spine[n-2]->spine[n-1]). With a clamped
+// spine[0] those two points sit ~1.5pt apart in x while their heights come from x-positions only
+// ~0.08pt apart on the curve (the sampler's first baseline point is the MIDPOINT of a 1mm band,
+// so fx0 already sits ~1.4pt inside x0). The chord between them therefore carried ~5% of the true
+// end slope — effectively horizontal — and the cap, laid perpendicular to it, came out
+// axis-aligned on a pill whose end genuinely rises. That is the "curved caption with horizontal
+// pill ends" bug (artist, 2026-07-17).
+//
+// So: extend LINEARLY along the fit's tangent at the endpoint instead. C1-continuous at fx0/fx1,
+// the end tangent stays honest (caps tilt with the curve), and a straight line cannot overshoot
+// the way the parabola could — which is what the clamp was defending against. Clamp the
+// CURVATURE, not the value.
+function _capSpinePoints(fit, x0, x1, fx0, fx1, halfBody, M) {
+    var spine = [], p, sx, y;
+    for (p = 0; p <= M; p++) {
+        sx = x0 + (x1 - x0) * (p / M);
+        if (sx < fx0)      y = _capYAt(fit, fx0) + _capSlopeAt(fit, fx0) * (sx - fx0);
+        else if (sx > fx1) y = _capYAt(fit, fx1) + _capSlopeAt(fit, fx1) * (sx - fx1);
+        else               y = _capYAt(fit, sx);
+        spine.push({ x: sx, y: y + halfBody });
+    }
+    return spine;
+}
+
 // Robust least-squares quadratic through baseline-candidate points (per-column bottom-of-ink).
 // Rejects descenders (sit below the baseline) and floating marks — apostrophes, dots, accents
 // (sit above) — via a median/MAD inlier test, 2 iterations. Decides straight vs curved from the
@@ -1116,17 +1152,10 @@ function buildCaptionPill(layer, textFrame, opts) {
             // reports the full two-line vertical span, so halfBody covers both lines + pad.
             var halfBody = _capPercentile(s.heights, pctile) / 2;
             radius = halfBody + padPt / 2;
-            spine = [];
-            var M = 40, p;
-            for (p = 0; p <= M; p++) {
-                var sx = bb[0] + (bb[2] - bb[0]) * (p / M);
-                // Clamp the curve evaluation to the fitted x-range so the parabola is never
-                // EXTRAPOLATED past where we have baseline data (a narrow bottom line would otherwise
-                // overshoot at the pill ends); beyond the range the spine continues flat at the
-                // endpoint height while still spanning the full pill width.
-                var ex = (sx < fx0) ? fx0 : ((sx > fx1) ? fx1 : sx);
-                spine.push({ x: sx, y: _capYAt(fit.fit, ex) + halfBody });
-            }
+            // Spans the full text box; outside the fitted baseline range the curve is extended
+            // along its endpoint TANGENT (never extrapolated as a parabola, never flattened —
+            // flattening is what gave curved captions horizontal caps). See _capSpinePoints.
+            spine = _capSpinePoints(fit.fit, bb[0], bb[2], fx0, fx1, halfBody, 40);
         }
     }
     var pill = buildCapsuleFromSpine(layer, spine, radius);   // existing helper
