@@ -139,7 +139,13 @@ if [ "$FAIL" -ne 0 ]; then echo "  Log contents:"; cat "$LOG"; exit 1; fi
 
 # ── Golden diff ───────────────────────────────────────────────────────────────
 strip_variable_lines() {
-    grep -Ev "^\[ai-pipeline\] === AI_BuildAndExportCutlines (start|done) ===" \
+    # NB: do NOT anchor on the trailing "===". The version signal (PR #23) appends a status to
+    # the banner — "=== AI_BuildAndExportCutlines start (version unknown) ===" here, and
+    # "... start (✓ version <sha>) ===" on a machine with the auto-updater. Anchoring on the
+    # trailing === stopped matching, so the banner survived stripping and every golden diff
+    # showed a spurious banner change — and a <sha> would break the golden on EVERY commit.
+    # The other runners (ps-build-elements, ai-layout-qa, ai-export-final) already omit it.
+    grep -Ev "^\[ai-pipeline\] === AI_BuildAndExportCutlines (start|done)" \
         | grep '^\[' \
         | sed -E "s#/private/tmp#/tmp#g; s#${TEMP_BASE}#<FIXTURE>#g; s#${REPO_ROOT}#<REPO>#g"
 }
