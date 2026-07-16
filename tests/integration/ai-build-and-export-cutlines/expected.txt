@@ -25,15 +25,16 @@
 [halfcut] Kroje | pts=38 end0=(303.3,-139.3) endN=(328.4,-140.4) curved
 [ai-pipeline] caption built | Kroje halfcut=true
 [seat] Kraslice | midpoint bulge relieved by 15% shrink.
-[seat] Kraslice | rotated 3.1deg to endpoint chord.
-[seat] Kraslice | seated rot=3.1deg move=12.3pt depth=0.3pt
-[halfcut] Kraslice | pts=558 end0=(53.7,-121.8) endN=(82.7,-122.4) curved
+[seat] Kraslice | rotated 3.5deg to endpoint chord.
+[seat] Kraslice | seated rot=3.5deg move=12.2pt depth=0.3pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] Kraslice | pts=591 end0=(52,-120.9) endN=(82.9,-122.1) curved
 [ai-pipeline] caption built | Kraslice halfcut=true
 [seat] Bryndzové halušky | midpoint bulge relieved by 15% shrink.
 [seat] Bryndzové halušky | rotated 1.2deg to endpoint chord.
-[seat] Bryndzové halušky | seated rot=1.2deg move=12.1pt depth=0.3pt
+[seat] Bryndzové halušky | seated rot=1.2deg move=12.2pt depth=0.3pt
 [halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
-[halfcut] Bryndzové halušky | pts=561 end0=(-199.6,-130.7) endN=(-142.5,-128.3) curved
+[halfcut] Bryndzové halušky | pts=568 end0=(-199.9,-130.6) endN=(-141.8,-128) curved
 [ai-pipeline] caption built | Bryndzové halušky halfcut=true
 [seat] Kapustnica | rotated 3.4deg to endpoint chord.
 [seat] Kapustnica | seated rot=3.4deg move=8.5pt depth=0.3pt
@@ -44,9 +45,9 @@
 [halfcut] Pirohy | pts=26 end0=(301,106.6) endN=(329.5,107.6) straight
 [ai-pipeline] caption built | Pirohy halfcut=true
 [seat] Šúľance s Makom | midpoint bulge relieved by 15% shrink.
-[seat] Šúľance s Makom | rotated 0.4deg to endpoint chord.
-[seat] Šúľance s Makom | seated rot=0.4deg move=13.5pt depth=0.3pt
-[halfcut] Šúľance s Makom | pts=621 end0=(37.3,132.5) endN=(101.9,132.6) curved
+[seat] Šúľance s Makom | rotated 0.5deg to endpoint chord.
+[seat] Šúľance s Makom | seated rot=0.5deg move=13.5pt depth=0.3pt
+[halfcut] Šúľance s Makom | pts=633 end0=(36.1,132.9) endN=(103.3,133.1) curved
 [ai-pipeline] caption built | Šúľance s Makom halfcut=true
 [seat] Bratislava(text) | rotated -0.1deg to endpoint chord.
 [seat] Bratislava(text) | seated rot=-0.1deg move=0pt depth=0.3pt
