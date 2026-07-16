@@ -22,6 +22,8 @@ eval(extract('_capSolve3'));
 eval(extract('_capPercentile'));
 eval(extract('_capStraightSpine'));
 eval(extract('_capYAt'));
+eval(extract('_capSlopeAt'));
+eval(extract('_capSpinePoints'));
 eval(extract('_capColumnSpan'));
 eval(extract('_capBandSpan'));
 eval(extract('_capRobustBaselineFit'));
@@ -155,6 +157,72 @@ var MIN  = 8;
     check(_capLineCount({ contents: 'St Elizabeth\'s Cathedral\r(Dóm Svätej Alzbety)' }) === 2, 'two lines → 2');
     check(_capLineCount({ contents: 'A\r\rB' }) === 2, 'blank middle line is not counted');
     check(_capLineCount({ contents: 'A\nB\nC' }) === 3, 'three lines → 3');
+})();
+
+
+// ── 4. END TANGENT: the spine's ends must follow the curve, not flatten ──
+// REGRESSION (artist, 2026-07-17): a curved caption produced a pill with HORIZONTAL ends.
+// buildCapsuleFromSpine takes each cap's orientation from spine[0]->spine[1], so if the spine
+// flattens at its ends the cap is laid perpendicular to a horizontal — axis-aligned — on a pill
+// whose end genuinely rises. The old guard clamped the VALUE outside the fitted range
+// (y = y(fx0) for every sx < fx0), which is exactly that flattening. It must extend along the
+// endpoint TANGENT instead.
+//
+// Geometry mirrors the real case: the sampler's first baseline point is the MIDPOINT of a 1mm
+// band, so fx0 sits ~1.4pt inside the text box while the spine still spans the full box.
+(function () {
+    var fit = { a: 0.004, b: 0, c: 0, xm: 30 };   // gentle bow, vertex mid-text
+    var x0 = 0, x1 = 60, fx0 = 1.42, fx1 = 58.58, halfBody = 0, M = 40;
+    var spine = _capSpinePoints(fit, x0, x1, fx0, fx1, halfBody, M);
+
+    check(spine.length === M + 1, 'spine should have M+1 points, got ' + spine.length);
+    check(approx(spine[0].x, x0, 1e-9) && approx(spine[M].x, x1, 1e-9),
+          'spine must span the full text box [' + x0 + ',' + x1 + ']');
+
+    // The cap tangent buildCapsuleFromSpine will actually use.
+    var usedStart = (spine[1].y - spine[0].y) / (spine[1].x - spine[0].x);
+    var trueStart = _capSlopeAt(fit, fx0);
+    check(approx(usedStart, trueStart, 0.02),
+          'START cap tangent must match the fit slope: used ' + usedStart.toFixed(4) +
+          ' vs true ' + trueStart.toFixed(4) + ' (a flattened end = the horizontal-cap bug)');
+
+    var usedEnd = (spine[M].y - spine[M - 1].y) / (spine[M].x - spine[M - 1].x);
+    var trueEnd = _capSlopeAt(fit, fx1);
+    check(approx(usedEnd, trueEnd, 0.02),
+          'END cap tangent must match the fit slope: used ' + usedEnd.toFixed(4) +
+          ' vs true ' + trueEnd.toFixed(4));
+
+    // Guard the specific failure mode: a near-zero end slope on a genuinely sloped end.
+    check(Math.abs(usedStart) > Math.abs(trueStart) * 0.5,
+          'START end must not be flattened (|used| ' + Math.abs(usedStart).toFixed(4) +
+          ' collapsed vs |true| ' + Math.abs(trueStart).toFixed(4) + ')');
+})();
+
+// ── 5. Outside the fitted range the spine extends LINEARLY (no parabola overshoot) ──
+// The clamp existed to stop the quadratic flaring past its data — a real concern. A tangent
+// extension must keep that property: beyond fx0/fx1 the spine is a straight line, so it can
+// never bend away faster than the curve was already going.
+(function () {
+    var fit = { a: 0.02, b: 0, c: 0, xm: 30 };    // strong curvature -> parabola would flare
+    var x0 = 0, x1 = 60, fx0 = 12, fx1 = 48, halfBody = 0, M = 40;   // narrow bottom line
+    var spine = _capSpinePoints(fit, x0, x1, fx0, fx1, halfBody, M);
+
+    // collect the points left of fx0 — they must be collinear (a straight tangent extension)
+    var out = [], i;
+    for (i = 0; i < spine.length; i++) if (spine[i].x < fx0 - 1e-9) out.push(spine[i]);
+    check(out.length >= 3, 'test needs >=3 points outside fx0, got ' + out.length);
+    var s01 = (out[1].y - out[0].y) / (out[1].x - out[0].x);
+    var s12 = (out[2].y - out[1].y) / (out[2].x - out[1].x);
+    check(approx(s01, s12, 1e-6), 'outside the fit the spine must be STRAIGHT (slopes ' +
+          s01.toFixed(4) + ' vs ' + s12.toFixed(4) + ') — no quadratic flare');
+    check(approx(s01, _capSlopeAt(fit, fx0), 1e-6),
+          'the extension slope must equal the fit tangent at fx0');
+
+    // and it must not overshoot what the parabola would have done (the original bug it guarded)
+    var parabolaY = _capYAt(fit, x0);
+    check(Math.abs(out[0].y) < Math.abs(parabolaY),
+          'tangent extension must stay inside the parabola extrapolation (' +
+          out[0].y.toFixed(2) + ' vs ' + parabolaY.toFixed(2) + ')');
 })();
 
 // ── Helper sanity (unchanged) ──
