@@ -1,153 +1,151 @@
-[ai-pipeline] === AI_BuildAndExportCutlines start ===
-[seat] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | rotated 0.7deg to endpoint chord.
-[seat] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | seated rot=0.7deg move=7.2pt depth=0.3pt
+[ai-pipeline] === AI_BuildAndExportCutlines start (version unknown) ===
+[seat] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | rotated 0.9deg to endpoint chord.
+[seat] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | seated rot=0.9deg move=6.7pt depth=0.3pt
 [step9] created halfcut layer: Halfcut
-[halfcut] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | pts=30 end0=(517.1,-380.5) endN=(603.2,-379.3) straight
+[halfcut] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | pts=26 end0=(516.2,-381.1) endN=(604.2,-379.8) straight
 [ai-pipeline] caption built | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) halfcut=true
 [seat] Carpathian Wooden Churches | rotated -0.3deg to endpoint chord.
-[seat] Carpathian Wooden Churches | seated rot=-0.3deg move=9pt depth=0.3pt
-[halfcut] Carpathian Wooden Churches | pts=26 end0=(265.5,-378.5) endN=(365,-379.2) straight
+[seat] Carpathian Wooden Churches | seated rot=-0.3deg move=8.9pt depth=0.3pt
+[halfcut] Carpathian Wooden Churches | pts=56 end0=(265.8,-378.7) endN=(365.3,-379) straight
 [ai-pipeline] caption built | Carpathian Wooden Churches halfcut=true
-[seat] Tatra chamois | rotated -0.3deg to endpoint chord.
-[seat] Tatra chamois | seated rot=-0.3deg move=7.3pt depth=0.3pt
-[halfcut] Tatra chamois | pts=34 end0=(43.7,-385.4) endN=(97.9,-385.6) straight
+[seat] Tatra chamois | rotated -0.7deg to endpoint chord.
+[seat] Tatra chamois | seated rot=-0.7deg move=7.6pt depth=0.3pt
+[halfcut] Tatra chamois | pts=39 end0=(43.9,-385.2) endN=(97.9,-385.8) straight
 [ai-pipeline] caption built | Tatra chamois halfcut=true
-[seat] Tram | rotated -0.9deg to endpoint chord.
-[seat] Tram | seated rot=-0.9deg move=8.5pt depth=0.3pt
-[halfcut] Tram | pts=31 end0=(-186.5,-374.9) endN=(-161.8,-375.3) straight
+[seat] Tram | rotated -1.2deg to endpoint chord.
+[seat] Tram | seated rot=-1.2deg move=8.8pt depth=0.3pt
+[halfcut] Tram | pts=30 end0=(-186.7,-375.2) endN=(-161.9,-375.6) straight
 [ai-pipeline] caption built | Tram halfcut=true
-[seat] Fujara | rotated -0.9deg to endpoint chord.
-[seat] Fujara | seated rot=-0.9deg move=8.3pt depth=0.3pt
-[halfcut] Fujara | pts=30 end0=(547,-141.2) endN=(575,-142.1) curved
+[seat] Fujara | rotated -2.2deg to endpoint chord.
+[seat] Fujara | seated rot=-2.2deg move=8.3pt depth=0.3pt
+[halfcut] Fujara | pts=37 end0=(545.6,-141.6) endN=(573.6,-142.2) curved
 [ai-pipeline] caption built | Fujara halfcut=true
-[seat] Kroje | rotated -2.8deg to endpoint chord.
-[seat] Kroje | seated rot=-2.8deg move=10.7pt depth=0.3pt
-[halfcut] Kroje | pts=44 end0=(303,-139.1) endN=(327.9,-140.2) straight
+[seat] Kroje | rotated -1.8deg to endpoint chord.
+[seat] Kroje | seated rot=-1.8deg move=10.5pt depth=0.3pt
+[halfcut] Kroje | pts=38 end0=(303.3,-139.3) endN=(328.4,-140.4) curved
 [ai-pipeline] caption built | Kroje halfcut=true
 [seat] Kraslice | midpoint bulge relieved by 15% shrink.
-[seat] Kraslice | rotated 3.5deg to endpoint chord.
-[seat] Kraslice | seated rot=3.5deg move=9.8pt depth=0.3pt
-[halfcut] Kraslice | pts=566 end0=(54,-124.1) endN=(82.3,-123.2) curved
+[seat] Kraslice | rotated 3.1deg to endpoint chord.
+[seat] Kraslice | seated rot=3.1deg move=12.3pt depth=0.3pt
+[halfcut] Kraslice | pts=558 end0=(53.7,-121.8) endN=(82.7,-122.4) curved
 [ai-pipeline] caption built | Kraslice halfcut=true
 [seat] Bryndzové halušky | midpoint bulge relieved by 15% shrink.
 [seat] Bryndzové halušky | rotated 1.2deg to endpoint chord.
 [seat] Bryndzové halušky | seated rot=1.2deg move=12.1pt depth=0.3pt
 [halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
-[halfcut] Bryndzové halušky | pts=548 end0=(-199.3,-130.8) endN=(-144.1,-128.8) curved
+[halfcut] Bryndzové halušky | pts=561 end0=(-199.6,-130.7) endN=(-142.5,-128.3) curved
 [ai-pipeline] caption built | Bryndzové halušky halfcut=true
-[seat] Kapustnica | rotated 3.5deg to endpoint chord.
-[seat] Kapustnica | seated rot=3.5deg move=8pt depth=0.3pt
-[halfcut] Kapustnica | pts=31 end0=(539.5,118.6) endN=(580.4,121.2) straight
+[seat] Kapustnica | rotated 3.4deg to endpoint chord.
+[seat] Kapustnica | seated rot=3.4deg move=8.5pt depth=0.3pt
+[halfcut] Kapustnica | pts=49 end0=(538.2,118.8) endN=(581.5,121.8) straight
 [ai-pipeline] caption built | Kapustnica halfcut=true
-[seat] Pirohy | rotated 2.0deg to endpoint chord.
-[seat] Pirohy | seated rot=2deg move=7.7pt depth=0.3pt
-[halfcut] Pirohy | pts=34 end0=(301.2,106.6) endN=(329.2,107.8) straight
+[seat] Pirohy | rotated 2.1deg to endpoint chord.
+[seat] Pirohy | seated rot=2.1deg move=7.8pt depth=0.3pt
+[halfcut] Pirohy | pts=26 end0=(301,106.6) endN=(329.5,107.6) straight
 [ai-pipeline] caption built | Pirohy halfcut=true
 [seat] Šúľance s Makom | midpoint bulge relieved by 15% shrink.
-[seat] Šúľance s Makom | rotated 0.6deg to endpoint chord.
-[seat] Šúľance s Makom | seated rot=0.6deg move=12.7pt depth=0.3pt
-[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
-[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
-[halfcut] Šúľance s Makom | pts=547 end0=(41.8,131.4) endN=(96.2,130.8) curved
+[seat] Šúľance s Makom | rotated 0.4deg to endpoint chord.
+[seat] Šúľance s Makom | seated rot=0.4deg move=13.5pt depth=0.3pt
+[halfcut] Šúľance s Makom | pts=621 end0=(37.3,132.5) endN=(101.9,132.6) curved
 [ai-pipeline] caption built | Šúľance s Makom halfcut=true
-[seat] Bratislava(text) | rotated 1.0deg to endpoint chord.
-[seat] Bratislava(text) | seated rot=1deg move=5.8pt depth=0.3pt
-[halfcut] Bratislava(text) | pts=30 end0=(-148.9,143.7) endN=(-201.4,143.2) curved
-[ai-pipeline] tab built | Bratislava(text) halfcut=true
-[seat] Čumil Statue | rotated -2.9deg to endpoint chord.
-[seat] Čumil Statue | seated rot=-2.9deg move=9.6pt depth=0.3pt
-[halfcut] Čumil Statue | pts=46 end0=(533.7,365.2) endN=(584.9,362.9) curved
+[seat] Bratislava(text) | rotated -0.1deg to endpoint chord.
+[seat] Bratislava(text) | seated rot=-0.1deg move=0pt depth=0.3pt
+[halfcut] inner-edge | submerged-vertex tally disagreed with art direction — trusting art direction (wrong-majority guard)
+[ai-pipeline] tab built | Bratislava(text) halfcut=false
+[seat] Čumil Statue | rotated -1.8deg to endpoint chord.
+[seat] Čumil Statue | seated rot=-1.8deg move=8.4pt depth=0.3pt
+[halfcut] Čumil Statue | pts=24 end0=(534.3,364.2) endN=(585.5,362.6) straight
 [ai-pipeline] caption built | Čumil Statue halfcut=true
-[seat] The Blue Church | Church of St. Elizabeth | rotated -1.0deg to endpoint chord.
-[seat] The Blue Church | Church of St. Elizabeth | seated rot=-1deg move=8.8pt depth=0.3pt
-[halfcut] The Blue Church | Church of St. Elizabeth | pts=42 end0=(272.7,353.8) endN=(358.1,352.6) curved
+[seat] The Blue Church | Church of St. Elizabeth | rotated -0.2deg to endpoint chord.
+[seat] The Blue Church | Church of St. Elizabeth | seated rot=-0.2deg move=8.1pt depth=0.3pt
+[halfcut] The Blue Church | Church of St. Elizabeth | pts=36 end0=(271.6,352.8) endN=(359,352.9) curved
 [ai-pipeline] caption built | The Blue Church | Church of St. Elizabeth halfcut=true
-[seat] Michael's Gate | rotated -2.8deg to endpoint chord.
-[seat] Michael's Gate | seated rot=-2.8deg move=9.3pt depth=0.3pt
-[halfcut] Michael's Gate | pts=33 end0=(43.4,344.9) endN=(98.2,342) straight
+[seat] Michael's Gate | rotated -3.0deg to endpoint chord.
+[seat] Michael's Gate | seated rot=-3deg move=9.3pt depth=0.3pt
+[halfcut] Michael's Gate | pts=33 end0=(43.5,345) endN=(98.5,342) straight
 [ai-pipeline] caption built | Michael's Gate halfcut=true
-[seat] Orava Castle | rotated -0.9deg to endpoint chord.
-[seat] Orava Castle | seated rot=-0.9deg move=7.7pt depth=0.3pt
-[halfcut] Orava Castle | pts=27 end0=(-198.4,362.6) endN=(-149.5,361.9) straight
+[seat] Orava Castle | rotated -0.3deg to endpoint chord.
+[seat] Orava Castle | seated rot=-0.3deg move=7.3pt depth=0.3pt
+[halfcut] Orava Castle | pts=24 end0=(-198.4,361.9) endN=(-149.4,361.6) straight
 [ai-pipeline] caption built | Orava Castle halfcut=true
-[seat] Bojnice Castle | rotated -0.9deg to endpoint chord.
-[seat] Bojnice Castle | seated rot=-0.9deg move=8.7pt depth=0.3pt
-[halfcut] Bojnice Castle | pts=26 end0=(531.9,598.5) endN=(587.3,597.6) straight
+[seat] Bojnice Castle | rotated 0.7deg to endpoint chord.
+[seat] Bojnice Castle | seated rot=0.7deg move=8.3pt depth=0.3pt
+[halfcut] Bojnice Castle | pts=23 end0=(532.1,597.7) endN=(588.1,597.8) curved
 [ai-pipeline] caption built | Bojnice Castle halfcut=true
-[seat] Old Town Hall (Bratislava) | rotated 0.8deg to endpoint chord.
-[seat] Old Town Hall (Bratislava) | seated rot=0.8deg move=6.9pt depth=0.3pt
-[halfcut] Old Town Hall (Bratislava) | pts=29 end0=(267.9,605.3) endN=(363.4,606.1) straight
+[seat] Old Town Hall (Bratislava) | rotated 0.4deg to endpoint chord.
+[seat] Old Town Hall (Bratislava) | seated rot=0.4deg move=6.9pt depth=0.3pt
+[halfcut] Old Town Hall (Bratislava) | pts=30 end0=(267.6,605.3) endN=(363,605.9) straight
 [ai-pipeline] caption built | Old Town Hall (Bratislava) halfcut=true
-[seat] UFO Observation Deck, Bridge SNP | rotated 0.4deg to endpoint chord.
-[seat] UFO Observation Deck, Bridge SNP | seated rot=0.4deg move=5.7pt depth=0.3pt
-[halfcut] UFO Observation Deck, Bridge SNP | pts=18 end0=(96,611.5) endN=(43,612.2) straight
-[ai-pipeline] tab built | UFO Observation Deck, Bridge SNP halfcut=true
-[seat] St. Martin's Cathedral | rotated -1.0deg to endpoint chord.
-[seat] St. Martin's Cathedral | seated rot=-1deg move=9pt depth=0.3pt
-[halfcut] St. Martin's Cathedral | pts=24 end0=(-213.5,592.6) endN=(-134.6,591.1) straight
-[ai-pipeline] caption built | St. Martin's Cathedral halfcut=true
-[seat] Slovakia Map | rotated 0.0deg to endpoint chord.
-[seat] Slovakia Map | seated rot=0deg move=-5.9pt depth=0.3pt
-[halfcut] Slovakia Map | pts=35 end0=(597.1,926.4) endN=(570.5,923.4) straight
-[ai-pipeline] tab built | Slovakia Map halfcut=true
-[seat] National Flower | rotated -6.3deg to endpoint chord.
-[seat] National Flower | seated rot=-6.3deg move=-13.9pt depth=0.3pt
+[seat] UFO Observation Deck, Bridge SNP | rotated 1.5deg to endpoint chord.
+[seat] UFO Observation Deck, Bridge SNP | seated rot=1.5deg move=5.6pt depth=0.3pt
 [halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
-[halfcut] National Flower | pts=35 end0=(337.6,913.3) endN=(329.7,926.7) straight
+[halfcut] UFO Observation Deck, Bridge SNP | pts=17 end0=(43.1,611.1) endN=(37.9,612.2) straight
+[ai-pipeline] tab built | UFO Observation Deck, Bridge SNP halfcut=true
+[seat] St. Martin's Cathedral | rotated -1.3deg to endpoint chord.
+[seat] St. Martin's Cathedral | seated rot=-1.3deg move=8.4pt depth=0.3pt
+[halfcut] St. Martin's Cathedral | pts=34 end0=(-214,592.9) endN=(-134.2,591.3) straight
+[ai-pipeline] caption built | St. Martin's Cathedral halfcut=true
+[seat] Slovakia Map | rotated 0.2deg to endpoint chord.
+[seat] Slovakia Map | seated rot=0.2deg move=-6pt depth=0.3pt
+[halfcut] Slovakia Map | pts=35 end0=(597.5,926.4) endN=(570.9,923.5) straight
+[ai-pipeline] tab built | Slovakia Map halfcut=true
+[seat] National Flower | rotated 1.0deg to endpoint chord.
+[seat] National Flower | seated rot=1deg move=-6.7pt depth=0.3pt
+[halfcut] National Flower | pts=23 end0=(337.5,913.5) endN=(320.5,932.6) curved
 [ai-pipeline] tab built | National Flower halfcut=true
-[seat] Štrbské Pleso | rotated -0.8deg to endpoint chord.
-[seat] Štrbské Pleso | seated rot=-0.8deg move=8.3pt depth=0.3pt
-[halfcut] Štrbské Pleso | pts=34 end0=(44.5,843.5) endN=(96.8,842.6) curved
+[seat] Štrbské Pleso | rotated 0.1deg to endpoint chord.
+[seat] Štrbské Pleso | seated rot=0.1deg move=7.8pt depth=0.3pt
+[halfcut] Štrbské Pleso | pts=22 end0=(44.5,842.8) endN=(97.1,842.7) curved
 [ai-pipeline] caption built | Štrbské Pleso halfcut=true
 [seat] Flag + Slovakia(text) | rotated -0.2deg to endpoint chord.
 [seat] Flag + Slovakia(text) | seated rot=-0.2deg move=6.9pt depth=0.3pt
-[halfcut] Flag + Slovakia(text) | pts=29 end0=(-213.4,855.3) endN=(-135.6,855.2) curved
+[halfcut] Flag + Slovakia(text) | pts=25 end0=(-212.2,855.6) endN=(-134.9,855.2) straight
 [ai-pipeline] caption built | Flag + Slovakia(text) halfcut=true
-[seat] Bratislava Castle | rotated -2.0deg to endpoint chord.
-[seat] Bratislava Castle | seated rot=-2deg move=10.9pt depth=0.3pt
-[halfcut] Bratislava Castle | pts=25 end0=(528.9,1076) endN=(591.4,1073.4) straight
+[seat] Bratislava Castle | rotated -3.4deg to endpoint chord.
+[seat] Bratislava Castle | seated rot=-3.4deg move=11pt depth=0.3pt
+[halfcut] Bratislava Castle | pts=40 end0=(528.5,1075.9) endN=(590.9,1072.6) straight
 [ai-pipeline] caption built | Bratislava Castle halfcut=true
-[seat] Spiš Castle | rotated 0.2deg to endpoint chord.
-[seat] Spiš Castle | seated rot=0.2deg move=8.8pt depth=0.3pt
-[halfcut] Spiš Castle | pts=25 end0=(292.8,1080.5) endN=(337.7,1080.8) straight
+[seat] Spiš Castle | rotated -0.8deg to endpoint chord.
+[seat] Spiš Castle | seated rot=-0.8deg move=8.6pt depth=0.3pt
+[halfcut] Spiš Castle | pts=26 end0=(292.9,1080.4) endN=(337.9,1079.8) straight
 [ai-pipeline] caption built | Spiš Castle halfcut=true
-[seat] Slovak Paradise National Park | rotated 0.5deg to endpoint chord.
-[seat] Slovak Paradise National Park | seated rot=0.5deg move=7.1pt depth=0.3pt
-[halfcut] Slovak Paradise National Park | pts=25 end0=(18.6,1092.2) endN=(122.5,1093.1) straight
+[seat] Slovak Paradise National Park | rotated 0.4deg to endpoint chord.
+[seat] Slovak Paradise National Park | seated rot=0.4deg move=5.6pt depth=0.3pt
+[halfcut] Slovak Paradise National Park | pts=44 end0=(18.2,1092.5) endN=(122.6,1093.1) straight
 [ai-pipeline] caption built | Slovak Paradise National Park halfcut=true
-[seat] Devín Castle | rotated -2.1deg to endpoint chord.
-[seat] Devín Castle | seated rot=-2.1deg move=8.9pt depth=0.3pt
-[halfcut] Devín Castle | pts=41 end0=(-197.6,1091) endN=(-150.5,1089.2) straight
+[seat] Devín Castle | rotated -2.4deg to endpoint chord.
+[seat] Devín Castle | seated rot=-2.4deg move=8.8pt depth=0.3pt
+[halfcut] Devín Castle | pts=27 end0=(-197.8,1091) endN=(-149.9,1089) straight
 [ai-pipeline] caption built | Devín Castle halfcut=true
 [ai-pipeline] captions built: 28 | skipped: 0 | failed: 0
-[step7a] regular   | ratio=0.88 | Devín Castle
-[step7a] regular   | ratio=0.937 | Slovak Paradise National Park
-[step7a] regular   | ratio=0.884 | Spiš Castle
-[step7a] regular   | ratio=0.905 | Bratislava Castle
-[step7a] regular   | ratio=0.934 | Flag + Slovakia(text)
-[step7a] regular   | ratio=0.861 | Štrbské Pleso
-[step7a] irregular | ratio=0.62 | National Flower
-[step7a] irregular | ratio=0.64 | Slovakia Map
-[step7a] regular   | ratio=0.866 | St. Martin's Cathedral
-[step7a] regular   | ratio=0.885 | UFO Observation Deck, Bridge SNP
-[step7a] regular   | ratio=0.91 | Old Town Hall (Bratislava)
-[step7a] regular   | ratio=0.881 | Bojnice Castle
-[step7a] regular   | ratio=0.877 | Orava Castle
-[step7a] regular   | ratio=0.847 | Michael's Gate
-[step7a] regular   | ratio=0.878 | The Blue Church | Church of St. Elizabeth
-[step7a] regular   | ratio=0.895 | Čumil Statue
-[step7a] irregular | ratio=0.7 | Bratislava(text)
-[step7a] irregular | ratio=0.737 | Šúľance s Makom
-[step7a] irregular | ratio=0.73 | Pirohy
-[step7a] irregular | ratio=0.756 | Kapustnica
-[step7a] irregular | ratio=0.789 | Bryndzové halušky
-[step7a] irregular | ratio=0.682 | Kraslice
-[step7a] irregular | ratio=0.71 | Kroje
-[step7a] irregular | ratio=0.717 | Fujara
-[step7a] irregular | ratio=0.652 | Tram
-[step7a] irregular | ratio=0.534 | Tatra chamois
-[step7a] regular   | ratio=0.918 | Carpathian Wooden Churches
-[step7a] regular   | ratio=0.862 | St Elizabeth's Cathedral | (Dóm Svätej Alzbety)
+[step7a] regular   | ratio=0.876 | Devín Castle
+[step7a] regular   | ratio=0.943 | Slovak Paradise National Park
+[step7a] regular   | ratio=0.887 | Spiš Castle
+[step7a] regular   | ratio=0.898 | Bratislava Castle
+[step7a] regular   | ratio=0.933 | Flag + Slovakia(text)
+[step7a] regular   | ratio=0.865 | Štrbské Pleso
+[step7a] irregular | ratio=0.601 | National Flower
+[step7a] irregular | ratio=0.639 | Slovakia Map
+[step7a] regular   | ratio=0.871 | St. Martin's Cathedral
+[step7a] regular   | ratio=0.886 | UFO Observation Deck, Bridge SNP
+[step7a] regular   | ratio=0.918 | Old Town Hall (Bratislava)
+[step7a] regular   | ratio=0.887 | Bojnice Castle
+[step7a] regular   | ratio=0.881 | Orava Castle
+[step7a] regular   | ratio=0.846 | Michael's Gate
+[step7a] regular   | ratio=0.885 | The Blue Church | Church of St. Elizabeth
+[step7a] regular   | ratio=0.901 | Čumil Statue
+[step7a] irregular | ratio=0.698 | Bratislava(text)
+[step7a] irregular | ratio=0.738 | Šúľance s Makom
+[step7a] irregular | ratio=0.732 | Pirohy
+[step7a] irregular | ratio=0.758 | Kapustnica
+[step7a] irregular | ratio=0.784 | Bryndzové halušky
+[step7a] irregular | ratio=0.672 | Kraslice
+[step7a] irregular | ratio=0.707 | Kroje
+[step7a] irregular | ratio=0.718 | Fujara
+[step7a] irregular | ratio=0.655 | Tram
+[step7a] irregular | ratio=0.531 | Tatra chamois
+[step7a] regular   | ratio=0.922 | Carpathian Wooden Churches
+[step7a] regular   | ratio=0.86 | St Elizabeth's Cathedral | (Dóm Svätej Alzbety)
 [step7a] classified: 16 regular, 12 irregular (threshold=0.82)
 [step7a] export | 16 item(s) -> /tmp/ai-build-and-export-cutlines-fixture_regular.svg
 [step7a] export | 12 item(s) -> /tmp/ai-build-and-export-cutlines-fixture_irregular.svg
