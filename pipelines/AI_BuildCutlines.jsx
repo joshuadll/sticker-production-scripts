@@ -126,6 +126,10 @@ var CONFIG = {
     // each element the MOST smoothing whose drift stays at/under this, backing that element's own
     // tolerance off until it fits (or leaving it un-smoothed if even minimal smoothing can't).
     // So NO cut ever leaves more than this fraction of the white margin, on any element or any SKU.
+    // Drift is measured in BOTH directions (_maxDriftMm): inward — the direction that actually eats
+    // the white band and approaches the art — counts against this budget exactly like outward. It
+    // did not until 2026-07-17: the check discarded every inward point, so inward silently ran past
+    // the cap (0.66mm vs 0.56mm at sm33) and thinned the white to ~1.03mm of 1.69mm.
     // 100% would put the cut at the outer white edge — stay well under. Artist workflow: set this,
     // run Pipeline 2, eyeball, adjust. Everything below is fixed internal tuning.
     smoothnessPct:          33,     // 20 tight/faithful .. 50 balanced .. 70 aggressive

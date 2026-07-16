@@ -328,14 +328,32 @@ function _largestPoly(polys) {
 // BEFORE sampling (plain {x,y}, detached from the DOM); the path is re-sampled AFTER. Concave dips
 // are where smoothing pushes the cut outward, so this is the number that answers "still within the
 // white edge?". Returns 0 when nothing crosses out.
-function _maxOutwardMm(path, prePolys) {
+// Max distance (mm) from any point of the simplified cut to the ORIGINAL traced contour —
+// in EITHER direction. This is the number smoothnessPct budgets.
+//
+// It was _maxOutwardMm and gated on `if (!pointInPolygon(v, pre))`, i.e. it only measured points
+// that landed OUTSIDE the original silhouette and silently discarded every inward one. That is
+// backwards: outward means the cut sits beyond the white edge, in bare vinyl — white on white,
+// invisible, harmless. INWARD is the direction that eats the white band and approaches the art,
+// and it was the one not being measured. Unmeasured, it ran past the budget it was nominally
+// under (0.66mm against a 0.56mm cap at sm33), thinning the white locally from 1.69mm to ~1.03mm.
+// The CONFIG docstring promised "NO cut ever leaves more than this fraction of the white margin"
+// — a statement about the inward direction, which nothing checked. It was safe only by accident:
+// simplifyMaxToleranceMm incidentally bounds how far RDP can stray, so raising that knob would
+// have quietly eaten more white with nothing to complain.
+//
+// Dropping the gate makes the measure symmetric: distance to the original contour, whichever side
+// the point fell on. NOTE it stays one-sided in the SET sense (post -> pre): it asks "did the new
+// cut move off the old line", not "did the new cut drop a feature the old line had". That is the
+// right question for a drift budget; feature loss is the tolerance's job, not the budget's.
+function _maxDriftMm(path, prePolys) {
     var pre = _largestPoly(prePolys);
     var post = _largestPoly(samplePathToPolygons(path, 16));
     if (!pre || !post) return 0;
-    var i, v, d, mo = 0;
+    var i, d, mo = 0;
     for (i = 0; i < post.length; i++) {
-        v = post[i];
-        if (!pointInPolygon(v, pre)) { d = Math.sqrt(_minDist2ToPolyEdges(v, pre)); if (d > mo) mo = d; }
+        d = Math.sqrt(_minDist2ToPolyEdges(post[i], pre));
+        if (d > mo) mo = d;
     }
     return pointsToMm(mo);
 }
@@ -382,7 +400,7 @@ function _simplifyWithinBudget(path, prePolys, startTolMm, cornerDeg, steps, bud
         _restorePath(snap);
         var did = simplifyPathItem(path, mmToPoints(tol), cornerDeg, steps);
         if (did <= 0) return { reduced: false, tol: tol, strayMm: 0, iters: iters, capped: false };
-        var stray = _maxOutwardMm(path, prePolys);
+        var stray = _maxDriftMm(path, prePolys);
         if (stray <= budgetMm) return { reduced: true, tol: tol, strayMm: stray, iters: iters, capped: false };
         tol *= backoff;
         if (tol < FLOOR) break;
