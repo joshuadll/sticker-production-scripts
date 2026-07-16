@@ -281,8 +281,8 @@ done < <(grep -oE "^\[step2\] layer\[[0-9]+\] = .+ \[ST\]" "$LOG_PS" | sed -E 's
 #     (National Flower went 70 -> 77 under the old `> n * 1.2` allowance.)
 DENS=$(grep -oE "\[step6\] simplify \| .+ \| [0-9]+ -> [0-9]+ pts" "$LOG_AI" \
        | sed -E 's/.*\| ([0-9]+) -> ([0-9]+) pts.*/\1 \2/' \
-       | awk '$2 > $1 { c++ } END { print c+0 }')
-if [ "$DENS" -ne 0 ]; then
+       | awk '$2 > $1 { c++ } END { print c+0 }' || true)
+if [ "${DENS:-0}" -ne 0 ]; then
     echo "  FAIL: $DENS element(s) GAINED nodes -- the re-fit is worse than the input."
     SIMP_OK=0
 fi
@@ -290,8 +290,8 @@ fi
 # (4) every accepted drift is inside its budget (Step 6 prints "(N% <= M% budget)").
 OVER=$(grep -oE "\([0-9]+% <= [0-9]+% budget\)" "$LOG_AI" \
        | sed -E 's/\(([0-9]+)% <= ([0-9]+)% budget\)/\1 \2/' \
-       | awk '$1 > $2 { c++ } END { print c+0 }')
-if [ "$OVER" -ne 0 ]; then
+       | awk '$1 > $2 { c++ } END { print c+0 }' || true)
+if [ "${OVER:-0}" -ne 0 ]; then
     echo "  FAIL: $OVER element(s) drifted past the budget."
     SIMP_OK=0
 fi

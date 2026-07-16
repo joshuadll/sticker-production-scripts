@@ -193,8 +193,7 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
         if (CONFIG.simplifyCutline && matched.styleCode === "ST") {
             log("[step6] simplify | " + matched.displayName
                 + " | SKIP — stamp (no white edge, so no drift budget to spend)");
-        }
-        if (CONFIG.simplifyCutline && matched.styleCode !== "ST") {
+        } else if (CONFIG.simplifyCutline) {
             var _before   = _cutlinePtCount(path);
             var _prePolys = samplePathToPolygons(path, 16);   // BEFORE geometry (detached {x,y})
             var _budgetMm = (CONFIG.smoothnessPct / 100) * CONFIG.whiteEdgeMm;
@@ -312,16 +311,6 @@ function _cutlinePtCount(p) {
 }
 
 // Largest-area polygon of a sampled set (the outer contour; holes are smaller).
-function _largestPoly(polys) {
-    var best = null, ba = -1, i, s, n, j, a, poly;
-    for (i = 0; i < polys.length; i++) {
-        poly = polys[i]; s = 0; n = poly.length;
-        for (j = 0; j < n; j++) { var k = (j + 1) % n; s += poly[j].x * poly[k].y - poly[k].x * poly[j].y; }
-        a = Math.abs(s) / 2;
-        if (a > ba) { ba = a; best = poly; }
-    }
-    return best;
-}
 
 // How far (mm) the simplified outline's outer contour strays OUTSIDE the pre-simplify contour —
 // i.e. beyond the outer white edge, the direction that risks an unprinted sliver. prePolys is the
@@ -346,14 +335,25 @@ function _largestPoly(polys) {
 // the point fell on. NOTE it stays one-sided in the SET sense (post -> pre): it asks "did the new
 // cut move off the old line", not "did the new cut drop a feature the old line had". That is the
 // right question for a drift budget; feature loss is the tolerance's job, not the budget's.
+// Measures EVERY sub-path, not just the biggest. It used to reduce both sides with _largestPoly
+// (the outer contour), while simplifyPathItem recurses and reshapes EVERY sub-path of a
+// CompoundPathItem — so an inner hole could be re-cut arbitrarily far and still report a drift the
+// budget accepted. Tram (43 -> 41 pts) reported "drift 0.00mm" for exactly that reason: the anchors
+// it lost were in a sub-path nothing looked at. Each post point is measured to the NEAREST original
+// sub-path, so a hole is compared against the hole it came from rather than the outer edge.
 function _maxDriftMm(path, prePolys) {
-    var pre = _largestPoly(prePolys);
-    var post = _largestPoly(samplePathToPolygons(path, 16));
-    if (!pre || !post) return 0;
-    var i, d, mo = 0;
-    for (i = 0; i < post.length; i++) {
-        d = Math.sqrt(_minDist2ToPolyEdges(post[i], pre));
-        if (d > mo) mo = d;
+    var post = samplePathToPolygons(path, 16);
+    if (!prePolys || prePolys.length === 0 || !post || post.length === 0) return 0;
+    var pi, vi, k, d2, best, mo = 0;
+    for (pi = 0; pi < post.length; pi++) {
+        for (vi = 0; vi < post[pi].length; vi++) {
+            best = -1;
+            for (k = 0; k < prePolys.length; k++) {
+                d2 = _minDist2ToPolyEdges(post[pi][vi], prePolys[k]);
+                if (best < 0 || d2 < best) best = d2;
+            }
+            if (best >= 0 && Math.sqrt(best) > mo) mo = Math.sqrt(best);
+        }
     }
     return pointsToMm(mo);
 }
