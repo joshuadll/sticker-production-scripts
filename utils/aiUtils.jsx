@@ -2178,8 +2178,14 @@ function _simplifyOnePath(path, tolerancePt, cornerAngleDeg, stepsPerSeg) {
         for (k = 0; k < keptC.length; k++) nodes.push({ x: keptC[k].x, y: keptC[k].y, corner: false });
     }
 
-    if (nodes.length >= n) return false;                        // no reduction
+    // A re-fit that removes NO nodes is still a win: the artist's Object>Path>Simplify routinely
+    // keeps the node COUNT and only re-types corners into smooth points (Bratislava(text): 36 -> 36,
+    // every corner smoothed). Gating on count reduction handed 9/23 elements back untouched, fully
+    // faceted — the kinks are the defect, not the node count. Outward drift is policed by the caller
+    // (_simplifyWithinBudget re-simplifies from the original and restores when it exceeds budget),
+    // so that is the real safety net; refuse only a collapse or a genuine densification.
     if (nodes.length < (closed ? 3 : 2)) return false;          // would collapse — bail
+    if (nodes.length > n * 1.2) return false;                   // densified >20% — not a simplification
 
     _writeSmoothNodes(path, nodes);
     return true;
@@ -2188,7 +2194,8 @@ function _simplifyOnePath(path, tolerancePt, cornerAngleDeg, stepsPerSeg) {
 // Simplifies a PathItem (or each sub-path of a CompoundPathItem) in place. tolerancePt is the
 // RDP epsilon (points); cornerAngleDeg is the tangent-break angle above which an anchor stays a
 // hard corner; stepsPerSeg is the bezier sampling density (default 16). Returns the number of
-// sub-paths actually reduced.
+// sub-paths actually CHANGED — re-typed (corner -> smooth) and/or reduced. A sub-path can change
+// with no drop in node count; that is the artist's usual case, not a no-op.
 function simplifyPathItem(path, tolerancePt, cornerAngleDeg, stepsPerSeg) {
     if (stepsPerSeg == null) stepsPerSeg = 16;
     if (path.typename === "CompoundPathItem") {
