@@ -174,6 +174,31 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
             continue;
         }
 
+        // ── Cutline smoothing (corner-aware) ──────────────────────────────────
+        // Flatten the trace's ruggedness while keeping intended sharp corners, the
+        // way the artist does by hand (Object>Path>Simplify). Done HERE — on the raw
+        // traced outline, before the caption text warps to it and before Pipeline 2's
+        // seat/unite/half-cut derive from it — so the whole cutline inherits the smooth
+        // shape. Applies to captioned AND stamp outlines alike. Handles compound paths
+        // (outer contour + holes). See CONFIG.simplify* and aiUtils.simplifyPathItem.
+        if (CONFIG.simplifyCutline) {
+            var _before   = _cutlinePtCount(path);
+            var _prePolys = samplePathToPolygons(path, 16);   // BEFORE geometry (detached {x,y})
+            var _budgetMm = (CONFIG.smoothnessPct / 100) * CONFIG.whiteEdgeMm;
+            var _r = _simplifyWithinBudget(path, _prePolys, CONFIG.simplifyMaxToleranceMm,
+                         CONFIG.simplifyCornerAngleDeg, CONFIG.simplifySampleSteps, _budgetMm);
+            var _pct = CONFIG.whiteEdgeMm > 0 ? Math.round(100 * _r.strayMm / CONFIG.whiteEdgeMm) : 0;
+            if (_r.reduced) {
+                log("[step6] simplify | " + matched.displayName + " | " + _before + " -> "
+                    + _cutlinePtCount(path) + " pts | drift " + _r.strayMm.toFixed(2) + "mm ("
+                    + _pct + "% <= " + CONFIG.smoothnessPct + "% budget) | tol " + _r.tol.toFixed(2)
+                    + "mm x" + _r.iters);
+            } else {
+                log("[step6] simplify | " + matched.displayName + " | no reduction within budget ("
+                    + _before + " pts)" + (_r.capped ? " [held un-smoothed to fit " + CONFIG.smoothnessPct + "%]" : ""));
+            }
+        }
+
         if (elementGetsCaption(matched.styleCode, matched.catCode)) {
             // Native caption: name the outline + place review text. The PILL/PLATE/cut are built in
             // Pipeline 2 (AI_BuildAndExportCutlines) after the artist reviews the text. The sidecar
@@ -261,6 +286,97 @@ function _artFolderFromElementsPath(elementsFilePath) {
 
 
 // ── Private helpers ───────────────────────────────────────────────────────────
+
+// Total anchor count of a cutline path — sums sub-paths for a CompoundPathItem
+// (outer contour + holes), so the simplify before/after log is correct either way.
+function _cutlinePtCount(p) {
+    if (p.typename === "CompoundPathItem") {
+        var c = 0, i;
+        for (i = 0; i < p.pathItems.length; i++) c += p.pathItems[i].pathPoints.length;
+        return c;
+    }
+    return (p.typename === "PathItem") ? p.pathPoints.length : 0;
+}
+
+// Largest-area polygon of a sampled set (the outer contour; holes are smaller).
+function _largestPoly(polys) {
+    var best = null, ba = -1, i, s, n, j, a, poly;
+    for (i = 0; i < polys.length; i++) {
+        poly = polys[i]; s = 0; n = poly.length;
+        for (j = 0; j < n; j++) { var k = (j + 1) % n; s += poly[j].x * poly[k].y - poly[k].x * poly[j].y; }
+        a = Math.abs(s) / 2;
+        if (a > ba) { ba = a; best = poly; }
+    }
+    return best;
+}
+
+// How far (mm) the simplified outline's outer contour strays OUTSIDE the pre-simplify contour —
+// i.e. beyond the outer white edge, the direction that risks an unprinted sliver. prePolys is the
+// BEFORE sampling (plain {x,y}, detached from the DOM); the path is re-sampled AFTER. Concave dips
+// are where smoothing pushes the cut outward, so this is the number that answers "still within the
+// white edge?". Returns 0 when nothing crosses out.
+function _maxOutwardMm(path, prePolys) {
+    var pre = _largestPoly(prePolys);
+    var post = _largestPoly(samplePathToPolygons(path, 16));
+    if (!pre || !post) return 0;
+    var i, v, d, mo = 0;
+    for (i = 0; i < post.length; i++) {
+        v = post[i];
+        if (!pointInPolygon(v, pre)) { d = Math.sqrt(_minDist2ToPolyEdges(v, pre)); if (d > mo) mo = d; }
+    }
+    return pointsToMm(mo);
+}
+
+// The PathItems that make up a cutline (one for a PathItem, each sub-path for a CompoundPathItem).
+function _constituentPaths(p) {
+    if (p.typename === "CompoundPathItem") { var a = [], i; for (i = 0; i < p.pathItems.length; i++) a.push(p.pathItems[i]); return a; }
+    if (p.typename === "PathItem") return [p];
+    return [];
+}
+
+// Snapshot exact geometry (per sub-path anchors + handles + closed) so an element can be RESTORED
+// and re-simplified from scratch at a different tolerance during the adaptive budget search.
+function _snapshotPath(p) {
+    var subs = _constituentPaths(p), snap = [], i, k;
+    for (i = 0; i < subs.length; i++) {
+        var pts = subs[i].pathPoints, A = [], L = [], R = [];
+        for (k = 0; k < pts.length; k++) { A.push(pts[k].anchor); L.push(pts[k].leftDirection); R.push(pts[k].rightDirection); }
+        snap.push({ sub: subs[i], A: A, L: L, R: R, closed: subs[i].closed });
+    }
+    return snap;
+}
+function _restorePath(snap) {
+    var i, k;
+    for (i = 0; i < snap.length; i++) {
+        var s = snap[i], coords = [];
+        for (k = 0; k < s.A.length; k++) coords.push([s.A[k][0], s.A[k][1]]);
+        s.sub.setEntirePath(coords);
+        s.sub.closed = s.closed;
+        var pts = s.sub.pathPoints;
+        for (k = 0; k < pts.length; k++) { pts[k].leftDirection = s.L[k]; pts[k].rightDirection = s.R[k]; }
+    }
+}
+
+// STRICT per-element smoothing: give the element the MOST smoothing (largest tolerance, searched
+// down from a ceiling) whose outward drift stays within budgetMm. Re-simplifies from the ORIGINAL
+// each try, so the accepted result is GUARANTEED <= budget; if even minimal smoothing can't fit,
+// the original is restored un-smoothed. Returns {reduced, tol, strayMm, iters, capped}.
+function _simplifyWithinBudget(path, prePolys, startTolMm, cornerDeg, steps, budgetMm) {
+    var snap = _snapshotPath(path);
+    var tol = startTolMm, iters = 0, MAXIT = 9, FLOOR = 0.03, backoff = 0.62;
+    while (iters < MAXIT) {
+        iters++;
+        _restorePath(snap);
+        var did = simplifyPathItem(path, mmToPoints(tol), cornerDeg, steps);
+        if (did <= 0) return { reduced: false, tol: tol, strayMm: 0, iters: iters, capped: false };
+        var stray = _maxOutwardMm(path, prePolys);
+        if (stray <= budgetMm) return { reduced: true, tol: tol, strayMm: stray, iters: iters, capped: false };
+        tol *= backoff;
+        if (tol < FLOOR) break;
+    }
+    _restorePath(snap);
+    return { reduced: false, tol: tol, strayMm: 0, iters: iters, capped: true };
+}
 
 // Applies the CONFIG trace-tuning overrides on top of the loaded "Silhouettes"
 // preset so the traced contour hugs the silhouette edge (the preset is built to

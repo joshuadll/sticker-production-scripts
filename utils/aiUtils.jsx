@@ -1619,16 +1619,23 @@ function seatPlateToOutline(name, outline, plate, captionItem, opts) {
     var items = [plate];
     if (captionItem) items.push(captionItem);
 
-    var E0, E1, B0, B1, r, kissOnly = false;
+    var E0, E1, B0, B1, r, kissOnly = false, travelDir = null;
 
     if (opts.innerEndpoints) {
-        // ── TAB path: the caller supplies the two attach-edge TIPS (the "pointy" endpoints that
-        // must land on the border). The pill inner-edge finder skips these as caps, so tabs pass
-        // them in directly — no cap-skip, no overhang/bulge shrink (all pill-specific). ──
-        E0 = opts.innerEndpoints[0]; E1 = opts.innerEndpoints[1];
+        // ── TAB path: derive the travel DIRECTION and the attach-edge TIPS from the tab's OWN
+        // geometry (PCA short axis toward the art). This seats correctly wherever the artist has
+        // dragged or ROTATED the tab, and fixes the wide/thin-element bottom-tab miss that the
+        // center-offset axis guess produced. The passed innerEndpoints only signal "this is a tab".
+        travelDir = _tabTravelDir(pp, artPolys);
+        var tips = _tabTipsDir(pp, travelDir);
+        if (!tips) {
+            log("[seat] " + name + " | WARN — tab attach edge indeterminate; not seated.");
+            return { ok: false, needsReview: true, reason: "tab attach edge indeterminate" };
+        }
+        E0 = tips.e0; E1 = tips.e1;
         r = Math.sqrt((E1.x - E0.x) * (E1.x - E0.x) + (E1.y - E0.y) * (E1.y - E0.y)) / 2;
-        B0 = _probeOutline(artPolys, geom, E0);
-        B1 = _probeOutline(artPolys, geom, E1);
+        B0 = _probeOutlineDir(artPolys, E0, travelDir);
+        B1 = _probeOutlineDir(artPolys, E1, travelDir);
         if (!B0 || !B1) {
             log("[seat] " + name + " | WARN — tab tip has no art in front of it; not seated.");
             return { ok: false, needsReview: true, reason: "tab tip off the art" };
@@ -1721,7 +1728,8 @@ function seatPlateToOutline(name, outline, plate, captionItem, opts) {
     // ── KISS (original): slide E0 onto B0 along the travel axis, submerged by depth d. E0 is the
     // rotation pivot (fixed) and B0 is on the stationary art, so both hold after rotation. E0 is
     // a REAL boundary point, so the real plate edge lands at depth d — no phantom float. ──
-    var k = _aiKissVector(E0, B0, geom, depth);
+    var k = travelDir ? _aiKissVectorDir(E0, B0, travelDir, depth)
+                      : _aiKissVector(E0, B0, geom, depth);
     _translateItems(items, k.tx, k.ty);
     if (CONFIG.seatDebug) {
         var _e0p = { x: E0.x + k.tx, y: E0.y + k.ty };
@@ -1888,6 +1896,66 @@ function _aiMidProtrusion(B0, B1, Bm, geom, depth) {
     return (-geom.sign * (bm - chordMid)) + depth;
 }
 
+// ── DIRECTION-VECTOR tab seating (rotation-robust) ────────────────────────────
+// The tab travel direction from the tab polygon's OWN orientation (PCA short axis), pointed toward
+// the outline. Reads the tab's ACTUAL current shape, so seating is correct wherever the artist has
+// dragged or ROTATED it — unlike the shape-level center-offset axis guess (_aiSeatGeometry), which
+// mis-seats a wide/thin element's bottom tab (probes sideways, misses the art). Returns
+// { dx, dy (unit, into the art), ux, uy (attach-edge axis), cx, cy (tab centroid) }.
+function _tabTravelDir(tabPoly, artPolys) {
+    var n = tabPoly.length, cx = 0, cy = 0, i, dx, dy;
+    for (i = 0; i < n; i++) { cx += tabPoly[i].x; cy += tabPoly[i].y; }
+    cx /= n; cy /= n;
+    var sxx = 0, syy = 0, sxy = 0;
+    for (i = 0; i < n; i++) { dx = tabPoly[i].x - cx; dy = tabPoly[i].y - cy; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+    var th = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    var ux = Math.cos(th), uy = Math.sin(th), vx = -uy, vy = ux;   // u = long axis (attach edge), v = short (depth)
+    var oc = _polyCentroid(_largestPoly(artPolys));
+    var dot = vx * (oc.x - cx) + vy * (oc.y - cy);                 // orient v TOWARD the art
+    if (dot < 0) { vx = -vx; vy = -vy; }
+    return { dx: vx, dy: vy, ux: ux, uy: uy, cx: cx, cy: cy };
+}
+
+// The tab's two attach-edge TIPS: the extremes along the attach-edge axis (u), on the art-facing
+// half (+travel side). Derived from the tab's current geometry, so they track a rotated tab.
+function _tabTipsDir(tabPoly, dir) {
+    var loT = 1e15, hiT = -1e15, lo = null, hi = null, i;
+    for (i = 0; i < tabPoly.length; i++) {
+        var ddx = tabPoly[i].x - dir.cx, ddy = tabPoly[i].y - dir.cy;
+        if (ddx * dir.dx + ddy * dir.dy < 0) continue;            // art-facing half only
+        var tt = ddx * dir.ux + ddy * dir.uy;
+        if (tt < loT) { loT = tt; lo = tabPoly[i]; }
+        if (tt > hiT) { hiT = tt; hi = tabPoly[i]; }
+    }
+    return (lo && hi && lo !== hi) ? { e0: { x: lo.x, y: lo.y }, e1: { x: hi.x, y: hi.y } } : null;
+}
+
+// Direction-vector twin of _probeOutline: cast a ray from E along (dir.dx, dir.dy) and return the
+// NEAREST FORWARD crossing with the outline, or null (no art ahead → the tab genuinely can't seat
+// at that tip in that direction, e.g. rotated too far on a thin element — a real hard error).
+function _probeOutlineDir(artPolys, E, dir) {
+    var best = null, bestT = 1e18, ai, A, i, j, p1, p2;
+    for (ai = 0; ai < artPolys.length; ai++) {
+        A = artPolys[ai];
+        for (i = 0, j = A.length - 1; i < A.length; j = i++) {
+            p1 = A[j]; p2 = A[i];
+            var sx = p2.x - p1.x, sy = p2.y - p1.y;
+            var det = sx * dir.dy - dir.dx * sy;
+            if (Math.abs(det) < 1e-9) continue;                   // ray parallel to this edge
+            var t = (-(p1.x - E.x) * sy + sx * (p1.y - E.y)) / det;   // ray param (>0 forward)
+            var u = (dir.dx * (p1.y - E.y) - dir.dy * (p1.x - E.x)) / det; // edge param [0,1]
+            if (t > 1e-6 && u >= 0 && u <= 1 && t < bestT) { bestT = t; best = { x: E.x + t * dir.dx, y: E.y + t * dir.dy }; }
+        }
+    }
+    return best;
+}
+
+// Direction-vector kiss: B0 lies along the probe ray from E0, so (B0-E0) is parallel to dir. Land
+// E0 on B0 and submerge by depth further along the travel direction (into the art).
+function _aiKissVectorDir(E0, B0, dir, depth) {
+    return { tx: (B0.x - E0.x) + dir.dx * depth, ty: (B0.y - E0.y) + dir.dy * depth };
+}
+
 // Signed angle (deg) of the chord p->q. Twin of Step3B's _chordAngleDeg.
 function _aiChordAngleDeg(p, q) { return Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI; }
 
@@ -1926,10 +1994,11 @@ function _translateItems(items, tx, ty) {
 }
 
 // ─── PATH SIMPLIFICATION (Step 8a) ────────────────────────────────────────────
-// Native Ramer–Douglas–Peucker anchor reduction + Catmull-Rom bezier refit with
-// corner preservation. Illustrator's Object>Path>Simplify is not scriptable
-// without a dialog, so this reproduces it deterministically. tolerance/cornerAngle
-// are supplied by the caller (CONFIG).
+// Curve-aware path simplify (the artist's Object>Path>Simplify, which isn't scriptable with
+// parameters). Corner-split -> dense bezier sample -> RDP on the sampling -> clamped-tangent
+// refit, so smooth curves stay smooth (not faceted) and genuine corners stay sharp (not
+// chamfered/looped). tolerance/cornerAngle/stepsPerSeg are supplied by the caller (CONFIG).
+// See _simplifyOnePath for the algorithm; rdpSimplify/_rdpClosed below are the RDP core.
 
 // Perpendicular distance from point p to the line through a–b (all {x,y}).
 function _perpDistance(p, a, b) {
@@ -1991,68 +2060,146 @@ function _rdpClosed(anchors, epsilon) {
     return k1.slice(0, k1.length - 1).concat(k2.slice(0, k2.length - 1));
 }
 
-// Rewrites a PathItem from a reduced anchor list, assigning Catmull-Rom handles
-// for smooth points and zero-length handles (sharp) for corners / open endpoints.
-function _applySmoothPath(path, anchors, cornerAngleDeg) {
+// Angle (degrees, 0..180) between two direction vectors.
+function _vecAngleDeg(ax, ay, bx, by) {
+    var m1 = Math.sqrt(ax * ax + ay * ay);
+    var m2 = Math.sqrt(bx * bx + by * by);
+    if (m1 === 0 || m2 === 0) return 0;
+    var c = (ax * bx + ay * by) / (m1 * m2);
+    if (c > 1) c = 1; else if (c < -1) c = -1;
+    return Math.acos(c) * 180 / Math.PI;
+}
+
+// Writes a reduced node list back onto a PathItem. Each node = {x, y, corner}. Corners get
+// zero-length handles (hard); smooth nodes get tangent handles CLAMPED to a fraction of the
+// adjacent chord — tangent keeps the curve smooth, the clamp (< 0.5) kills the Catmull-Rom
+// overshoot that curled tight corners in the old anchor-only refit.
+function _writeSmoothNodes(path, nodes) {
     var closed = path.closed;
-    var n = anchors.length;
-    var coords = [], i;
-    for (i = 0; i < n; i++) coords.push([anchors[i].x, anchors[i].y]);
-
+    var n = nodes.length, i;
+    var frac = 0.33;
+    var coords = [];
+    for (i = 0; i < n; i++) coords.push([nodes[i].x, nodes[i].y]);
     path.setEntirePath(coords);
-    path.closed = closed; // setEntirePath can drop the closed flag
+    path.closed = closed;                       // setEntirePath can drop the closed flag
 
-    var pts = path.pathPoints;
+    var pp = path.pathPoints;
     for (i = 0; i < n; i++) {
-        var prev = anchors[(i - 1 + n) % n];
-        var cur  = anchors[i];
-        var next = anchors[(i + 1) % n];
-        var isEndpoint = (!closed && (i === 0 || i === n - 1));
-        var isCorner   = isEndpoint || _turnAngle(prev, cur, next) >= cornerAngleDeg;
-        var pp = pts[i];
-        if (isCorner) {
-            pp.leftDirection  = [cur.x, cur.y];
-            pp.rightDirection = [cur.x, cur.y];
-            pp.pointType = PointType.CORNER;
-        } else {
-            var tx = (next.x - prev.x) / 6;
-            var ty = (next.y - prev.y) / 6;
-            pp.rightDirection = [cur.x + tx, cur.y + ty];
-            pp.leftDirection  = [cur.x - tx, cur.y - ty];
-            pp.pointType = PointType.SMOOTH;
+        var cur = nodes[i], p = pp[i];
+        var isEnd = (!closed && (i === 0 || i === n - 1));
+        if (cur.corner || isEnd) {
+            p.leftDirection  = [cur.x, cur.y];
+            p.rightDirection = [cur.x, cur.y];
+            p.pointType = PointType.CORNER;
+            continue;
         }
+        var prev = nodes[(i - 1 + n) % n], next = nodes[(i + 1) % n];
+        var tx = next.x - prev.x, ty = next.y - prev.y;
+        var tm = Math.sqrt(tx * tx + ty * ty);
+        if (tm < 1e-9) {
+            p.leftDirection  = [cur.x, cur.y];
+            p.rightDirection = [cur.x, cur.y];
+            p.pointType = PointType.CORNER;
+            continue;
+        }
+        tx /= tm; ty /= tm;
+        var dPrev = Math.sqrt((cur.x - prev.x) * (cur.x - prev.x) + (cur.y - prev.y) * (cur.y - prev.y));
+        var dNext = Math.sqrt((next.x - cur.x) * (next.x - cur.x) + (next.y - cur.y) * (next.y - cur.y));
+        p.leftDirection  = [cur.x - tx * frac * dPrev, cur.y - ty * frac * dPrev];
+        p.rightDirection = [cur.x + tx * frac * dNext, cur.y + ty * frac * dNext];
+        p.pointType = PointType.SMOOTH;
     }
 }
 
-// Simplifies a PathItem (or each sub-path of a CompoundPathItem) in place.
-// tolerancePt is the RDP epsilon (points); cornerAngleDeg preserves sharp corners.
-// Returns the number of sub-paths actually reduced.
-function simplifyPathItem(path, tolerancePt, cornerAngleDeg) {
+// Curve-aware simplify of ONE PathItem in place. A raw RDP on the sparse anchors chord-
+// approximates the bezier curves, so it facets/overshoots them (the flower collapsed to a
+// polygon, rounded corners chamfered). This instead:
+//   1. classifies each ORIGINAL anchor as a genuine CORNER (tangents break by >= cornerAngle)
+//      vs SMOOTH — real corners are protected, rounded ones are NOT mistaken for corners;
+//   2. densely SAMPLES the true bezier of each smooth run between corners;
+//   3. RDPs that dense sampling, so it follows the real curve rather than a chord guess;
+//   4. rebuilds with CLAMPED tangent handles (smooth, no overshoot). Corners stay hard.
+// Returns true if the anchor count dropped.
+function _simplifyOnePath(path, tolerancePt, cornerAngleDeg, stepsPerSeg) {
+    var pts = path.pathPoints;
+    var n = pts.length;
+    if (n < 4) return false;
+    var closed = path.closed;
+
+    var A = [], L = [], R = [], k;
+    for (k = 0; k < n; k++) { A[k] = pts[k].anchor; L[k] = pts[k].leftDirection; R[k] = pts[k].rightDirection; }
+
+    // 1. corner classification from tangent discontinuity (handles, with anchor-chord fallback).
+    var corner = [], C = [];
+    for (k = 0; k < n; k++) {
+        if (!closed && (k === 0 || k === n - 1)) { corner[k] = true; C.push(k); continue; }
+        var a = A[k], pv = A[(k - 1 + n) % n], nx = A[(k + 1) % n];
+        var inx = a[0] - L[k][0], iny = a[1] - L[k][1];
+        if (inx * inx + iny * iny < 1e-6) { inx = a[0] - pv[0]; iny = a[1] - pv[1]; }
+        var outx = R[k][0] - a[0], outy = R[k][1] - a[1];
+        if (outx * outx + outy * outy < 1e-6) { outx = nx[0] - a[0]; outy = nx[1] - a[1]; }
+        corner[k] = (_vecAngleDeg(inx, iny, outx, outy) >= cornerAngleDeg);
+        if (corner[k]) C.push(k);
+    }
+
+    // dense-sample the bezier from anchor i0 forward to anchor i1 (wraps if i1 < i0), inclusive.
+    function denseRun(i0, i1) {
+        var poly = [{ x: A[i0][0], y: A[i0][1] }], i = i0;
+        while (i !== i1) {
+            var nn = (i + 1) % n, p0 = A[i], p1 = R[i], p2 = L[nn], p3 = A[nn], j, t;
+            for (j = 1; j <= stepsPerSeg; j++) { t = j / stepsPerSeg; poly.push(_bezierPoint(p0, p1, p2, p3, t)); }
+            i = nn;
+        }
+        return poly;
+    }
+
+    var nodes = [], m;
+
+    if (!closed || C.length >= 2) {
+        // Split into smooth runs between consecutive corners; RDP each, keep corners hard.
+        var lim = closed ? C.length : C.length - 1;
+        for (m = 0; m < lim; m++) {
+            var c0 = C[m], c1 = C[(m + 1) % C.length];
+            var run  = denseRun(c0, c1);
+            var kept = rdpSimplify(run, tolerancePt);          // open RDP; keeps both ends
+            nodes.push({ x: A[c0][0], y: A[c0][1], corner: true });
+            var q;
+            for (q = 1; q < kept.length - 1; q++) nodes.push({ x: kept[q].x, y: kept[q].y, corner: false });
+        }
+        if (!closed) nodes.push({ x: A[n - 1][0], y: A[n - 1][1], corner: true });
+    } else {
+        // Fully smooth closed loop (0 or 1 corner): sample the whole loop, RDP it closed, all smooth.
+        var full = [];
+        for (k = 0; k < n; k++) {
+            var nk = (k + 1) % n, b0 = A[k], b1 = R[k], b2 = L[nk], b3 = A[nk], jj, tt;
+            for (jj = 0; jj < stepsPerSeg; jj++) { tt = jj / stepsPerSeg; full.push(_bezierPoint(b0, b1, b2, b3, tt)); }
+        }
+        var keptC = _rdpClosed(full, tolerancePt);
+        for (k = 0; k < keptC.length; k++) nodes.push({ x: keptC[k].x, y: keptC[k].y, corner: false });
+    }
+
+    if (nodes.length >= n) return false;                        // no reduction
+    if (nodes.length < (closed ? 3 : 2)) return false;          // would collapse — bail
+
+    _writeSmoothNodes(path, nodes);
+    return true;
+}
+
+// Simplifies a PathItem (or each sub-path of a CompoundPathItem) in place. tolerancePt is the
+// RDP epsilon (points); cornerAngleDeg is the tangent-break angle above which an anchor stays a
+// hard corner; stepsPerSeg is the bezier sampling density (default 16). Returns the number of
+// sub-paths actually reduced.
+function simplifyPathItem(path, tolerancePt, cornerAngleDeg, stepsPerSeg) {
+    if (stepsPerSeg == null) stepsPerSeg = 16;
     if (path.typename === "CompoundPathItem") {
         var reduced = 0, i;
         for (i = 0; i < path.pathItems.length; i++) {
-            reduced += simplifyPathItem(path.pathItems[i], tolerancePt, cornerAngleDeg);
+            reduced += simplifyPathItem(path.pathItems[i], tolerancePt, cornerAngleDeg, stepsPerSeg);
         }
         return reduced;
     }
     if (path.typename !== "PathItem") return 0;
-
-    var pts = path.pathPoints;
-    if (pts.length < 4) return 0; // too few anchors to meaningfully reduce
-
-    var anchors = [], j;
-    for (j = 0; j < pts.length; j++) {
-        anchors.push({ x: pts[j].anchor[0], y: pts[j].anchor[1] });
-    }
-
-    var kept = path.closed ? _rdpClosed(anchors, tolerancePt)
-                           : rdpSimplify(anchors, tolerancePt);
-
-    if (kept.length >= anchors.length) return 0;            // no reduction
-    if (kept.length < (path.closed ? 3 : 2)) return 0;      // would collapse — bail
-
-    _applySmoothPath(path, kept, cornerAngleDeg);
-    return 1;
+    return _simplifyOnePath(path, tolerancePt, cornerAngleDeg, stepsPerSeg) ? 1 : 0;
 }
 
 // ─── STEP 9 SHARED HELPERS ────────────────────────────────────────────────────
