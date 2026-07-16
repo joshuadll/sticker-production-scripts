@@ -44,7 +44,12 @@ strip_variable_lines() {
     # coordinates (pixel-level, fixture-position-dependent) — the geometry they describe is
     # asserted by the dedicated unit tests (test-ai-caption-seat, test-halfcut-alignment),
     # and the COUNTS are still checked by the "half-cut sync | N" / "result | matched" lines.
-    grep -Ev "^(\[pipeline\] === AI_ImportNesting (start|done) ===|\[pipeline\] (document|SVG|art folder):|Log: |\[seat\]|\[seatdbg\]|\[halfcut\])" \
+    # NB: do NOT anchor the banner on the trailing "===". The version signal (PR #23) appends a
+    # status inside it — "=== AI_ImportNesting start (version unknown) ===" here, and
+    # "... start (✓ version <sha>) ===" on a machine with the auto-updater — so the trailing ===
+    # stopped matching and the banner survived stripping. A <sha> would then break this golden on
+    # EVERY commit. Same fix as ai-build-and-export-cutlines (b0012ce).
+    grep -Ev "^(\[pipeline\] === AI_ImportNesting (start|done)|\[pipeline\] (document|SVG|art folder):|Log: |\[seat\]|\[seatdbg\]|\[halfcut\])" \
         | grep '^\['
 }
 

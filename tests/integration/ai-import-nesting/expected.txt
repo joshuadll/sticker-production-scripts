@@ -1,9 +1,4 @@
-[pipeline] === AI_ImportNesting start (version unknown) ===
 [pipeline] dryRun: false
-[pipeline] document: import-nesting.ai
-[pipeline] SVG: /Users/joshuadelallana/sticker-production-scripts/tests/integration/ai-import-nesting/fixtures/import-nesting/import-nesting_regular_nested.svg
-[pipeline] SVG: /Users/joshuadelallana/sticker-production-scripts/tests/integration/ai-import-nesting/fixtures/import-nesting/import-nesting_irregular_nested.svg
-[pipeline] art folder: /Users/joshuadelallana/sticker-production-scripts/tests/integration/ai-import-nesting/fixtures/import-nesting/import-nesting_elements
 [pipeline] elements sidecar: 28 element(s), psdWidth=4961
 [pipeline] --- importing Deepnest layout ---
 [step-nest] art sizing: factor=0.24000 pt/px (psdWidth=4961, sourceDPI=300)
@@ -55,64 +50,33 @@
 [step-nest] irregular best rotation: 0° (outside approx 216813 pt²)
 [step-nest] irregular group placed | rotation=0° | top y=113
 [step-nest] irregular contour-fit | nested up 83pt to close the gap to 2mm.
-[halfcut] Devín Castle | pts=29 end0=(187.5,411.3) endN=(235.5,409.3) straight
 [buffer] Devín Castle | band 0..+1mm
-[halfcut] Slovak Paradise National Park | pts=43 end0=(281,318.2) endN=(385.3,318.8) straight
 [buffer] Slovak Paradise National Park | band 0..+1mm
-[halfcut] Spiš Castle | pts=26 end0=(441.2,751.4) endN=(440.6,706.4) straight
 [buffer] Spiš Castle | band 0..+1mm
-[halfcut] Bratislava Castle | pts=42 end0=(224.9,796.4) endN=(162.5,799.7) straight
 [buffer] Bratislava Castle | band 0..+1mm
-[halfcut] Flag + Slovakia(text) | pts=25 end0=(303.5,200.4) endN=(226.2,200.8) straight
 [buffer] Flag + Slovakia(text) | band 0..+1mm
-[halfcut] Štrbské Pleso | pts=23 end0=(300.8,507.5) endN=(300.7,454.9) curved
 [buffer] Štrbské Pleso | band 0..+1mm
-[halfcut] National Flower | pts=23 end0=(287.8,-12) endN=(312.7,-18.4) curved
 [buffer] National Flower | band 0..+1mm
-[halfcut] Slovakia Map | pts=35 end0=(392.1,-115.1) endN=(384,-89.5) straight
 [buffer] Slovakia Map | band 0..+1mm
-[halfcut] St. Martin's Cathedral | pts=34 end0=(312.7,695) endN=(392.5,693.4) straight
 [buffer] St. Martin's Cathedral | band 0..+1mm
-[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
-[halfcut] UFO Observation Deck, Bridge SNP | pts=17 end0=(40.1,524) endN=(41.2,529.2) straight
 [buffer] UFO Observation Deck, Bridge SNP | band 0..+1mm
-[halfcut] Old Town Hall (Bratislava) | pts=30 end0=(131.4,327.8) endN=(130.8,423.2) straight
 [buffer] Old Town Hall (Bratislava) | band 0..+1mm
-[halfcut] Bojnice Castle | pts=23 end0=(505.4,628.2) endN=(449.4,628.1) curved
 [buffer] Bojnice Castle | band 0..+1mm
-[halfcut] Orava Castle | pts=22 end0=(472.6,305.8) endN=(521.5,305.5) straight
 [buffer] Orava Castle | band 0..+1mm
-[halfcut] Michael's Gate | pts=32 end0=(47.3,571.5) endN=(102.3,568.5) straight
 [buffer] Michael's Gate | band 0..+1mm
-[halfcut] The Blue Church | Church of St. Elizabeth | pts=36 end0=(284.1,570.1) endN=(371.4,570.2) curved
 [buffer] The Blue Church | Church of St. Elizabeth | band 0..+1mm
-[halfcut] Čumil Statue | pts=24 end0=(162.5,359.7) endN=(160.8,308.6) straight
 [buffer] Čumil Statue | band 0..+1mm
-[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
-[halfcut] Bratislava(text) | pts=14 end0=(122.5,-243.4) endN=(130.1,-227.4) straight
 [buffer] Bratislava(text) | band 0..+1mm
-[halfcut] Šúľance s Makom | pts=633 end0=(245.9,-106.4) endN=(293.5,-153.8) curved
 [buffer] Šúľance s Makom | band 0..+1mm
-[halfcut] Pirohy | pts=26 end0=(59.3,60.6) endN=(39.9,39.7) straight
 [buffer] Pirohy | band 0..+1mm
-[halfcut] Kapustnica | pts=49 end0=(447.4,106.8) endN=(490.6,109.7) straight
 [buffer] Kapustnica | band 0..+1mm
-[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
-[halfcut] Bryndzové halušky | pts=568 end0=(97.7,184.2) endN=(45,159.6) curved
 [buffer] Bryndzové halušky | band 0..+1mm
-[halfcut] Kraslice | pts=590 end0=(231.5,81.9) endN=(210.8,102.2) curved
 [buffer] Kraslice | band 0..+1mm
-[halfcut] Kroje | pts=37 end0=(134.8,-180.1) endN=(151.8,-198.5) curved
 [buffer] Kroje | band 0..+1mm
-[halfcut] Fujara | pts=36 end0=(337.5,-194.9) endN=(322.5,-171.3) curved
 [buffer] Fujara | band 0..+1mm
-[halfcut] Tram | pts=28 end0=(39,-104.4) endN=(43.4,-128.8) straight
 [buffer] Tram | band 0..+1mm
-[halfcut] Tatra chamois | pts=41 end0=(154.7,-16) endN=(143.8,-69.1) straight
 [buffer] Tatra chamois | band 0..+1mm
-[halfcut] Carpathian Wooden Churches | pts=56 end0=(515.4,503) endN=(415.9,503.3) straight
 [buffer] Carpathian Wooden Churches | band 0..+1mm
-[halfcut] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | pts=25 end0=(146.3,633.5) endN=(147.5,545.5) straight
 [buffer] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | band 0..+1mm
 [step-nest] half-cut sync | 28 GC/WC/tab element(s) re-synced to nested pose
 [step-nest] spacing-buffer | 28 keep-out halo(s) built (GC/WC + stamps)
@@ -122,16 +86,3 @@
 [step-nest] art-layer-check | on Stickers: 28 (embedded 28 / linked 0) / placed: 28  ok
 [step-nest] art-pos-check | checked: 28 | worst art-outline centre offset: 11pt (Fujara)  ok
 [step-nest] result | matched: 28 | unmatched: 0 | art placed: 28
-[pipeline] === AI_ImportNesting done ===
-✅ Nesting imported.
-
-  Placed:     28 element(s) at nested positions
-  Unmatched:  0 element(s) — see log
-  Layout:     regular rotated -90° at artboard top-left;
-              irregular auto-rotated below with 2 mm gap
-  Art placed: 28 PNG(s) in Stickers layer
-  Captions:   0 caption PNG(s) placed (decoupled)
-
-Review the cutline layout, then nest the elements. Run
-AI_NormaliseCaptions during the resize loop and AI_LayoutQA to
-check spacing; run AI_ExportFinal when the layout is done.
