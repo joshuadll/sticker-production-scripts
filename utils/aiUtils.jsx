@@ -2185,7 +2185,16 @@ function _simplifyOnePath(path, tolerancePt, cornerAngleDeg, stepsPerSeg) {
     // (_simplifyWithinBudget re-simplifies from the original and restores when it exceeds budget),
     // so that is the real safety net; refuse only a collapse or a genuine densification.
     if (nodes.length < (closed ? 3 : 2)) return false;          // would collapse — bail
-    if (nodes.length > n * 1.2) return false;                   // densified >20% — not a simplification
+    // Refuse ANY densification. This started as `> n * 1.2` (allow up to +20%), which let
+    // National Flower go 70 -> 77 on a live Pipeline 1 run — the "simplify" ADDING 7 anchors.
+    // That is not a tuning miss, it is the algorithm meeting its limit: an already-well-fitted
+    // curve (National Flower was 71 pts, 48 of them already smooth) cannot be re-described by
+    // RDP-of-a-sampling + Catmull-Rom handles in FEWER points than the original beziers used.
+    // So when our re-fit needs more anchors than what is already there, our re-fit is simply
+    // worse than the input and the right move is to decline and leave the path alone.
+    // `== n` is still allowed — that is the artist's usual case (re-type corners to smooth at
+    // the same count, e.g. Bratislava(text) 36 -> 36).
+    if (nodes.length > n) return false;                         // our re-fit is worse than the input
 
     _writeSmoothNodes(path, nodes);
     return true;

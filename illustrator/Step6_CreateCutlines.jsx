@@ -179,9 +179,22 @@ function runCreateCutlines(doc, silhPngPath, elementsFilePath) {
         // way the artist does by hand (Object>Path>Simplify). Done HERE — on the raw
         // traced outline, before the caption text warps to it and before Pipeline 2's
         // seat/unite/half-cut derive from it — so the whole cutline inherits the smooth
-        // shape. Applies to captioned AND stamp outlines alike. Handles compound paths
-        // (outer contour + holes). See CONFIG.simplify* and aiUtils.simplifyPathItem.
-        if (CONFIG.simplifyCutline) {
+        // shape. Handles compound paths (outer contour + holes).
+        // See CONFIG.simplify* and aiUtils.simplifyPathItem.
+        //
+        // STAMPS ARE EXCLUDED, and this is a correctness guard, not a preference:
+        // Step2B skips the white edge for ST ("stamp element, no white edge"), so a stamp's
+        // cut line sits directly ON the artwork. The whole safety model here is "drift is
+        // affordable because it is spent inside the white band" — smoothnessPct is literally
+        // a PERCENTAGE OF whiteEdgeMm. A stamp has no such band, so that budget is drawn
+        // against a margin that does not exist and any inward drift eats real art. (Inward
+        // drift is not even measured — the budget checks OUTWARD stray only.) Until stamps
+        // have a budget derived from something real, they keep their raw trace.
+        if (CONFIG.simplifyCutline && matched.styleCode === "ST") {
+            log("[step6] simplify | " + matched.displayName
+                + " | SKIP — stamp (no white edge, so no drift budget to spend)");
+        }
+        if (CONFIG.simplifyCutline && matched.styleCode !== "ST") {
             var _before   = _cutlinePtCount(path);
             var _prePolys = samplePathToPolygons(path, 16);   // BEFORE geometry (detached {x,y})
             var _budgetMm = (CONFIG.smoothnessPct / 100) * CONFIG.whiteEdgeMm;
