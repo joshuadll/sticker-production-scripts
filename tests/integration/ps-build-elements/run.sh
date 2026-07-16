@@ -108,15 +108,21 @@ else
     echo "FAIL [$STEP]: sidecars missing -- cannot drive Phase 2 ($SILH / $ELEM)."; exit 1
 fi
 
-# White-edge ANTI-ALIASING guard (pixel-level; the PS log golden is deliberately pixel-blind).
-# The exported element PNGs must carry a SOFT (anti-aliased) alpha edge -- partial-alpha pixels
-# (alpha 1..254). Re-introducing Step2B hardenSelection() would binarise the edge to 0 partial-
-# alpha (the jagged-edge regression fixed in PR #18) and NOTHING else in the suite would catch it.
+# White-edge HARDNESS guard (pixel-level; the PS log golden is deliberately pixel-blind).
+# The exported element PNGs must carry a CRISP (1-bit) alpha edge -- essentially no partial-alpha
+# pixels (alpha 1..254). Step2B hardenSelection() is what produces that.
+#
+# This guard was originally INVERTED (PR #18, cf2817f): it asserted the edge stayed SOFT, to stop
+# hardenSelection being re-introduced. That was reversed on 2026-07-17 -- the anti-aliased edge
+# shipped blurry exported edges and degraded the traced cutlines (Image Trace fitting the ~50%
+# contour of a gradient instead of a definite boundary), so hardening was restored deliberately.
+# The guard is kept, pointing the other way: dropping hardenSelection again must fail here,
+# because nothing else in the suite is pixel-aware.
 # Skips (does not fail) if Python/PIL is unavailable so the guard is best-effort off dev machines.
 ELEMENTS_DIR="$SOURCE_FIXTURE/${BASE}_elements"
 # `if COND` exempts the assignment from `set -e`, so a non-zero python exit reaches the else
 # branch (where we read its code) instead of aborting the script at the assignment.
-if AA_OUT=$(python3 - "$ELEMENTS_DIR" <<'PY'
+if AA_OUT=$(python3 - "$ELEMENTS_DIR" <<'PY_INNER'
 import sys, os, glob
 try:
     from PIL import Image
@@ -131,16 +137,18 @@ checked = sorted(pngs)[:8]
 for p in checked:
     total += sum(Image.open(p).convert("RGBA").split()[3].histogram()[1:255])
 print("%d partial-alpha px across %d element(s)" % (total, len(checked)))
-sys.exit(0 if total > 500 else 1)
-PY
+# Hard edge = a handful of stray partial pixels at most. Soft edge measured ~6000 across 4
+# elements (1e3aa65), so 500 across 8 separates them with a wide margin either side.
+sys.exit(0 if total <= 500 else 1)
+PY_INNER
 ); then
-    echo "  PASS: white edge anti-aliased ($AA_OUT)."
+    echo "  PASS: white edge is crisp ($AA_OUT)."
 else
     AA_RC=$?
     if [ "$AA_RC" -eq 3 ]; then
-        echo "  WARN [$STEP]: white-edge AA guard skipped ($AA_OUT)."
+        echo "  WARN [$STEP]: white-edge hardness guard skipped ($AA_OUT)."
     else
-        echo "FAIL [$STEP]: white edge is HARD ($AA_OUT) -- Step2B hardenSelection regression? (PR #18)"; exit 1
+        echo "FAIL [$STEP]: white edge is SOFT ($AA_OUT) -- Step2B hardenSelection missing?"; exit 1
     fi
 fi
 
