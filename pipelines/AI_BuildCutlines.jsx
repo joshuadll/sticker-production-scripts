@@ -100,6 +100,50 @@ var CONFIG = {
     traceNoiseFidelity:  5,     // px, lower = keep small detail (preset is higher)
     traceThreshold:      null,  // 0-255, or null to keep preset (tune for edge placement)
 
+    // ── Cutline smoothing (corner-aware, post-trace) ─────────────────────────
+    // Reproduces what the artist does by hand (Object>Path>Simplify): flatten the
+    // trace's ruggedness while KEEPING intended sharp corners. Runs on the traced
+    // outline in Step 6, BEFORE the caption warp/seat/half-cut derive from it, so
+    // the whole cutline inherits the smoothed shape (a raster smooth in PS can't:
+    // the later trace re-interprets it, and it's corner-blind — it rounds real
+    // corners). Two knobs that INTERACT (see Step 6 / simplifyPathItem in aiUtils):
+    //   simplifyToleranceMm    how far the cut may stray from the trace = how much
+    //                          wobble it flattens. ~half the ~1.7mm white edge, so
+    //                          the cut can never visibly leave the (white) rim.
+    //                          UP = smoother but more shape drift; DOWN = more faithful.
+    //   simplifyCornerAngleDeg turns sharper than this stay HARD corners; gentler
+    //                          ones smooth. Sits between gentle curvature (~10-25deg
+    //                          after thinning) and real corners (45deg+). If smoothed
+    //                          curves look FACETED, raise it; if real corners get
+    //                          ROUNDED, lower it.
+    // Per-element before->after point counts are logged so you can see what took effect.
+    simplifyCutline:        true,
+    // ── SMOOTHNESS DIAL — the one number the artist tunes ─────────────────────────────
+    // Max outward drift of the cut, as a PERCENT of the white edge. This is BOTH the smoothness
+    // control and the safety cap, because smoothing == letting the cut drift outward to flatten
+    // wobble: HIGHER = smoother (cut may move further off the white to round out bigger waves),
+    // LOWER = more faithful to the traced edge. It is a HARD per-element guarantee — Step 6 gives
+    // each element the MOST smoothing whose drift stays at/under this, backing that element's own
+    // tolerance off until it fits (or leaving it un-smoothed if even minimal smoothing can't).
+    // So NO cut ever leaves more than this fraction of the white margin, on any element or any SKU.
+    // 100% would put the cut at the outer white edge — stay well under. Artist workflow: set this,
+    // run Pipeline 2, eyeball, adjust. Everything below is fixed internal tuning.
+    smoothnessPct:          33,     // 20 tight/faithful .. 50 balanced .. 70 aggressive
+                                    // 33 calibrated against the artist's Slovakia Simplify output
+                                    // (2026-07-17): matches their node density to +0.30 nodes/path
+                                    // (23.61 vs 23.30) at 0.084mm mean / 0.67mm max deviation — half
+                                    // the gap of 30, at no cost in drift. 34+ overshoots (22.74).
+                                    // NOTE this is the ONLY knob that moves the result: a sweep of
+                                    // cornerAngleDeg 20..45 was INERT on that SKU (23.70..23.78
+                                    // nodes) because a white-edged silhouette has no real corners
+                                    // (max tangent break measured: 19deg). Do not conclude the corner
+                                    // knob is dead — STAMPS (ST) skip the white edge in Step 2B, so
+                                    // they keep genuine corners and it should matter there. Untested.
+    whiteEdgeMm:            1.69,   // physical white-edge width (PS whiteEdgePx 20 @ 300dpi) — the budget base
+    simplifyMaxToleranceMm: 0.85,   // ceiling the per-element adaptive search starts from and backs off
+    simplifyCornerAngleDeg: 35,     // tangent break (deg) at/above which an anchor stays a hard corner
+    simplifySampleSteps:    16,     // bezier sampling density (curve-aware; higher = more faithful)
+
     // Trace-junk filters. Image Trace on the whole sheet can emit spurious paths
     // beyond the real elements: a whole-sheet background compound (frame + every
     // outline) and tiny stray fragments. Drop them before they get named/grouped,
