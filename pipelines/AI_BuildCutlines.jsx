@@ -128,7 +128,17 @@ var CONFIG = {
     // So NO cut ever leaves more than this fraction of the white margin, on any element or any SKU.
     // 100% would put the cut at the outer white edge — stay well under. Artist workflow: set this,
     // run Pipeline 2, eyeball, adjust. Everything below is fixed internal tuning.
-    smoothnessPct:          30,     // 20 tight/faithful .. 50 balanced .. 70 aggressive
+    smoothnessPct:          33,     // 20 tight/faithful .. 50 balanced .. 70 aggressive
+                                    // 33 calibrated against the artist's Slovakia Simplify output
+                                    // (2026-07-17): matches their node density to +0.30 nodes/path
+                                    // (23.61 vs 23.30) at 0.084mm mean / 0.67mm max deviation — half
+                                    // the gap of 30, at no cost in drift. 34+ overshoots (22.74).
+                                    // NOTE this is the ONLY knob that moves the result: a sweep of
+                                    // cornerAngleDeg 20..45 was INERT on that SKU (23.70..23.78
+                                    // nodes) because a white-edged silhouette has no real corners
+                                    // (max tangent break measured: 19deg). Do not conclude the corner
+                                    // knob is dead — STAMPS (ST) skip the white edge in Step 2B, so
+                                    // they keep genuine corners and it should matter there. Untested.
     whiteEdgeMm:            1.69,   // physical white-edge width (PS whiteEdgePx 20 @ 300dpi) — the budget base
     simplifyMaxToleranceMm: 0.85,   // ceiling the per-element adaptive search starts from and backs off
     simplifyCornerAngleDeg: 35,     // tangent break (deg) at/above which an anchor stays a hard corner
