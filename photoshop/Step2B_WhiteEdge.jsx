@@ -112,17 +112,25 @@ function applyWhiteEdge(doc, soLayer) {
     // this one smoothed raster, so they stay consistent. radius 0 → no-op.
     smoothSelection(mmToPx(CONFIG.whiteEdgeSmoothRadiusMm));
 
-    // NB: the smoothed selection keeps its natural anti-aliased edge — we deliberately do NOT
-    // harden it to a 1-bit crisp edge. Hardening (psUtils.hardenSelection) was added 2026-06-15
-    // to align the OLD Photoshop caption-seat probe (which read the outermost covered pixel) with
-    // Illustrator's Image Trace (which cuts the ~50% contour), so the caption<->art overlap
-    // survived into the traced cutline. The native-caption rewrite removed that PS probe — caption
-    // seating now runs in Illustrator against the TRACED vector cutline, not the PS raster — so the
-    // hard edge no longer serves any reader; it only showed up as a JAGGED white edge in the
-    // exported per-element PNGs. Removing it restores an anti-aliased (smooth) white edge.
-    // Validated live 2026-07-15: soft edge (0 -> ~6k partial-alpha px), trace clean (28 named,
-    // 0 unmatched), flat-bottom Tatra chamois caption still seats. See memory:
-    // white_edge_antialias_fix.
+    // Harden the smoothed band to a CRISP 1-bit edge before filling (psUtils.hardenSelection:
+    // makeWorkPath -> makeSelection with antiAlias OFF). Keeps the smoothed SHAPE; only crisps
+    // the EDGE.
+    //
+    // Why this is here NOW is not why it was here originally — do not restore the old rationale:
+    //   da3c1a3 (2026-06-15) added it to make the OLD Photoshop caption-seat probe agree with
+    //     Illustrator's Image Trace. That probe is GONE (the native-caption rewrite moved seating
+    //     to Illustrator, against the traced vector via aiUtils.seatPlateToOutline), so the seat
+    //     no longer cares either way.
+    //   1e3aa65 / PR #18 (2026-07-15) removed it, reasoning that nothing read the hard edge any
+    //     more and that it caused "jagged exported PNG edges".
+    //   RESTORED 2026-07-17 (artist): the anti-aliased edge shipped BLURRY exported edges and
+    //     degraded the traced cutlines — Image Trace was fitting the ~50% contour of a soft
+    //     gradient rather than a definite boundary, so the cut wandered.
+    //
+    // So the reason to harden today is the TRACE and the printed edge, not the seat. Note the
+    // tension this sits in: hard reads as stair-stepped, soft reads as blurry — both are symptoms
+    // of resolving a ~1.7mm edge at 300dpi, which is what the resolution-aware pipeline addresses.
+    hardenSelection(doc);
 
     // Create white layer, fill, deselect.
     var wbcLayer  = doc.artLayers.add();
