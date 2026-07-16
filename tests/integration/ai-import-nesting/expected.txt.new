@@ -1,0 +1,89 @@
+[pipeline] === AI_ImportNesting start (version unknown) ===
+[pipeline] dryRun: false
+[pipeline] elements sidecar: 28 element(s), psdWidth=4961
+[pipeline] --- importing Deepnest layout ---
+[step-nest] art sizing: factor=0.24000 pt/px (psdWidth=4961, sourceDPI=300)
+[step-nest] found 28 cutline(s) in working file.
+[step-nest] caption warp baked | Slovak Paradise National Park
+[step-nest] caption warp baked | Šúľance s Makom
+[step-nest] caption warp baked | Pirohy
+[step-nest] caption warp baked | Kapustnica
+[step-nest] caption warp baked | Bryndzové halušky
+[step-nest] caption warp baked | Kraslice
+[step-nest] caption warp bake | 6 warp(s) baked (batched)
+[step-nest] --- processing regular SVG: import-nesting_regular_nested.svg ---
+[step-nest] read 16 part(s) from import-nesting_regular_nested.svg
+[step-nest] found 16 nested part(s) in import-nesting_regular_nested.svg
+[step-nest] VERIFY | The Blue Church | Church of St. Elizabeth rot=90 fitRMS=0 bboxΔ=(1,0)  ok
+[step-nest] VERIFY | Štrbské Pleso rot=0 fitRMS=0 bboxΔ=(0,1)  ok
+[step-nest] VERIFY | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) rot=0 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | St. Martin's Cathedral rot=90 fitRMS=0 bboxΔ=(1,0)  ok
+[step-nest] VERIFY | Old Town Hall (Bratislava) rot=180 fitRMS=0 bboxΔ=(0,1)  ok
+[step-nest] VERIFY | UFO Observation Deck, Bridge SNP rot=0 fitRMS=0 bboxΔ=(0,2)  ok
+[step-nest] VERIFY | Bojnice Castle rot=-90 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Slovak Paradise National Park rot=90 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Devín Castle rot=90 fitRMS=0 bboxΔ=(1,0)  ok
+[step-nest] VERIFY | Spiš Castle rot=0 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Čumil Statue rot=0 fitRMS=0 bboxΔ=(0,1)  ok
+[step-nest] VERIFY | Flag + Slovakia(text) rot=-90 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Bratislava Castle rot=-90 fitRMS=0 bboxΔ=(1,0)  ok
+[step-nest] VERIFY | Michael's Gate rot=90 fitRMS=0 bboxΔ=(1,0)  ok
+[step-nest] VERIFY | Orava Castle rot=90 fitRMS=0 bboxΔ=(1,0)  ok
+[step-nest] VERIFY | Carpathian Wooden Churches rot=-90 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] group-rotated 16 pair(s) by -90°
+[step-nest] group-rot-check | pre 695x534 -> post 534x695  ok
+[step-nest] regular group placed | bottom y=119
+[step-nest] --- processing irregular SVG: import-nesting_irregular_nested.svg ---
+[step-nest] read 12 part(s) from import-nesting_irregular_nested.svg
+[step-nest] found 12 nested part(s) in import-nesting_irregular_nested.svg
+[step-nest] VERIFY | Tram rot=-79 fitRMS=0 bboxΔ=(2,0)  ok
+[step-nest] VERIFY | Kapustnica rot=0 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Bryndzové halušky rot=-157 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Pirohy rot=-135 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Kraslice rot=135 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Bratislava(text) rot=-146 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | National Flower rot=-146 fitRMS=0 bboxΔ=(0,3)  ok
+[step-nest] VERIFY | Kroje rot=-45 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Šúľance s Makom rot=-45 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Slovakia Map rot=-79 fitRMS=0 bboxΔ=(3,0)  ok
+[step-nest] VERIFY | Fujara rot=124 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Tatra chamois rot=-101 fitRMS=0 bboxΔ=(1,0)  ok
+[step-nest] irregular best rotation: 0° (outside approx 216813 pt²)
+[step-nest] irregular group placed | rotation=0° | top y=113
+[step-nest] irregular contour-fit | nested up 83pt to close the gap to 2mm.
+[buffer] Devín Castle | band 0..+1mm
+[buffer] Slovak Paradise National Park | band 0..+1mm
+[buffer] Spiš Castle | band 0..+1mm
+[buffer] Bratislava Castle | band 0..+1mm
+[buffer] Flag + Slovakia(text) | band 0..+1mm
+[buffer] Štrbské Pleso | band 0..+1mm
+[buffer] National Flower | band 0..+1mm
+[buffer] Slovakia Map | band 0..+1mm
+[buffer] St. Martin's Cathedral | band 0..+1mm
+[buffer] UFO Observation Deck, Bridge SNP | band 0..+1mm
+[buffer] Old Town Hall (Bratislava) | band 0..+1mm
+[buffer] Bojnice Castle | band 0..+1mm
+[buffer] Orava Castle | band 0..+1mm
+[buffer] Michael's Gate | band 0..+1mm
+[buffer] The Blue Church | Church of St. Elizabeth | band 0..+1mm
+[buffer] Čumil Statue | band 0..+1mm
+[buffer] Bratislava(text) | band 0..+1mm
+[buffer] Šúľance s Makom | band 0..+1mm
+[buffer] Pirohy | band 0..+1mm
+[buffer] Kapustnica | band 0..+1mm
+[buffer] Bryndzové halušky | band 0..+1mm
+[buffer] Kraslice | band 0..+1mm
+[buffer] Kroje | band 0..+1mm
+[buffer] Fujara | band 0..+1mm
+[buffer] Tram | band 0..+1mm
+[buffer] Tatra chamois | band 0..+1mm
+[buffer] Carpathian Wooden Churches | band 0..+1mm
+[buffer] St Elizabeth's Cathedral | (Dóm Svätej Alzbety) | band 0..+1mm
+[step-nest] half-cut sync | 28 GC/WC/tab element(s) re-synced to nested pose
+[step-nest] spacing-buffer | 28 keep-out halo(s) built (GC/WC + stamps)
+[step-nest] overlap-check | 0 overlapping cut-line pair(s)  ok
+[step-nest] art-rot-reconcile | stamped 28 | corrected 0 | worst residual 0°  ok
+[step-nest] embed | 0 embedded / 0 failed (portable handoff)
+[step-nest] art-layer-check | on Stickers: 28 (embedded 28 / linked 0) / placed: 28  ok
+[step-nest] art-pos-check | checked: 28 | worst art-outline centre offset: 11pt (Fujara)  ok
+[step-nest] result | matched: 28 | unmatched: 0 | art placed: 28
