@@ -57,3 +57,7 @@ tmp-verify/
 # Installer distributable — built and published by CI (see .github/workflows/publish-installer.yml),
 # never committed. The artist downloads it from the GitHub Releases "latest" permalink.
 installer/installer.zip
+
+# Runner scratch: written by an integration run on a golden mismatch, purely so you can
+# cp it over the golden. Build output, never source.
+tests/integration/**/expected.txt.new
