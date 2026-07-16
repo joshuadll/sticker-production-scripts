@@ -42,16 +42,16 @@
 [step-nest] found 12 nested part(s) in import-nesting_irregular_nested.svg
 [step-nest] VERIFY | Tram rot=-79 fitRMS=0 bboxΔ=(2,0)  ok
 [step-nest] VERIFY | Kapustnica rot=0 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Kraslice rot=135 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | Bryndzové halušky rot=-157 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | Pirohy rot=-135 fitRMS=0 bboxΔ=(0,0)  ok
-[step-nest] VERIFY | Kraslice rot=135 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | Bratislava(text) rot=-146 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | National Flower rot=-146 fitRMS=0 bboxΔ=(0,3)  ok
+[step-nest] VERIFY | Tatra chamois rot=-101 fitRMS=0 bboxΔ=(1,0)  ok
 [step-nest] VERIFY | Kroje rot=-45 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | Šúľance s Makom rot=-45 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | Slovakia Map rot=-79 fitRMS=0 bboxΔ=(3,0)  ok
 [step-nest] VERIFY | Fujara rot=124 fitRMS=0 bboxΔ=(0,0)  ok
-[step-nest] VERIFY | Tatra chamois rot=-101 fitRMS=0 bboxΔ=(1,0)  ok
 [step-nest] irregular best rotation: 0° (outside approx 216813 pt²)
 [step-nest] irregular group placed | rotation=0° | top y=113
 [step-nest] irregular contour-fit | nested up 83pt to close the gap to 2mm.
@@ -67,9 +67,9 @@
 [buffer] Flag + Slovakia(text) | band 0..+1mm
 [halfcut] Štrbské Pleso | pts=23 end0=(300.8,507.5) endN=(300.7,454.9) curved
 [buffer] Štrbské Pleso | band 0..+1mm
-[halfcut] National Flower | pts=23 end0=(287.8,-12.2) endN=(312.7,-18.7) curved
+[halfcut] National Flower | pts=23 end0=(287.8,-12) endN=(312.7,-18.4) curved
 [buffer] National Flower | band 0..+1mm
-[halfcut] Slovakia Map | pts=35 end0=(392.1,-115.4) endN=(384,-89.8) straight
+[halfcut] Slovakia Map | pts=35 end0=(392.1,-115.1) endN=(384,-89.5) straight
 [buffer] Slovakia Map | band 0..+1mm
 [halfcut] St. Martin's Cathedral | pts=34 end0=(312.7,695) endN=(392.5,693.4) straight
 [buffer] St. Martin's Cathedral | band 0..+1mm
@@ -89,27 +89,26 @@
 [halfcut] Čumil Statue | pts=24 end0=(162.5,359.7) endN=(160.8,308.6) straight
 [buffer] Čumil Statue | band 0..+1mm
 [halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
-[halfcut] Bratislava(text) | pts=14 end0=(122.5,-243.7) endN=(130.1,-227.6) straight
+[halfcut] Bratislava(text) | pts=14 end0=(122.5,-243.4) endN=(130.1,-227.4) straight
 [buffer] Bratislava(text) | band 0..+1mm
-[halfcut] Šúľance s Makom | pts=633 end0=(245.9,-106.6) endN=(293.5,-154) curved
+[halfcut] Šúľance s Makom | pts=633 end0=(245.9,-106.4) endN=(293.5,-153.8) curved
 [buffer] Šúľance s Makom | band 0..+1mm
-[halfcut] Pirohy | pts=26 end0=(59.3,60.3) endN=(39.9,39.4) straight
+[halfcut] Pirohy | pts=26 end0=(59.3,60.6) endN=(39.9,39.7) straight
 [buffer] Pirohy | band 0..+1mm
-[halfcut] Kapustnica | pts=49 end0=(447.4,106.6) endN=(490.6,109.5) straight
+[halfcut] Kapustnica | pts=49 end0=(447.4,106.8) endN=(490.6,109.7) straight
 [buffer] Kapustnica | band 0..+1mm
 [halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
-[halfcut] Bryndzové halušky | pts=568 end0=(97.7,184) endN=(45,159.4) curved
+[halfcut] Bryndzové halušky | pts=568 end0=(97.7,184.2) endN=(45,159.6) curved
 [buffer] Bryndzové halušky | band 0..+1mm
-[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
-[halfcut] Kraslice | pts=591 end0=(231.3,79.5) endN=(210.3,102.2) curved
+[halfcut] Kraslice | pts=590 end0=(231.5,81.9) endN=(210.8,102.2) curved
 [buffer] Kraslice | band 0..+1mm
-[halfcut] Kroje | pts=37 end0=(134.8,-180.3) endN=(151.8,-198.8) curved
+[halfcut] Kroje | pts=37 end0=(134.8,-180.1) endN=(151.8,-198.5) curved
 [buffer] Kroje | band 0..+1mm
-[halfcut] Fujara | pts=36 end0=(337.5,-195.2) endN=(322.5,-171.6) curved
+[halfcut] Fujara | pts=36 end0=(337.5,-194.9) endN=(322.5,-171.3) curved
 [buffer] Fujara | band 0..+1mm
-[halfcut] Tram | pts=28 end0=(39,-104.6) endN=(43.4,-129.1) straight
+[halfcut] Tram | pts=28 end0=(39,-104.4) endN=(43.4,-128.8) straight
 [buffer] Tram | band 0..+1mm
-[halfcut] Tatra chamois | pts=38 end0=(155,-16.5) endN=(143.9,-69.3) straight
+[halfcut] Tatra chamois | pts=41 end0=(154.7,-16) endN=(143.8,-69.1) straight
 [buffer] Tatra chamois | band 0..+1mm
 [halfcut] Carpathian Wooden Churches | pts=56 end0=(515.4,503) endN=(415.9,503.3) straight
 [buffer] Carpathian Wooden Churches | band 0..+1mm

@@ -8,9 +8,9 @@
 [seat] Carpathian Wooden Churches | seated rot=-0.3deg move=8.9pt depth=0.3pt
 [halfcut] Carpathian Wooden Churches | pts=56 end0=(265.8,-378.7) endN=(365.3,-379) straight
 [ai-pipeline] caption built | Carpathian Wooden Churches halfcut=true
-[seat] Tatra chamois | rotated -0.7deg to endpoint chord.
-[seat] Tatra chamois | seated rot=-0.7deg move=7.6pt depth=0.3pt
-[halfcut] Tatra chamois | pts=39 end0=(43.9,-385.2) endN=(97.9,-385.8) straight
+[seat] Tatra chamois | rotated -0.3deg to endpoint chord.
+[seat] Tatra chamois | seated rot=-0.3deg move=7.3pt depth=0.3pt
+[halfcut] Tatra chamois | pts=43 end0=(43.7,-385.4) endN=(97.9,-385.8) straight
 [ai-pipeline] caption built | Tatra chamois halfcut=true
 [seat] Tram | rotated -1.2deg to endpoint chord.
 [seat] Tram | seated rot=-1.2deg move=8.8pt depth=0.3pt
@@ -25,10 +25,9 @@
 [halfcut] Kroje | pts=38 end0=(303.3,-139.3) endN=(328.4,-140.4) curved
 [ai-pipeline] caption built | Kroje halfcut=true
 [seat] Kraslice | midpoint bulge relieved by 15% shrink.
-[seat] Kraslice | rotated 3.5deg to endpoint chord.
-[seat] Kraslice | seated rot=3.5deg move=12.2pt depth=0.3pt
-[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
-[halfcut] Kraslice | pts=591 end0=(52,-120.9) endN=(82.9,-122.1) curved
+[seat] Kraslice | rotated 3.7deg to endpoint chord.
+[seat] Kraslice | seated rot=3.7deg move=9.6pt depth=0.3pt
+[halfcut] Kraslice | pts=590 end0=(53.4,-123.4) endN=(82.4,-123.1) curved
 [ai-pipeline] caption built | Kraslice halfcut=true
 [seat] Bryndzové halušky | midpoint bulge relieved by 15% shrink.
 [seat] Bryndzové halušky | rotated 1.2deg to endpoint chord.
@@ -140,11 +139,11 @@
 [step7a] irregular | ratio=0.732 | Pirohy
 [step7a] irregular | ratio=0.758 | Kapustnica
 [step7a] irregular | ratio=0.784 | Bryndzové halušky
-[step7a] irregular | ratio=0.672 | Kraslice
+[step7a] irregular | ratio=0.682 | Kraslice
 [step7a] irregular | ratio=0.707 | Kroje
 [step7a] irregular | ratio=0.718 | Fujara
 [step7a] irregular | ratio=0.655 | Tram
-[step7a] irregular | ratio=0.531 | Tatra chamois
+[step7a] irregular | ratio=0.532 | Tatra chamois
 [step7a] regular   | ratio=0.922 | Carpathian Wooden Churches
 [step7a] regular   | ratio=0.86 | St Elizabeth's Cathedral | (Dóm Svätej Alzbety)
 [step7a] classified: 16 regular, 12 irregular (threshold=0.82)

@@ -38,16 +38,16 @@
 [step-nest] found 12 nested part(s) in import-nesting_irregular_nested.svg
 [step-nest] VERIFY | Tram rot=-79 fitRMS=0 bboxΔ=(2,0)  ok
 [step-nest] VERIFY | Kapustnica rot=0 fitRMS=0 bboxΔ=(0,0)  ok
+[step-nest] VERIFY | Kraslice rot=135 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | Bryndzové halušky rot=-157 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | Pirohy rot=-135 fitRMS=0 bboxΔ=(0,0)  ok
-[step-nest] VERIFY | Kraslice rot=135 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | Bratislava(text) rot=-146 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | National Flower rot=-146 fitRMS=0 bboxΔ=(0,3)  ok
+[step-nest] VERIFY | Tatra chamois rot=-101 fitRMS=0 bboxΔ=(1,0)  ok
 [step-nest] VERIFY | Kroje rot=-45 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | Šúľance s Makom rot=-45 fitRMS=0 bboxΔ=(0,0)  ok
 [step-nest] VERIFY | Slovakia Map rot=-79 fitRMS=0 bboxΔ=(3,0)  ok
 [step-nest] VERIFY | Fujara rot=124 fitRMS=0 bboxΔ=(0,0)  ok
-[step-nest] VERIFY | Tatra chamois rot=-101 fitRMS=0 bboxΔ=(1,0)  ok
 [step-nest] irregular best rotation: 0° (outside approx 216813 pt²)
 [step-nest] irregular group placed | rotation=0° | top y=113
 [step-nest] irregular contour-fit | nested up 83pt to close the gap to 2mm.
