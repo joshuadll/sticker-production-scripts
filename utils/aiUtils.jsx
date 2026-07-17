@@ -1382,18 +1382,19 @@ function buildCaption(doc, layer, textFrame, outline, opts) {
     try { pillArea = Math.abs(pill.area); } catch (ePA) {}   // rotation-invariant scale reference
     group.note = _capNoteFormat(styleCode, lines, pillArea, !!seat.needsReview);
 
-    // Derive the half-cut from the submerged pill arc.
-    var hc = syncHalfcut(doc, group, { polyCache: {} });
-    return { ok: true, group: group, needsReview: !!seat.needsReview, moved: seat.moved,
-             halfcut: !!(hc && hc.ok), reason: hc ? hc.reason : null };
+    // The half-cut is NOT built here. It is a nested-pose feature that Step 7B (import)
+    // re-derives from scratch after Deepnest (AI_ImportNesting → syncHalfcut), and it never
+    // reaches the Deepnest SVG export (Step 7A ignores the Halfcut layer) — so building it in
+    // this pipeline is wasted work. Half-cut generation lives only in Step 7B + Step 8b.
+    return { ok: true, group: group, needsReview: !!seat.needsReview, moved: seat.moved };
 }
 
 // Pipeline-2 build for a DEFAULT PEEL TAB (uncaptioned element). Mirrors buildCaption minus the
 // pill/text build: the loose "{name} tab" group (placed in Pipeline 1, possibly repositioned by
 // the artist) supplies a CUTLINE (the plate) and a FILL (a ride-along printed member). Seats the
-// cutline into the traced outline, unites into the fused cut, bundles the separable members, and
-// derives the half-cut from the submerged tab arc. An unseated tab returns { ok:false } for the
-// caller to surface as a hard error (no fallback).
+// cutline into the traced outline, unites into the fused cut, and bundles the separable members.
+// (The half-cut is NOT built here — Step 7B re-derives it after nesting; see buildCaption.) An
+// unseated tab returns { ok:false } for the caller to surface as a hard error (no fallback).
 function buildDefaultTab(doc, layer, tabGroup, outline, opts) {
     opts = opts || {};
     var name = opts.name || tabGroup.name.replace(/ tab$/, "");
@@ -1451,9 +1452,8 @@ function buildDefaultTab(doc, layer, tabGroup, outline, opts) {
     try { plateArea = Math.abs(cutline.area); } catch (ePA) {}
     group.note = _capNoteFormat("ST", 0, plateArea, !!seat.needsReview);
 
-    var hc = syncHalfcut(doc, group, { polyCache: {} });
-    return { ok: true, group: group, needsReview: !!seat.needsReview,
-             halfcut: !!(hc && hc.ok), reason: hc ? hc.reason : null };
+    // Half-cut deferred to Step 7B (import) — see buildCaption. Not built in this pipeline.
+    return { ok: true, group: group, needsReview: !!seat.needsReview };
 }
 
 // Places a GC decorative plate raster behind the caption, scaled to span the pill width (+ pad
