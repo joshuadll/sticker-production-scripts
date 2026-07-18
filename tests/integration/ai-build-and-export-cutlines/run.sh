@@ -114,11 +114,13 @@ else
     echo "FAIL [$STEP]: captions built=$BUILT failed=$FAILED ($SUMMARY)."; FAIL=1
 fi
 
-# Default tabs: the ST elements must build as tabs with a half-cut (built > 0, failed = 0).
-if grep -qE "\[ai-pipeline\] tab built \| .* halfcut=true" "$LOG"; then
-    echo "  PASS: at least one default tab built with a half-cut."
+# Default tabs: the ST elements must build as tabs (built > 0, failed = 0). The half-cut is NOT
+# generated in this pipeline anymore — Step 7B (import) re-derives it after nesting — so only the
+# tab build itself is asserted here (half-cut coverage lives in the import + unit tests).
+if grep -qE "\[ai-pipeline\] tab built \| " "$LOG"; then
+    echo "  PASS: at least one default tab built."
 else
-    echo "FAIL [$STEP]: no default tab built with a half-cut."
+    echo "FAIL [$STEP]: no default tab built."
     grep -E "\[ai-pipeline\] tab built|tab \(" "$LOG" || true; FAIL=1
 fi
 

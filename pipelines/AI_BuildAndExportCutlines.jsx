@@ -80,7 +80,7 @@ function runBuildAndExport(doc) {
             catch (eT) { failed.push(el.displayName + " tab (line " + eT.line + ": " + eT.message + ")"); continue; }
             if (tres && tres.ok) {
                 built++;
-                log("[ai-pipeline] tab built | " + el.displayName + " halfcut=" + tres.halfcut
+                log("[ai-pipeline] tab built | " + el.displayName
                     + (tres.needsReview ? " REVIEW" : ""));
             } else {
                 failed.push(el.displayName + " tab" + (tres ? " (" + tres.reason + ")" : ""));
@@ -104,7 +104,7 @@ function runBuildAndExport(doc) {
         catch (eB) { failed.push(el.displayName + " (line " + eB.line + ": " + eB.message + ")"); continue; }
         if (res && res.ok) {
             built++;
-            log("[ai-pipeline] caption built | " + el.displayName + " halfcut=" + res.halfcut
+            log("[ai-pipeline] caption built | " + el.displayName
                 + (res.needsReview ? " REVIEW" : ""));
         } else {
             failed.push(el.displayName + (res ? " (" + res.reason + ")" : ""));

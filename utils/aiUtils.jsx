@@ -1382,18 +1382,19 @@ function buildCaption(doc, layer, textFrame, outline, opts) {
     try { pillArea = Math.abs(pill.area); } catch (ePA) {}   // rotation-invariant scale reference
     group.note = _capNoteFormat(styleCode, lines, pillArea, !!seat.needsReview);
 
-    // Derive the half-cut from the submerged pill arc.
-    var hc = syncHalfcut(doc, group, { polyCache: {} });
-    return { ok: true, group: group, needsReview: !!seat.needsReview, moved: seat.moved,
-             halfcut: !!(hc && hc.ok), reason: hc ? hc.reason : null };
+    // The half-cut is NOT built here. It is a nested-pose feature that Step 7B (import)
+    // re-derives from scratch after Deepnest (AI_ImportNesting → syncHalfcut), and it never
+    // reaches the Deepnest SVG export (Step 7A ignores the Halfcut layer) — so building it in
+    // this pipeline is wasted work. Half-cut generation lives only in Step 7B + Step 8b.
+    return { ok: true, group: group, needsReview: !!seat.needsReview, moved: seat.moved };
 }
 
 // Pipeline-2 build for a DEFAULT PEEL TAB (uncaptioned element). Mirrors buildCaption minus the
 // pill/text build: the loose "{name} tab" group (placed in Pipeline 1, possibly repositioned by
 // the artist) supplies a CUTLINE (the plate) and a FILL (a ride-along printed member). Seats the
-// cutline into the traced outline, unites into the fused cut, bundles the separable members, and
-// derives the half-cut from the submerged tab arc. An unseated tab returns { ok:false } for the
-// caller to surface as a hard error (no fallback).
+// cutline into the traced outline, unites into the fused cut, and bundles the separable members.
+// (The half-cut is NOT built here — Step 7B re-derives it after nesting; see buildCaption.) An
+// unseated tab returns { ok:false } for the caller to surface as a hard error (no fallback).
 function buildDefaultTab(doc, layer, tabGroup, outline, opts) {
     opts = opts || {};
     var name = opts.name || tabGroup.name.replace(/ tab$/, "");
@@ -1451,9 +1452,8 @@ function buildDefaultTab(doc, layer, tabGroup, outline, opts) {
     try { plateArea = Math.abs(cutline.area); } catch (ePA) {}
     group.note = _capNoteFormat("ST", 0, plateArea, !!seat.needsReview);
 
-    var hc = syncHalfcut(doc, group, { polyCache: {} });
-    return { ok: true, group: group, needsReview: !!seat.needsReview,
-             halfcut: !!(hc && hc.ok), reason: hc ? hc.reason : null };
+    // Half-cut deferred to Step 7B (import) — see buildCaption. Not built in this pipeline.
+    return { ok: true, group: group, needsReview: !!seat.needsReview };
 }
 
 // Places a GC decorative plate raster behind the caption, scaled to span the pill width (+ pad
@@ -2801,9 +2801,10 @@ function _seamCurved(pts, tol) {
 //   • Take the SUBMERGED sub-span: first..last inside vertex. Any interior exposed stretch (a
 //     notch) is bridged straight — so an arbitrary NUMBER of art intersections is handled by
 //     construction, not just two.
-//   • Each end is where the edge surfaces from the art (_seamWaterline): on the inner edge for
-//     a shallow seat (the edge end pokes out), or around on the CAP for a deep seat (the whole
-//     edge is buried, so the surfacing point is on the rounded end).
+//   • Each end FOLLOWS the plate edge from the submerged run around the cap curve to the art∩
+//     caption crossing (_capArcToCrossing) — so the seam hugs the caption's curve up to the
+//     intersection instead of chording straight across it. syncHalfcut then runs the 1mm tail
+//     down the ART path from each crossing.
 // Straight for a flat/tilted seat; curved only if the plate's spine is genuinely curved.
 //
 // Degenerate plate (near-circular / ambiguous inner side) → a straight chord between the two
@@ -2848,41 +2849,43 @@ function plateSeamPath(plate, outline, steps, platePolys, artPolys) {
     }
     if (f < 0) return null;   // inner edge fully exposed → not seated as a peel tab
 
-    // Each end = where the edge surfaces from the art (inner edge if shallow, cap if deep).
-    var leftEnd  = _seamWaterline(pp, inside, artPolys, run, f, -1);
-    var rightEnd = _seamWaterline(pp, inside, artPolys, run, l,  1);
-    if (!leftEnd || !rightEnd) return null;
+    // Each end: follow the plate's OWN submerged edge from the last inner-edge vertex — including
+    // the submerged part of the rounded cap — up to the art∩caption INTERSECTION, so the seam hugs
+    // the caption's curve instead of chording straight across it. The inner edge alone (run)
+    // excludes the caps; _capArcToCrossing walks the plate loop past run's end, collecting the
+    // still-submerged cap vertices, and stops at the crossing. syncHalfcut then runs the 1mm tail
+    // along the ART path from each crossing (not the caption's exposed edge past the cap).
+    var leftCap  = _capArcToCrossing(pp, inside, artPolys, run[f].idx, -1);  // [capVerts…, leftCrossing]
+    var rightCap = _capArcToCrossing(pp, inside, artPolys, run[l].idx,  1);  // [capVerts…, rightCrossing]
+    if (!leftCap || !rightCap) return null;
 
-    var seam = [leftEnd];
+    // leftCrossing … capVerts … run[f] … run[l] … capVerts … rightCrossing. The left path is walked
+    // outward from run[f], so reverse it to read crossing-first.
+    var seam = [], i;
+    for (i = leftCap.length - 1; i >= 0; i--) seam.push(leftCap[i]);
     for (k = f; k <= l; k++) seam.push({ x: run[k].x, y: run[k].y });
-    seam.push(rightEnd);
+    for (i = 0; i < rightCap.length; i++) seam.push(rightCap[i]);
 
-    // The seam ends are the raw plate∩art crossings; syncHalfcut re-projects each onto the
-    // current cut line and adds the 1mm peel-tab tail (_extendHalfcutEndsToCutline).
     return seam;
 }
 
-// One seam endpoint = where the inner edge surfaces from the art, on the side away from the
-// submerged span. run[k] is the first (dir -1) or last (dir +1) submerged vertex.
-//   • Shallow seat: the neighbouring run vertex (run[k+dir]) is exposed → the edge surfaces
-//     ON the inner edge; bisect that segment to the art border.
-//   • Deep seat: run[k] is the run's end (no neighbour that way) → the whole inner edge is
-//     buried; walk the plate loop onto the CAP (step = dir) to the first crossing and bisect.
-// Returns {x,y} or null.
-function _seamWaterline(pp, inside, artPolys, run, k, dir) {
-    var nb = k + dir;
-    if (nb >= 0 && nb < run.length) {                         // shallow: surfaces on the edge
-        return _segCrossArt({ x: run[nb].x, y: run[nb].y },   // exposed neighbour (run[k±1])
-                            { x: run[k].x,  y: run[k].y },     // submerged run[k]
-                            artPolys);
-    }
-    var nn = pp.length, cur = run[k].idx, guard = 0, nx;       // deep: walk onto the cap
-    while (guard < nn) {
-        nx = (cur + dir + nn) % nn;
-        if (inside[cur] !== inside[nx]) {
-            return _segCrossArt(inside[cur] ? pp[nx] : pp[cur],
-                                inside[cur] ? pp[cur] : pp[nx], artPolys);
+// Walks the plate loop from vertex startIdx in direction dir, collecting each still-SUBMERGED
+// vertex (inner edge + the submerged part of the rounded cap), up to where the plate edge crosses
+// out of the art — the art∩caption INTERSECTION. Returns [capVerts…, crossing] (walk order); the
+// last element is the crossing point on the art border. This makes the half-cut hug the caption's
+// submerged edge (including the cap's curve) all the way to the intersection instead of a straight
+// chord, then STOPS there so the 1mm tail can run along the art path. null if no crossing found.
+// Pure geometry.
+function _capArcToCrossing(pp, inside, artPolys, startIdx, dir) {
+    var n = pp.length, out = [], cur = startIdx, guard = 0, nx;
+    while (guard < n) {
+        nx = (cur + dir + n) % n;
+        if (inside[cur] !== inside[nx]) {          // crossed the art edge → the intersection
+            out.push(_segCrossArt(inside[cur] ? pp[nx] : pp[cur],
+                                  inside[cur] ? pp[cur] : pp[nx], artPolys));
+            return out;
         }
+        out.push({ x: pp[nx].x, y: pp[nx].y });    // still submerged → follow the caption edge
         cur = nx; guard++;
     }
     return null;
@@ -3075,7 +3078,8 @@ function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps, p
     }
     var cutPoly = cutline ? _largestPoly(samplePathToPolygons(cutline, steps)) : null;
     if (!cutPoly) return straightOvershoot();               // can't sample cut line → legacy
-    // Reuse the plate polys syncHalfcut already sampled this pass (no mutation since), else sample.
+    // Plate outline: the tail direction runs DOWN THE ART PATH, i.e. the cut-line branch that
+    // leaves the plate (the caption's exposed edge hugs it). Reuse the polys syncHalfcut sampled.
     var platePoly = platePolys ? _largestPoly(platePolys)
                   : (plate ? _largestPoly(samplePathToPolygons(plate, steps)) : null);
     if (!platePoly) return straightOvershoot();             // can't sample plate → legacy
@@ -3123,51 +3127,47 @@ function _seamFinite(seam) {
     return (maxx - minx) > 1e-3 || (maxy - miny) > 1e-3;   // reject a zero-extent (coincident) seam
 }
 
+// Which way to run the peel-tab tail along the cut contour from junction P (on edge edgeIdx):
+// +1 (toward edgeIdx+1) or −1. The junction is the art∩caption crossing; the cut line leaves it
+// two ways — along the ART edge (into the body, LEAVING the plate) or along the caption's exposed
+// edge (which HUGS the plate). The tail must run down the ART path, so probe `probe` arc length
+// each way and take the branch whose endpoint is FARTHER from the plate outline (the caption
+// branch stays ~on it, distance ≈ 0; the art branch peels away). With the seam now ending exactly
+// at the crossing this is usually a clear winner, but on a SMALL element the ~probe walk can wrap
+// past the body so both endpoints sit ~equidistant from the plate — a near-tie. There, break by
+// the distance-to-plate summed over the WHOLE walk (the caption branch hugs the plate the entire
+// way ≈ 0; the art branch peels away), not just the endpoints. Pure geometry.
+function _pickTailDir(cutPoly, P, edgeIdx, platePoly, probe) {
+    var fEnd = _walkCutPolyArc(cutPoly, P, edgeIdx,  1, probe);
+    var bEnd = _walkCutPolyArc(cutPoly, P, edgeIdx, -1, probe);
+    var fp = fEnd[fEnd.length - 1], bp = bEnd[bEnd.length - 1];
+    var dF = _minDist2ToPolyEdges(fp, platePoly);
+    var dB = _minDist2ToPolyEdges(bp, platePoly);
+    if (Math.abs(Math.sqrt(dF) - Math.sqrt(dB)) >= mmToPoints(0.5)) return (dF >= dB) ? 1 : -1;
+    // Near-tie: the single endpoint can't separate the branches; integrate over the whole walk.
+    var sF = _sumDist2ToPoly(fEnd, platePoly), sB = _sumDist2ToPoly(bEnd, platePoly);
+    var dir = (sF >= sB) ? 1 : -1;
+    log("[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate ("
+        + (dir > 0 ? "fwd" : "back") + ")");
+    return dir;
+}
+
 // One seam end → an ordered list of points [P, …, tailEnd] that all lie ON the cut line: P is
-// the nearest point on the contour to the seam end (= the junction), then a walk of overshootPt
-// arc length along the cut-line polygon in the direction heading AWAY from the plate (into the
-// body). So the tail tracks the cut line exactly rather than diverging along the art tangent.
+// the nearest point on the contour to the seam end (= the art∩caption crossing), then a walk of
+// overshootPt arc length along the cut-line polygon down the ART path (away from the plate),
+// chosen by _pickTailDir. So the tail tracks the art cut line rather than the caption's exposed
+// edge or a straight tangent.
 function _cutlineOvershootTail(endPt, innerPt, cutPoly, platePoly, overshootPt) {
     // Anchor the tail at the junction by projecting the seam end to the NEAREST point on the cut
     // line — NOT by shooting a ray along the seam tangent. The seam runs along the pill edge, so
     // its tangent is nearly parallel to the cut line at the junction; a ray SKIMS and lands the
-    // anchor far away on a stretch that hugs the plate, where both probe branches read ~0 and the
-    // branch test below degenerates to an arbitrary tie. Nearest-point keeps the anchor at the
-    // crossing, where one branch clearly leaves the plate.
+    // anchor far away. Nearest-point keeps the anchor at the crossing.
     var Pn = _nearestPointOnPoly(endPt, cutPoly);
     if (!Pn) return [_extendPoint(endPt, innerPt, overshootPt)];       // no contour → fixed
     var P = { x: Pn.x, y: Pn.y };
-    var ei = Pn.edge;
-    // Pick the contour direction that heads INTO THE BODY (the art cut line), not back around
-    // the pill toward the tab. Decide by PROBING ~2mm each way and taking the branch whose
-    // endpoint ends up farther from the PLATE OUTLINE: the pill/cap branch runs along the
-    // plate's own edge and stays ~on it (distance ≈ 0), while the body branch peels away from
-    // it (distance grows). Distance-to-outline separates the two even at a rounded cap, where
-    // distance-to-CENTRE fails — a cap point is far from the plate centre yet still on its edge.
     var probe = Math.max(overshootPt, mmToPoints(2));
-    var fEnd = _walkCutPolyArc(cutPoly, P, ei,  1, probe);
-    var bEnd = _walkCutPolyArc(cutPoly, P, ei, -1, probe);
-    var fp = fEnd[fEnd.length - 1], bp = bEnd[bEnd.length - 1];
-    var dF = _minDist2ToPolyEdges(fp, platePoly);
-    var dB = _minDist2ToPolyEdges(bp, platePoly);
-    // Clear winner: the endpoint farther from the plate is the body branch (the tab branch hugs
-    // the plate edge, distance ~0). Unchanged from the prior behaviour.
-    var dir;
-    if (Math.abs(Math.sqrt(dF) - Math.sqrt(dB)) >= mmToPoints(0.5)) {
-        dir = (dF >= dB) ? 1 : -1;
-    } else {
-        // Near-tie (#8): on a small element the ~2mm probe can wrap past the body region, so the
-        // two endpoints sit ~equidistant from the plate and a single endpoint can't separate the
-        // branches — the bare `dF >= dB` then defaults to +1, which may be the TAB side. Integrate
-        // distance-to-plate over the WHOLE walk instead: the tab branch hugs the plate edge the
-        // entire way (~0), the body branch peels away, so the summed distance decides. Only fires
-        // on a genuine tie; clear winners above are byte-identical to before.
-        var sF = _sumDist2ToPoly(fEnd, platePoly), sB = _sumDist2ToPoly(bEnd, platePoly);
-        dir = (sF >= sB) ? 1 : -1;
-        log("[halfcut] overshoot tail | near-tie on direction — broke by integrated "
-            + "distance-to-plate (" + (dir > 0 ? "fwd" : "back") + ")");
-    }
-    return _walkCutPolyArc(cutPoly, P, ei, dir, overshootPt);
+    var dir = _pickTailDir(cutPoly, P, Pn.edge, platePoly, probe);
+    return _walkCutPolyArc(cutPoly, P, Pn.edge, dir, overshootPt);
 }
 
 // Nearest point on a polygon's OUTLINE to pt: { x, y, edge } (edge = index i of segment i..i+1).
@@ -3192,8 +3192,8 @@ function _minDist2ToPolyEdges(pt, poly) {
     return best;
 }
 
-// Sum of squared distances from each point of a walk to a polygon's OUTLINE. The tie-break
-// signal for the overshoot direction: a contour walk that hugs the plate edge sums ~0; one
+// Sum of squared distances from each point of a walk to a polygon's OUTLINE. The tie-break signal
+// for the overshoot direction (_pickTailDir): a contour walk that hugs the plate edge sums ~0; one
 // that peels into the body sums large. Pure geometry.
 function _sumDist2ToPoly(pts, poly) {
     var s = 0, i;
