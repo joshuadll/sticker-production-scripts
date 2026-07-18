@@ -2865,7 +2865,6 @@ function plateSeamPath(plate, outline, steps, platePolys, artPolys) {
     for (i = leftCap.length - 1; i >= 0; i--) seam.push(leftCap[i]);
     for (k = f; k <= l; k++) seam.push({ x: run[k].x, y: run[k].y });
     for (i = 0; i < rightCap.length; i++) seam.push(rightCap[i]);
-    if (seam.length < 2) return null;
 
     return seam;
 }
@@ -3133,15 +3132,24 @@ function _seamFinite(seam) {
 // two ways — along the ART edge (into the body, LEAVING the plate) or along the caption's exposed
 // edge (which HUGS the plate). The tail must run down the ART path, so probe `probe` arc length
 // each way and take the branch whose endpoint is FARTHER from the plate outline (the caption
-// branch stays ~on it, distance ≈ 0; the art branch peels away). Now that the seam ends exactly
-// at the crossing, the two branches separate cleanly, so there's a clear winner. Pure geometry.
+// branch stays ~on it, distance ≈ 0; the art branch peels away). With the seam now ending exactly
+// at the crossing this is usually a clear winner, but on a SMALL element the ~probe walk can wrap
+// past the body so both endpoints sit ~equidistant from the plate — a near-tie. There, break by
+// the distance-to-plate summed over the WHOLE walk (the caption branch hugs the plate the entire
+// way ≈ 0; the art branch peels away), not just the endpoints. Pure geometry.
 function _pickTailDir(cutPoly, P, edgeIdx, platePoly, probe) {
     var fEnd = _walkCutPolyArc(cutPoly, P, edgeIdx,  1, probe);
     var bEnd = _walkCutPolyArc(cutPoly, P, edgeIdx, -1, probe);
     var fp = fEnd[fEnd.length - 1], bp = bEnd[bEnd.length - 1];
     var dF = _minDist2ToPolyEdges(fp, platePoly);
     var dB = _minDist2ToPolyEdges(bp, platePoly);
-    return (dF >= dB) ? 1 : -1;
+    if (Math.abs(Math.sqrt(dF) - Math.sqrt(dB)) >= mmToPoints(0.5)) return (dF >= dB) ? 1 : -1;
+    // Near-tie: the single endpoint can't separate the branches; integrate over the whole walk.
+    var sF = _sumDist2ToPoly(fEnd, platePoly), sB = _sumDist2ToPoly(bEnd, platePoly);
+    var dir = (sF >= sB) ? 1 : -1;
+    log("[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate ("
+        + (dir > 0 ? "fwd" : "back") + ")");
+    return dir;
 }
 
 // One seam end → an ordered list of points [P, …, tailEnd] that all lie ON the cut line: P is
@@ -3182,6 +3190,15 @@ function _minDist2ToPolyEdges(pt, poly) {
         if (c.dist2 < best) best = c.dist2;
     }
     return best;
+}
+
+// Sum of squared distances from each point of a walk to a polygon's OUTLINE. The tie-break signal
+// for the overshoot direction (_pickTailDir): a contour walk that hugs the plate edge sums ~0; one
+// that peels into the body sums large. Pure geometry.
+function _sumDist2ToPoly(pts, poly) {
+    var s = 0, i;
+    for (i = 0; i < pts.length; i++) s += _minDist2ToPolyEdges(pts[i], poly);
+    return s;
 }
 
 // Walks the cut-line polygon from P (on edge edgeIdx) by `dist` arc length in stepDir

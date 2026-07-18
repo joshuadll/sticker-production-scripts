@@ -3,15 +3,19 @@
 // The seam now ends at the art∩caption crossing. From there the cut line leaves two ways: down
 // the ART path (which peels AWAY from the caption plate) or along the caption's exposed edge
 // (which HUGS the plate). The 1mm peel-tab tail must run down the ART path. _pickTailDir probes
-// each way and takes the branch whose endpoint is FARTHER from the plate outline.
+// each way and takes the branch whose endpoint is FARTHER from the plate outline; on a near-tie
+// (endpoints ~equidistant) it breaks by the summed distance over the whole walk.
 var fs = require('fs');
 var src = fs.readFileSync(__dirname + '/../../../utils/aiUtils.jsx', 'utf8');
 function extract(name) {
     var re = new RegExp('function ' + name + '\\s*\\([\\s\\S]*?\\n}');
     var m = src.match(re); if (!m) throw new Error('could not extract ' + name); return m[0];
 }
+var log = function () {};   // stub the side-effect log used by _pickTailDir's near-tie branch
+eval(extract('mmToPoints'));
 eval(extract('_ptSegClosestSq'));
 eval(extract('_minDist2ToPolyEdges'));
+eval(extract('_sumDist2ToPoly'));
 eval(extract('_walkCutPolyArc'));
 eval(extract('_pickTailDir'));
 
