@@ -3075,13 +3075,16 @@ function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps, p
     }
     var cutPoly = cutline ? _largestPoly(samplePathToPolygons(cutline, steps)) : null;
     if (!cutPoly) return straightOvershoot();               // can't sample cut line → legacy
-    // Reuse the plate polys syncHalfcut already sampled this pass (no mutation since), else sample.
-    var platePoly = platePolys ? _largestPoly(platePolys)
-                  : (plate ? _largestPoly(samplePathToPolygons(plate, steps)) : null);
-    if (!platePoly) return straightOvershoot();             // can't sample plate → legacy
 
-    var tail0 = _cutlineOvershootTail(seam[0],     seam[1],     cutPoly, platePoly, overshootPt); // [P0..end0]
-    var tailN = _cutlineOvershootTail(seam[L - 1], seam[L - 2], cutPoly, platePoly, overshootPt); // [PN..endN]
+    // "Away from the caption" reference = the seam centroid. Both tails extend outward from it,
+    // so neither doubles back over the caption. (plate/platePolys are no longer needed for the
+    // direction choice; kept in the signature for the callers.)
+    var cx = 0, cy = 0, j;
+    for (j = 0; j < L; j++) { cx += seam[j].x; cy += seam[j].y; }
+    var awayFrom = { x: cx / L, y: cy / L };
+
+    var tail0 = _cutlineOvershootTail(seam[0],     seam[1],     cutPoly, awayFrom, overshootPt); // [P0..end0]
+    var tailN = _cutlineOvershootTail(seam[L - 1], seam[L - 2], cutPoly, awayFrom, overshootPt); // [PN..endN]
 
     // end0 … P0  +  interior seam  +  PN … endN. The raw ends seam[0]/seam[L-1] are dropped;
     // their on-contour crossings P0/PN take their place (tail*[0]).
@@ -3123,51 +3126,38 @@ function _seamFinite(seam) {
     return (maxx - minx) > 1e-3 || (maxy - miny) > 1e-3;   // reject a zero-extent (coincident) seam
 }
 
+// Which way to run the peel-tab tail along the cut contour from junction P (on edge edgeIdx):
+// +1 (toward edgeIdx+1) or −1. Probes `probe` arc length each way and takes the branch whose
+// endpoint ends up FARTHER from `awayFrom` — the caption-seam centroid. The tail must extend
+// AWAY from the caption (into the body); the seam centroid is a robust "where the caption is"
+// reference. This replaced a distance-to-PLATE heuristic that tied on curved/small elements and
+// could pick the branch running BACK over the caption — the spike + "doesn't follow the curve"
+// on a curved attach edge. Pure geometry.
+function _pickTailDir(cutPoly, P, edgeIdx, awayFrom, probe) {
+    var fEnd = _walkCutPolyArc(cutPoly, P, edgeIdx,  1, probe);
+    var bEnd = _walkCutPolyArc(cutPoly, P, edgeIdx, -1, probe);
+    var fp = fEnd[fEnd.length - 1], bp = bEnd[bEnd.length - 1];
+    var dF = (fp.x - awayFrom.x) * (fp.x - awayFrom.x) + (fp.y - awayFrom.y) * (fp.y - awayFrom.y);
+    var dB = (bp.x - awayFrom.x) * (bp.x - awayFrom.x) + (bp.y - awayFrom.y) * (bp.y - awayFrom.y);
+    return (dF >= dB) ? 1 : -1;
+}
+
 // One seam end → an ordered list of points [P, …, tailEnd] that all lie ON the cut line: P is
 // the nearest point on the contour to the seam end (= the junction), then a walk of overshootPt
-// arc length along the cut-line polygon in the direction heading AWAY from the plate (into the
-// body). So the tail tracks the cut line exactly rather than diverging along the art tangent.
-function _cutlineOvershootTail(endPt, innerPt, cutPoly, platePoly, overshootPt) {
+// arc length along the cut-line polygon in the direction heading AWAY from the caption (into the
+// body), chosen by _pickTailDir against the seam centroid. So the tail tracks the cut line
+// exactly (following its curve) rather than diverging along the art tangent or doubling back.
+function _cutlineOvershootTail(endPt, innerPt, cutPoly, awayFrom, overshootPt) {
     // Anchor the tail at the junction by projecting the seam end to the NEAREST point on the cut
     // line — NOT by shooting a ray along the seam tangent. The seam runs along the pill edge, so
     // its tangent is nearly parallel to the cut line at the junction; a ray SKIMS and lands the
-    // anchor far away on a stretch that hugs the plate, where both probe branches read ~0 and the
-    // branch test below degenerates to an arbitrary tie. Nearest-point keeps the anchor at the
-    // crossing, where one branch clearly leaves the plate.
+    // anchor far away. Nearest-point keeps the anchor at the crossing.
     var Pn = _nearestPointOnPoly(endPt, cutPoly);
     if (!Pn) return [_extendPoint(endPt, innerPt, overshootPt)];       // no contour → fixed
     var P = { x: Pn.x, y: Pn.y };
-    var ei = Pn.edge;
-    // Pick the contour direction that heads INTO THE BODY (the art cut line), not back around
-    // the pill toward the tab. Decide by PROBING ~2mm each way and taking the branch whose
-    // endpoint ends up farther from the PLATE OUTLINE: the pill/cap branch runs along the
-    // plate's own edge and stays ~on it (distance ≈ 0), while the body branch peels away from
-    // it (distance grows). Distance-to-outline separates the two even at a rounded cap, where
-    // distance-to-CENTRE fails — a cap point is far from the plate centre yet still on its edge.
     var probe = Math.max(overshootPt, mmToPoints(2));
-    var fEnd = _walkCutPolyArc(cutPoly, P, ei,  1, probe);
-    var bEnd = _walkCutPolyArc(cutPoly, P, ei, -1, probe);
-    var fp = fEnd[fEnd.length - 1], bp = bEnd[bEnd.length - 1];
-    var dF = _minDist2ToPolyEdges(fp, platePoly);
-    var dB = _minDist2ToPolyEdges(bp, platePoly);
-    // Clear winner: the endpoint farther from the plate is the body branch (the tab branch hugs
-    // the plate edge, distance ~0). Unchanged from the prior behaviour.
-    var dir;
-    if (Math.abs(Math.sqrt(dF) - Math.sqrt(dB)) >= mmToPoints(0.5)) {
-        dir = (dF >= dB) ? 1 : -1;
-    } else {
-        // Near-tie (#8): on a small element the ~2mm probe can wrap past the body region, so the
-        // two endpoints sit ~equidistant from the plate and a single endpoint can't separate the
-        // branches — the bare `dF >= dB` then defaults to +1, which may be the TAB side. Integrate
-        // distance-to-plate over the WHOLE walk instead: the tab branch hugs the plate edge the
-        // entire way (~0), the body branch peels away, so the summed distance decides. Only fires
-        // on a genuine tie; clear winners above are byte-identical to before.
-        var sF = _sumDist2ToPoly(fEnd, platePoly), sB = _sumDist2ToPoly(bEnd, platePoly);
-        dir = (sF >= sB) ? 1 : -1;
-        log("[halfcut] overshoot tail | near-tie on direction — broke by integrated "
-            + "distance-to-plate (" + (dir > 0 ? "fwd" : "back") + ")");
-    }
-    return _walkCutPolyArc(cutPoly, P, ei, dir, overshootPt);
+    var dir = _pickTailDir(cutPoly, P, Pn.edge, awayFrom, probe);
+    return _walkCutPolyArc(cutPoly, P, Pn.edge, dir, overshootPt);
 }
 
 // Nearest point on a polygon's OUTLINE to pt: { x, y, edge } (edge = index i of segment i..i+1).
@@ -3190,15 +3180,6 @@ function _minDist2ToPolyEdges(pt, poly) {
         if (c.dist2 < best) best = c.dist2;
     }
     return best;
-}
-
-// Sum of squared distances from each point of a walk to a polygon's OUTLINE. The tie-break
-// signal for the overshoot direction: a contour walk that hugs the plate edge sums ~0; one
-// that peels into the body sums large. Pure geometry.
-function _sumDist2ToPoly(pts, poly) {
-    var s = 0, i;
-    for (i = 0; i < pts.length; i++) s += _minDist2ToPolyEdges(pts[i], poly);
-    return s;
 }
 
 // Walks the cut-line polygon from P (on edge edgeIdx) by `dist` arc length in stepDir
