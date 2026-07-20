@@ -1,4 +1,4 @@
-[pipeline] === AI_ExportFinal start ===
+[pipeline] === AI_ExportFinal start (version unknown) ===
 [pipeline] dryRun: false
 [pipeline] document: ai-export-final-fixture.ai
 [pipeline] WARN | no sourceDPI in sidecar; per-element PNGs at CONFIG default 300 DPI
@@ -7,7 +7,7 @@
 [step8c] collected 26 cut line(s).
 [step8c] margin | 190x267mm safe area.
 [step8c] overlay | drew flags on "Layout QA" layer | 0 halo(s), 0 spacing badge(s), 0 margin arrow(s), 0 sliver(s)
-[timing] step8c | sample=10213 spacing=2332 margin=3 overlay=4 (ms)
+[timing] step8c | sample=199 spacing=2262 margin=3 overlay=3 (ms)
 [step8c] done | checked=26 flagged=0 (spacing: 0 pair(s); margin: 0)
 [pipeline] spacing/margin guard complete | 26 path(s) checked, 0 flagged.
 [pipeline] --- Step 9A: Half-cut ---
@@ -106,16 +106,16 @@
 [step11] halfcut layer → "Halfcut/Peeling Tab"
 [step11] removing layer: Color Block
 [step11] removing layer: Grid
+[step11] removing layer: Layer 7
 [step11] removing layer: Margin
 [step11] removing layer: Layout QA
 [step11] captions relocated to Stickers | 26 element(s), 48 item(s)
-[step11] WARN | expected 3 layers in final file, found 4 — check final file manually.
-[step11] done | <out>/ai-export-final-fixture_export/ai-export-final-fixture_final.ai | layers=4
+[step11] text outlined | 20 frame(s)
+[step11] done | <out>/ai-export-final-fixture_export/ai-export-final-fixture_final.ai | layers=3
 [pipeline] step 11 complete | <out>/ai-export-final-fixture_export/ai-export-final-fixture_final.ai
 [pipeline] === AI_ExportFinal done ===
 ✅ Final file ready.
 
   26 path(s) checked · 26 half-cut(s) verified · 26 PNG(s) exported.
   Final file: <out>/ai-export-final-fixture_export/ai-export-final-fixture_final.ai
-  WARNING: final file has 4 layer(s) — expected 3. Check manually.
 

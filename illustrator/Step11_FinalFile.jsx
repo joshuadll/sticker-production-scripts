@@ -54,22 +54,39 @@ function runFinalFile(doc) {
         log("[step11] WARN | halfcut layer not found — skipping rename.");
     }
 
-    // Remove non-production layers. Iterate backwards — safe when items are removed.
-    // The QA overlay (flags + pocket fills) is stripped by its shared name
-    // (QA_LAYER_NAME, lowercased to match _s11InList); "nqi pockets" is the legacy
-    // name. Strip by name so a stray QA layer the artist forgot to hide never prints.
-    var REMOVE = ["margin", "offset path", "grid", "color block",
-                  QA_LAYER_NAME.toLowerCase(), "nqi pockets"];
+    // Strip to the three production layers via an ALLOWLIST (keep-by-identity), NOT a
+    // denylist of names. A name-based strip only removes layers it can enumerate, so any
+    // stray layer it didn't name — a leftover spacing buffer, an artist's scratch layer,
+    // a future QA layer — rode through into the final file (the recurring "extra layer"
+    // bug). Keeping ONLY Cutlines, the halfcut layer, and Sticker guarantees exactly the
+    // three production layers regardless of what else is in the working file.
+    var keepers = [];
+    if (halfcutLayer) keepers.push(halfcutLayer);
+    var cutlinesKeep = findLayer(fd, CONFIG.cutlinesLayerName);
+    var stickersKeep = findLayer(fd, CONFIG.stickersLayerName);
+    // Required CONTENT layers. If either can't be resolved by name, ABORT before the strip
+    // loop — an allowlist that can't identify a keeper would DELETE it, and a missing Cutlines
+    // is otherwise silent downstream (_s11MoveCaptionsToStickers only warns), shipping a final
+    // file with no cut geometry. Hard-error over silent data loss.
+    if (!cutlinesKeep) {
+        throw new Error("Cutlines layer '" + CONFIG.cutlinesLayerName
+            + "' not found — aborting before layer strip (would delete cut geometry).");
+    }
+    if (!stickersKeep) {
+        throw new Error("Sticker layer '" + CONFIG.stickersLayerName
+            + "' not found — aborting before layer strip.");
+    }
+    keepers.push(cutlinesKeep);
+    keepers.push(stickersKeep);
     var i;
     for (i = fd.layers.length - 1; i >= 0; i--) {
-        if (_s11InList(fd.layers[i].name.toLowerCase(), REMOVE)) {
-            log("[step11] removing layer: " + fd.layers[i].name);
-            // buildWorkingDocument creates Margin/Grid/Color Block LOCKED, and
-            // layer.remove() throws "Trying to delete locked layer" — unlock first.
-            fd.layers[i].locked  = false;
-            fd.layers[i].visible = true;
-            fd.layers[i].remove();
-        }
+        if (_s11IsKeeper(fd.layers[i], keepers)) continue;
+        log("[step11] removing layer: " + fd.layers[i].name);
+        // buildWorkingDocument creates Margin/Grid/Color Block LOCKED, and
+        // layer.remove() throws "Trying to delete locked layer" — unlock first.
+        fd.layers[i].locked  = false;
+        fd.layers[i].visible = true;
+        fd.layers[i].remove();
     }
 
     // Move VISIBLE printed caption/tab artwork out of the Cutlines groups onto the
@@ -77,6 +94,12 @@ function runFinalFile(doc) {
     // printed pill/text/GC-raster/tab-fill must not live there. Final copy only; move()
     // preserves absolute position, so each caption stays exactly inside its cut.
     _s11MoveCaptionsToStickers(fd);
+
+    // Convert live caption text to vector outlines so the final file carries no font
+    // dependency (the printer/another machine need not have Kalam installed). Warped
+    // captions are already baked to path geometry upstream (Step 7B Expand Appearance);
+    // only flat-bottomed captions survive as live TextFrames — this catches those.
+    _s11OutlineText(fd);
 
     var layerCount = fd.layers.length;
     if (layerCount !== 3) {
@@ -108,11 +131,51 @@ function _s11FindHalfcutLayer(doc) {
     return null;
 }
 
-function _s11InList(val, arr) {
-    for (var i = 0; i < arr.length; i++) {
-        if (arr[i] === val) return true;
+// True when `layer` is one of the keeper layers (object identity, not name).
+function _s11IsKeeper(layer, keepers) {
+    for (var i = 0; i < keepers.length; i++) {
+        if (keepers[i] === layer) return true;
     }
     return false;
+}
+
+// Converts every remaining live TextFrame in the final doc to vector outlines, so the
+// shipped file has no font dependency. Snapshots the collection first — createOutline()
+// replaces each frame with a GroupItem in place, mutating doc.textFrames as it goes.
+// After Step 11's strip the only text left is caption text (on Sticker); warped captions
+// are already path geometry, so this only outlines the flat-bottomed frames. Returns count.
+function _s11OutlineText(fd) {
+    var i;
+    // Bake any stray LIVE warp first (Expand Appearance): a warped caption that somehow
+    // reached here still live (e.g. runFinalFile invoked without the Step 7B bake) would
+    // otherwise be outlined UN-warped (wrong shape). expandStyle turns a warped frame into
+    // geometry and is a no-op on a flat frame (it stays an editable TextFrame) — same
+    // mechanism as Step 7B's _nestBakeCaptionWarp. In the normal pipeline no live warp
+    // survives, so this is a defensive no-op.
+    var warpSel = [];
+    for (i = 0; i < fd.textFrames.length; i++) warpSel.push(fd.textFrames[i]);
+    if (warpSel.length) {
+        app.selection = null;
+        for (i = 0; i < warpSel.length; i++) warpSel[i].selected = true;
+        try { app.executeMenuCommand("expandStyle"); } catch (eEx) {}
+        app.selection = null;
+    }
+
+    // Outline the remaining (flat) text frames. Snapshot first — createOutline() replaces each
+    // frame with a GroupItem in place, mutating doc.textFrames as it goes.
+    var frames = [];
+    for (i = 0; i < fd.textFrames.length; i++) frames.push(fd.textFrames[i]);
+    var outlined = 0;
+    for (i = 0; i < frames.length; i++) {
+        try {
+            frames[i].createOutline();
+            outlined++;
+        } catch (e) {
+            log("[step11] WARN | could not outline text '" + frames[i].name + "': " + e.message);
+        }
+    }
+    log("[step11] text outlined | " + outlined + " frame(s)");
+    return outlined;
 }
 
 // Gathers every element GroupItem in a Cutlines container, recursing into SUBLAYERS

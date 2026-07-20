@@ -182,7 +182,7 @@ function _s10ExportJpegs(doc, clipData, outFolder, stkCode) {
             cutDupe.moveToBeginning(grp);   // pageItems[0] = clipping mask
             artDupe.moveToEnd(grp);
             whiteDupe.moveToEnd(grp);
-            _s10AddCaptionMembers(grp, entry.cutline, tmpLayer);   // native caption (text+pill+plate), in front of art
+            _s10AddCaptionMembers(grp, entry.cutline, tmpLayer, true);   // sheet preview: keep the peel-tab decoration
             cutDupe.moveToBeginning(grp);   // re-assert the mask at pageItems[0]
             _s10ClipGroup(doc, grp);
         }
@@ -232,13 +232,17 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
     tmpLayer.visible = true;
 
     var artDupe     = entry.element.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
-    var cutlinePath = _s10GetCutlinePath(entry.cutline);
+    // Product PNG clips to the fused cut for captioned elements, but to the art-only outline
+    // for uncaptioned default-tab elements (so the peel tab doesn't print) — see the helper.
+    var cutlinePath = _s10ProductClipPath(entry);
     var cutDupe     = null;
     var whiteDupe   = null;
 
     if (cutlinePath) {
-        // Non-stamp: build clip group [cutDupe (mask), artDupe, whiteDupe].
-        cutDupe   = cutlinePath.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
+        // Non-stamp: build clip group [cutDupe (mask), artDupe, whiteDupe]. The outline member
+        // is a HIDDEN separable component, so its duplicate must be un-hidden to mask/back-fill.
+        cutDupe        = cutlinePath.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
+        cutDupe.hidden = false;
         whiteDupe = cutDupe.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
         _s10SetWhiteFill(whiteDupe);
 
@@ -247,7 +251,7 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
         cutDupe.moveToBeginning(grp);   // pageItems[0] = clipping mask
         artDupe.moveToEnd(grp);
         whiteDupe.moveToEnd(grp);
-        _s10AddCaptionMembers(grp, entry.cutline, tmpLayer);   // native caption (text+pill+plate), in front of art
+        _s10AddCaptionMembers(grp, entry.cutline, tmpLayer, false);   // product PNG: drop the peel-tab decoration (captions kept)
         cutDupe.moveToBeginning(grp);   // re-assert the mask at pageItems[0]
         _s10ClipGroup(doc, grp);
         _s10RotateUpright(doc, grp, entry);   // upright for export (per-element PNG only)
@@ -291,6 +295,30 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
 
 // ─── PRIVATE HELPERS ─────────────────────────────────────────────────────────
 
+// Clip path for the per-element PRODUCT PNG. Captioned (GC/WC) elements clip to the fused
+// cut (art + caption pill) — the caption is part of the finished sticker. An uncaptioned
+// DEFAULT-TAB element (group note styleCode "ST", incl. a WC/MP-TL element routed to a peel
+// tab) instead clips to the art-only " outline": the peel-tab dome is a manufacturing grab,
+// not product art, and it is UNITED into the fused cut, so clipping to the fused cut leaves
+// the tab's white backing poking a semicircle above the local art edge in the PNG. Clipping
+// to the art outline drops the tab cleanly (the tab was united separately, so " outline" has
+// no tab notch). Falls back to the fused cut if the note/outline member is missing.
+function _s10ProductClipPath(entry) {
+    var cut = entry.cutline;
+    if (cut && cut.typename === "GroupItem") {
+        var note = parseNote(cut.note);
+        if (note && note.styleCode === "ST") {
+            var outline = findGroupMember(cut, " outline");
+            if (outline && (outline.typename === "PathItem" || outline.typename === "CompoundPathItem")) {
+                return outline;
+            }
+            log("[step10] WARN | default-tab '" + entry.displayName
+                + "' has no usable outline member — product PNG clips to the fused cut (tab may show)");
+        }
+    }
+    return _s10GetCutlinePath(cut);
+}
+
 // Returns the clippable PathItem/CompoundPathItem from a cutline. Drills into groups —
 // the named cut member can itself be a GroupItem (Pathfinder Unite wraps its result), and
 // that must resolve to a flat path to serve as a clip mask. Returns null for PlacedItems
@@ -328,14 +356,22 @@ function _s10FirstClipPath(item) {
 // white-backing. Covers BOTH captioned elements (decorative plate raster, white pill, text) AND
 // default-tab/uncaptioned elements, whose printed "PEEL HERE"/semi-circle decoration is the
 // separate " tab fill" ride-along member (the " plate" member there is the hidden tab cutline, so
-// it is skipped by the !hidden guard). Without " tab fill" the tab art vanished from the export.
+// it is skipped by the !hidden guard). The " tab fill" is gated by `includeTabFill` — kept for
+// the sheet JPEG previews, dropped for the per-element product PNG (see the flag docs below).
 // The caller re-asserts the clip mask at pageItems[0] afterward. These members live inside the
 // cut boundary, so they clip cleanly with the rest. No-op for stamps (PlacedItem cutline) /
 // missing members.
-function _s10AddCaptionMembers(grp, cutlineItem, tmpLayer) {
+function _s10AddCaptionMembers(grp, cutlineItem, tmpLayer, includeTabFill) {
     if (!cutlineItem || cutlineItem.typename !== "GroupItem") return;
     // Back-to-front insertion (each moved to the front): plate, pill, tab fill, then text.
-    var order = [" caption plate", " plate", " tab fill", " caption text"];
+    // The " tab fill" (the "PEEL HERE" / semi-circle grab decoration) exists ONLY on
+    // uncaptioned default-tab elements; captioned elements never have it. includeTabFill
+    // is false for the per-element product PNG (the peel-tab decoration shouldn't print on
+    // the finished sticker image) and true for the sheet JPEG previews (which show the tab
+    // in the nesting layout). Captioned members ride along regardless of this flag.
+    var order = includeTabFill
+        ? [" caption plate", " plate", " tab fill", " caption text"]
+        : [" caption plate", " plate", " caption text"];
     var k, member, dup;
     for (k = 0; k < order.length; k++) {
         member = findGroupMember(cutlineItem, order[k]);
