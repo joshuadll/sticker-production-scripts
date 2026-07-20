@@ -232,13 +232,17 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
     tmpLayer.visible = true;
 
     var artDupe     = entry.element.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
-    var cutlinePath = _s10GetCutlinePath(entry.cutline);
+    // Product PNG clips to the fused cut for captioned elements, but to the art-only outline
+    // for uncaptioned default-tab elements (so the peel tab doesn't print) — see the helper.
+    var cutlinePath = _s10ProductClipPath(entry);
     var cutDupe     = null;
     var whiteDupe   = null;
 
     if (cutlinePath) {
-        // Non-stamp: build clip group [cutDupe (mask), artDupe, whiteDupe].
-        cutDupe   = cutlinePath.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
+        // Non-stamp: build clip group [cutDupe (mask), artDupe, whiteDupe]. The outline member
+        // is a HIDDEN separable component, so its duplicate must be un-hidden to mask/back-fill.
+        cutDupe        = cutlinePath.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
+        cutDupe.hidden = false;
         whiteDupe = cutDupe.duplicate(tmpLayer, ElementPlacement.PLACEATEND);
         _s10SetWhiteFill(whiteDupe);
 
@@ -290,6 +294,30 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
 
 
 // ─── PRIVATE HELPERS ─────────────────────────────────────────────────────────
+
+// Clip path for the per-element PRODUCT PNG. Captioned (GC/WC) elements clip to the fused
+// cut (art + caption pill) — the caption is part of the finished sticker. An uncaptioned
+// DEFAULT-TAB element (group note styleCode "ST", incl. a WC/MP-TL element routed to a peel
+// tab) instead clips to the art-only " outline": the peel-tab dome is a manufacturing grab,
+// not product art, and it is UNITED into the fused cut, so clipping to the fused cut leaves
+// the tab's white backing poking a semicircle above the local art edge in the PNG. Clipping
+// to the art outline drops the tab cleanly (the tab was united separately, so " outline" has
+// no tab notch). Falls back to the fused cut if the note/outline member is missing.
+function _s10ProductClipPath(entry) {
+    var cut = entry.cutline;
+    if (cut && cut.typename === "GroupItem") {
+        var note = parseNote(cut.note);
+        if (note && note.styleCode === "ST") {
+            var outline = findGroupMember(cut, " outline");
+            if (outline && (outline.typename === "PathItem" || outline.typename === "CompoundPathItem")) {
+                return outline;
+            }
+            log("[step10] WARN | default-tab '" + entry.displayName
+                + "' has no usable outline member — product PNG clips to the fused cut (tab may show)");
+        }
+    }
+    return _s10GetCutlinePath(cut);
+}
 
 // Returns the clippable PathItem/CompoundPathItem from a cutline. Drills into groups —
 // the named cut member can itself be a GroupItem (Pathfinder Unite wraps its result), and
