@@ -63,9 +63,21 @@ function runFinalFile(doc) {
     var keepers = [];
     if (halfcutLayer) keepers.push(halfcutLayer);
     var cutlinesKeep = findLayer(fd, CONFIG.cutlinesLayerName);
-    if (cutlinesKeep) keepers.push(cutlinesKeep);
     var stickersKeep = findLayer(fd, CONFIG.stickersLayerName);
-    if (stickersKeep) keepers.push(stickersKeep);
+    // Required CONTENT layers. If either can't be resolved by name, ABORT before the strip
+    // loop — an allowlist that can't identify a keeper would DELETE it, and a missing Cutlines
+    // is otherwise silent downstream (_s11MoveCaptionsToStickers only warns), shipping a final
+    // file with no cut geometry. Hard-error over silent data loss.
+    if (!cutlinesKeep) {
+        throw new Error("Cutlines layer '" + CONFIG.cutlinesLayerName
+            + "' not found — aborting before layer strip (would delete cut geometry).");
+    }
+    if (!stickersKeep) {
+        throw new Error("Sticker layer '" + CONFIG.stickersLayerName
+            + "' not found — aborting before layer strip.");
+    }
+    keepers.push(cutlinesKeep);
+    keepers.push(stickersKeep);
     var i;
     for (i = fd.layers.length - 1; i >= 0; i--) {
         if (_s11IsKeeper(fd.layers[i], keepers)) continue;
@@ -133,7 +145,25 @@ function _s11IsKeeper(layer, keepers) {
 // After Step 11's strip the only text left is caption text (on Sticker); warped captions
 // are already path geometry, so this only outlines the flat-bottomed frames. Returns count.
 function _s11OutlineText(fd) {
-    var frames = [], i;
+    var i;
+    // Bake any stray LIVE warp first (Expand Appearance): a warped caption that somehow
+    // reached here still live (e.g. runFinalFile invoked without the Step 7B bake) would
+    // otherwise be outlined UN-warped (wrong shape). expandStyle turns a warped frame into
+    // geometry and is a no-op on a flat frame (it stays an editable TextFrame) — same
+    // mechanism as Step 7B's _nestBakeCaptionWarp. In the normal pipeline no live warp
+    // survives, so this is a defensive no-op.
+    var warpSel = [];
+    for (i = 0; i < fd.textFrames.length; i++) warpSel.push(fd.textFrames[i]);
+    if (warpSel.length) {
+        app.selection = null;
+        for (i = 0; i < warpSel.length; i++) warpSel[i].selected = true;
+        try { app.executeMenuCommand("expandStyle"); } catch (eEx) {}
+        app.selection = null;
+    }
+
+    // Outline the remaining (flat) text frames. Snapshot first — createOutline() replaces each
+    // frame with a GroupItem in place, mutating doc.textFrames as it goes.
+    var frames = [];
     for (i = 0; i < fd.textFrames.length; i++) frames.push(fd.textFrames[i]);
     var outlined = 0;
     for (i = 0; i < frames.length; i++) {
