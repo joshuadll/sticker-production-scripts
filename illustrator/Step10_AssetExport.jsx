@@ -182,7 +182,7 @@ function _s10ExportJpegs(doc, clipData, outFolder, stkCode) {
             cutDupe.moveToBeginning(grp);   // pageItems[0] = clipping mask
             artDupe.moveToEnd(grp);
             whiteDupe.moveToEnd(grp);
-            _s10AddCaptionMembers(grp, entry.cutline, tmpLayer);   // native caption (text+pill+plate), in front of art
+            _s10AddCaptionMembers(grp, entry.cutline, tmpLayer, true);   // sheet preview: keep the peel-tab decoration
             cutDupe.moveToBeginning(grp);   // re-assert the mask at pageItems[0]
             _s10ClipGroup(doc, grp);
         }
@@ -247,7 +247,7 @@ function _s10ExportElementPng(doc, entry, outFolder, stkCode) {
         cutDupe.moveToBeginning(grp);   // pageItems[0] = clipping mask
         artDupe.moveToEnd(grp);
         whiteDupe.moveToEnd(grp);
-        _s10AddCaptionMembers(grp, entry.cutline, tmpLayer);   // native caption (text+pill+plate), in front of art
+        _s10AddCaptionMembers(grp, entry.cutline, tmpLayer, false);   // product PNG: drop the peel-tab decoration (captions kept)
         cutDupe.moveToBeginning(grp);   // re-assert the mask at pageItems[0]
         _s10ClipGroup(doc, grp);
         _s10RotateUpright(doc, grp, entry);   // upright for export (per-element PNG only)
@@ -328,14 +328,22 @@ function _s10FirstClipPath(item) {
 // white-backing. Covers BOTH captioned elements (decorative plate raster, white pill, text) AND
 // default-tab/uncaptioned elements, whose printed "PEEL HERE"/semi-circle decoration is the
 // separate " tab fill" ride-along member (the " plate" member there is the hidden tab cutline, so
-// it is skipped by the !hidden guard). Without " tab fill" the tab art vanished from the export.
+// it is skipped by the !hidden guard). The " tab fill" is gated by `includeTabFill` — kept for
+// the sheet JPEG previews, dropped for the per-element product PNG (see the flag docs below).
 // The caller re-asserts the clip mask at pageItems[0] afterward. These members live inside the
 // cut boundary, so they clip cleanly with the rest. No-op for stamps (PlacedItem cutline) /
 // missing members.
-function _s10AddCaptionMembers(grp, cutlineItem, tmpLayer) {
+function _s10AddCaptionMembers(grp, cutlineItem, tmpLayer, includeTabFill) {
     if (!cutlineItem || cutlineItem.typename !== "GroupItem") return;
     // Back-to-front insertion (each moved to the front): plate, pill, tab fill, then text.
-    var order = [" caption plate", " plate", " tab fill", " caption text"];
+    // The " tab fill" (the "PEEL HERE" / semi-circle grab decoration) exists ONLY on
+    // uncaptioned default-tab elements; captioned elements never have it. includeTabFill
+    // is false for the per-element product PNG (the peel-tab decoration shouldn't print on
+    // the finished sticker image) and true for the sheet JPEG previews (which show the tab
+    // in the nesting layout). Captioned members ride along regardless of this flag.
+    var order = includeTabFill
+        ? [" caption plate", " plate", " tab fill", " caption text"]
+        : [" caption plate", " plate", " caption text"];
     var k, member, dup;
     for (k = 0; k < order.length; k++) {
         member = findGroupMember(cutlineItem, order[k]);

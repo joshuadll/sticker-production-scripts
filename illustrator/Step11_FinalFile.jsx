@@ -54,22 +54,27 @@ function runFinalFile(doc) {
         log("[step11] WARN | halfcut layer not found — skipping rename.");
     }
 
-    // Remove non-production layers. Iterate backwards — safe when items are removed.
-    // The QA overlay (flags + pocket fills) is stripped by its shared name
-    // (QA_LAYER_NAME, lowercased to match _s11InList); "nqi pockets" is the legacy
-    // name. Strip by name so a stray QA layer the artist forgot to hide never prints.
-    var REMOVE = ["margin", "offset path", "grid", "color block",
-                  QA_LAYER_NAME.toLowerCase(), "nqi pockets"];
+    // Strip to the three production layers via an ALLOWLIST (keep-by-identity), NOT a
+    // denylist of names. A name-based strip only removes layers it can enumerate, so any
+    // stray layer it didn't name — a leftover spacing buffer, an artist's scratch layer,
+    // a future QA layer — rode through into the final file (the recurring "extra layer"
+    // bug). Keeping ONLY Cutlines, the halfcut layer, and Sticker guarantees exactly the
+    // three production layers regardless of what else is in the working file.
+    var keepers = [];
+    if (halfcutLayer) keepers.push(halfcutLayer);
+    var cutlinesKeep = findLayer(fd, CONFIG.cutlinesLayerName);
+    if (cutlinesKeep) keepers.push(cutlinesKeep);
+    var stickersKeep = findLayer(fd, CONFIG.stickersLayerName);
+    if (stickersKeep) keepers.push(stickersKeep);
     var i;
     for (i = fd.layers.length - 1; i >= 0; i--) {
-        if (_s11InList(fd.layers[i].name.toLowerCase(), REMOVE)) {
-            log("[step11] removing layer: " + fd.layers[i].name);
-            // buildWorkingDocument creates Margin/Grid/Color Block LOCKED, and
-            // layer.remove() throws "Trying to delete locked layer" — unlock first.
-            fd.layers[i].locked  = false;
-            fd.layers[i].visible = true;
-            fd.layers[i].remove();
-        }
+        if (_s11IsKeeper(fd.layers[i], keepers)) continue;
+        log("[step11] removing layer: " + fd.layers[i].name);
+        // buildWorkingDocument creates Margin/Grid/Color Block LOCKED, and
+        // layer.remove() throws "Trying to delete locked layer" — unlock first.
+        fd.layers[i].locked  = false;
+        fd.layers[i].visible = true;
+        fd.layers[i].remove();
     }
 
     // Move VISIBLE printed caption/tab artwork out of the Cutlines groups onto the
@@ -77,6 +82,12 @@ function runFinalFile(doc) {
     // printed pill/text/GC-raster/tab-fill must not live there. Final copy only; move()
     // preserves absolute position, so each caption stays exactly inside its cut.
     _s11MoveCaptionsToStickers(fd);
+
+    // Convert live caption text to vector outlines so the final file carries no font
+    // dependency (the printer/another machine need not have Kalam installed). Warped
+    // captions are already baked to path geometry upstream (Step 7B Expand Appearance);
+    // only flat-bottomed captions survive as live TextFrames — this catches those.
+    _s11OutlineText(fd);
 
     var layerCount = fd.layers.length;
     if (layerCount !== 3) {
@@ -108,11 +119,33 @@ function _s11FindHalfcutLayer(doc) {
     return null;
 }
 
-function _s11InList(val, arr) {
-    for (var i = 0; i < arr.length; i++) {
-        if (arr[i] === val) return true;
+// True when `layer` is one of the keeper layers (object identity, not name).
+function _s11IsKeeper(layer, keepers) {
+    for (var i = 0; i < keepers.length; i++) {
+        if (keepers[i] === layer) return true;
     }
     return false;
+}
+
+// Converts every remaining live TextFrame in the final doc to vector outlines, so the
+// shipped file has no font dependency. Snapshots the collection first — createOutline()
+// replaces each frame with a GroupItem in place, mutating doc.textFrames as it goes.
+// After Step 11's strip the only text left is caption text (on Sticker); warped captions
+// are already path geometry, so this only outlines the flat-bottomed frames. Returns count.
+function _s11OutlineText(fd) {
+    var frames = [], i;
+    for (i = 0; i < fd.textFrames.length; i++) frames.push(fd.textFrames[i]);
+    var outlined = 0;
+    for (i = 0; i < frames.length; i++) {
+        try {
+            frames[i].createOutline();
+            outlined++;
+        } catch (e) {
+            log("[step11] WARN | could not outline text '" + frames[i].name + "': " + e.message);
+        }
+    }
+    log("[step11] text outlined | " + outlined + " frame(s)");
+    return outlined;
 }
 
 // Gathers every element GroupItem in a Cutlines container, recursing into SUBLAYERS
