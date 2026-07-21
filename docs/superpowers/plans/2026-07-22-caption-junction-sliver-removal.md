@@ -241,8 +241,10 @@ Replace those two lines with:
 
 - [ ] **Step 4: Syntax-check**
 
-Run: `node --check utils/aiUtils.jsx`
-Expected: no output, exit 0. (ES3 is a subset of what `node --check` parses; a syntax error here means a typo.)
+`node --check` rejects a `.jsx` extension (treats it as ESM). `utils/aiUtils.jsx` has no
+`#include`/`#target` directives, so copy it to a `.js` name and check that:
+Run: `cp utils/aiUtils.jsx /tmp/aiUtils-check.js && node --check /tmp/aiUtils-check.js && echo OK`
+Expected: `OK` (exit 0). A syntax error here means a typo in the added code.
 
 - [ ] **Step 5: Add the leaf-count assertion to the normalise runner**
 
