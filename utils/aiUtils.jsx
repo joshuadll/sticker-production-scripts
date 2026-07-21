@@ -1350,7 +1350,9 @@ function buildCaption(doc, layer, textFrame, outline, opts) {
     var rideItem = rideGroup;
 
     // Seat into the white-edge outline (authoritative). The overlap IS the attachment.
-    var seat = seatPlateToOutline(name, outline, pill, rideItem, { polyCache: {} });
+    var _capOverlap = (CONFIG.captionSeatOverlapMm != null) ? CONFIG.captionSeatOverlapMm : 0;
+    var seat = seatPlateToOutline(name, outline, pill, rideItem,
+        { polyCache: {}, overlapPt: mmToPoints(_capOverlap) });
     if (!seat.ok) {
         // Un-nest the ride items so a failed seat leaves clean inputs.
         try { textFrame.move(layer, ElementPlacement.PLACEATEND); } catch (e1) {}
@@ -1735,44 +1737,81 @@ function seatPlateToOutline(name, outline, plate, captionItem, opts) {
         }
     }
 
-    // ── ROTATE: align the inner edge parallel to the art chord B0->B1, pivot E0. Two real
-    // endpoints decide the tilt, so a wiggle in the middle can't swing it. ──
     var rotDeg = 0;
-    if (CONFIG.seatConform && !kissOnly) {
-        var baseLen = Math.sqrt((E1.x - E0.x) * (E1.x - E0.x) + (E1.y - E0.y) * (E1.y - E0.y));
-        if (baseLen >= epsPt) {
-            var phi = _aiNormalizeDeg(_aiChordAngleDeg(B0, B1) - _aiChordAngleDeg(E0, E1));
-            if (Math.abs(phi) <= maxRot) {
-                _rotateItemsAbout(items, E0, rotSign * phi);
-                rotDeg = phi;
-                log("[seat] " + name + " | rotated " + phi.toFixed(1) + "deg to endpoint chord.");
-            } else {
-                needsReview = true;
-                log("[seat] " + name + " | chord tilt " + phi.toFixed(1)
-                    + "deg exceeds maxSeatRotationDeg — rotation skipped, flagged.");
+
+    if (travelDir) {
+        // ── TAB (unchanged): rotate the inner edge parallel to the art chord (pivot E0), then
+        // kiss E0 onto B0 along the tab's travel direction, submerged by depth. ──
+        if (CONFIG.seatConform && !kissOnly) {
+            var baseLen = Math.sqrt((E1.x - E0.x) * (E1.x - E0.x) + (E1.y - E0.y) * (E1.y - E0.y));
+            if (baseLen >= epsPt) {
+                var phi = _aiNormalizeDeg(_aiChordAngleDeg(B0, B1) - _aiChordAngleDeg(E0, E1));
+                if (Math.abs(phi) <= maxRot) {
+                    _rotateItemsAbout(items, E0, rotSign * phi);
+                    rotDeg = phi;
+                    log("[seat] " + name + " | rotated " + phi.toFixed(1) + "deg to endpoint chord.");
+                } else {
+                    needsReview = true;
+                    log("[seat] " + name + " | chord tilt " + phi.toFixed(1)
+                        + "deg exceeds maxSeatRotationDeg — rotation skipped, flagged.");
+                }
             }
+        }
+        var kt = _aiKissVectorDir(E0, B0, travelDir, depth);
+        _translateItems(items, kt.tx, kt.ty);
+        log("[seat] " + name + " | seated (tab) rot=" + _r1(rotDeg) + "deg move="
+            + _r1(Math.sqrt(kt.tx * kt.tx + kt.ty * kt.ty)) + "pt depth=" + _r1(depth) + "pt"
+            + (needsReview ? " (needsReview)" : ""));
+        return { ok: true, moved: Math.sqrt(kt.tx * kt.tx + kt.ty * kt.ty),
+                 rotDeg: rotDeg, needsReview: needsReview };
+    }
+
+    // ── CAPTION (two-point contact): translate the NEARER inner-edge endpoint onto the border
+    // (depth 0), then ROTATE about it until the FAR endpoint also lands on the border (exact
+    // circle∩border solve). Both endpoints end exactly on the traced border — no stale-probe
+    // float, no over-burial. See docs/superpowers/specs/2026-07-21-caption-seat-two-point-contact-design.md. ──
+    var pick = _seatNearEndpoint(E0, B0, E1, B1, geom);
+
+    // Step A — near endpoint onto its border point (depth 0).
+    var kA = _aiKissVector(pick.P, pick.Bp, geom, 0);
+    _translateItems(items, kA.tx, kA.ty);
+    var Pm = { x: pick.P.x + kA.tx, y: pick.P.y + kA.ty };
+    var Qm = { x: pick.Q.x + kA.tx, y: pick.Q.y + kA.ty };
+
+    // Step B — rotate about the seated near endpoint until the far endpoint touches the border.
+    if (CONFIG.seatConform && !kissOnly) {
+        var rot = _seatContactRotation(Pm, Qm, artPolys, maxRot);
+        if (!rot.ok) {
+            needsReview = true;
+            log("[seat] " + name + " | far endpoint can't reach the border (" + rot.reason
+                + ") — contact rotation skipped, flagged.");
+        } else if (rot.clamped) {
+            needsReview = true;
+            log("[seat] " + name + " | contact rotation exceeds maxSeatRotationDeg — skipped, flagged.");
+        } else if (Math.abs(rot.deg) >= 0.01) {
+            _rotateItemsAbout(items, Pm, rot.deg);
+            rotDeg = rot.deg;
+            log("[seat] " + name + " | rotated " + rot.deg.toFixed(1) + "deg to two-point contact.");
         }
     }
 
-    // ── KISS (original): slide E0 onto B0 along the travel axis, submerged by depth d. E0 is the
-    // rotation pivot (fixed) and B0 is on the stationary art, so both hold after rotation. E0 is
-    // a REAL boundary point, so the real plate edge lands at depth d — no phantom float. ──
-    var k = travelDir ? _aiKissVectorDir(E0, B0, travelDir, depth)
-                      : _aiKissVector(E0, B0, geom, depth);
-    _translateItems(items, k.tx, k.ty);
+    // Step C — optional embed past contact (depth 0 by default → pure tangent contact).
+    if (depth > 1e-6) {
+        var eC = geom.travelIsX ? { tx: geom.sign * depth, ty: 0 }
+                                : { tx: 0, ty: geom.sign * depth };
+        _translateItems(items, eC.tx, eC.ty);
+    }
+
     if (CONFIG.seatDebug) {
-        var _e0p = { x: E0.x + k.tx, y: E0.y + k.ty };
         log("[seatdbg] " + name + " | axisX=" + geom.travelIsX + " sign=" + geom.sign
             + " depth=" + _r1(depth) + " r=" + _r1(r) + " kissOnly=" + kissOnly
-            + " shrunk=" + shrunk + " rot=" + _r1(rotDeg) + " k=(" + _r1(k.tx) + "," + _r1(k.ty) + ")");
-        log("[seatdbg] " + name + "   E0=(" + _r1(E0.x) + "," + _r1(E0.y) + ") B0=(" + _r1(B0.x)
-            + "," + _r1(B0.y) + ") E0post=(" + _r1(_e0p.x) + "," + _r1(_e0p.y) + ") inArt="
-            + _pointInPolysEO(_e0p, artPolys));
+            + " shrunk=" + shrunk + " rot=" + _r1(rotDeg)
+            + " P=(" + _r1(Pm.x) + "," + _r1(Pm.y) + ")");
     }
-    log("[seat] " + name + " | seated rot=" + _r1(rotDeg) + "deg move="
-        + _r1(geom.travelIsX ? k.tx : k.ty) + "pt depth=" + _r1(depth) + "pt"
+    log("[seat] " + name + " | seated (contact) rot=" + _r1(rotDeg) + "deg move="
+        + _r1(Math.sqrt(kA.tx * kA.tx + kA.ty * kA.ty)) + "pt depth=" + _r1(depth) + "pt"
         + (needsReview ? " (needsReview)" : ""));
-    return { ok: true, moved: Math.sqrt(k.tx * k.tx + k.ty * k.ty),
+    return { ok: true, moved: Math.sqrt(kA.tx * kA.tx + kA.ty * kA.ty),
              rotDeg: rotDeg, needsReview: needsReview };
 }
 
@@ -1781,7 +1820,10 @@ function seatPlateToOutline(name, outline, plate, captionItem, opts) {
 // than a floating straight chord. PCA gives the long axis (to classify caps vs long edges and
 // pick the inner side toward geom.sign); the near-circular guard switches to a deterministic
 // basis and flags kissOnly. Returns { verts:[{x,y,t}...], radius, kissOnly } or null. Pure geometry.
-function _innerEdgeVerts(pp, geom) {
+function _innerEdgeVerts(pp, geom, opts) {
+    opts = opts || {};
+    var includeCaps = !!opts.includeCaps;   // true = keep the caps too (the half-cut seam spans
+                                            // cap-to-cap); false (seat) = long-edge ends only.
     var n = pp.length, i, dx, dy;
     if (n < 4) return null;
     var cx = 0, cy = 0;
@@ -1809,7 +1851,7 @@ function _innerEdgeVerts(pp, geom) {
     for (i = 0; i < n; i++) {
         dx = pp[i].x - cx; dy = pp[i].y - cy;
         tt = dx * ux + dy * uy; ss = dx * vx + dy * vy;
-        if (tt <= ext.tmin + r || tt >= ext.tmax - r) continue;   // skip caps
+        if (!includeCaps && (tt <= ext.tmin + r || tt >= ext.tmax - r)) continue;   // skip caps
         if (ss * sInner <= 0) continue;                           // skip the outer long edge
         verts.push({ x: pp[i].x, y: pp[i].y, t: tt });
     }
@@ -1911,6 +1953,85 @@ function _probeOutline(artPolys, geom, E) {
 function _aiKissVector(E0, B0, geom, depth) {
     var dT = (geom.travelIsX ? (B0.x - E0.x) : (B0.y - E0.y)) + geom.sign * depth;
     return geom.travelIsX ? { tx: dT, ty: 0 } : { tx: 0, ty: dT };
+}
+
+// Drops near-coincident points (a shared polygon vertex is hit from both adjacent segments).
+// Pure geometry.
+function _dedupePoints(pts, tol) {
+    if (tol === undefined) tol = 1e-4;
+    var out = [], i, jj, dup;
+    for (i = 0; i < pts.length; i++) {
+        dup = false;
+        for (jj = 0; jj < out.length; jj++) {
+            if (Math.abs(pts[i].x - out[jj].x) <= tol && Math.abs(pts[i].y - out[jj].y) <= tol) {
+                dup = true; break;
+            }
+        }
+        if (!dup) out.push(pts[i]);
+    }
+    return out;
+}
+
+// Every point where the circle of radius L centered at P crosses a segment of the sampled border
+// polygons. Solves |p1 + t*(p2-p1) - P|^2 = L^2 per segment, keeping roots with t in [0,1].
+// Returns a deduped array of {x,y}; empty when the circle never reaches the border. Pure geometry.
+function _circlePolyIntersections(P, L, polys) {
+    var out = [], ai, A, i, j, p1, p2, k;
+    var L2 = L * L, eps = 1e-9;
+    for (ai = 0; ai < polys.length; ai++) {
+        A = polys[ai];
+        for (i = 0, j = A.length - 1; i < A.length; j = i++) {
+            p1 = A[j]; p2 = A[i];
+            var dx = p2.x - p1.x, dy = p2.y - p1.y;
+            var fx = p1.x - P.x, fy = p1.y - P.y;
+            var a = dx * dx + dy * dy;
+            if (a < eps) continue;                                   // degenerate segment
+            var b = 2 * (fx * dx + fy * dy);
+            var c = fx * fx + fy * fy - L2;
+            var disc = b * b - 4 * a * c;
+            if (disc < -eps) continue;                               // no real intersection
+            if (disc < 0) disc = 0;
+            var sq = Math.sqrt(disc);
+            var roots = [(-b - sq) / (2 * a), (-b + sq) / (2 * a)];
+            for (k = 0; k < 2; k++) {
+                var t = roots[k];
+                if (t < -1e-6 || t > 1 + 1e-6) continue;             // outside the segment
+                out.push({ x: p1.x + t * dx, y: p1.y + t * dy });
+            }
+        }
+    }
+    return _dedupePoints(out, 1e-4);
+}
+
+// Of the two inner-edge endpoints, the one that reaches its border point with the LEAST forward
+// travel toward the art (smallest signed gap). That one is translated onto the border first; the
+// other is then rotated down onto the border. geom = { travelIsX, sign } (plate -> art). Both
+// border points are non-null here (overhang is handled upstream). Pure geometry.
+function _seatNearEndpoint(E0, B0, E1, B1, geom) {
+    function gap(E, B) {
+        return geom.sign * (geom.travelIsX ? (B.x - E.x) : (B.y - E.y));
+    }
+    if (gap(E0, B0) <= gap(E1, B1)) return { P: E0, Bp: B0, Q: E1, Bq: B1 };
+    return { P: E1, Bp: B1, Q: E0, Bq: B0 };
+}
+
+// The smallest-magnitude rotation about the (already on-border) near endpoint P that lands the far
+// endpoint Q on the border. Q is rigidly at distance L=|P-Q| from P, so its target is where the
+// circle of radius L about P meets the border. deg is CCW-positive in AI's y-up space (feeds
+// _rotateItemsAbout directly). Pure geometry.
+function _seatContactRotation(P, Q, polys, maxRot) {
+    var L = Math.sqrt((Q.x - P.x) * (Q.x - P.x) + (Q.y - P.y) * (Q.y - P.y));
+    if (L < 1e-6) return { ok: false, reason: "degenerate chord" };
+    var hits = _circlePolyIntersections(P, L, polys);
+    if (!hits.length) return { ok: false, reason: "far endpoint cannot reach border" };
+    var qAng = _aiChordAngleDeg(P, Q);
+    var best = 0, bestAbs = 1e18, i, d;
+    for (i = 0; i < hits.length; i++) {
+        d = _aiNormalizeDeg(_aiChordAngleDeg(P, hits[i]) - qAng);
+        if (Math.abs(d) < bestAbs) { bestAbs = Math.abs(d); best = d; }
+    }
+    if (bestAbs > maxRot) return { ok: true, deg: 0, needsReview: true, clamped: true };
+    return { ok: true, deg: best, needsReview: false, clamped: false };
 }
 
 // How far the outline at the inner-edge midpoint protrudes INTO the pill along the travel
@@ -2413,7 +2534,7 @@ function syncHalfcut(doc, group, opts) {
         return { ok: false, reason: "caption not seated into the art (not connected, or completely inside it)" };
     }
     var curved = _seamCurved(seam, mmToPoints(0.12));
-    seam = _extendHalfcutEndsToCutline(seam, cutline, plate, ext, steps, platePolys);
+    seam = _extendHalfcutEndsToCutline(seam, cutline, plate, ext, steps, platePolys, artPolys);
     if (!_seamFinite(seam)) {   // never hand setEntirePath a <2-point / non-finite / zero-extent seam
         return { ok: false, reason: "degenerate seam (too few/coincident points after extension)" };
     }
@@ -2790,30 +2911,24 @@ function _seamCurved(pts, tol) {
     return false;
 }
 
-// Builds the half-cut seam polyline = the SUBMERGED SPAN of the caption plate's INNER EDGE.
-// Both rounded CAPS and the outer "grab" edge are excluded, so the cut follows the inner edge
-// only and never wraps a cap (the back-and-forth "cap dip" spike is impossible by construction).
+// Builds the half-cut seam polyline = the caption plate's INNER (art-facing) EDGE, cap to cap —
+// the boundary between the caption and the art. It is DEPTH-INDEPENDENT: derived from the plate
+// GEOMETRY (`_innerEdgeVerts(pp, geom, {includeCaps:true})` — PCA long axis + the plate→art
+// direction), NOT from how deeply the caption is submerged, so it yields a full caption-width seam
+// at any embed depth including 0 (two-point contact: the top edge sits on the art border with
+// nothing strictly submerged). The two-point-contact seat guarantees the inner-edge endpoints land
+// on the border, so the seam terminates at the two junctions; syncHalfcut's
+// _extendHalfcutEndsToCutline ties each end onto the cut contour. Straight for a flat/tilted seat;
+// curved only if the plate's spine is genuinely curved. The near-square (kissOnly) case still gets
+// a valid geom-based seam — the inner SIDE comes from geom, so only the (noisy) long-axis ordering
+// is affected, not correctness.
 //
-// The endpoint selection is confined to the inner edge — it can't be hijacked by a stray
-// crossing on a cap or the outer edge:
-//   • Isolate the inner edge as a contiguous run of the plate boundary, each vertex tagged
-//     inside/outside the art (_innerEdgeRun).
-//   • Take the SUBMERGED sub-span: first..last inside vertex. Any interior exposed stretch (a
-//     notch) is bridged straight — so an arbitrary NUMBER of art intersections is handled by
-//     construction, not just two.
-//   • Each end FOLLOWS the plate edge from the submerged run around the cap curve to the art∩
-//     caption crossing (_capArcToCrossing) — so the seam hugs the caption's curve up to the
-//     intersection instead of chording straight across it. syncHalfcut then runs the 1mm tail
-//     down the ART path from each crossing.
-// Straight for a flat/tilted seat; curved only if the plate's spine is genuinely curved.
+// The unseated-caption hard error now lives solely at the seat (seatPlateToOutline → ok:false, so
+// the caption is never built); this seam no longer re-checks submersion on the main path.
 //
-// Degenerate plate (near-circular / ambiguous inner side) → a straight chord between the two
-// farthest crossings (still spike-free, on the submerged side) — a shape-degeneracy guard, NOT
-// the removed not-seated fallback.
-//
-// Returns [{x,y}, …] (>=2 pts), or NULL when the caption is NOT seated into the art: nothing
-// inside (not connected), nothing outside (fully buried), or no submerged inner edge. The
-// caller treats null as a hard error — there is no flat-cut fallback.
+// Degenerate plate (inner edge unresolvable, < 2 verts) → a straight chord between the two
+// farthest plate∩art crossings (submersion computed only for this fallback), or NULL if the plate
+// is genuinely not against the art. The caller treats null as a hard error — no flat-cut fallback.
 function plateSeamPath(plate, outline, steps, platePolys, artPolys) {
     var s = steps || 16;
     // Pre-sampled polys may be threaded in (syncHalfcut samples the plate once per pass and the
@@ -2826,73 +2941,51 @@ function plateSeamPath(plate, outline, steps, platePolys, artPolys) {
     var n = pp.length;
     if (n < 4) return null;
 
-    // Inside-art flag per plate vertex (even-odd, so art holes count as outside).
-    var inside = [], i, countIn = 0;
-    for (i = 0; i < n; i++) {
-        inside[i] = _pointInPolysEO(pp[i], artPolys);
-        if (inside[i]) countIn++;
-    }
-    // Not seated: nothing inside (not connected) or nothing outside (fully buried).
-    if (countIn === 0 || countIn === n) return null;
-
-    // The inner edge as a contiguous run (cap to cap), each vertex tagged inside/outside.
-    // geom (plate→art bbox direction) lets _innerEdgeRun sanity-check its submersion tally
-    // against the reliable art direction — see the wrong-majority guard there.
     var geom = _aiSeatGeometry(plate, outline);
-    var run = _innerEdgeRun(pp, inside, geom);
-    if (!run) return _chordFallback(pp, inside, artPolys);   // degenerate plate shape
 
-    // Submerged span: first..last inside vertex (interior notches bridged).
-    var f = -1, l = -1, k;
-    for (k = 0; k < run.length; k++) {
-        if (run[k].inside) { if (f < 0) f = k; l = k; }
-    }
-    if (f < 0) return null;   // inner edge fully exposed → not seated as a peel tab
+    // The half-cut runs along the caption's INNER (art-facing) LONG edge — the boundary between the
+    // caption and the art. It is derived from the plate GEOMETRY (PCA long axis + the plate→art
+    // direction), NOT from how deeply the caption is submerged, so it yields a seam at ANY embed
+    // depth including 0 (two-point contact: the top edge sits on the art border with nothing
+    // strictly submerged; the OLD submersion-gated seam collapsed to zero there).
+    //
+    // The seam deliberately EXCLUDES the rounded cap arcs (default `_innerEdgeVerts`, no
+    // includeCaps): it must end near the two junctions so syncHalfcut's overshoot anchors THERE and
+    // runs the 1mm tail along the ART cut line. A seam that ran down the cap arcs would end deep on
+    // the caption, so the overshoot anchors on the caption's own edge and the tail runs the wrong
+    // way (every element then hits _pickTailDir's near-tie). The seat lands the inner-edge endpoints
+    // on the border just inside the junctions, so the overshoot's nearest-point projection reaches
+    // the junction cleanly. The upstream seat is the hard-error gate for a genuinely unseated
+    // caption (seatPlateToOutline → ok:false; the caption is never built), so no submersion re-check.
+    var ie = _innerEdgeVerts(pp, geom);
+    var seam = (ie && !ie.kissOnly) ? _innerEdgeSeam(ie) : null;
+    if (seam) return seam;
 
-    // Each end: follow the plate's OWN submerged edge from the last inner-edge vertex — including
-    // the submerged part of the rounded cap — up to the art∩caption INTERSECTION, so the seam hugs
-    // the caption's curve instead of chording straight across it. The inner edge alone (run)
-    // excludes the caps; _capArcToCrossing walks the plate loop past run's end, collecting the
-    // still-submerged cap vertices, and stops at the crossing. syncHalfcut then runs the 1mm tail
-    // along the ART path from each crossing (not the caption's exposed edge past the cap).
-    var leftCap  = _capArcToCrossing(pp, inside, artPolys, run[f].idx, -1);  // [capVerts…, leftCrossing]
-    var rightCap = _capArcToCrossing(pp, inside, artPolys, run[l].idx,  1);  // [capVerts…, rightCrossing]
-    if (!leftCap || !rightCap) return null;
+    // Near-square / very-short caption: the PCA long axis is noise (kissOnly) and the cap band can
+    // swallow the whole trimmed inner edge. Retry KEEPING the caps so a legit 1-2 char caption still
+    // yields a (short) art-facing seam instead of nulling out → export hard-error (review #1).
+    seam = _innerEdgeSeam(_innerEdgeVerts(pp, geom, { includeCaps: true }));
+    if (seam) return seam;
 
-    // leftCrossing … capVerts … run[f] … run[l] … capVerts … rightCrossing. The left path is walked
-    // outward from run[f], so reverse it to read crossing-first.
+    // Truly degenerate plate (inner edge unresolvable) → straight chord between the two farthest
+    // plate∩art crossings, if the plate is genuinely seated. Submersion computed only for this fallback.
+    var inside = [], k, countIn = 0;
+    for (k = 0; k < n; k++) { inside[k] = _pointInPolysEO(pp[k], artPolys); if (inside[k]) countIn++; }
+    if (countIn === 0 || countIn === n) return null;
+    return _chordFallback(pp, inside, artPolys);
+}
+
+// The inner-edge verts from _innerEdgeVerts → a seam polyline [{x,y}, …], or null if < 2 verts.
+// (The caller decides whether to accept a kissOnly result.) Pure.
+function _innerEdgeSeam(ie) {
+    if (!ie || !ie.verts || ie.verts.length < 2) return null;
     var seam = [], i;
-    for (i = leftCap.length - 1; i >= 0; i--) seam.push(leftCap[i]);
-    for (k = f; k <= l; k++) seam.push({ x: run[k].x, y: run[k].y });
-    for (i = 0; i < rightCap.length; i++) seam.push(rightCap[i]);
-
+    for (i = 0; i < ie.verts.length; i++) seam.push({ x: ie.verts[i].x, y: ie.verts[i].y });
     return seam;
 }
 
-// Walks the plate loop from vertex startIdx in direction dir, collecting each still-SUBMERGED
-// vertex (inner edge + the submerged part of the rounded cap), up to where the plate edge crosses
-// out of the art — the art∩caption INTERSECTION. Returns [capVerts…, crossing] (walk order); the
-// last element is the crossing point on the art border. This makes the half-cut hug the caption's
-// submerged edge (including the cap's curve) all the way to the intersection instead of a straight
-// chord, then STOPS there so the 1mm tail can run along the art path. null if no crossing found.
-// Pure geometry.
-function _capArcToCrossing(pp, inside, artPolys, startIdx, dir) {
-    var n = pp.length, out = [], cur = startIdx, guard = 0, nx;
-    while (guard < n) {
-        nx = (cur + dir + n) % n;
-        if (inside[cur] !== inside[nx]) {          // crossed the art edge → the intersection
-            out.push(_segCrossArt(inside[cur] ? pp[nx] : pp[cur],
-                                  inside[cur] ? pp[cur] : pp[nx], artPolys));
-            return out;
-        }
-        out.push({ x: pp[nx].x, y: pp[nx].y });    // still submerged → follow the caption edge
-        cur = nx; guard++;
-    }
-    return null;
-}
-
 // Shape-degeneracy fallback: a straight chord between the two farthest plate∩art crossings.
-// Used only when _innerEdgeRun can't split a near-circular plate. Returns [P,Q] or null (<2).
+// Used only when the geometry seam is unresolvable (< 2 inner-edge verts). Returns [P,Q] or null (<2).
 function _chordFallback(pp, inside, artPolys) {
     var n = pp.length, crossings = [], i, j, a, b;
     for (i = 0; i < n; i++) {
@@ -2920,96 +3013,6 @@ function _farthestCrossingPair(crossings) {
         }
     }
     return { i: bi, j: bj };
-}
-
-// Isolates the plate's INNER EDGE as a CONTIGUOUS run of the boundary loop, one cap to the
-// other: [{x, y, idx, inside}, …] in plate-loop order, where idx is the vertex's index in pp
-// and inside is whether it's submerged in the art. Returns null when the capsule can't be split
-// (near-circular / ambiguous inner side) → caller chords it. Carries no seat info: the caller
-// finds the submerged sub-span and the surfacing endpoints itself.
-//
-// Method: PCA gives the long axis u (perpendicular v) through the vertex centroid. A vertex is
-// on a CAP when its axis projection is within one radius r of either extreme (the semicircular
-// ends occupy the last r of length). The remaining long-edge vertices split by side; the INNER
-// edge is the side with more submerged vertices (a majority, robust to a notch). Its vertices
-// are contiguous in the loop — return the longest such contiguous arc.
-function _innerEdgeRun(pp, inside, geom) {
-    var n = pp.length, i, dx, dy;
-    var cx = 0, cy = 0;
-    for (i = 0; i < n; i++) { cx += pp[i].x; cy += pp[i].y; }
-    cx /= n; cy /= n;
-    // Covariance → principal (long) axis u and perpendicular v.
-    var sxx = 0, syy = 0, sxy = 0;
-    for (i = 0; i < n; i++) {
-        dx = pp[i].x - cx; dy = pp[i].y - cy;
-        sxx += dx * dx; syy += dy * dy; sxy += dx * dy;
-    }
-    var theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
-    var ux = Math.cos(theta), uy = Math.sin(theta);
-    var vx = -uy, vy = ux;
-    // Project every vertex: t along u, soff along v. Axis span + perpendicular half-extent r.
-    var t = [], soff = [], tmin = 1e15, tmax = -1e15, smin = 1e15, smax = -1e15, tt, ss;
-    for (i = 0; i < n; i++) {
-        dx = pp[i].x - cx; dy = pp[i].y - cy;
-        tt = dx * ux + dy * uy; ss = dx * vx + dy * vy;
-        t[i] = tt; soff[i] = ss;
-        if (tt < tmin) tmin = tt;
-        if (tt > tmax) tmax = tt;
-        if (ss < smin) smin = ss;
-        if (ss > smax) smax = ss;
-    }
-    var r = (smax - smin) / 2;
-    if (r <= 1e-6) return null;
-    // Too short to hold two caps plus a straight edge (near-circular) → caller chords it.
-    if ((tmax - tmin) <= 2 * r * 1.05) return null;
-    // Inner side = the long edge (non-cap vertices, split by sign of soff) with more of its
-    // vertices submerged in the art. Counting beats a single midpoint probe, which can land in
-    // a notch and read the wrong side. Caps excluded so they don't skew the tally.
-    var inPos = 0, inNeg = 0;
-    for (i = 0; i < n; i++) {
-        if (t[i] <= tmin + r || t[i] >= tmax - r) continue;   // skip caps
-        if (!inside[i]) continue;
-        if (soff[i] > 0) inPos++; else inNeg++;
-    }
-    if (inPos === inNeg) return null;     // can't tell which long edge is the inner one
-    var sign = inPos > inNeg ? 1 : -1;
-    // Wrong-majority guard (#4): the inner edge MUST face the art. Cross-check the submerged-
-    // vertex tally against the RELIABLE art direction (geom = plate→art bbox centroids, NOT the
-    // PCA eigenvector sign, which is fragile). vTravel is this PCA's perpendicular-axis component
-    // along the travel axis; the art-facing soff side is sign(vTravel*geom.sign) — the SAME rule
-    // the seat's _innerEdgeVerts uses. On a normal seat the submerged majority already faces the
-    // art, so they AGREE and this is a no-op. They disagree only when a shallow/tilted seat over
-    // CONVEX art submerges verts onto the OUTER edge — then the tally would trace the grab edge,
-    // so trust the art direction instead. (No-op on the validated fixture; the log flags any fire.)
-    if (geom) {
-        var vTravel = geom.travelIsX ? vx : vy;
-        var artSide = (vTravel * geom.sign >= 0) ? 1 : -1;
-        if (sign !== artSide) {
-            log("[halfcut] inner-edge | submerged-vertex tally disagreed with art direction — "
-                + "trusting art direction (wrong-majority guard)");
-            sign = artSide;
-        }
-    }
-    // Mark inner-edge vertices: clear of both caps AND on the inner side.
-    var isInner = [];
-    for (i = 0; i < n; i++) {
-        isInner[i] = (t[i] > tmin + r && t[i] < tmax - r && soff[i] * sign > 0);
-    }
-    // Longest contiguous cyclic arc of inner-edge vertices (one capsule side).
-    var bestStart = -1, bestLen = 0, len, j2, guard;
-    for (i = 0; i < n; i++) {
-        if (!isInner[i] || isInner[(i - 1 + n) % n]) continue;   // i starts a fresh arc
-        len = 0; j2 = i; guard = 0;
-        while (isInner[j2] && guard < n) { len++; j2 = (j2 + 1) % n; guard++; }
-        if (len > bestLen) { bestLen = len; bestStart = i; }
-    }
-    if (bestStart < 0) return null;
-    var run = [], idx = bestStart, c;
-    for (c = 0; c < bestLen; c++) {
-        run.push({ x: pp[idx].x, y: pp[idx].y, idx: idx, inside: inside[idx] });
-        idx = (idx + 1) % n;
-    }
-    return run;
 }
 
 // Even-odd point-in-polygons test across a sampled path's subpaths (holes subtract).
@@ -3065,7 +3068,7 @@ function _extendPoint(from, toward, dist) {
 // along the contour, away from the caption plate. Returns a NEW seam (never mutates the input).
 // Falls back to a fixed outward extension when the cut line / plate can't be sampled or the
 // rebuilt tail degenerates.
-function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps, platePolys) {
+function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps, platePolys, artPolys) {
     var L = seam.length;
     if (L < 2) return seam;
     // Straight outward overshoot of both ends, on a COPY (the shared fallback for every path
@@ -3078,14 +3081,15 @@ function _extendHalfcutEndsToCutline(seam, cutline, plate, overshootPt, steps, p
     }
     var cutPoly = cutline ? _largestPoly(samplePathToPolygons(cutline, steps)) : null;
     if (!cutPoly) return straightOvershoot();               // can't sample cut line → legacy
-    // Plate outline: the tail direction runs DOWN THE ART PATH, i.e. the cut-line branch that
-    // leaves the plate (the caption's exposed edge hugs it). Reuse the polys syncHalfcut sampled.
+    // Plate outline (legacy tie-breaker) + ART outline (primary discriminator): the tail runs down
+    // the cut-line branch that stays ON the art outline; the caption branch peels onto the plate.
     var platePoly = platePolys ? _largestPoly(platePolys)
                   : (plate ? _largestPoly(samplePathToPolygons(plate, steps)) : null);
     if (!platePoly) return straightOvershoot();             // can't sample plate → legacy
+    var artPoly = artPolys ? _largestPoly(artPolys) : null;
 
-    var tail0 = _cutlineOvershootTail(seam[0],     seam[1],     cutPoly, platePoly, overshootPt); // [P0..end0]
-    var tailN = _cutlineOvershootTail(seam[L - 1], seam[L - 2], cutPoly, platePoly, overshootPt); // [PN..endN]
+    var tail0 = _cutlineOvershootTail(seam[0],     seam[1],     cutPoly, platePoly, artPoly, overshootPt); // [P0..end0]
+    var tailN = _cutlineOvershootTail(seam[L - 1], seam[L - 2], cutPoly, platePoly, artPoly, overshootPt); // [PN..endN]
 
     // end0 … P0  +  interior seam  +  PN … endN. The raw ends seam[0]/seam[L-1] are dropped;
     // their on-contour crossings P0/PN take their place (tail*[0]).
@@ -3129,35 +3133,39 @@ function _seamFinite(seam) {
 
 // Which way to run the peel-tab tail along the cut contour from junction P (on edge edgeIdx):
 // +1 (toward edgeIdx+1) or −1. The junction is the art∩caption crossing; the cut line leaves it
-// two ways — along the ART edge (into the body, LEAVING the plate) or along the caption's exposed
-// edge (which HUGS the plate). The tail must run down the ART path, so probe `probe` arc length
-// each way and take the branch whose endpoint is FARTHER from the plate outline (the caption
-// branch stays ~on it, distance ≈ 0; the art branch peels away). With the seam now ending exactly
-// at the crossing this is usually a clear winner, but on a SMALL element the ~probe walk can wrap
-// past the body so both endpoints sit ~equidistant from the plate — a near-tie. There, break by
-// the distance-to-plate summed over the WHOLE walk (the caption branch hugs the plate the entire
-// way ≈ 0; the art branch peels away), not just the endpoints. Pure geometry.
-function _pickTailDir(cutPoly, P, edgeIdx, platePoly, probe) {
+// two ways — along the ART edge (which LIES ON the art outline) or along the caption's exposed
+// edge (which peels onto the PLATE outline, away from the art). The tail must run down the ART
+// path, so probe `probe` arc length each way and take the branch that stays CLOSER TO THE ART
+// OUTLINE, summed over the whole walk.
+//
+// Why art-distance and not "farther from the plate": near a seated junction the art edge runs
+// right alongside the caption, so BOTH branches sit ≈0 from the plate for the first ~1mm — the
+// plate metric can't separate them and mis-picks (the caption tail on a small/tilted element,
+// e.g. Tram's right end: fwd art=0/plate=0 vs back art=1.3/plate=0 — only art tells them apart).
+// The art branch is definitionally ON the art outline (≈0) regardless of element size or tilt, so
+// this is robust with no near-tie fallback. Falls back to the legacy plate discriminator only when
+// the art outline is unavailable. Pure geometry.
+function _pickTailDir(cutPoly, P, edgeIdx, platePoly, artPoly, probe) {
     var fEnd = _walkCutPolyArc(cutPoly, P, edgeIdx,  1, probe);
     var bEnd = _walkCutPolyArc(cutPoly, P, edgeIdx, -1, probe);
+    if (artPoly && artPoly.length >= 3) {
+        var aF = _sumDist2ToPoly(fEnd, artPoly), aB = _sumDist2ToPoly(bEnd, artPoly);
+        return (aF <= aB) ? 1 : -1;                          // stay on the art outline
+    }
+    // Legacy fallback (no art outline): farther-from-plate, then integrated-distance tie-break.
     var fp = fEnd[fEnd.length - 1], bp = bEnd[bEnd.length - 1];
-    var dF = _minDist2ToPolyEdges(fp, platePoly);
-    var dB = _minDist2ToPolyEdges(bp, platePoly);
+    var dF = _minDist2ToPolyEdges(fp, platePoly), dB = _minDist2ToPolyEdges(bp, platePoly);
     if (Math.abs(Math.sqrt(dF) - Math.sqrt(dB)) >= mmToPoints(0.5)) return (dF >= dB) ? 1 : -1;
-    // Near-tie: the single endpoint can't separate the branches; integrate over the whole walk.
     var sF = _sumDist2ToPoly(fEnd, platePoly), sB = _sumDist2ToPoly(bEnd, platePoly);
-    var dir = (sF >= sB) ? 1 : -1;
-    log("[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate ("
-        + (dir > 0 ? "fwd" : "back") + ")");
-    return dir;
+    return (sF >= sB) ? 1 : -1;
 }
 
 // One seam end → an ordered list of points [P, …, tailEnd] that all lie ON the cut line: P is
 // the nearest point on the contour to the seam end (= the art∩caption crossing), then a walk of
-// overshootPt arc length along the cut-line polygon down the ART path (away from the plate),
-// chosen by _pickTailDir. So the tail tracks the art cut line rather than the caption's exposed
-// edge or a straight tangent.
-function _cutlineOvershootTail(endPt, innerPt, cutPoly, platePoly, overshootPt) {
+// overshootPt arc length along the cut-line polygon down the ART path (the branch that stays on
+// the art outline), chosen by _pickTailDir. So the tail tracks the art cut line rather than the
+// caption's exposed edge or a straight tangent.
+function _cutlineOvershootTail(endPt, innerPt, cutPoly, platePoly, artPoly, overshootPt) {
     // Anchor the tail at the junction by projecting the seam end to the NEAREST point on the cut
     // line — NOT by shooting a ray along the seam tangent. The seam runs along the pill edge, so
     // its tangent is nearly parallel to the cut line at the junction; a ray SKIMS and lands the
@@ -3166,7 +3174,7 @@ function _cutlineOvershootTail(endPt, innerPt, cutPoly, platePoly, overshootPt) 
     if (!Pn) return [_extendPoint(endPt, innerPt, overshootPt)];       // no contour → fixed
     var P = { x: Pn.x, y: Pn.y };
     var probe = Math.max(overshootPt, mmToPoints(2));
-    var dir = _pickTailDir(cutPoly, P, Pn.edge, platePoly, probe);
+    var dir = _pickTailDir(cutPoly, P, Pn.edge, platePoly, artPoly, probe);
     return _walkCutPolyArc(cutPoly, P, Pn.edge, dir, overshootPt);
 }
 

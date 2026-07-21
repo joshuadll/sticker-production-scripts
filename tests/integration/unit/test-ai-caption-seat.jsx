@@ -182,6 +182,109 @@ var sqIe = _innerEdgeVerts(
 assert("near-square pill kissOnly", sqIe.kissOnly, true);
 assertClose("near-square pill radius = 10", sqIe.radius, 10);
 
+// --- _circlePolyIntersections (exact circle ∩ border) --------------------------
+testLog("[ai-seat-test] --- _circlePolyIntersections ---");
+
+// SQUARE [0,100]^2. Center on the bottom edge, radius 50 -> hits the two bottom corners.
+var ci1 = _circlePolyIntersections({x:50, y:0}, 50, SQUARE);
+assert("circle r50 on bottom edge -> 2 hits", ci1.length, 2);
+
+// Radius 100 from (50,0): left edge (0,~86.6), right edge (100,~86.6), tangent top (50,100).
+var ci2 = _circlePolyIntersections({x:50, y:0}, 100, SQUARE);
+assert("circle r100 -> 3 hits", ci2.length, 3);
+
+// Radius 10 from (50,0): stays inside the square, never reaches an edge except the bottom it
+// sits on — (40,0) and (60,0).
+var ci3 = _circlePolyIntersections({x:50, y:0}, 10, SQUARE);
+assert("circle r10 -> 2 hits on bottom", ci3.length, 2);
+
+// A circle far too small to reach a raised border line -> 0 hits.
+var LINE = [[ {x:-100,y:20}, {x:100,y:20} ]];
+var ci4 = _circlePolyIntersections({x:0, y:0}, 10, LINE);
+assert("circle can't reach border -> 0 hits", ci4.length, 0);
+
+// _dedupePoints collapses coincident points.
+var dd = _dedupePoints([{x:1,y:1},{x:1,y:1},{x:2,y:2}], 1e-4);
+assert("dedupe 3 -> 2", dd.length, 2);
+
+// --- _seatNearEndpoint (which endpoint reaches the border first) ---------------
+testLog("[ai-seat-test] --- _seatNearEndpoint ---");
+// gBelow: travelIsX=false, sign=+1. E0 gap to border = 5, E1 gap = 8 -> E0 is nearer.
+var pick = _seatNearEndpoint({x:0,y:0}, {x:0,y:5}, {x:10,y:0}, {x:10,y:8}, gBelow);
+assertPt("near endpoint P = E0", pick.P, 0, 0);
+assertPt("far endpoint Q = E1", pick.Q, 10, 0);
+
+// --- _seatContactRotation (rotate P->Q chord until Q lands on the border) -------
+testLog("[ai-seat-test] --- _seatContactRotation ---");
+// P at origin, Q at (10,0) (chord length 10). Border = horizontal line y=6.
+// Circle r10 about origin hits y=6 at x=+-8: (8,6) at +36.87deg, (-8,6) at +143.13deg.
+// Smallest rotation from Q (angle 0) is +36.87deg.
+var LINE6 = [[ {x:-100,y:6}, {x:100,y:6} ]];
+var rc = _seatContactRotation({x:0,y:0}, {x:10,y:0}, LINE6, 75);
+assert("contact rotation ok", rc.ok, true);
+assert("contact rotation not clamped", rc.clamped, false);
+assertClose("contact rotation +36.87deg", rc.deg, 36.8698976, 1e-3);
+
+// Same geometry, tight maxRot -> clamped, flagged, deg 0.
+var rcClamp = _seatContactRotation({x:0,y:0}, {x:10,y:0}, LINE6, 30);
+assert("contact rotation clamped", rcClamp.clamped, true);
+assert("contact rotation clamp needsReview", rcClamp.needsReview, true);
+assertClose("contact rotation clamped deg 0", rcClamp.deg, 0);
+
+// Border too far for the chord to reach -> ok:false (overhang).
+var LINE20 = [[ {x:-100,y:20}, {x:100,y:20} ]];
+var rcNo = _seatContactRotation({x:0,y:0}, {x:10,y:0}, LINE20, 75);
+assert("contact rotation unreachable -> ok false", rcNo.ok, false);
+
+// --- plateSeamPath (depth-independent half-cut seam) ---------------------------
+// Regression guard for two-point contact: a caption seated at depth 0 (top edge ON the art
+// border, NOTHING strictly submerged) must still yield a FULL-width seam. The seam is derived
+// from the plate's inner-edge GEOMETRY, not from submersion — the old submersion-gated code
+// returned a collapsed/empty seam here (countIn==0 -> null -> zero-length peel tab).
+testLog("[ai-seat-test] --- plateSeamPath (depth-0 seam) ---");
+
+// Art = square, bottom border at y=1 (interior y in (1,200)). Plate = a stadium BELOW the border
+// with its top edge on y=0 — every vertex is strictly OUTSIDE the art (y<=0 < 1), so countIn==0
+// and the OLD submersion-gated code returns null (the collapse). Yet the inner (top) edge faces
+// +y (toward the art), so the GEOMETRY-based derivation still yields a full-width seam.
+var seamOutline = { geometricBounds: [0, 200, 200, 1] };          // [l,t,r,b] y-up
+var seamPlate   = { geometricBounds: [40, 0, 160, -40] };
+var seamPlatePolys = [[
+    {x:50,y:0},{x:75,y:0},{x:100,y:0},{x:125,y:0},{x:150,y:0},     // top edge (art-facing)
+    {x:158,y:-8},{x:160,y:-20},{x:158,y:-32},                       // right cap
+    {x:150,y:-40},{x:125,y:-40},{x:100,y:-40},{x:75,y:-40},{x:50,y:-40}, // bottom edge
+    {x:42,y:-32},{x:40,y:-20},{x:42,y:-8}                           // left cap
+]];
+var seamArtPolys = [[ {x:0,y:1},{x:200,y:1},{x:200,y:200},{x:0,y:200} ]];
+var seam0 = plateSeamPath(seamPlate, seamOutline, 16, seamPlatePolys, seamArtPolys);
+assert("depth-0 seam is not null", seam0 !== null, true);
+assert("depth-0 seam has >= 2 pts", (seam0 && seam0.length >= 2), true);
+// The RAW seam is the trimmed inner LONG edge (caps excluded so the overshoot anchors at the
+// junctions, not on the caption); full caption width is reached later by the cut-line extension.
+// The guard here is non-COLLAPSE — the old submersion path returned null/zero at depth 0.
+var seamSpan = 0;
+if (seam0 && seam0.length >= 2) {
+    var _sa = seam0[0], _sb = seam0[seam0.length - 1];
+    seamSpan = Math.sqrt((_sb.x-_sa.x)*(_sb.x-_sa.x) + (_sb.y-_sa.y)*(_sb.y-_sa.y));
+}
+assert("depth-0 seam does not collapse (span > 30pt)", seamSpan > 30, true);
+// Seam runs along the art-facing (top) side only — never down the bottom/outer edge (y<=-15).
+var seamOnTop = (seam0 && seam0.length >= 2);
+if (seam0) { for (var _si = 0; _si < seam0.length; _si++) { if (seam0[_si].y < -15) seamOnTop = false; } }
+assert("depth-0 seam runs along the top/inner edge", seamOnTop, true);
+
+// Near-circular / very-short caption (near-SQUARE pill) at depth 0 must ALSO yield a seam.
+// _innerEdgeVerts flags kissOnly for a ~square pill (PCA long axis is noise), but the seam is
+// still derived from the geom-based inner side, so plateSeamPath must NOT null out here — a null
+// would hard-error export for a legitimate 1-2 char caption. (Regression guard for review #1.)
+var sqSeamPlate     = { geometricBounds: [0, 0, 20, -20] };
+var sqSeamPlatePolys = [[
+    {x:0,y:0},{x:10,y:0},{x:20,y:0},{x:20,y:-10},{x:20,y:-20},{x:10,y:-20},{x:0,y:-20},{x:0,y:-10}
+]];
+var seamSq = plateSeamPath(sqSeamPlate, seamOutline, 16, sqSeamPlatePolys, seamArtPolys);
+assert("near-square pill depth-0 seam is not null", seamSq !== null, true);
+assert("near-square pill depth-0 seam has >= 2 pts", (seamSq && seamSq.length >= 2), true);
+
 // --- SUMMARY ------------------------------------------------------------------
 
 testLog("[ai-seat-test] ====================================");

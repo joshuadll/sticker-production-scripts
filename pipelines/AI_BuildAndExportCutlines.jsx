@@ -24,6 +24,9 @@ var CONFIG = {
 
     // Caption vector seat (aiUtils.seatPlateToOutline) — same knobs as AI_BuildCutlines.
     seatOverlapMm:       0.1,
+    captionSeatOverlapMm: 0,     // caption embed PAST two-point contact (mm). 0 = endpoints exactly
+                                 // on the border. Raise to a hair (e.g. 0.1) only if a concave base
+                                 // pinches the Unite. Separate from seatOverlapMm (the TAB embed).
     seatSampleSteps:     24,
     seatConform:         true,
     seatRotationSign:    1,

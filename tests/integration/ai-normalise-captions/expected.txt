@@ -1,40 +1,40 @@
-[pipeline] === AI_NormaliseCaptions start ===
+[pipeline] === AI_NormaliseCaptions start (version unknown) ===
 [pipeline] dryRun: false
 [pipeline] document: resize-elements.ai
-[seat] Devín Castle | rotated -0.3deg to endpoint chord.
-[seat] Devín Castle | seated rot=-0.3deg move=0.2pt depth=0.3pt
-[halfcut] Devín Castle | pts=53 end0=(178.5,475.4) endN=(177.6,428.2) straight
+[seat] Devín Castle | rotated -0.3deg to two-point contact.
+[seat] Devín Castle | seated (contact) rot=-0.3deg move=0.1pt depth=0pt
+[halfcut] Devín Castle | pts=45 end0=(177.4,429.3) endN=(178.4,474) straight
 [buffer] Devín Castle | band 0..+1mm
 [step8b] reset to spec | Devín Castle (WC, x0.904)
-[seat] Slovak Paradise National Park | rotated -0.2deg to endpoint chord.
-[seat] Slovak Paradise National Park | seated rot=-0.2deg move=1pt depth=0.3pt
-[halfcut] Slovak Paradise National Park | pts=22 end0=(311.2,285.3) endN=(417.3,286.2) curved
+[seat] Slovak Paradise National Park | rotated -0.2deg to two-point contact.
+[seat] Slovak Paradise National Park | seated (contact) rot=-0.2deg move=0.4pt depth=0pt
+[halfcut] Slovak Paradise National Park | pts=20 end0=(311.9,285.2) endN=(415.8,286.1) straight
 [buffer] Slovak Paradise National Park | band 0..+1mm
 [step8b] reset to spec | Slovak Paradise National Park (WC, x0.923)
 [step8b] at spec | Spiš Castle (WC)
-[seat] Bratislava Castle | rotated -0.2deg to endpoint chord.
-[seat] Bratislava Castle | seated rot=-0.2deg move=0.5pt depth=0.3pt
-[halfcut] Bratislava Castle | pts=30 end0=(233.2,799.8) endN=(171,802.6) straight
+[seat] Bratislava Castle | rotated -0.2deg to two-point contact.
+[seat] Bratislava Castle | seated (contact) rot=-0.2deg move=0.8pt depth=0pt
+[halfcut] Bratislava Castle | pts=26 end0=(172.8,802.4) endN=(232,799.8) straight
 [buffer] Bratislava Castle | band 0..+1mm
 [step8b] reset to spec | Bratislava Castle (WC, x1.125)
-[seat] Štrbské Pleso | rotated 0.1deg to endpoint chord.
-[seat] Štrbské Pleso | seated rot=0.1deg move=-0.7pt depth=0.3pt
-[halfcut] Štrbské Pleso | pts=31 end0=(413.2,439.4) endN=(415.6,491.7) curved
+[seat] Štrbské Pleso | rotated 0.1deg to two-point contact.
+[seat] Štrbské Pleso | seated (contact) rot=0.1deg move=0.4pt depth=0pt
+[halfcut] Štrbské Pleso | pts=27 end0=(413.5,446.9) endN=(415,484) straight
 [buffer] Štrbské Pleso | band 0..+1mm
 [step8b] reset to spec | Štrbské Pleso (WC, x0.898)
 [step8b] SKIP | National Flower — not a caption (ST).
 [step8b] SKIP | Slovakia Map — not a caption (ST).
 [step8b] at spec | St. Martin's Cathedral (WC)
 [step8b] SKIP | UFO Observation Deck, Bridge SNP — not a caption (ST).
-[seat] Old Town Hall (Bratislava) | rotated 0.0deg to endpoint chord.
-[seat] Old Town Hall (Bratislava) | seated rot=0deg move=0.1pt depth=0.3pt
-[halfcut] Old Town Hall (Bratislava) | pts=27 end0=(49.7,448.9) endN=(145,451.1) straight
+[seat] Old Town Hall (Bratislava) | rotated 0.0deg to two-point contact.
+[seat] Old Town Hall (Bratislava) | seated (contact) rot=0deg move=0.2pt depth=0pt
+[halfcut] Old Town Hall (Bratislava) | pts=54 end0=(51.4,448.9) endN=(143.3,451.1) straight
 [buffer] Old Town Hall (Bratislava) | band 0..+1mm
 [step8b] reset to spec | Old Town Hall (Bratislava) (WC, x0.981)
 [step8b] at spec | Bojnice Castle (WC)
-[seat] Orava Castle | rotated -0.1deg to endpoint chord.
-[seat] Orava Castle | seated rot=-0.1deg move=0.6pt depth=0.3pt
-[halfcut] Orava Castle | pts=26 end0=(412.6,173.6) endN=(461.5,172.9) straight
+[seat] Orava Castle | rotated -0.1deg to two-point contact.
+[seat] Orava Castle | seated (contact) rot=-0.1deg move=0.3pt depth=0pt
+[halfcut] Orava Castle | pts=22 end0=(414.4,173.6) endN=(459.8,172.9) straight
 [buffer] Orava Castle | band 0..+1mm
 [step8b] reset to spec | Orava Castle (WC, x0.900)
 [step8b] at spec | Michael's Gate (WC)
@@ -45,29 +45,28 @@
 [step8b] at spec | Pirohy (WC)
 [step8b] at spec | Bryndzové halušky (WC)
 [step8b] at spec | Kraslice (WC)
-[seat] Kroje | rotated 0.3deg to endpoint chord.
-[seat] Kroje | seated rot=0.3deg move=1.1pt depth=0.3pt
-[halfcut] Kroje | pts=27 end0=(294.9,86.6) endN=(307.8,64.6) curved
+[seat] Kroje | rotated 0.3deg to two-point contact.
+[seat] Kroje | seated (contact) rot=0.3deg move=0.8pt depth=0pt
+[halfcut] Kroje | pts=41 end0=(295.7,85.3) endN=(307.2,65.4) straight
 [buffer] Kroje | band 0..+1mm
 [step8b] reset to spec | Kroje (WC, x0.863)
-[seat] Fujara | rotated 0.5deg to endpoint chord.
-[seat] Fujara | seated rot=0.5deg move=0.7pt depth=0.3pt
-[halfcut] Fujara | pts=31 end0=(48.6,328.8) endN=(40.1,302.2) curved
+[seat] Fujara | rotated 0.5deg to two-point contact.
+[seat] Fujara | seated (contact) rot=0.5deg move=0.2pt depth=0pt
+[halfcut] Fujara | pts=26 end0=(40.7,304) endN=(48.2,327.6) straight
 [buffer] Fujara | band 0..+1mm
 [step8b] reset to spec | Fujara (WC, x0.917)
-[seat] Tram | rotated 0.0deg to endpoint chord.
-[seat] Tram | seated rot=0deg move=-0.2pt depth=0.3pt
-[halfcut] Tram | pts=28 end0=(498,296.7) endN=(520.6,306.6) straight
+[seat] Tram | seated (contact) rot=0deg move=0.4pt depth=0pt
+[halfcut] Tram | pts=45 end0=(499.4,297.3) endN=(513.7,303.5) straight
 [buffer] Tram | band 0..+1mm
 [step8b] reset to spec | Tram (WC, x1.025)
-[seat] Tatra chamois | rotated -0.0deg to endpoint chord.
-[seat] Tatra chamois | seated rot=0deg move=0.3pt depth=0.3pt
-[halfcut] Tatra chamois | pts=31 end0=(272.8,170.7) endN=(326.7,172.8) straight
+[seat] Tatra chamois | rotated -0.0deg to two-point contact.
+[seat] Tatra chamois | seated (contact) rot=0deg move=0pt depth=0pt
+[halfcut] Tatra chamois | pts=41 end0=(274.9,170.7) endN=(325.2,172.7) straight
 [buffer] Tatra chamois | band 0..+1mm
 [step8b] reset to spec | Tatra chamois (WC, x0.940)
-[seat] Carpathian Wooden Churches | rotated 0.2deg to endpoint chord.
-[seat] Carpathian Wooden Churches | seated rot=0.2deg move=-0.2pt depth=0.3pt
-[halfcut] Carpathian Wooden Churches | pts=52 end0=(548.1,501.3) endN=(446.6,501.6) straight
+[seat] Carpathian Wooden Churches | rotated 0.2deg to two-point contact.
+[seat] Carpathian Wooden Churches | seated (contact) rot=0.2deg move=0.5pt depth=0pt
+[halfcut] Carpathian Wooden Churches | pts=53 end0=(447.8,501.7) endN=(546.6,501.6) straight
 [buffer] Carpathian Wooden Churches | band 0..+1mm
 [step8b] reset to spec | Carpathian Wooden Churches (WC, x0.904)
 [step8b] at spec | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) (WC)

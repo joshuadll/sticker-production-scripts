@@ -60,6 +60,45 @@
 >   (both AI pipelines; do NOT raise `halfcutSeamSteps` — it overflows `setEntirePath`). Half-cut
 >   crash-proofed: seam decimated ≤400 pts + `setEntirePath`/zero-extent guards + Step 6 try/catch.
 >   P2 end-to-end on the Slovakia fixture: 22/22 peel tabs, unmatched=0, both SVGs.
+> - 🔧 **Caption seat REWORKED to two-point contact** (2026-07-21, branch
+>   `fix/caption-seat-two-point-contact`): `seatPlateToOutline`'s CAPTION path (the pill; the
+>   default-tab path is untouched) replaces rotate-then-kiss with **translate-nearest +
+>   rotate-until-far-touches**. `_seatNearEndpoint` picks whichever inner-edge endpoint reaches
+>   the border with the least travel and translates it there at depth 0 (`captionSeatOverlapMm`,
+>   default **0** — a separate knob from the tab's `seatOverlapMm`, kept apart so the tab branch
+>   doesn't regress); `_seatContactRotation` then rotates about that now-pinned point via an exact
+>   circle∩border solve (`_circlePolyIntersections`) until the far endpoint also lands on the
+>   border. Both endpoints end up EXACTLY on the traced border — no depth-`d` float on either end
+>   — and the seat's middle is unmanaged by design. The 15%-shrink overhang/convex-bulge guard is
+>   unchanged upstream; a far endpoint that can't reach the border, or only past
+>   `maxSeatRotationDeg`, still routes to `needsReview`. Log line changed:
+>   `[seat] … seated (contact) rot=… move=… depth=…` (was `seated rot=…`). AI-validated:
+>   `ai-build-and-export-cutlines` integration runner green (28/28 captions seated (contact),
+>   0 failed, byte-identical across 2 runs, golden regenerated) + the half-cut alignment
+>   regression green (21/21 endpoints on the cut line, worst gap 0.01pt) — confirming the seam
+>   tracer still follows the new pose. The junction "bump" visual is NOT yet human-confirmed. See
+>   `docs/superpowers/specs/2026-07-21-caption-seat-two-point-contact-design.md`.
+> - 🔧 **Half-cut peel-tab seam now depth-independent** (2026-07-21, same branch): `plateSeamPath`
+>   traced the seam over the plate's **submerged** vertices only, so depth-0 contact (top edge on
+>   the border, nothing submerged) collapsed several peel tabs to zero length. It now derives the
+>   seam from the plate's **inner-edge GEOMETRY** (`_innerEdgeVerts`, geom-based, no submersion),
+>   which yields a seam at any embed depth incl. 0. The seam is the **trimmed inner LONG edge —
+>   caps EXCLUDED** (`_innerEdgeSeam(_innerEdgeVerts(pp, geom))`): it must end just inside the two
+>   junctions so `syncHalfcut`'s overshoot anchors THERE and runs the 1mm tail along the **ART** cut
+>   line. (Including the cap arcs made the seam end deep on the caption → the overshoot anchored on
+>   the caption and `_pickTailDir` ran the tail the wrong way; every element hit its near-tie
+>   fallback.) `includeCaps:true` is now only the **near-square/short-caption retry** (the cap band
+>   can swallow the trimmed edge — keeps a 1-2 char caption from nulling out → export hard-error).
+>   Submersion → only the near-circular `_chordFallback`. Unseated-caption hard error lives solely
+>   at the seat (`seatPlateToOutline` → `ok:false`). `_innerEdgeRun`/`_capArcToCrossing` removed
+>   (off the seam path). The 1mm overshoot **tail direction** is chosen by `_pickTailDir` using
+>   **art-outline proximity** (the ART outline is threaded through `_extendHalfcutEndsToCutline` →
+>   `_cutlineOvershootTail`): the tail follows the branch that stays ON the art outline, not
+>   "farther from the plate" — near a seated junction the art edge hugs the caption so the
+>   plate metric ties and mis-picks the caption tail on small/tilted elements (Tram). AI-validated:
+>   `ai-normalise-captions` green (11 reset, idempotent); all half-cuts straight; **all 22 overshoot
+>   tails run along the art (0 near-ties)**; endpoints on the cut line (0.01pt, alignment 21/21);
+>   tabs at proven lengths. **Human visual confirm of the tail direction still owed.**
 > - 🔁 **Caption-junction cut-line cleanup — REMOVED (reverted 2026-06-14)**: `cleanCaptionJunction()`
 >   and the `CONFIG.weldFilletRadiusPt` gate were removed; the export cutline is back to the raw
 >   `Unite(outline, plate)`, so the plate∩art junction may again show the boolean spike/sliver
