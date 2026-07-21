@@ -1913,6 +1913,54 @@ function _aiKissVector(E0, B0, geom, depth) {
     return geom.travelIsX ? { tx: dT, ty: 0 } : { tx: 0, ty: dT };
 }
 
+// Drops near-coincident points (a shared polygon vertex is hit from both adjacent segments).
+// Pure geometry.
+function _dedupePoints(pts, tol) {
+    if (tol === undefined) tol = 1e-4;
+    var out = [], i, jj, dup;
+    for (i = 0; i < pts.length; i++) {
+        dup = false;
+        for (jj = 0; jj < out.length; jj++) {
+            if (Math.abs(pts[i].x - out[jj].x) <= tol && Math.abs(pts[i].y - out[jj].y) <= tol) {
+                dup = true; break;
+            }
+        }
+        if (!dup) out.push(pts[i]);
+    }
+    return out;
+}
+
+// Every point where the circle of radius L centered at P crosses a segment of the sampled border
+// polygons. Solves |p1 + t*(p2-p1) - P|^2 = L^2 per segment, keeping roots with t in [0,1].
+// Returns a deduped array of {x,y}; empty when the circle never reaches the border. Pure geometry.
+function _circlePolyIntersections(P, L, polys) {
+    var out = [], ai, A, i, j, p1, p2, k;
+    var L2 = L * L, eps = 1e-9;
+    for (ai = 0; ai < polys.length; ai++) {
+        A = polys[ai];
+        for (i = 0, j = A.length - 1; i < A.length; j = i++) {
+            p1 = A[j]; p2 = A[i];
+            var dx = p2.x - p1.x, dy = p2.y - p1.y;
+            var fx = p1.x - P.x, fy = p1.y - P.y;
+            var a = dx * dx + dy * dy;
+            if (a < eps) continue;                                   // degenerate segment
+            var b = 2 * (fx * dx + fy * dy);
+            var c = fx * fx + fy * fy - L2;
+            var disc = b * b - 4 * a * c;
+            if (disc < -eps) continue;                               // no real intersection
+            if (disc < 0) disc = 0;
+            var sq = Math.sqrt(disc);
+            var roots = [(-b - sq) / (2 * a), (-b + sq) / (2 * a)];
+            for (k = 0; k < 2; k++) {
+                var t = roots[k];
+                if (t < -1e-6 || t > 1 + 1e-6) continue;             // outside the segment
+                out.push({ x: p1.x + t * dx, y: p1.y + t * dy });
+            }
+        }
+    }
+    return _dedupePoints(out, 1e-4);
+}
+
 // How far the outline at the inner-edge midpoint protrudes INTO the pill along the travel
 // axis: p = sagitta + depth (sagitta = Bm's deviation from the B0->B1 chord toward the pill,
 // signed by geom.sign). Twin of Step3B's _midProtrusion. null when any probe is missing.

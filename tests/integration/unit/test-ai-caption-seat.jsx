@@ -182,6 +182,31 @@ var sqIe = _innerEdgeVerts(
 assert("near-square pill kissOnly", sqIe.kissOnly, true);
 assertClose("near-square pill radius = 10", sqIe.radius, 10);
 
+// --- _circlePolyIntersections (exact circle ∩ border) --------------------------
+testLog("[ai-seat-test] --- _circlePolyIntersections ---");
+
+// SQUARE [0,100]^2. Center on the bottom edge, radius 50 -> hits the two bottom corners.
+var ci1 = _circlePolyIntersections({x:50, y:0}, 50, SQUARE);
+assert("circle r50 on bottom edge -> 2 hits", ci1.length, 2);
+
+// Radius 100 from (50,0): left edge (0,~86.6), right edge (100,~86.6), tangent top (50,100).
+var ci2 = _circlePolyIntersections({x:50, y:0}, 100, SQUARE);
+assert("circle r100 -> 3 hits", ci2.length, 3);
+
+// Radius 10 from (50,0): stays inside the square, never reaches an edge except the bottom it
+// sits on — (40,0) and (60,0).
+var ci3 = _circlePolyIntersections({x:50, y:0}, 10, SQUARE);
+assert("circle r10 -> 2 hits on bottom", ci3.length, 2);
+
+// A circle far too small to reach a raised border line -> 0 hits.
+var LINE = [[ {x:-100,y:20}, {x:100,y:20} ]];
+var ci4 = _circlePolyIntersections({x:0, y:0}, 10, LINE);
+assert("circle can't reach border -> 0 hits", ci4.length, 0);
+
+// _dedupePoints collapses coincident points.
+var dd = _dedupePoints([{x:1,y:1},{x:1,y:1},{x:2,y:2}], 1e-4);
+assert("dedupe 3 -> 2", dd.length, 2);
+
 // --- SUMMARY ------------------------------------------------------------------
 
 testLog("[ai-seat-test] ====================================");
