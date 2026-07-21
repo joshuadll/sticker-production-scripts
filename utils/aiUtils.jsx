@@ -2959,13 +2959,17 @@ function plateSeamPath(plate, outline, steps, platePolys, artPolys) {
     // for a genuinely unseated caption (seatPlateToOutline returns ok:false and the caption is never
     // built), so the seam no longer re-checks submersion on the main path.
     var ie = _innerEdgeVerts(pp, geom, { includeCaps: true });
-    if (ie && !ie.kissOnly && ie.verts && ie.verts.length >= 2) {
+    if (ie && ie.verts && ie.verts.length >= 2) {
+        // Includes the kissOnly (near-square / very-short caption) case: the PCA long axis is noise
+        // there, but the inner SIDE is still picked from geom (plate→art), so the geom-based inner
+        // edge is a valid seam — and depth-independent, so a short caption at depth 0 does not null
+        // out (which would hard-error export). See the caption-seat design spec follow-up.
         var seam = [], i;
         for (i = 0; i < ie.verts.length; i++) seam.push({ x: ie.verts[i].x, y: ie.verts[i].y });
         return seam;
     }
 
-    // Degenerate plate (near-circular / ambiguous inner side) → straight chord between the two
+    // Truly degenerate plate (inner edge unresolvable, < 2 verts) → straight chord between the two
     // farthest plate∩art crossings, if the plate is genuinely seated. Submersion is computed only
     // for this fallback.
     var inside = [], k, countIn = 0;

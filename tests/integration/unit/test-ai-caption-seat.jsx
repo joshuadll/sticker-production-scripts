@@ -270,6 +270,18 @@ var seamOnTop = (seam0 && seam0.length >= 2);
 if (seam0) { for (var _si = 0; _si < seam0.length; _si++) { if (seam0[_si].y < -15) seamOnTop = false; } }
 assert("depth-0 seam runs along the top/inner edge", seamOnTop, true);
 
+// Near-circular / very-short caption (near-SQUARE pill) at depth 0 must ALSO yield a seam.
+// _innerEdgeVerts flags kissOnly for a ~square pill (PCA long axis is noise), but the seam is
+// still derived from the geom-based inner side, so plateSeamPath must NOT null out here — a null
+// would hard-error export for a legitimate 1-2 char caption. (Regression guard for review #1.)
+var sqSeamPlate     = { geometricBounds: [0, 0, 20, -20] };
+var sqSeamPlatePolys = [[
+    {x:0,y:0},{x:10,y:0},{x:20,y:0},{x:20,y:-10},{x:20,y:-20},{x:10,y:-20},{x:0,y:-20},{x:0,y:-10}
+]];
+var seamSq = plateSeamPath(sqSeamPlate, seamOutline, 16, sqSeamPlatePolys, seamArtPolys);
+assert("near-square pill depth-0 seam is not null", seamSq !== null, true);
+assert("near-square pill depth-0 seam has >= 2 pts", (seamSq && seamSq.length >= 2), true);
+
 // --- SUMMARY ------------------------------------------------------------------
 
 testLog("[ai-seat-test] ====================================");
