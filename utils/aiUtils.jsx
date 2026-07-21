@@ -2911,30 +2911,24 @@ function _seamCurved(pts, tol) {
     return false;
 }
 
-// Builds the half-cut seam polyline = the SUBMERGED SPAN of the caption plate's INNER EDGE.
-// Both rounded CAPS and the outer "grab" edge are excluded, so the cut follows the inner edge
-// only and never wraps a cap (the back-and-forth "cap dip" spike is impossible by construction).
+// Builds the half-cut seam polyline = the caption plate's INNER (art-facing) EDGE, cap to cap —
+// the boundary between the caption and the art. It is DEPTH-INDEPENDENT: derived from the plate
+// GEOMETRY (`_innerEdgeVerts(pp, geom, {includeCaps:true})` — PCA long axis + the plate→art
+// direction), NOT from how deeply the caption is submerged, so it yields a full caption-width seam
+// at any embed depth including 0 (two-point contact: the top edge sits on the art border with
+// nothing strictly submerged). The two-point-contact seat guarantees the inner-edge endpoints land
+// on the border, so the seam terminates at the two junctions; syncHalfcut's
+// _extendHalfcutEndsToCutline ties each end onto the cut contour. Straight for a flat/tilted seat;
+// curved only if the plate's spine is genuinely curved. The near-square (kissOnly) case still gets
+// a valid geom-based seam — the inner SIDE comes from geom, so only the (noisy) long-axis ordering
+// is affected, not correctness.
 //
-// The endpoint selection is confined to the inner edge — it can't be hijacked by a stray
-// crossing on a cap or the outer edge:
-//   • Isolate the inner edge as a contiguous run of the plate boundary, each vertex tagged
-//     inside/outside the art (_innerEdgeRun).
-//   • Take the SUBMERGED sub-span: first..last inside vertex. Any interior exposed stretch (a
-//     notch) is bridged straight — so an arbitrary NUMBER of art intersections is handled by
-//     construction, not just two.
-//   • Each end FOLLOWS the plate edge from the submerged run around the cap curve to the art∩
-//     caption crossing (_capArcToCrossing) — so the seam hugs the caption's curve up to the
-//     intersection instead of chording straight across it. syncHalfcut then runs the 1mm tail
-//     down the ART path from each crossing.
-// Straight for a flat/tilted seat; curved only if the plate's spine is genuinely curved.
+// The unseated-caption hard error now lives solely at the seat (seatPlateToOutline → ok:false, so
+// the caption is never built); this seam no longer re-checks submersion on the main path.
 //
-// Degenerate plate (near-circular / ambiguous inner side) → a straight chord between the two
-// farthest crossings (still spike-free, on the submerged side) — a shape-degeneracy guard, NOT
-// the removed not-seated fallback.
-//
-// Returns [{x,y}, …] (>=2 pts), or NULL when the caption is NOT seated into the art: nothing
-// inside (not connected), nothing outside (fully buried), or no submerged inner edge. The
-// caller treats null as a hard error — there is no flat-cut fallback.
+// Degenerate plate (inner edge unresolvable, < 2 verts) → a straight chord between the two
+// farthest plate∩art crossings (submersion computed only for this fallback), or NULL if the plate
+// is genuinely not against the art. The caller treats null as a hard error — no flat-cut fallback.
 function plateSeamPath(plate, outline, steps, platePolys, artPolys) {
     var s = steps || 16;
     // Pre-sampled polys may be threaded in (syncHalfcut samples the plate once per pass and the
@@ -2978,30 +2972,8 @@ function plateSeamPath(plate, outline, steps, platePolys, artPolys) {
     return _chordFallback(pp, inside, artPolys);
 }
 
-// Walks the plate loop from vertex startIdx in direction dir, collecting each still-SUBMERGED
-// vertex (inner edge + the submerged part of the rounded cap), up to where the plate edge crosses
-// out of the art — the art∩caption INTERSECTION. Returns [capVerts…, crossing] (walk order); the
-// last element is the crossing point on the art border. This makes the half-cut hug the caption's
-// submerged edge (including the cap's curve) all the way to the intersection instead of a straight
-// chord, then STOPS there so the 1mm tail can run along the art path. null if no crossing found.
-// Pure geometry.
-function _capArcToCrossing(pp, inside, artPolys, startIdx, dir) {
-    var n = pp.length, out = [], cur = startIdx, guard = 0, nx;
-    while (guard < n) {
-        nx = (cur + dir + n) % n;
-        if (inside[cur] !== inside[nx]) {          // crossed the art edge → the intersection
-            out.push(_segCrossArt(inside[cur] ? pp[nx] : pp[cur],
-                                  inside[cur] ? pp[cur] : pp[nx], artPolys));
-            return out;
-        }
-        out.push({ x: pp[nx].x, y: pp[nx].y });    // still submerged → follow the caption edge
-        cur = nx; guard++;
-    }
-    return null;
-}
-
 // Shape-degeneracy fallback: a straight chord between the two farthest plate∩art crossings.
-// Used only when _innerEdgeRun can't split a near-circular plate. Returns [P,Q] or null (<2).
+// Used only when the geometry seam is unresolvable (< 2 inner-edge verts). Returns [P,Q] or null (<2).
 function _chordFallback(pp, inside, artPolys) {
     var n = pp.length, crossings = [], i, j, a, b;
     for (i = 0; i < n; i++) {
@@ -3029,96 +3001,6 @@ function _farthestCrossingPair(crossings) {
         }
     }
     return { i: bi, j: bj };
-}
-
-// Isolates the plate's INNER EDGE as a CONTIGUOUS run of the boundary loop, one cap to the
-// other: [{x, y, idx, inside}, …] in plate-loop order, where idx is the vertex's index in pp
-// and inside is whether it's submerged in the art. Returns null when the capsule can't be split
-// (near-circular / ambiguous inner side) → caller chords it. Carries no seat info: the caller
-// finds the submerged sub-span and the surfacing endpoints itself.
-//
-// Method: PCA gives the long axis u (perpendicular v) through the vertex centroid. A vertex is
-// on a CAP when its axis projection is within one radius r of either extreme (the semicircular
-// ends occupy the last r of length). The remaining long-edge vertices split by side; the INNER
-// edge is the side with more submerged vertices (a majority, robust to a notch). Its vertices
-// are contiguous in the loop — return the longest such contiguous arc.
-function _innerEdgeRun(pp, inside, geom) {
-    var n = pp.length, i, dx, dy;
-    var cx = 0, cy = 0;
-    for (i = 0; i < n; i++) { cx += pp[i].x; cy += pp[i].y; }
-    cx /= n; cy /= n;
-    // Covariance → principal (long) axis u and perpendicular v.
-    var sxx = 0, syy = 0, sxy = 0;
-    for (i = 0; i < n; i++) {
-        dx = pp[i].x - cx; dy = pp[i].y - cy;
-        sxx += dx * dx; syy += dy * dy; sxy += dx * dy;
-    }
-    var theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
-    var ux = Math.cos(theta), uy = Math.sin(theta);
-    var vx = -uy, vy = ux;
-    // Project every vertex: t along u, soff along v. Axis span + perpendicular half-extent r.
-    var t = [], soff = [], tmin = 1e15, tmax = -1e15, smin = 1e15, smax = -1e15, tt, ss;
-    for (i = 0; i < n; i++) {
-        dx = pp[i].x - cx; dy = pp[i].y - cy;
-        tt = dx * ux + dy * uy; ss = dx * vx + dy * vy;
-        t[i] = tt; soff[i] = ss;
-        if (tt < tmin) tmin = tt;
-        if (tt > tmax) tmax = tt;
-        if (ss < smin) smin = ss;
-        if (ss > smax) smax = ss;
-    }
-    var r = (smax - smin) / 2;
-    if (r <= 1e-6) return null;
-    // Too short to hold two caps plus a straight edge (near-circular) → caller chords it.
-    if ((tmax - tmin) <= 2 * r * 1.05) return null;
-    // Inner side = the long edge (non-cap vertices, split by sign of soff) with more of its
-    // vertices submerged in the art. Counting beats a single midpoint probe, which can land in
-    // a notch and read the wrong side. Caps excluded so they don't skew the tally.
-    var inPos = 0, inNeg = 0;
-    for (i = 0; i < n; i++) {
-        if (t[i] <= tmin + r || t[i] >= tmax - r) continue;   // skip caps
-        if (!inside[i]) continue;
-        if (soff[i] > 0) inPos++; else inNeg++;
-    }
-    if (inPos === inNeg) return null;     // can't tell which long edge is the inner one
-    var sign = inPos > inNeg ? 1 : -1;
-    // Wrong-majority guard (#4): the inner edge MUST face the art. Cross-check the submerged-
-    // vertex tally against the RELIABLE art direction (geom = plate→art bbox centroids, NOT the
-    // PCA eigenvector sign, which is fragile). vTravel is this PCA's perpendicular-axis component
-    // along the travel axis; the art-facing soff side is sign(vTravel*geom.sign) — the SAME rule
-    // the seat's _innerEdgeVerts uses. On a normal seat the submerged majority already faces the
-    // art, so they AGREE and this is a no-op. They disagree only when a shallow/tilted seat over
-    // CONVEX art submerges verts onto the OUTER edge — then the tally would trace the grab edge,
-    // so trust the art direction instead. (No-op on the validated fixture; the log flags any fire.)
-    if (geom) {
-        var vTravel = geom.travelIsX ? vx : vy;
-        var artSide = (vTravel * geom.sign >= 0) ? 1 : -1;
-        if (sign !== artSide) {
-            log("[halfcut] inner-edge | submerged-vertex tally disagreed with art direction — "
-                + "trusting art direction (wrong-majority guard)");
-            sign = artSide;
-        }
-    }
-    // Mark inner-edge vertices: clear of both caps AND on the inner side.
-    var isInner = [];
-    for (i = 0; i < n; i++) {
-        isInner[i] = (t[i] > tmin + r && t[i] < tmax - r && soff[i] * sign > 0);
-    }
-    // Longest contiguous cyclic arc of inner-edge vertices (one capsule side).
-    var bestStart = -1, bestLen = 0, len, j2, guard;
-    for (i = 0; i < n; i++) {
-        if (!isInner[i] || isInner[(i - 1 + n) % n]) continue;   // i starts a fresh arc
-        len = 0; j2 = i; guard = 0;
-        while (isInner[j2] && guard < n) { len++; j2 = (j2 + 1) % n; guard++; }
-        if (len > bestLen) { bestLen = len; bestStart = i; }
-    }
-    if (bestStart < 0) return null;
-    var run = [], idx = bestStart, c;
-    for (c = 0; c < bestLen; c++) {
-        run.push({ x: pp[idx].x, y: pp[idx].y, idx: idx, inside: inside[idx] });
-        idx = (idx + 1) % n;
-    }
-    return run;
 }
 
 // Even-odd point-in-polygons test across a sampled path's subpaths (holes subtract).
