@@ -60,6 +60,24 @@
 >   (both AI pipelines; do NOT raise `halfcutSeamSteps` — it overflows `setEntirePath`). Half-cut
 >   crash-proofed: seam decimated ≤400 pts + `setEntirePath`/zero-extent guards + Step 6 try/catch.
 >   P2 end-to-end on the Slovakia fixture: 22/22 peel tabs, unmatched=0, both SVGs.
+> - 🔧 **Caption seat REWORKED to two-point contact** (2026-07-21, branch
+>   `fix/caption-seat-two-point-contact`): `seatPlateToOutline`'s CAPTION path (the pill; the
+>   default-tab path is untouched) replaces rotate-then-kiss with **translate-nearest +
+>   rotate-until-far-touches**. `_seatNearEndpoint` picks whichever inner-edge endpoint reaches
+>   the border with the least travel and translates it there at depth 0 (`captionSeatOverlapMm`,
+>   default **0** — a separate knob from the tab's `seatOverlapMm`, kept apart so the tab branch
+>   doesn't regress); `_seatContactRotation` then rotates about that now-pinned point via an exact
+>   circle∩border solve (`_circlePolyIntersections`) until the far endpoint also lands on the
+>   border. Both endpoints end up EXACTLY on the traced border — no depth-`d` float on either end
+>   — and the seat's middle is unmanaged by design. The 15%-shrink overhang/convex-bulge guard is
+>   unchanged upstream; a far endpoint that can't reach the border, or only past
+>   `maxSeatRotationDeg`, still routes to `needsReview`. Log line changed:
+>   `[seat] … seated (contact) rot=… move=… depth=…` (was `seated rot=…`). AI-validated:
+>   `ai-build-and-export-cutlines` integration runner green (28/28 captions seated (contact),
+>   0 failed, byte-identical across 2 runs, golden regenerated) + the half-cut alignment
+>   regression green (21/21 endpoints on the cut line, worst gap 0.01pt) — confirming the seam
+>   tracer still follows the new pose. The junction "bump" visual is NOT yet human-confirmed. See
+>   `docs/superpowers/specs/2026-07-21-caption-seat-two-point-contact-design.md`.
 > - 🔁 **Caption-junction cut-line cleanup — REMOVED (reverted 2026-06-14)**: `cleanCaptionJunction()`
 >   and the `CONFIG.weldFilletRadiusPt` gate were removed; the export cutline is back to the raw
 >   `Unite(outline, plate)`, so the plate∩art junction may again show the boolean spike/sliver
