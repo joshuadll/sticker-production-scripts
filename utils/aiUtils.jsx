@@ -1961,6 +1961,37 @@ function _circlePolyIntersections(P, L, polys) {
     return _dedupePoints(out, 1e-4);
 }
 
+// Of the two inner-edge endpoints, the one that reaches its border point with the LEAST forward
+// travel toward the art (smallest signed gap). That one is translated onto the border first; the
+// other is then rotated down onto the border. geom = { travelIsX, sign } (plate -> art). Both
+// border points are non-null here (overhang is handled upstream). Pure geometry.
+function _seatNearEndpoint(E0, B0, E1, B1, geom) {
+    function gap(E, B) {
+        return geom.sign * (geom.travelIsX ? (B.x - E.x) : (B.y - E.y));
+    }
+    if (gap(E0, B0) <= gap(E1, B1)) return { P: E0, Bp: B0, Q: E1, Bq: B1 };
+    return { P: E1, Bp: B1, Q: E0, Bq: B0 };
+}
+
+// The smallest-magnitude rotation about the (already on-border) near endpoint P that lands the far
+// endpoint Q on the border. Q is rigidly at distance L=|P-Q| from P, so its target is where the
+// circle of radius L about P meets the border. deg is CCW-positive in AI's y-up space (feeds
+// _rotateItemsAbout directly). Pure geometry.
+function _seatContactRotation(P, Q, polys, maxRot) {
+    var L = Math.sqrt((Q.x - P.x) * (Q.x - P.x) + (Q.y - P.y) * (Q.y - P.y));
+    if (L < 1e-6) return { ok: false, reason: "degenerate chord" };
+    var hits = _circlePolyIntersections(P, L, polys);
+    if (!hits.length) return { ok: false, reason: "far endpoint cannot reach border" };
+    var qAng = _aiChordAngleDeg(P, Q);
+    var best = 0, bestAbs = 1e18, i, d;
+    for (i = 0; i < hits.length; i++) {
+        d = _aiNormalizeDeg(_aiChordAngleDeg(P, hits[i]) - qAng);
+        if (Math.abs(d) < bestAbs) { bestAbs = Math.abs(d); best = d; }
+    }
+    if (bestAbs > maxRot) return { ok: true, deg: 0, needsReview: true, clamped: true };
+    return { ok: true, deg: best, needsReview: false, clamped: false };
+}
+
 // How far the outline at the inner-edge midpoint protrudes INTO the pill along the travel
 // axis: p = sagitta + depth (sagitta = Bm's deviation from the B0->B1 chord toward the pill,
 // signed by geom.sign). Twin of Step3B's _midProtrusion. null when any probe is missing.

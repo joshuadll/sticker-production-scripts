@@ -207,6 +207,35 @@ assert("circle can't reach border -> 0 hits", ci4.length, 0);
 var dd = _dedupePoints([{x:1,y:1},{x:1,y:1},{x:2,y:2}], 1e-4);
 assert("dedupe 3 -> 2", dd.length, 2);
 
+// --- _seatNearEndpoint (which endpoint reaches the border first) ---------------
+testLog("[ai-seat-test] --- _seatNearEndpoint ---");
+// gBelow: travelIsX=false, sign=+1. E0 gap to border = 5, E1 gap = 8 -> E0 is nearer.
+var pick = _seatNearEndpoint({x:0,y:0}, {x:0,y:5}, {x:10,y:0}, {x:10,y:8}, gBelow);
+assertPt("near endpoint P = E0", pick.P, 0, 0);
+assertPt("far endpoint Q = E1", pick.Q, 10, 0);
+
+// --- _seatContactRotation (rotate P->Q chord until Q lands on the border) -------
+testLog("[ai-seat-test] --- _seatContactRotation ---");
+// P at origin, Q at (10,0) (chord length 10). Border = horizontal line y=6.
+// Circle r10 about origin hits y=6 at x=+-8: (8,6) at +36.87deg, (-8,6) at +143.13deg.
+// Smallest rotation from Q (angle 0) is +36.87deg.
+var LINE6 = [[ {x:-100,y:6}, {x:100,y:6} ]];
+var rc = _seatContactRotation({x:0,y:0}, {x:10,y:0}, LINE6, 75);
+assert("contact rotation ok", rc.ok, true);
+assert("contact rotation not clamped", rc.clamped, false);
+assertClose("contact rotation +36.87deg", rc.deg, 36.8698976, 1e-3);
+
+// Same geometry, tight maxRot -> clamped, flagged, deg 0.
+var rcClamp = _seatContactRotation({x:0,y:0}, {x:10,y:0}, LINE6, 30);
+assert("contact rotation clamped", rcClamp.clamped, true);
+assert("contact rotation clamp needsReview", rcClamp.needsReview, true);
+assertClose("contact rotation clamped deg 0", rcClamp.deg, 0);
+
+// Border too far for the chord to reach -> ok:false (overhang).
+var LINE20 = [[ {x:-100,y:20}, {x:100,y:20} ]];
+var rcNo = _seatContactRotation({x:0,y:0}, {x:10,y:0}, LINE20, 75);
+assert("contact rotation unreachable -> ok false", rcNo.ok, false);
+
 // --- SUMMARY ------------------------------------------------------------------
 
 testLog("[ai-seat-test] ====================================");
