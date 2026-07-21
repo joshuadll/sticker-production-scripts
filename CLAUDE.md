@@ -81,14 +81,20 @@
 > - 🔧 **Half-cut peel-tab seam now depth-independent** (2026-07-21, same branch): `plateSeamPath`
 >   traced the seam over the plate's **submerged** vertices only, so depth-0 contact (top edge on
 >   the border, nothing submerged) collapsed several peel tabs to zero length. It now derives the
->   seam from the plate's **inner-edge GEOMETRY** (`_innerEdgeVerts` with a new `includeCaps:true` —
->   full cap-to-cap art-facing edge, no submersion test), so it spans the full caption width at any
->   embed depth incl. 0. Submersion is used only for the near-circular `_chordFallback`. The
->   unseated-caption hard error now lives solely at the seat (`seatPlateToOutline` → `ok:false`),
->   not re-checked here. `_innerEdgeRun`/`_capArcToCrossing` are no longer on the seam path (dead —
->   cleanup pending). AI-validated: `ai-normalise-captions` green (11 reset, idempotent) with all
->   previously-collapsed tabs restored to their proven lengths (Orava 49.3pt, Tram 24.5pt, Tatra
->   chamois 54.8pt, Štrbské Pleso 53.8pt — matching the pre-change depth-0.1mm values).
+>   seam from the plate's **inner-edge GEOMETRY** (`_innerEdgeVerts`, geom-based, no submersion),
+>   which yields a seam at any embed depth incl. 0. The seam is the **trimmed inner LONG edge —
+>   caps EXCLUDED** (`_innerEdgeSeam(_innerEdgeVerts(pp, geom))`): it must end just inside the two
+>   junctions so `syncHalfcut`'s overshoot anchors THERE and runs the 1mm tail along the **ART** cut
+>   line. (Including the cap arcs made the seam end deep on the caption → the overshoot anchored on
+>   the caption and `_pickTailDir` ran the tail the wrong way; every element hit its near-tie
+>   fallback.) `includeCaps:true` is now only the **near-square/short-caption retry** (the cap band
+>   can swallow the trimmed edge — keeps a 1-2 char caption from nulling out → export hard-error).
+>   Submersion → only the near-circular `_chordFallback`. Unseated-caption hard error lives solely
+>   at the seat (`seatPlateToOutline` → `ok:false`). `_innerEdgeRun`/`_capArcToCrossing` removed
+>   (off the seam path). AI-validated: `ai-normalise-captions` green (11 reset, idempotent); all
+>   half-cuts straight; near-tie 22→3 (residual = small-element wrap); endpoints on the cut line
+>   (0.01pt, alignment 21/21); tabs at proven lengths (Orava 45.4pt, Tram 21.1pt, …). **Human visual
+>   confirm of the tail direction still owed.**
 > - 🔁 **Caption-junction cut-line cleanup — REMOVED (reverted 2026-06-14)**: `cleanCaptionJunction()`
 >   and the `CONFIG.weldFilletRadiusPt` gate were removed; the export cutline is back to the raw
 >   `Unite(outline, plate)`, so the plate∩art junction may again show the boolean spike/sliver

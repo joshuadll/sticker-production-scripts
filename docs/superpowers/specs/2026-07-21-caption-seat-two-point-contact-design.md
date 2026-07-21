@@ -199,20 +199,31 @@ is strictly submerged → empty span → collapsed seam.
 exactly on the border (depth 0 stays) and make the half-cut independent of embed. The seam sits on
 the caption/art boundary (no into-art offset).
 
-**Implementation:** `plateSeamPath` now derives the seam from the plate's **inner-edge geometry** —
-`_innerEdgeVerts(pp, geom, { includeCaps: true })`, a new option that keeps the full cap-to-cap
-art-facing edge instead of the seat's cap-trimmed ends — depth-independent (PCA long axis +
-plate→art direction, no submersion test). Submersion is computed only for the near-circular
+**Implementation:** `plateSeamPath` now derives the seam from the plate's **inner-edge geometry**
+(`_innerEdgeVerts`, geom-based, depth-independent — PCA long axis + plate→art direction, no
+submersion test). The seam is the **trimmed inner LONG edge, caps EXCLUDED**
+(`_innerEdgeSeam(_innerEdgeVerts(pp, geom))`). Submersion is computed only for the near-circular
 `_chordFallback`. The unseated-caption hard error now lives solely at the seat
 (`seatPlateToOutline` → `ok:false`); the seam no longer re-checks it on the main path.
-`_innerEdgeRun` / `_capArcToCrossing` (+ its `test-halfcut-cap-follow.js`) are no longer on the seam
-path — dead code, cleanup pending (flagged for final review).
+`_innerEdgeRun` / `_capArcToCrossing` (+ its `test-halfcut-cap-follow.js`) were removed (off the seam
+path).
 
-**Validated live:** `ai-normalise-captions` green (11 reset, idempotent reset=0/atSpec=22) with every
-collapsed tab restored to its pre-change (depth-0.1mm) length: Orava 0→49.3pt, Tram 0→24.5pt, Tatra
-chamois 0→54.8pt, Štrbské Pleso 6→53.8pt, Slovak Paradise 13→105.2pt. New pure unit test
-(`plateSeamPath` depth-0 seam) guards the regression: a plate with nothing submerged still yields a
-full-width seam.
+**Correction — cap arcs must be EXCLUDED (found via live review of the tail direction):** an early
+version used `includeCaps:true` (full cap-to-cap edge). That made the seam end deep on the caption's
+rounded cap, so `syncHalfcut`'s overshoot anchored on the caption's own edge and `_pickTailDir`
+could not find the art branch — the 1mm tail ran along the CAPTION instead of the art cut line, and
+every element (22/22 endpoints) hit the near-tie fallback. Fix: derive from the trimmed inner long
+edge, which ends just inside the two junctions, so the overshoot's nearest-point projection reaches
+the junction and the tail runs along the ART cut line. `includeCaps:true` is retained ONLY as the
+near-square/short-caption retry (the cap band can otherwise swallow the whole trimmed edge → null →
+export hard-error, review #1).
 
-**Still owed:** human visual confirmation in-app that (1) the junction bump is gone and (2) the
-depth-0 peel tabs cut and peel correctly on the flat and curved bases.
+**Validated live:** `ai-normalise-captions` green (11 reset, idempotent reset=0/atSpec=22); all
+half-cuts straight (were curved from the cap arcs); near-tie 22→3 (residual = small-element wrap,
+resolved by the integrated-distance fallback); endpoints on the cut line (alignment 21/21, 0.01pt);
+tabs at proven lengths (Orava 45.4pt, Tram 21.1pt, Tatra chamois 50.3pt, …). Unit tests guard both
+the depth-0 non-collapse and the near-square seam.
+
+**Still owed:** human visual confirmation in-app that (1) the junction bump is gone, (2) the depth-0
+peel tabs cut/peel correctly, and (3) the half-cut overshoot tail runs along the ART cut line
+(superimposed on it), not along the caption.
