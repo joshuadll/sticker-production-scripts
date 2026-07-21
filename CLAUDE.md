@@ -91,10 +91,14 @@
 >   can swallow the trimmed edge — keeps a 1-2 char caption from nulling out → export hard-error).
 >   Submersion → only the near-circular `_chordFallback`. Unseated-caption hard error lives solely
 >   at the seat (`seatPlateToOutline` → `ok:false`). `_innerEdgeRun`/`_capArcToCrossing` removed
->   (off the seam path). AI-validated: `ai-normalise-captions` green (11 reset, idempotent); all
->   half-cuts straight; near-tie 22→3 (residual = small-element wrap); endpoints on the cut line
->   (0.01pt, alignment 21/21); tabs at proven lengths (Orava 45.4pt, Tram 21.1pt, …). **Human visual
->   confirm of the tail direction still owed.**
+>   (off the seam path). The 1mm overshoot **tail direction** is chosen by `_pickTailDir` using
+>   **art-outline proximity** (the ART outline is threaded through `_extendHalfcutEndsToCutline` →
+>   `_cutlineOvershootTail`): the tail follows the branch that stays ON the art outline, not
+>   "farther from the plate" — near a seated junction the art edge hugs the caption so the
+>   plate metric ties and mis-picks the caption tail on small/tilted elements (Tram). AI-validated:
+>   `ai-normalise-captions` green (11 reset, idempotent); all half-cuts straight; **all 22 overshoot
+>   tails run along the art (0 near-ties)**; endpoints on the cut line (0.01pt, alignment 21/21);
+>   tabs at proven lengths. **Human visual confirm of the tail direction still owed.**
 > - 🔁 **Caption-junction cut-line cleanup — REMOVED (reverted 2026-06-14)**: `cleanCaptionJunction()`
 >   and the `CONFIG.weldFilletRadiusPt` gate were removed; the export cutline is back to the raw
 >   `Unite(outline, plate)`, so the plate∩art junction may again show the boolean spike/sliver

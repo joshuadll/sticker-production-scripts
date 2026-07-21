@@ -19,9 +19,7 @@
 [step8b] reset to spec | Bratislava Castle (WC, x1.125)
 [seat] Štrbské Pleso | rotated 0.1deg to two-point contact.
 [seat] Štrbské Pleso | seated (contact) rot=0.1deg move=0.4pt depth=0pt
-[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
-[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
-[halfcut] Štrbské Pleso | pts=49 end0=(414,441.4) endN=(415,484) straight
+[halfcut] Štrbské Pleso | pts=27 end0=(413.5,446.9) endN=(415,484) straight
 [buffer] Štrbské Pleso | band 0..+1mm
 [step8b] reset to spec | Štrbské Pleso (WC, x0.898)
 [step8b] SKIP | National Flower — not a caption (ST).
@@ -58,8 +56,7 @@
 [buffer] Fujara | band 0..+1mm
 [step8b] reset to spec | Fujara (WC, x0.917)
 [seat] Tram | seated (contact) rot=0deg move=0.4pt depth=0pt
-[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
-[halfcut] Tram | pts=64 end0=(499.4,297.3) endN=(519,305.1) straight
+[halfcut] Tram | pts=45 end0=(499.4,297.3) endN=(513.7,303.5) straight
 [buffer] Tram | band 0..+1mm
 [step8b] reset to spec | Tram (WC, x1.025)
 [seat] Tatra chamois | rotated -0.0deg to two-point contact.

@@ -218,11 +218,21 @@ the junction and the tail runs along the ART cut line. `includeCaps:true` is ret
 near-square/short-caption retry (the cap band can otherwise swallow the whole trimmed edge → null →
 export hard-error, review #1).
 
+**Correction 2 — overshoot tail direction (found via live review of Tram):** even after the cap-arc
+fix, the residual near-tie elements (Tram, Štrbské Pleso) still ran the 1mm overshoot tail along the
+CAPTION on one end. Root cause: `_pickTailDir` chose the tail direction by *distance to the plate*,
+but near a seated junction the art edge runs right alongside the caption, so BOTH cut branches sit
+≈0 from the plate for the first ~1mm (Tram's right: fwd art=0/plate=0 vs back art=1.3/plate=0 — only
+art separates them). Fix: thread the ART outline through `_extendHalfcutEndsToCutline` →
+`_cutlineOvershootTail` → `_pickTailDir` and pick the branch that stays CLOSER TO THE ART OUTLINE
+(summed over the walk). The art branch is definitionally on the art outline (≈0) regardless of size
+or tilt, so it is robust with no near-tie fallback (which is removed). Verified via instrumentation:
+all 22 endpoints now pick the art branch (0 caption).
+
 **Validated live:** `ai-normalise-captions` green (11 reset, idempotent reset=0/atSpec=22); all
-half-cuts straight (were curved from the cap arcs); near-tie 22→3 (residual = small-element wrap,
-resolved by the integrated-distance fallback); endpoints on the cut line (alignment 21/21, 0.01pt);
-tabs at proven lengths (Orava 45.4pt, Tram 21.1pt, Tatra chamois 50.3pt, …). Unit tests guard both
-the depth-0 non-collapse and the near-square seam.
+half-cuts straight; **all 22 overshoot tails run along the art (0 near-ties)**; endpoints on the cut
+line (alignment 21/21, 0.01pt); tabs at proven lengths. Unit tests guard the depth-0 non-collapse
+and the near-square seam.
 
 **Still owed:** human visual confirmation in-app that (1) the junction bump is gone, (2) the depth-0
 peel tabs cut/peel correctly, and (3) the half-cut overshoot tail runs along the ART cut line
