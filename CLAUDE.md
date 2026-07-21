@@ -78,6 +78,17 @@
 >   regression green (21/21 endpoints on the cut line, worst gap 0.01pt) — confirming the seam
 >   tracer still follows the new pose. The junction "bump" visual is NOT yet human-confirmed. See
 >   `docs/superpowers/specs/2026-07-21-caption-seat-two-point-contact-design.md`.
+> - 🔧 **Half-cut peel-tab seam now depth-independent** (2026-07-21, same branch): `plateSeamPath`
+>   traced the seam over the plate's **submerged** vertices only, so depth-0 contact (top edge on
+>   the border, nothing submerged) collapsed several peel tabs to zero length. It now derives the
+>   seam from the plate's **inner-edge GEOMETRY** (`_innerEdgeVerts` with a new `includeCaps:true` —
+>   full cap-to-cap art-facing edge, no submersion test), so it spans the full caption width at any
+>   embed depth incl. 0. Submersion is used only for the near-circular `_chordFallback`. The
+>   unseated-caption hard error now lives solely at the seat (`seatPlateToOutline` → `ok:false`),
+>   not re-checked here. `_innerEdgeRun`/`_capArcToCrossing` are no longer on the seam path (dead —
+>   cleanup pending). AI-validated: `ai-normalise-captions` green (11 reset, idempotent) with all
+>   previously-collapsed tabs restored to their proven lengths (Orava 49.3pt, Tram 24.5pt, Tatra
+>   chamois 54.8pt, Štrbské Pleso 53.8pt — matching the pre-change depth-0.1mm values).
 > - 🔁 **Caption-junction cut-line cleanup — REMOVED (reverted 2026-06-14)**: `cleanCaptionJunction()`
 >   and the `CONFIG.weldFilletRadiusPt` gate were removed; the export cutline is back to the raw
 >   `Unite(outline, plate)`, so the plate∩art junction may again show the boolean spike/sliver

@@ -1,40 +1,52 @@
-[pipeline] === AI_NormaliseCaptions start ===
+[pipeline] === AI_NormaliseCaptions start (version unknown) ===
 [pipeline] dryRun: false
 [pipeline] document: resize-elements.ai
-[seat] Devín Castle | rotated -0.3deg to endpoint chord.
-[seat] Devín Castle | seated rot=-0.3deg move=0.2pt depth=0.3pt
-[halfcut] Devín Castle | pts=53 end0=(178.5,475.4) endN=(177.6,428.2) straight
+[seat] Devín Castle | rotated -0.3deg to two-point contact.
+[seat] Devín Castle | seated (contact) rot=-0.3deg move=0.1pt depth=0pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] Devín Castle | pts=231 end0=(174.1,427.2) endN=(170.1,476.3) curved
 [buffer] Devín Castle | band 0..+1mm
 [step8b] reset to spec | Devín Castle (WC, x0.904)
-[seat] Slovak Paradise National Park | rotated -0.2deg to endpoint chord.
-[seat] Slovak Paradise National Park | seated rot=-0.2deg move=1pt depth=0.3pt
-[halfcut] Slovak Paradise National Park | pts=22 end0=(311.2,285.3) endN=(417.3,286.2) curved
+[seat] Slovak Paradise National Park | rotated -0.2deg to two-point contact.
+[seat] Slovak Paradise National Park | seated (contact) rot=-0.2deg move=0.4pt depth=0pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] Slovak Paradise National Park | pts=227 end0=(312.1,277.6) endN=(417.1,283.5) curved
 [buffer] Slovak Paradise National Park | band 0..+1mm
 [step8b] reset to spec | Slovak Paradise National Park (WC, x0.923)
 [step8b] at spec | Spiš Castle (WC)
-[seat] Bratislava Castle | rotated -0.2deg to endpoint chord.
-[seat] Bratislava Castle | seated rot=-0.2deg move=0.5pt depth=0.3pt
-[halfcut] Bratislava Castle | pts=30 end0=(233.2,799.8) endN=(171,802.6) straight
+[seat] Bratislava Castle | rotated -0.2deg to two-point contact.
+[seat] Bratislava Castle | seated (contact) rot=-0.2deg move=0.8pt depth=0pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
+[halfcut] Bratislava Castle | pts=228 end0=(171.1,805.2) endN=(234.2,802.8) curved
 [buffer] Bratislava Castle | band 0..+1mm
 [step8b] reset to spec | Bratislava Castle (WC, x1.125)
-[seat] Štrbské Pleso | rotated 0.1deg to endpoint chord.
-[seat] Štrbské Pleso | seated rot=0.1deg move=-0.7pt depth=0.3pt
-[halfcut] Štrbské Pleso | pts=31 end0=(413.2,439.4) endN=(415.6,491.7) curved
+[seat] Štrbské Pleso | rotated 0.1deg to two-point contact.
+[seat] Štrbské Pleso | seated (contact) rot=0.1deg move=0.4pt depth=0pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
+[halfcut] Štrbské Pleso | pts=226 end0=(422.1,438.2) endN=(424.4,492) curved
 [buffer] Štrbské Pleso | band 0..+1mm
 [step8b] reset to spec | Štrbské Pleso (WC, x0.898)
 [step8b] SKIP | National Flower — not a caption (ST).
 [step8b] SKIP | Slovakia Map — not a caption (ST).
 [step8b] at spec | St. Martin's Cathedral (WC)
 [step8b] SKIP | UFO Observation Deck, Bridge SNP — not a caption (ST).
-[seat] Old Town Hall (Bratislava) | rotated 0.0deg to endpoint chord.
-[seat] Old Town Hall (Bratislava) | seated rot=0deg move=0.1pt depth=0.3pt
-[halfcut] Old Town Hall (Bratislava) | pts=27 end0=(49.7,448.9) endN=(145,451.1) straight
+[seat] Old Town Hall (Bratislava) | rotated 0.0deg to two-point contact.
+[seat] Old Town Hall (Bratislava) | seated (contact) rot=0deg move=0.2pt depth=0pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] Old Town Hall (Bratislava) | pts=223 end0=(48.4,439.6) endN=(146.1,447.6) curved
 [buffer] Old Town Hall (Bratislava) | band 0..+1mm
 [step8b] reset to spec | Old Town Hall (Bratislava) (WC, x0.981)
 [step8b] at spec | Bojnice Castle (WC)
-[seat] Orava Castle | rotated -0.1deg to endpoint chord.
-[seat] Orava Castle | seated rot=-0.1deg move=0.6pt depth=0.3pt
-[halfcut] Orava Castle | pts=26 end0=(412.6,173.6) endN=(461.5,172.9) straight
+[seat] Orava Castle | rotated -0.1deg to two-point contact.
+[seat] Orava Castle | seated (contact) rot=-0.1deg move=0.3pt depth=0pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] Orava Castle | pts=227 end0=(412.5,170.9) endN=(461.8,170) curved
 [buffer] Orava Castle | band 0..+1mm
 [step8b] reset to spec | Orava Castle (WC, x0.900)
 [step8b] at spec | Michael's Gate (WC)
@@ -45,29 +57,38 @@
 [step8b] at spec | Pirohy (WC)
 [step8b] at spec | Bryndzové halušky (WC)
 [step8b] at spec | Kraslice (WC)
-[seat] Kroje | rotated 0.3deg to endpoint chord.
-[seat] Kroje | seated rot=0.3deg move=1.1pt depth=0.3pt
-[halfcut] Kroje | pts=27 end0=(294.9,86.6) endN=(307.8,64.6) curved
+[seat] Kroje | rotated 0.3deg to two-point contact.
+[seat] Kroje | seated (contact) rot=0.3deg move=0.8pt depth=0pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] Kroje | pts=223 end0=(286.7,82.9) endN=(305.2,63.3) curved
 [buffer] Kroje | band 0..+1mm
 [step8b] reset to spec | Kroje (WC, x0.863)
-[seat] Fujara | rotated 0.5deg to endpoint chord.
-[seat] Fujara | seated rot=0.5deg move=0.7pt depth=0.3pt
-[halfcut] Fujara | pts=31 end0=(48.6,328.8) endN=(40.1,302.2) curved
+[seat] Fujara | rotated 0.5deg to two-point contact.
+[seat] Fujara | seated (contact) rot=0.5deg move=0.2pt depth=0pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] Fujara | pts=225 end0=(37.1,302.8) endN=(40.2,332.7) curved
 [buffer] Fujara | band 0..+1mm
 [step8b] reset to spec | Fujara (WC, x0.917)
-[seat] Tram | rotated 0.0deg to endpoint chord.
-[seat] Tram | seated rot=0deg move=-0.2pt depth=0.3pt
-[halfcut] Tram | pts=28 end0=(498,296.7) endN=(520.6,306.6) straight
+[seat] Tram | seated (contact) rot=0deg move=0.4pt depth=0pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (back)
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] Tram | pts=230 end0=(499,294.3) endN=(521.4,304.2) curved
 [buffer] Tram | band 0..+1mm
 [step8b] reset to spec | Tram (WC, x1.025)
-[seat] Tatra chamois | rotated -0.0deg to endpoint chord.
-[seat] Tatra chamois | seated rot=0deg move=0.3pt depth=0.3pt
-[halfcut] Tatra chamois | pts=31 end0=(272.8,170.7) endN=(326.7,172.8) straight
+[seat] Tatra chamois | rotated -0.0deg to two-point contact.
+[seat] Tatra chamois | seated (contact) rot=0deg move=0pt depth=0pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] Tatra chamois | pts=227 end0=(272.9,162.5) endN=(327.2,169.9) curved
 [buffer] Tatra chamois | band 0..+1mm
 [step8b] reset to spec | Tatra chamois (WC, x0.940)
-[seat] Carpathian Wooden Churches | rotated 0.2deg to endpoint chord.
-[seat] Carpathian Wooden Churches | seated rot=0.2deg move=-0.2pt depth=0.3pt
-[halfcut] Carpathian Wooden Churches | pts=52 end0=(548.1,501.3) endN=(446.6,501.6) straight
+[seat] Carpathian Wooden Churches | rotated 0.2deg to two-point contact.
+[seat] Carpathian Wooden Churches | seated (contact) rot=0.2deg move=0.5pt depth=0pt
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] overshoot tail | near-tie on direction — broke by integrated distance-to-plate (fwd)
+[halfcut] Carpathian Wooden Churches | pts=222 end0=(444.8,505.7) endN=(550.2,511.1) curved
 [buffer] Carpathian Wooden Churches | band 0..+1mm
 [step8b] reset to spec | Carpathian Wooden Churches (WC, x0.904)
 [step8b] at spec | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) (WC)

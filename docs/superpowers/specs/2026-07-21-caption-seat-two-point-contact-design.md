@@ -182,3 +182,37 @@ it to invalidate. Both endpoints end exactly on the border.
 - Decide whether Step-A translation being axis-aligned (decision #3) leaves the near endpoint
   *visibly* off a steeply tilted border enough to matter; if so, revisit "translate along border
   normal" as a follow-up (explicitly deferred now).
+
+## Follow-up — half-cut peel-tab rework (decided + implemented 2026-07-21)
+
+Live validation of the depth-0 seat (via `ai-normalise-captions`, the Step 8b path) exposed a
+downstream regression the original spec under-weighted: the half-cut **peel tab** collapsed to zero
+length on several elements (Orava Castle, Kroje, Tram, Tatra chamois → 0pt; Štrbské Pleso, Slovak
+Paradise → tiny). A zero-length tab is a functional break — the artist can't grab and peel that
+sticker.
+
+**Cause:** `plateSeamPath` traced the half-cut seam over the plate's **submerged** vertices only
+(`_pointInPolysEO` inside the art). At depth 0 the caption top edge sits *on* the border, so nothing
+is strictly submerged → empty span → collapsed seam.
+
+**Decision (user, "keep depth 0, rework half-cut" + fork (a) "on the boundary"):** hold the endpoints
+exactly on the border (depth 0 stays) and make the half-cut independent of embed. The seam sits on
+the caption/art boundary (no into-art offset).
+
+**Implementation:** `plateSeamPath` now derives the seam from the plate's **inner-edge geometry** —
+`_innerEdgeVerts(pp, geom, { includeCaps: true })`, a new option that keeps the full cap-to-cap
+art-facing edge instead of the seat's cap-trimmed ends — depth-independent (PCA long axis +
+plate→art direction, no submersion test). Submersion is computed only for the near-circular
+`_chordFallback`. The unseated-caption hard error now lives solely at the seat
+(`seatPlateToOutline` → `ok:false`); the seam no longer re-checks it on the main path.
+`_innerEdgeRun` / `_capArcToCrossing` (+ its `test-halfcut-cap-follow.js`) are no longer on the seam
+path — dead code, cleanup pending (flagged for final review).
+
+**Validated live:** `ai-normalise-captions` green (11 reset, idempotent reset=0/atSpec=22) with every
+collapsed tab restored to its pre-change (depth-0.1mm) length: Orava 0→49.3pt, Tram 0→24.5pt, Tatra
+chamois 0→54.8pt, Štrbské Pleso 6→53.8pt, Slovak Paradise 13→105.2pt. New pure unit test
+(`plateSeamPath` depth-0 seam) guards the regression: a plate with nothing submerged still yields a
+full-width seam.
+
+**Still owed:** human visual confirmation in-app that (1) the junction bump is gone and (2) the
+depth-0 peel tabs cut and peel correctly on the flat and curved bases.
