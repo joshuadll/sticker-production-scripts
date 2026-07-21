@@ -236,6 +236,40 @@ var LINE20 = [[ {x:-100,y:20}, {x:100,y:20} ]];
 var rcNo = _seatContactRotation({x:0,y:0}, {x:10,y:0}, LINE20, 75);
 assert("contact rotation unreachable -> ok false", rcNo.ok, false);
 
+// --- plateSeamPath (depth-independent half-cut seam) ---------------------------
+// Regression guard for two-point contact: a caption seated at depth 0 (top edge ON the art
+// border, NOTHING strictly submerged) must still yield a FULL-width seam. The seam is derived
+// from the plate's inner-edge GEOMETRY, not from submersion — the old submersion-gated code
+// returned a collapsed/empty seam here (countIn==0 -> null -> zero-length peel tab).
+testLog("[ai-seat-test] --- plateSeamPath (depth-0 seam) ---");
+
+// Art = square, bottom border at y=1 (interior y in (1,200)). Plate = a stadium BELOW the border
+// with its top edge on y=0 — every vertex is strictly OUTSIDE the art (y<=0 < 1), so countIn==0
+// and the OLD submersion-gated code returns null (the collapse). Yet the inner (top) edge faces
+// +y (toward the art), so the GEOMETRY-based derivation still yields a full-width seam.
+var seamOutline = { geometricBounds: [0, 200, 200, 1] };          // [l,t,r,b] y-up
+var seamPlate   = { geometricBounds: [40, 0, 160, -40] };
+var seamPlatePolys = [[
+    {x:50,y:0},{x:75,y:0},{x:100,y:0},{x:125,y:0},{x:150,y:0},     // top edge (art-facing)
+    {x:158,y:-8},{x:160,y:-20},{x:158,y:-32},                       // right cap
+    {x:150,y:-40},{x:125,y:-40},{x:100,y:-40},{x:75,y:-40},{x:50,y:-40}, // bottom edge
+    {x:42,y:-32},{x:40,y:-20},{x:42,y:-8}                           // left cap
+]];
+var seamArtPolys = [[ {x:0,y:1},{x:200,y:1},{x:200,y:200},{x:0,y:200} ]];
+var seam0 = plateSeamPath(seamPlate, seamOutline, 16, seamPlatePolys, seamArtPolys);
+assert("depth-0 seam is not null", seam0 !== null, true);
+assert("depth-0 seam has >= 2 pts", (seam0 && seam0.length >= 2), true);
+var seamSpan = 0;
+if (seam0 && seam0.length >= 2) {
+    var _sa = seam0[0], _sb = seam0[seam0.length - 1];
+    seamSpan = Math.sqrt((_sb.x-_sa.x)*(_sb.x-_sa.x) + (_sb.y-_sa.y)*(_sb.y-_sa.y));
+}
+assert("depth-0 seam spans full caption width (>80pt)", seamSpan > 80, true);
+// Seam runs along the art-facing (top) side only — never down the bottom/outer edge (y<=-15).
+var seamOnTop = (seam0 && seam0.length >= 2);
+if (seam0) { for (var _si = 0; _si < seam0.length; _si++) { if (seam0[_si].y < -15) seamOnTop = false; } }
+assert("depth-0 seam runs along the top/inner edge", seamOnTop, true);
+
 // --- SUMMARY ------------------------------------------------------------------
 
 testLog("[ai-seat-test] ====================================");

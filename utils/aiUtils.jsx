@@ -1820,7 +1820,10 @@ function seatPlateToOutline(name, outline, plate, captionItem, opts) {
 // than a floating straight chord. PCA gives the long axis (to classify caps vs long edges and
 // pick the inner side toward geom.sign); the near-circular guard switches to a deterministic
 // basis and flags kissOnly. Returns { verts:[{x,y,t}...], radius, kissOnly } or null. Pure geometry.
-function _innerEdgeVerts(pp, geom) {
+function _innerEdgeVerts(pp, geom, opts) {
+    opts = opts || {};
+    var includeCaps = !!opts.includeCaps;   // true = keep the caps too (the half-cut seam spans
+                                            // cap-to-cap); false (seat) = long-edge ends only.
     var n = pp.length, i, dx, dy;
     if (n < 4) return null;
     var cx = 0, cy = 0;
@@ -1848,7 +1851,7 @@ function _innerEdgeVerts(pp, geom) {
     for (i = 0; i < n; i++) {
         dx = pp[i].x - cx; dy = pp[i].y - cy;
         tt = dx * ux + dy * uy; ss = dx * vx + dy * vy;
-        if (tt <= ext.tmin + r || tt >= ext.tmax - r) continue;   // skip caps
+        if (!includeCaps && (tt <= ext.tmin + r || tt >= ext.tmax - r)) continue;   // skip caps
         if (ss * sInner <= 0) continue;                           // skip the outer long edge
         verts.push({ x: pp[i].x, y: pp[i].y, t: tt });
     }
@@ -2944,47 +2947,31 @@ function plateSeamPath(plate, outline, steps, platePolys, artPolys) {
     var n = pp.length;
     if (n < 4) return null;
 
-    // Inside-art flag per plate vertex (even-odd, so art holes count as outside).
-    var inside = [], i, countIn = 0;
-    for (i = 0; i < n; i++) {
-        inside[i] = _pointInPolysEO(pp[i], artPolys);
-        if (inside[i]) countIn++;
-    }
-    // Not seated: nothing inside (not connected) or nothing outside (fully buried).
-    if (countIn === 0 || countIn === n) return null;
-
-    // The inner edge as a contiguous run (cap to cap), each vertex tagged inside/outside.
-    // geom (plate→art bbox direction) lets _innerEdgeRun sanity-check its submersion tally
-    // against the reliable art direction — see the wrong-majority guard there.
     var geom = _aiSeatGeometry(plate, outline);
-    var run = _innerEdgeRun(pp, inside, geom);
-    if (!run) return _chordFallback(pp, inside, artPolys);   // degenerate plate shape
 
-    // Submerged span: first..last inside vertex (interior notches bridged).
-    var f = -1, l = -1, k;
-    for (k = 0; k < run.length; k++) {
-        if (run[k].inside) { if (f < 0) f = k; l = k; }
+    // The half-cut runs along the caption's INNER (art-facing) edge, cap to cap — the boundary
+    // between the caption and the art. It is derived from the plate GEOMETRY (PCA long axis + the
+    // plate→art direction), NOT from how deeply the caption is submerged, so it yields a full
+    // caption-width seam at ANY embed depth including 0 (two-point contact: the top edge sits on
+    // the art border with nothing strictly submerged). The seat guarantees the inner-edge endpoints
+    // land on the border, so the seam terminates at the two junctions; _extendHalfcutEndsToCutline
+    // (in syncHalfcut) ties each end onto the cut contour. The upstream seat is the hard-error gate
+    // for a genuinely unseated caption (seatPlateToOutline returns ok:false and the caption is never
+    // built), so the seam no longer re-checks submersion on the main path.
+    var ie = _innerEdgeVerts(pp, geom, { includeCaps: true });
+    if (ie && !ie.kissOnly && ie.verts && ie.verts.length >= 2) {
+        var seam = [], i;
+        for (i = 0; i < ie.verts.length; i++) seam.push({ x: ie.verts[i].x, y: ie.verts[i].y });
+        return seam;
     }
-    if (f < 0) return null;   // inner edge fully exposed → not seated as a peel tab
 
-    // Each end: follow the plate's OWN submerged edge from the last inner-edge vertex — including
-    // the submerged part of the rounded cap — up to the art∩caption INTERSECTION, so the seam hugs
-    // the caption's curve instead of chording straight across it. The inner edge alone (run)
-    // excludes the caps; _capArcToCrossing walks the plate loop past run's end, collecting the
-    // still-submerged cap vertices, and stops at the crossing. syncHalfcut then runs the 1mm tail
-    // along the ART path from each crossing (not the caption's exposed edge past the cap).
-    var leftCap  = _capArcToCrossing(pp, inside, artPolys, run[f].idx, -1);  // [capVerts…, leftCrossing]
-    var rightCap = _capArcToCrossing(pp, inside, artPolys, run[l].idx,  1);  // [capVerts…, rightCrossing]
-    if (!leftCap || !rightCap) return null;
-
-    // leftCrossing … capVerts … run[f] … run[l] … capVerts … rightCrossing. The left path is walked
-    // outward from run[f], so reverse it to read crossing-first.
-    var seam = [], i;
-    for (i = leftCap.length - 1; i >= 0; i--) seam.push(leftCap[i]);
-    for (k = f; k <= l; k++) seam.push({ x: run[k].x, y: run[k].y });
-    for (i = 0; i < rightCap.length; i++) seam.push(rightCap[i]);
-
-    return seam;
+    // Degenerate plate (near-circular / ambiguous inner side) → straight chord between the two
+    // farthest plate∩art crossings, if the plate is genuinely seated. Submersion is computed only
+    // for this fallback.
+    var inside = [], k, countIn = 0;
+    for (k = 0; k < n; k++) { inside[k] = _pointInPolysEO(pp[k], artPolys); if (inside[k]) countIn++; }
+    if (countIn === 0 || countIn === n) return null;
+    return _chordFallback(pp, inside, artPolys);
 }
 
 // Walks the plate loop from vertex startIdx in direction dir, collecting each still-SUBMERGED
