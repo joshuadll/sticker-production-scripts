@@ -140,7 +140,9 @@ function runCaptionNormalise(doc) {
             rideItem = rideGroup;
         }
         var polyCache = {};
-        var seat = seatPlateToOutline(group.name, outline, pill, rideItem, { polyCache: polyCache });
+        var _capOverlap = (CONFIG.captionSeatOverlapMm != null) ? CONFIG.captionSeatOverlapMm : 0;
+        var seat = seatPlateToOutline(group.name, outline, pill, rideItem,
+            { polyCache: polyCache, overlapPt: mmToPoints(_capOverlap) });
         if (rideGroup) {
             text.move(group, ElementPlacement.PLACEATBEGINNING);
             plateR.move(group, ElementPlacement.PLACEATBEGINNING);

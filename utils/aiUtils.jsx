@@ -1350,7 +1350,9 @@ function buildCaption(doc, layer, textFrame, outline, opts) {
     var rideItem = rideGroup;
 
     // Seat into the white-edge outline (authoritative). The overlap IS the attachment.
-    var seat = seatPlateToOutline(name, outline, pill, rideItem, { polyCache: {} });
+    var _capOverlap = (CONFIG.captionSeatOverlapMm != null) ? CONFIG.captionSeatOverlapMm : 0;
+    var seat = seatPlateToOutline(name, outline, pill, rideItem,
+        { polyCache: {}, overlapPt: mmToPoints(_capOverlap) });
     if (!seat.ok) {
         // Un-nest the ride items so a failed seat leaves clean inputs.
         try { textFrame.move(layer, ElementPlacement.PLACEATEND); } catch (e1) {}
@@ -1735,44 +1737,81 @@ function seatPlateToOutline(name, outline, plate, captionItem, opts) {
         }
     }
 
-    // ── ROTATE: align the inner edge parallel to the art chord B0->B1, pivot E0. Two real
-    // endpoints decide the tilt, so a wiggle in the middle can't swing it. ──
     var rotDeg = 0;
-    if (CONFIG.seatConform && !kissOnly) {
-        var baseLen = Math.sqrt((E1.x - E0.x) * (E1.x - E0.x) + (E1.y - E0.y) * (E1.y - E0.y));
-        if (baseLen >= epsPt) {
-            var phi = _aiNormalizeDeg(_aiChordAngleDeg(B0, B1) - _aiChordAngleDeg(E0, E1));
-            if (Math.abs(phi) <= maxRot) {
-                _rotateItemsAbout(items, E0, rotSign * phi);
-                rotDeg = phi;
-                log("[seat] " + name + " | rotated " + phi.toFixed(1) + "deg to endpoint chord.");
-            } else {
-                needsReview = true;
-                log("[seat] " + name + " | chord tilt " + phi.toFixed(1)
-                    + "deg exceeds maxSeatRotationDeg — rotation skipped, flagged.");
+
+    if (travelDir) {
+        // ── TAB (unchanged): rotate the inner edge parallel to the art chord (pivot E0), then
+        // kiss E0 onto B0 along the tab's travel direction, submerged by depth. ──
+        if (CONFIG.seatConform && !kissOnly) {
+            var baseLen = Math.sqrt((E1.x - E0.x) * (E1.x - E0.x) + (E1.y - E0.y) * (E1.y - E0.y));
+            if (baseLen >= epsPt) {
+                var phi = _aiNormalizeDeg(_aiChordAngleDeg(B0, B1) - _aiChordAngleDeg(E0, E1));
+                if (Math.abs(phi) <= maxRot) {
+                    _rotateItemsAbout(items, E0, rotSign * phi);
+                    rotDeg = phi;
+                    log("[seat] " + name + " | rotated " + phi.toFixed(1) + "deg to endpoint chord.");
+                } else {
+                    needsReview = true;
+                    log("[seat] " + name + " | chord tilt " + phi.toFixed(1)
+                        + "deg exceeds maxSeatRotationDeg — rotation skipped, flagged.");
+                }
             }
+        }
+        var kt = _aiKissVectorDir(E0, B0, travelDir, depth);
+        _translateItems(items, kt.tx, kt.ty);
+        log("[seat] " + name + " | seated (tab) rot=" + _r1(rotDeg) + "deg move="
+            + _r1(Math.sqrt(kt.tx * kt.tx + kt.ty * kt.ty)) + "pt depth=" + _r1(depth) + "pt"
+            + (needsReview ? " (needsReview)" : ""));
+        return { ok: true, moved: Math.sqrt(kt.tx * kt.tx + kt.ty * kt.ty),
+                 rotDeg: rotDeg, needsReview: needsReview };
+    }
+
+    // ── CAPTION (two-point contact): translate the NEARER inner-edge endpoint onto the border
+    // (depth 0), then ROTATE about it until the FAR endpoint also lands on the border (exact
+    // circle∩border solve). Both endpoints end exactly on the traced border — no stale-probe
+    // float, no over-burial. See docs/superpowers/specs/2026-07-21-caption-seat-two-point-contact-design.md. ──
+    var pick = _seatNearEndpoint(E0, B0, E1, B1, geom);
+
+    // Step A — near endpoint onto its border point (depth 0).
+    var kA = _aiKissVector(pick.P, pick.Bp, geom, 0);
+    _translateItems(items, kA.tx, kA.ty);
+    var Pm = { x: pick.P.x + kA.tx, y: pick.P.y + kA.ty };
+    var Qm = { x: pick.Q.x + kA.tx, y: pick.Q.y + kA.ty };
+
+    // Step B — rotate about the seated near endpoint until the far endpoint touches the border.
+    if (CONFIG.seatConform && !kissOnly) {
+        var rot = _seatContactRotation(Pm, Qm, artPolys, maxRot);
+        if (!rot.ok) {
+            needsReview = true;
+            log("[seat] " + name + " | far endpoint can't reach the border (" + rot.reason
+                + ") — contact rotation skipped, flagged.");
+        } else if (rot.clamped) {
+            needsReview = true;
+            log("[seat] " + name + " | contact rotation exceeds maxSeatRotationDeg — skipped, flagged.");
+        } else if (Math.abs(rot.deg) >= 0.01) {
+            _rotateItemsAbout(items, Pm, rot.deg);
+            rotDeg = rot.deg;
+            log("[seat] " + name + " | rotated " + rot.deg.toFixed(1) + "deg to two-point contact.");
         }
     }
 
-    // ── KISS (original): slide E0 onto B0 along the travel axis, submerged by depth d. E0 is the
-    // rotation pivot (fixed) and B0 is on the stationary art, so both hold after rotation. E0 is
-    // a REAL boundary point, so the real plate edge lands at depth d — no phantom float. ──
-    var k = travelDir ? _aiKissVectorDir(E0, B0, travelDir, depth)
-                      : _aiKissVector(E0, B0, geom, depth);
-    _translateItems(items, k.tx, k.ty);
+    // Step C — optional embed past contact (depth 0 by default → pure tangent contact).
+    if (depth > 1e-6) {
+        var eC = geom.travelIsX ? { tx: geom.sign * depth, ty: 0 }
+                                : { tx: 0, ty: geom.sign * depth };
+        _translateItems(items, eC.tx, eC.ty);
+    }
+
     if (CONFIG.seatDebug) {
-        var _e0p = { x: E0.x + k.tx, y: E0.y + k.ty };
         log("[seatdbg] " + name + " | axisX=" + geom.travelIsX + " sign=" + geom.sign
             + " depth=" + _r1(depth) + " r=" + _r1(r) + " kissOnly=" + kissOnly
-            + " shrunk=" + shrunk + " rot=" + _r1(rotDeg) + " k=(" + _r1(k.tx) + "," + _r1(k.ty) + ")");
-        log("[seatdbg] " + name + "   E0=(" + _r1(E0.x) + "," + _r1(E0.y) + ") B0=(" + _r1(B0.x)
-            + "," + _r1(B0.y) + ") E0post=(" + _r1(_e0p.x) + "," + _r1(_e0p.y) + ") inArt="
-            + _pointInPolysEO(_e0p, artPolys));
+            + " shrunk=" + shrunk + " rot=" + _r1(rotDeg)
+            + " P=(" + _r1(Pm.x) + "," + _r1(Pm.y) + ")");
     }
-    log("[seat] " + name + " | seated rot=" + _r1(rotDeg) + "deg move="
-        + _r1(geom.travelIsX ? k.tx : k.ty) + "pt depth=" + _r1(depth) + "pt"
+    log("[seat] " + name + " | seated (contact) rot=" + _r1(rotDeg) + "deg move="
+        + _r1(Math.sqrt(kA.tx * kA.tx + kA.ty * kA.ty)) + "pt depth=" + _r1(depth) + "pt"
         + (needsReview ? " (needsReview)" : ""));
-    return { ok: true, moved: Math.sqrt(k.tx * k.tx + k.ty * k.ty),
+    return { ok: true, moved: Math.sqrt(kA.tx * kA.tx + kA.ty * kA.ty),
              rotDeg: rotDeg, needsReview: needsReview };
 }
 
