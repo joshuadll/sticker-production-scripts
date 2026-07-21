@@ -259,12 +259,15 @@ var seamArtPolys = [[ {x:0,y:1},{x:200,y:1},{x:200,y:200},{x:0,y:200} ]];
 var seam0 = plateSeamPath(seamPlate, seamOutline, 16, seamPlatePolys, seamArtPolys);
 assert("depth-0 seam is not null", seam0 !== null, true);
 assert("depth-0 seam has >= 2 pts", (seam0 && seam0.length >= 2), true);
+// The RAW seam is the trimmed inner LONG edge (caps excluded so the overshoot anchors at the
+// junctions, not on the caption); full caption width is reached later by the cut-line extension.
+// The guard here is non-COLLAPSE — the old submersion path returned null/zero at depth 0.
 var seamSpan = 0;
 if (seam0 && seam0.length >= 2) {
     var _sa = seam0[0], _sb = seam0[seam0.length - 1];
     seamSpan = Math.sqrt((_sb.x-_sa.x)*(_sb.x-_sa.x) + (_sb.y-_sa.y)*(_sb.y-_sa.y));
 }
-assert("depth-0 seam spans full caption width (>80pt)", seamSpan > 80, true);
+assert("depth-0 seam does not collapse (span > 30pt)", seamSpan > 30, true);
 // Seam runs along the art-facing (top) side only — never down the bottom/outer edge (y<=-15).
 var seamOnTop = (seam0 && seam0.length >= 2);
 if (seam0) { for (var _si = 0; _si < seam0.length; _si++) { if (seam0[_si].y < -15) seamOnTop = false; } }

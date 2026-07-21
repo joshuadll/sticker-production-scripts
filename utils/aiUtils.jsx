@@ -2943,33 +2943,45 @@ function plateSeamPath(plate, outline, steps, platePolys, artPolys) {
 
     var geom = _aiSeatGeometry(plate, outline);
 
-    // The half-cut runs along the caption's INNER (art-facing) edge, cap to cap — the boundary
-    // between the caption and the art. It is derived from the plate GEOMETRY (PCA long axis + the
-    // plate→art direction), NOT from how deeply the caption is submerged, so it yields a full
-    // caption-width seam at ANY embed depth including 0 (two-point contact: the top edge sits on
-    // the art border with nothing strictly submerged). The seat guarantees the inner-edge endpoints
-    // land on the border, so the seam terminates at the two junctions; _extendHalfcutEndsToCutline
-    // (in syncHalfcut) ties each end onto the cut contour. The upstream seat is the hard-error gate
-    // for a genuinely unseated caption (seatPlateToOutline returns ok:false and the caption is never
-    // built), so the seam no longer re-checks submersion on the main path.
-    var ie = _innerEdgeVerts(pp, geom, { includeCaps: true });
-    if (ie && ie.verts && ie.verts.length >= 2) {
-        // Includes the kissOnly (near-square / very-short caption) case: the PCA long axis is noise
-        // there, but the inner SIDE is still picked from geom (plate→art), so the geom-based inner
-        // edge is a valid seam — and depth-independent, so a short caption at depth 0 does not null
-        // out (which would hard-error export). See the caption-seat design spec follow-up.
-        var seam = [], i;
-        for (i = 0; i < ie.verts.length; i++) seam.push({ x: ie.verts[i].x, y: ie.verts[i].y });
-        return seam;
-    }
+    // The half-cut runs along the caption's INNER (art-facing) LONG edge — the boundary between the
+    // caption and the art. It is derived from the plate GEOMETRY (PCA long axis + the plate→art
+    // direction), NOT from how deeply the caption is submerged, so it yields a seam at ANY embed
+    // depth including 0 (two-point contact: the top edge sits on the art border with nothing
+    // strictly submerged; the OLD submersion-gated seam collapsed to zero there).
+    //
+    // The seam deliberately EXCLUDES the rounded cap arcs (default `_innerEdgeVerts`, no
+    // includeCaps): it must end near the two junctions so syncHalfcut's overshoot anchors THERE and
+    // runs the 1mm tail along the ART cut line. A seam that ran down the cap arcs would end deep on
+    // the caption, so the overshoot anchors on the caption's own edge and the tail runs the wrong
+    // way (every element then hits _pickTailDir's near-tie). The seat lands the inner-edge endpoints
+    // on the border just inside the junctions, so the overshoot's nearest-point projection reaches
+    // the junction cleanly. The upstream seat is the hard-error gate for a genuinely unseated
+    // caption (seatPlateToOutline → ok:false; the caption is never built), so no submersion re-check.
+    var ie = _innerEdgeVerts(pp, geom);
+    var seam = (ie && !ie.kissOnly) ? _innerEdgeSeam(ie) : null;
+    if (seam) return seam;
 
-    // Truly degenerate plate (inner edge unresolvable, < 2 verts) → straight chord between the two
-    // farthest plate∩art crossings, if the plate is genuinely seated. Submersion is computed only
-    // for this fallback.
+    // Near-square / very-short caption: the PCA long axis is noise (kissOnly) and the cap band can
+    // swallow the whole trimmed inner edge. Retry KEEPING the caps so a legit 1-2 char caption still
+    // yields a (short) art-facing seam instead of nulling out → export hard-error (review #1).
+    seam = _innerEdgeSeam(_innerEdgeVerts(pp, geom, { includeCaps: true }));
+    if (seam) return seam;
+
+    // Truly degenerate plate (inner edge unresolvable) → straight chord between the two farthest
+    // plate∩art crossings, if the plate is genuinely seated. Submersion computed only for this fallback.
     var inside = [], k, countIn = 0;
     for (k = 0; k < n; k++) { inside[k] = _pointInPolysEO(pp[k], artPolys); if (inside[k]) countIn++; }
     if (countIn === 0 || countIn === n) return null;
     return _chordFallback(pp, inside, artPolys);
+}
+
+// The inner-edge verts from _innerEdgeVerts → a seam polyline [{x,y}, …], or null if < 2 verts.
+// (The caller decides whether to accept a kissOnly result.) Pure.
+function _innerEdgeSeam(ie) {
+    if (!ie || !ie.verts || ie.verts.length < 2) return null;
+    var seam = [], i;
+    for (i = 0; i < ie.verts.length; i++) seam.push({ x: ie.verts[i].x, y: ie.verts[i].y });
+    return seam;
 }
 
 // Shape-degeneracy fallback: a straight chord between the two farthest plate∩art crossings.
