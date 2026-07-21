@@ -3295,6 +3295,28 @@ function _sampleSubPath(subPath, stepsPerSeg) {
     return poly;
 }
 
+// Selects the fused-cut leaf indices that are caption-junction slivers to delete: every leaf
+// EXCEPT the largest whose centroid lies inside the plate∩art overlap (inside BOTH the pill and
+// the art). leaves = [{ c:{x,y}, area:Number }, ...]; platePolys/artPolys = samplePathToPolygons
+// outputs. Parameter-free — overlap membership IS the test (no band, no area cap). The largest
+// leaf (the real sticker contour) is never a candidate. Pure; node-testable.
+function _junctionSliverLeaves(leaves, platePolys, artPolys) {
+    var doomed = [];
+    if (!leaves || leaves.length < 2) return doomed;
+    var maxI = 0, i;
+    for (i = 1; i < leaves.length; i++) {
+        if (leaves[i].area > leaves[maxI].area) maxI = i;
+    }
+    for (i = 0; i < leaves.length; i++) {
+        if (i === maxI) continue;                               // never the real contour
+        var c = leaves[i].c;
+        if (_pointInPolysEO(c, platePolys) && _pointInPolysEO(c, artPolys)) {
+            doomed.push(i);
+        }
+    }
+    return doomed;
+}
+
 // Samples a PathItem/CompoundPathItem/GroupItem into an array of closed polygons
 // (each [{x, y}, …] in document points). stepsPerSeg controls precision.
 function samplePathToPolygons(item, stepsPerSeg) {
