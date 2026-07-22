@@ -148,7 +148,10 @@ name. Deterministic (fixed element order), so it appears cleanly in goldens.
 
 - Junction filleting / spike smoothing (`_filletAtCrossing` and its bezier-arc machinery).
 - Any PS-side / raster change.
-- The default-tab (non-caption) cutline path — untouched.
+- The default-tab **seating** code — untouched. (Note: `deriveCutline` is the shared chokepoint
+  for tab cuts too, so the sliver cleanup DOES run on default-tab cutlines — this is benign and
+  arguably desirable, since a tab weld leaves the same junction crumbs. It is not a separate code
+  path, just the same cleanup applied wherever `deriveCutline` unites a plate/tab with the art.)
 
 ## Risk / edge cases
 
