@@ -3295,8 +3295,6 @@ function _sampleSubPath(subPath, stepsPerSeg) {
     return poly;
 }
 
-// Selects the fused-cut leaf indices that are caption-junction slivers to delete: every leaf
-// EXCEPT the largest whose centroid lies inside the plate∩art overlap (inside BOTH the pill and
 // Selects the fused-cut leaf indices that are caption-junction slivers to delete. A fused leaf is
 // REAL (keep) when it echoes a subpath already present in the art-alone `outline` — the plate
 // Unite leaves genuine art holes untouched (same centroid, same area). A non-largest fused leaf
