@@ -8,6 +8,8 @@
 [ai-pipeline] caption built | Carpathian Wooden Churches
 [seat] Tatra chamois | rotated -0.3deg to two-point contact.
 [seat] Tatra chamois | seated (contact) rot=-0.3deg move=6.8pt depth=0pt
+[cutline] junction slivers removed | 1
+[fuse] Tatra chamois | embedded 0.02mm to fuse caption
 [ai-pipeline] caption built | Tatra chamois
 [seat] Tram | rotated -1.2deg to two-point contact.
 [seat] Tram | seated (contact) rot=-1.2deg move=8.2pt depth=0pt
@@ -125,7 +127,7 @@
 [step7a] irregular | ratio=0.706 | Kroje
 [step7a] irregular | ratio=0.717 | Fujara
 [step7a] irregular | ratio=0.654 | Tram
-[step7a] irregular | ratio=0.531 | Tatra chamois
+[step7a] irregular | ratio=0.532 | Tatra chamois
 [step7a] regular   | ratio=0.922 | Carpathian Wooden Churches
 [step7a] regular   | ratio=0.859 | St Elizabeth's Cathedral | (Dóm Svätej Alzbety)
 [step7a] classified: 16 regular, 12 irregular (threshold=0.82)
