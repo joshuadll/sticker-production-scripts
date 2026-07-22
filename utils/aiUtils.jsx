@@ -1515,7 +1515,48 @@ function deriveCutline(outline, plate) {
     app.executeMenuCommand("expandStyle");
     app.userInteractionLevel = prevLevel;
 
-    return app.selection[0];
+    var fused = app.selection[0];
+    var sw = removeCaptionJunctionSlivers(fused, outline);
+    if (sw.removed > 0) log("[cutline] junction slivers removed | " + sw.removed);
+    return fused;
+}
+
+// Leaf PathItems of a fused cutline or an outline (PathItem / CompoundPathItem / GroupItem).
+// deriveCutline's Unite result is usually a GroupItem wrapping several PathItems.
+function _fusedCutLeaves(item, acc) {
+    var t = item.typename, i;
+    if (t === "PathItem") { acc.push(item); }
+    else if (t === "CompoundPathItem") { for (i = 0; i < item.pathItems.length; i++) acc.push(item.pathItems[i]); }
+    else if (t === "GroupItem") { for (i = 0; i < item.pageItems.length; i++) _fusedCutLeaves(item.pageItems[i], acc); }
+    return acc;
+}
+
+// [{ c:{x,y}, area:Number }] for a list of leaf PathItems, from each leaf's geometricBounds.
+function _leafMetrics(items) {
+    var out = [], i, b;
+    for (i = 0; i < items.length; i++) {
+        b = items[i].geometricBounds;                          // [left, top, right, bottom]
+        out.push({ c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) });
+    }
+    return out;
+}
+
+// Deletes caption-junction sliver subpaths from a freshly-Unite'd fused cutline: the boolean
+// crumbs the plate∩art weld invents at the seam. Keeps the largest leaf (the real contour) and
+// any leaf that echoes a subpath of the art-alone `outline` (a genuine art hole, like Tram's);
+// drops the rest. Idempotent (a cut with no unmatched leaves is a no-op). Returns { removed:N }.
+function removeCaptionJunctionSlivers(cutline, outline) {
+    if (!cutline || !outline) return { removed: 0 };
+    var fusedItems = _fusedCutLeaves(cutline, []);
+    if (fusedItems.length < 2) return { removed: 0 };
+    var outlineLeaves = _leafMetrics(_fusedCutLeaves(outline, []));
+    var fusedLeaves   = _leafMetrics(fusedItems);
+    var doomed = _junctionSliverLeaves(fusedLeaves, outlineLeaves);
+    var i;
+    for (i = 0; i < doomed.length; i++) {
+        try { fusedItems[doomed[i]].remove(); } catch (e) {}
+    }
+    return { removed: doomed.length };
 }
 
 // Assembles the per-element bundle as a GroupItem so the components ride along

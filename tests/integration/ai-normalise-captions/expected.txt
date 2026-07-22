@@ -8,12 +8,14 @@
 [step8b] reset to spec | Devín Castle (WC, x0.904)
 [seat] Slovak Paradise National Park | rotated -0.2deg to two-point contact.
 [seat] Slovak Paradise National Park | seated (contact) rot=-0.2deg move=0.4pt depth=0pt
+[cutline] junction slivers removed | 2
 [halfcut] Slovak Paradise National Park | pts=20 end0=(311.9,285.2) endN=(415.8,286.1) straight
 [buffer] Slovak Paradise National Park | band 0..+1mm
 [step8b] reset to spec | Slovak Paradise National Park (WC, x0.923)
 [step8b] at spec | Spiš Castle (WC)
 [seat] Bratislava Castle | rotated -0.2deg to two-point contact.
 [seat] Bratislava Castle | seated (contact) rot=-0.2deg move=0.8pt depth=0pt
+[cutline] junction slivers removed | 1
 [halfcut] Bratislava Castle | pts=26 end0=(172.8,802.4) endN=(232,799.8) straight
 [buffer] Bratislava Castle | band 0..+1mm
 [step8b] reset to spec | Bratislava Castle (WC, x1.125)
@@ -34,6 +36,7 @@
 [step8b] at spec | Bojnice Castle (WC)
 [seat] Orava Castle | rotated -0.1deg to two-point contact.
 [seat] Orava Castle | seated (contact) rot=-0.1deg move=0.3pt depth=0pt
+[cutline] junction slivers removed | 1
 [halfcut] Orava Castle | pts=22 end0=(414.4,173.6) endN=(459.8,172.9) straight
 [buffer] Orava Castle | band 0..+1mm
 [step8b] reset to spec | Orava Castle (WC, x0.900)
@@ -47,11 +50,13 @@
 [step8b] at spec | Kraslice (WC)
 [seat] Kroje | rotated 0.3deg to two-point contact.
 [seat] Kroje | seated (contact) rot=0.3deg move=0.8pt depth=0pt
+[cutline] junction slivers removed | 2
 [halfcut] Kroje | pts=41 end0=(295.7,85.3) endN=(307.2,65.4) straight
 [buffer] Kroje | band 0..+1mm
 [step8b] reset to spec | Kroje (WC, x0.863)
 [seat] Fujara | rotated 0.5deg to two-point contact.
 [seat] Fujara | seated (contact) rot=0.5deg move=0.2pt depth=0pt
+[cutline] junction slivers removed | 1
 [halfcut] Fujara | pts=26 end0=(40.7,304) endN=(48.2,327.6) straight
 [buffer] Fujara | band 0..+1mm
 [step8b] reset to spec | Fujara (WC, x0.917)
@@ -61,11 +66,13 @@
 [step8b] reset to spec | Tram (WC, x1.025)
 [seat] Tatra chamois | rotated -0.0deg to two-point contact.
 [seat] Tatra chamois | seated (contact) rot=0deg move=0pt depth=0pt
+[cutline] junction slivers removed | 1
 [halfcut] Tatra chamois | pts=41 end0=(274.9,170.7) endN=(325.2,172.7) straight
 [buffer] Tatra chamois | band 0..+1mm
 [step8b] reset to spec | Tatra chamois (WC, x0.940)
 [seat] Carpathian Wooden Churches | rotated 0.2deg to two-point contact.
 [seat] Carpathian Wooden Churches | seated (contact) rot=0.2deg move=0.5pt depth=0pt
+[cutline] junction slivers removed | 1
 [halfcut] Carpathian Wooden Churches | pts=53 end0=(447.8,501.7) endN=(546.6,501.6) straight
 [buffer] Carpathian Wooden Churches | band 0..+1mm
 [step8b] reset to spec | Carpathian Wooden Churches (WC, x0.904)
