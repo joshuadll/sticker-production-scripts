@@ -3297,24 +3297,41 @@ function _sampleSubPath(subPath, stepsPerSeg) {
 
 // Selects the fused-cut leaf indices that are caption-junction slivers to delete: every leaf
 // EXCEPT the largest whose centroid lies inside the plate∩art overlap (inside BOTH the pill and
-// the art). leaves = [{ c:{x,y}, area:Number }, ...]; platePolys/artPolys = samplePathToPolygons
-// outputs. Parameter-free — overlap membership IS the test (no band, no area cap). The largest
-// leaf (the real sticker contour) is never a candidate. Pure; node-testable.
-function _junctionSliverLeaves(leaves, platePolys, artPolys) {
+// Selects the fused-cut leaf indices that are caption-junction slivers to delete. A fused leaf is
+// REAL (keep) when it echoes a subpath already present in the art-alone `outline` — the plate
+// Unite leaves genuine art holes untouched (same centroid, same area). A non-largest fused leaf
+// with NO outline match was invented by the union at the pill∩art seam = a sliver (delete). The
+// largest fused leaf (the real sticker contour) is never a candidate.
+// fusedLeaves / outlineLeaves = [{ c:{x,y}, area:Number }, ...]. Pure; node-testable.
+function _junctionSliverLeaves(fusedLeaves, outlineLeaves) {
     var doomed = [];
-    if (!leaves || leaves.length < 2) return doomed;
+    if (!fusedLeaves || fusedLeaves.length < 2) return doomed;
     var maxI = 0, i;
-    for (i = 1; i < leaves.length; i++) {
-        if (leaves[i].area > leaves[maxI].area) maxI = i;
+    for (i = 1; i < fusedLeaves.length; i++) {
+        if (fusedLeaves[i].area > fusedLeaves[maxI].area) maxI = i;
     }
-    for (i = 0; i < leaves.length; i++) {
+    for (i = 0; i < fusedLeaves.length; i++) {
         if (i === maxI) continue;                               // never the real contour
-        var c = leaves[i].c;
-        if (_pointInPolysEO(c, platePolys) && _pointInPolysEO(c, artPolys)) {
-            doomed.push(i);
-        }
+        if (!_matchesAnOutlineLeaf(fusedLeaves[i], outlineLeaves)) doomed.push(i);
     }
     return doomed;
+}
+
+// True when fused leaf f echoes some outline subpath: centroids within 10pt AND areas within
+// +/-25%. Wide margins by design — real echoes coincide (dist~0, ratio~1.0) while slivers miss
+// (dist>=20pt, ratio<=0.007) on the live SKU, so nothing lands between the two clusters.
+function _matchesAnOutlineLeaf(f, outlineLeaves) {
+    if (!outlineLeaves) return false;
+    var DIST2 = 10 * 10, i, o, dx, dy, ratio;
+    for (i = 0; i < outlineLeaves.length; i++) {
+        o = outlineLeaves[i];
+        if (o.area <= 0) continue;
+        dx = f.c.x - o.c.x; dy = f.c.y - o.c.y;
+        if (dx * dx + dy * dy > DIST2) continue;
+        ratio = f.area / o.area;
+        if (ratio >= 0.75 && ratio <= 1.25) return true;
+    }
+    return false;
 }
 
 // Samples a PathItem/CompoundPathItem/GroupItem into an array of closed polygons
