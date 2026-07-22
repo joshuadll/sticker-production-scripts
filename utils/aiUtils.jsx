@@ -1379,9 +1379,18 @@ function buildCaption(doc, layer, textFrame, outline, opts) {
         return { ok: false, needsReview: !!seat.needsReview, reason: seat.reason };
     }
 
-    // Unite outline + pill into the fused cut; bundle the separable members.
-    var cut = deriveCutline(outline, pill);
-    strokeRecursive(cut, (opts.strokePt != null ? opts.strokePt : 0.25), blackRgb());
+    // Unite outline + pill into the fused cut (fuse-rescue a caption that won't join at zero embed).
+    var moveItems = [pill, rideGroup];
+    var fuse = fuseCaptionCutline(outline, pill, moveItems,
+        (opts.strokePt != null ? opts.strokePt : 0.25), { name: name });
+    if (!fuse.ok) {
+        try { textFrame.move(layer, ElementPlacement.PLACEATEND); } catch (e1) {}
+        try { if (plateRaster) plateRaster.move(layer, ElementPlacement.PLACEATEND); } catch (e2) {}
+        try { rideGroup.remove(); } catch (e3) {}
+        log("[fuse] " + name + " | " + fuse.reason);
+        return { ok: false, needsReview: true, reason: fuse.reason };
+    }
+    var cut = fuse.cut;
     var group = assembleElementGroup(layer, name, outline, pill, cut);
 
     // PRINTED caption rides the cut group: pill stays VISIBLE (white background), and the text
@@ -1492,6 +1501,64 @@ function _placeCaptionPlateRaster(layer, pill, plateFile, heightMm, widthPadMm) 
     placed.translate(pcx - (placed.position[0] + placed.width / 2),
                      pcy - (placed.position[1] - placed.height / 2));
     return placed;
+}
+
+// Leaf metrics [{c,area}] of a fused-cut item (PathItem / CompoundPathItem / GroupItem).
+function _fusedLeafMetrics(item) {
+    var acc = [];
+    (function walk(it) {
+        var t = it.typename, i;
+        if (t === "PathItem") acc.push(it);
+        else if (t === "CompoundPathItem") { for (i = 0; i < it.pathItems.length; i++) acc.push(it.pathItems[i]); }
+        else if (t === "GroupItem") { for (i = 0; i < it.pageItems.length; i++) walk(it.pageItems[i]); }
+    })(item);
+    var out = [], i, b;
+    for (i = 0; i < acc.length; i++) {
+        b = acc[i].geometricBounds;
+        out.push({ c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) });
+    }
+    return out;
+}
+
+// {c,area} of a single item's bbox.
+function _plateMetrics(plate) {
+    var b = plate.geometricBounds;
+    return { c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) };
+}
+
+// Unite outline + plate via the boolean deriveCutline; if the caption fused, return the stroked
+// cut. If it did NOT fuse (caption is a separate leaf), nudge every item in moveItems stepMm toward
+// the art (direction from _aiSeatGeometry) and re-unite, iterating until fused or capMm is reached
+// (hard error). The seat is untouched; only a non-fusing caption moves. Returns
+// { cut, embeddedMm, ok, reason }.
+function fuseCaptionCutline(outline, plate, moveItems, strokePt, opts) {
+    opts = opts || {};
+    var name   = opts.name || "(caption)";
+    var stepMm = (opts.stepMm != null) ? opts.stepMm
+               : ((typeof CONFIG !== "undefined" && CONFIG.captionFuseStepMm != null) ? CONFIG.captionFuseStepMm : 0.02);
+    var capMm  = (opts.capMm != null) ? opts.capMm
+               : ((typeof CONFIG !== "undefined" && CONFIG.captionFuseCapMm != null) ? CONFIG.captionFuseCapMm : 0.3);
+    var geom = _aiSeatGeometry(plate, outline);
+    var step = mmToPoints(stepMm);
+    var embeddedMm = 0;
+
+    var cut = deriveCutline(outline, plate);
+    while (_captionLeafDetached(_fusedLeafMetrics(cut), _plateMetrics(plate))) {
+        if (embeddedMm + stepMm > capMm + 1e-9) {
+            try { cut.remove(); } catch (e0) {}
+            return { cut: null, embeddedMm: embeddedMm, ok: false,
+                     reason: "caption '" + name + "' won't fuse within " + capMm + "mm" };
+        }
+        var tx = geom.travelIsX ? geom.sign * step : 0;
+        var ty = geom.travelIsX ? 0 : geom.sign * step;
+        _translateItems(moveItems, tx, ty);
+        embeddedMm += stepMm;
+        try { cut.remove(); } catch (e1) {}
+        cut = deriveCutline(outline, plate);
+    }
+    strokeRecursive(cut, strokePt, blackRgb());
+    if (embeddedMm > 0) log("[fuse] " + name + " | embedded " + (Math.round(embeddedMm * 1000) / 1000) + "mm to fuse caption");
+    return { cut: cut, embeddedMm: embeddedMm, ok: true, reason: null };
 }
 
 // Derives the fused cutline = boolean union of element_outline and plate.
@@ -1636,8 +1703,18 @@ function reuniteCutline(group, outline, plate, strokePt) {
 
     var oldCutline = findGroupMember(group, "");
 
-    var newCutline = deriveCutline(outline, plate);
-    strokeRecursive(newCutline, strokePt, blackRgb());
+    var moveItems = [plate];
+    var capText   = findGroupMember(group, " caption text");
+    var capRaster = findGroupMember(group, " caption plate");
+    if (capText)   moveItems.push(capText);
+    if (capRaster) moveItems.push(capRaster);
+    var fuse = fuseCaptionCutline(outline, plate, moveItems, strokePt, { name: group.name });
+    if (!fuse.ok) {
+        outline.hidden = outlineHidden;
+        plate.hidden   = plateHidden;
+        throw new Error(fuse.reason);   // surfaced by the pipeline's per-phase try/catch
+    }
+    var newCutline = fuse.cut;
 
     if (oldCutline) oldCutline.remove();
     newCutline.name = group.name;
