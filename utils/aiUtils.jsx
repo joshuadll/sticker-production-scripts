@@ -1552,11 +1552,11 @@ function removeCaptionJunctionSlivers(cutline, outline) {
     var outlineLeaves = _leafMetrics(_fusedCutLeaves(outline, []));
     var fusedLeaves   = _leafMetrics(fusedItems);
     var doomed = _junctionSliverLeaves(fusedLeaves, outlineLeaves);
-    var i;
-    for (i = 0; i < doomed.length; i++) {
-        try { fusedItems[doomed[i]].remove(); } catch (e) {}
+    var removed = 0, i;
+    for (i = doomed.length - 1; i >= 0; i--) {      // descending: removing a leaf can't stale a lower index
+        try { fusedItems[doomed[i]].remove(); removed++; } catch (e) {}
     }
-    return { removed: doomed.length };
+    return { removed: removed };
 }
 
 // Assembles the per-element bundle as a GroupItem so the components ride along
