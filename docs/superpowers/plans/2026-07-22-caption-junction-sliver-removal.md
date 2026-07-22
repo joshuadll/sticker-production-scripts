@@ -4,7 +4,7 @@
 
 **Goal:** Delete the tiny boolean "blob" subpaths the caption-plate Unite leaves at the plate∩art junction, inside `deriveCutline` so they never persist across regeneration.
 
-**Architecture:** A pure, node-testable decision function (`_junctionSliverLeaves`) selects which fused-cut leaves are slivers — every leaf except the largest whose centroid lies inside the plate∩art overlap. An Illustrator wrapper (`removeCaptionJunctionSlivers`) enumerates the leaf PathItems, computes their centroids, calls the decision function, and removes the flagged leaves. It is called once inside `deriveCutline` after the Unite, so it re-applies at every caption regeneration (Step 6 / 7B / 8b-normalise).
+**Architecture:** A pure, node-testable decision function (`_junctionSliverLeaves`) selects which fused-cut leaves are slivers — every non-largest leaf that does NOT echo a subpath of the art-alone `outline` (genuine art holes are preserved by the `Unite`, so they match; union-invented seam crumbs don't). An Illustrator wrapper (`removeCaptionJunctionSlivers`) enumerates the fused + outline leaf PathItems, computes their centroids/areas, calls the decision function, and removes the flagged leaves. It is called once inside `deriveCutline` after the Unite, so it re-applies at every caption regeneration (Step 6 / 7B / 8b-normalise).
 
 **Tech Stack:** ExtendScript (ES3) for Illustrator; Node.js for pure-geometry unit tests; bash + osascript for the integration runner.
 
@@ -12,10 +12,10 @@
 
 - **ES3 only** (`utils/aiUtils.jsx` is `#include`d into Illustrator pipelines): no `let`/`const`, no arrow functions, no template literals, no `Array.prototype` ES5 extras beyond what the file already uses. Copy the style of the surrounding functions.
 - `utils/aiUtils.jsx` step/util files have **no `#target`, no `CONFIG`, no `main()`** — `CONFIG` and `log` are globals provided by the pipeline at run time. Guard `CONFIG` access with `typeof CONFIG !== "undefined"`.
-- **Parameter-free:** no `bandPt`, no area cap, no CONFIG gate. The overlap membership IS the test.
+- **No junction-distance / area-cap / CONFIG-gate tuning.** The discriminator is "does this leaf echo an outline subpath?" with wide-margin match thresholds (centroid ≤10 pt, area ±25%) that only need to separate real echoes (~0 pt / ~1.0) from slivers (≥20 pt / ~0).
 - **Always-on**, **idempotent** (a single-leaf cut is a no-op).
 - Log prefix for aiUtils-level lines: `[cutline]`.
-- Reuse existing helpers — do not reimplement: `samplePathToPolygons`, `_pointInPolysEO`, `pointInPolygon`, `boundsCenter`.
+- Reuse existing helper — do not reimplement: `boundsCenter`. (The decision needs no polygon sampling or point-in-polygon — it works on each leaf's centroid + bbox area.)
 - Node unit-test pattern: read `utils/aiUtils.jsx` as text, regex-`extract` each needed function, `eval` it, test on plain `{x,y}` polygons. Model on `tests/integration/unit/test-halfcut-tail-dir.js`.
 
 ---
@@ -23,65 +23,89 @@
 ### Task 1: Pure sliver-selection function (`_junctionSliverLeaves`) — node TDD
 
 **Files:**
-- Modify: `utils/aiUtils.jsx` (add `_junctionSliverLeaves` near `samplePathToPolygons`, ~line 3300)
+- Modify: `utils/aiUtils.jsx` (replace `_junctionSliverLeaves`; add `_matchesAnOutlineLeaf` beside it, ~line 3303)
 - Test: `tests/integration/unit/test-junction-slivers.js` (create)
 - Test runner: `tests/integration/unit/run-test-junction-slivers.sh` (create)
 
+**NOTE (redesign 2026-07-22):** an earlier version of this task shipped `_junctionSliverLeaves`
+with an "overlap" signature `(leaves, platePolys, artPolys)`. Live testing proved that approach
+matches zero real slivers (they straddle the seam, so centroids aren't inside both polygons).
+This task now REPLACES that committed function with the "compare against the outline" design.
+The implementer OVERWRITES the existing `_junctionSliverLeaves` and its test.
+
 **Interfaces:**
-- Consumes: `_pointInPolysEO(pt, polys)` and `pointInPolygon(pt, poly)` — both already in `aiUtils.jsx`, both operate on `{x,y}` points and polygons that are arrays of `{x,y}`.
-- Produces: `_junctionSliverLeaves(leaves, platePolys, artPolys) -> [Number]` where `leaves = [{ c:{x,y}, area:Number }, ...]`, `platePolys`/`artPolys` are `samplePathToPolygons`-style arrays of polygons. Returns the indices of leaves to delete: every index except the max-`area` index whose centroid `c` is inside BOTH `platePolys` and `artPolys`.
+- Consumes: nothing from aiUtils (pure — works on plain `{c:{x,y},area}` records).
+- Produces:
+  - `_junctionSliverLeaves(fusedLeaves, outlineLeaves) -> [Number]` — indices of `fusedLeaves`
+    to delete: every index except the max-`area` index that has NO matching outline leaf.
+  - `_matchesAnOutlineLeaf(f, outlineLeaves) -> Boolean` — true when `f` echoes some outline
+    subpath (centroid within 10 pt AND area ratio within ±25%).
+  - `fusedLeaves`/`outlineLeaves = [{ c:{x,y}, area:Number }, ...]`.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Rewrite the test (replace the whole file)**
 
-Create `tests/integration/unit/test-junction-slivers.js`:
+Overwrite `tests/integration/unit/test-junction-slivers.js` with:
 
 ```javascript
 // Pure-geometry unit test for caption-junction sliver selection (_junctionSliverLeaves in
-// aiUtils.jsx). A fused-cut leaf is a sliver iff it is NOT the largest AND its centroid lies
-// inside BOTH the plate and the art (the plate∩art overlap). No band, no area cap. y-UP coords.
+// aiUtils.jsx). A non-largest fused leaf is a SLIVER (delete) when NO outline subpath matches it
+// (centroid within 10pt AND area within +/-25%); a leaf that DOES match an outline subpath is a
+// genuine art hole (keep). The largest fused leaf is never deleted. Numbers mirror live data:
+// real echoes coincide (dist~0, ratio~1.0); slivers miss (dist>>10, ratio~0).
 var fs = require('fs');
 var src = fs.readFileSync(__dirname + '/../../../utils/aiUtils.jsx', 'utf8');
 function extract(name) {
     var re = new RegExp('function ' + name + '\\s*\\([\\s\\S]*?\\n}');
     var m = src.match(re); if (!m) throw new Error('could not extract ' + name); return m[0];
 }
-eval(extract('pointInPolygon'));
-eval(extract('_pointInPolysEO'));
+eval(extract('_matchesAnOutlineLeaf'));
 eval(extract('_junctionSliverLeaves'));
 
 var fails = 0;
 function check(c, m) { if (!c) { console.log('FAIL: ' + m); fails++; } }
 function arrEq(a, b) { return a.length === b.length && a.join(',') === b.join(','); }
 
-// art = 100x100 square; plate = pill straddling the bottom edge -> overlap = x[20,80], y[0,20].
-var ART   = [[{x:0,y:0},{x:100,y:0},{x:100,y:100},{x:0,y:100}]];
-var PLATE = [[{x:20,y:-10},{x:80,y:-10},{x:80,y:20},{x:20,y:20}]];
+// the art-alone trace: main contour + a genuine art hole (like Tram's).
+var OUTLINE = [
+    { c:{x:365,y:338}, area:14696 },   // art main contour
+    { c:{x:510,y:361}, area:299 }      // a genuine art hole
+];
 
-// contour (largest) + two blobs in the overlap + one real hole up in the art body.
+// fused: main + the real hole (echoes OUTLINE) + two junction slivers (no echo).
 (function () {
-    var leaves = [
-        { c:{x:50,y:50}, area:10000 },   // 0 real contour (largest, art body)
-        { c:{x:50,y:10}, area:50 },      // 1 blob in overlap        -> doomed
-        { c:{x:50,y:70}, area:40 },      // 2 real hole (art only)   -> keep
-        { c:{x:40,y:5},  area:30 }       // 3 blob in overlap        -> doomed
+    var fused = [
+        { c:{x:365,y:332}, area:16145 },   // 0 main contour (largest)            -> keep
+        { c:{x:510,y:361}, area:299 },     // 1 echoes the art hole (dist0, r1.0) -> keep
+        { c:{x:386,y:287}, area:49 },      // 2 sliver (dist~56, ratio~0.003)     -> doomed
+        { c:{x:332,y:286}, area:15 }       // 3 sliver (dist~61, ratio~0.001)     -> doomed
     ];
-    var d = _junctionSliverLeaves(leaves, PLATE, ART);
-    check(arrEq(d, [1, 3]), 'two overlap blobs doomed, real hole + contour kept (got [' + d + '])');
+    var d = _junctionSliverLeaves(fused, OUTLINE);
+    check(arrEq(d, [2, 3]), 'slivers doomed; main + real hole kept (got [' + d + '])');
 })();
 
-// the LARGEST leaf is never doomed, even if its centroid is in the overlap.
+// the LARGEST fused leaf is never doomed, even with no outline match.
 (function () {
-    var leaves = [
-        { c:{x:50,y:10}, area:10000 },   // 0 largest, centroid in overlap -> still kept
-        { c:{x:50,y:12}, area:50 }       // 1 blob                          -> doomed
+    var fused = [
+        { c:{x:0,y:0}, area:9999 },        // 0 largest, no outline match -> still kept
+        { c:{x:400,y:300}, area:20 }       // 1 sliver                    -> doomed
     ];
-    var d = _junctionSliverLeaves(leaves, PLATE, ART);
-    check(arrEq(d, [1]), 'largest kept even if in overlap; blob doomed (got [' + d + '])');
+    var d = _junctionSliverLeaves(fused, OUTLINE);
+    check(arrEq(d, [1]), 'largest kept even with no match; sliver doomed (got [' + d + '])');
 })();
 
-// a single leaf (already clean) -> nothing doomed (idempotent no-op).
+// a clean cut (every non-largest leaf echoes an outline subpath) -> no-op.
 (function () {
-    var d = _junctionSliverLeaves([{ c:{x:50,y:50}, area:10000 }], PLATE, ART);
+    var fused = [
+        { c:{x:365,y:332}, area:16145 },   // main (largest)
+        { c:{x:510,y:361}, area:299 }      // real hole, matches OUTLINE -> kept
+    ];
+    var d = _junctionSliverLeaves(fused, OUTLINE);
+    check(arrEq(d, []), 'all non-largest leaves matched -> no-op (got [' + d + '])');
+})();
+
+// single leaf -> no-op.
+(function () {
+    var d = _junctionSliverLeaves([{ c:{x:0,y:0}, area:100 }], OUTLINE);
     check(arrEq(d, []), 'single leaf -> no-op (got [' + d + '])');
 })();
 
@@ -92,33 +116,48 @@ else { console.log(fails + ' FAIL'); process.exit(1); }
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `node tests/integration/unit/test-junction-slivers.js`
-Expected: throws `Error: could not extract _junctionSliverLeaves` (function not defined yet).
+Expected: throws `Error: could not extract _matchesAnOutlineLeaf` (the new helper doesn't exist yet — the old `_junctionSliverLeaves` is still the committed overlap version).
 
-- [ ] **Step 3: Write minimal implementation**
+- [ ] **Step 3: Replace the implementation**
 
-In `utils/aiUtils.jsx`, immediately BEFORE `function samplePathToPolygons(` (~line 3300), add:
+In `utils/aiUtils.jsx`, DELETE the existing `function _junctionSliverLeaves(leaves, platePolys, artPolys) { ... }` (committed in the prior task, ~line 3303, just before `samplePathToPolygons`) and replace it with these TWO functions:
 
 ```javascript
-// Selects the fused-cut leaf indices that are caption-junction slivers to delete: every leaf
-// EXCEPT the largest whose centroid lies inside the plate∩art overlap (inside BOTH the pill and
-// the art). leaves = [{ c:{x,y}, area:Number }, ...]; platePolys/artPolys = samplePathToPolygons
-// outputs. Parameter-free — overlap membership IS the test (no band, no area cap). The largest
-// leaf (the real sticker contour) is never a candidate. Pure; node-testable.
-function _junctionSliverLeaves(leaves, platePolys, artPolys) {
+// Selects the fused-cut leaf indices that are caption-junction slivers to delete. A fused leaf is
+// REAL (keep) when it echoes a subpath already present in the art-alone `outline` — the plate
+// Unite leaves genuine art holes untouched (same centroid, same area). A non-largest fused leaf
+// with NO outline match was invented by the union at the pill∩art seam = a sliver (delete). The
+// largest fused leaf (the real sticker contour) is never a candidate.
+// fusedLeaves / outlineLeaves = [{ c:{x,y}, area:Number }, ...]. Pure; node-testable.
+function _junctionSliverLeaves(fusedLeaves, outlineLeaves) {
     var doomed = [];
-    if (!leaves || leaves.length < 2) return doomed;
+    if (!fusedLeaves || fusedLeaves.length < 2) return doomed;
     var maxI = 0, i;
-    for (i = 1; i < leaves.length; i++) {
-        if (leaves[i].area > leaves[maxI].area) maxI = i;
+    for (i = 1; i < fusedLeaves.length; i++) {
+        if (fusedLeaves[i].area > fusedLeaves[maxI].area) maxI = i;
     }
-    for (i = 0; i < leaves.length; i++) {
+    for (i = 0; i < fusedLeaves.length; i++) {
         if (i === maxI) continue;                               // never the real contour
-        var c = leaves[i].c;
-        if (_pointInPolysEO(c, platePolys) && _pointInPolysEO(c, artPolys)) {
-            doomed.push(i);
-        }
+        if (!_matchesAnOutlineLeaf(fusedLeaves[i], outlineLeaves)) doomed.push(i);
     }
     return doomed;
+}
+
+// True when fused leaf f echoes some outline subpath: centroids within 10pt AND areas within
+// +/-25%. Wide margins by design — real echoes coincide (dist~0, ratio~1.0) while slivers miss
+// (dist>=20pt, ratio<=0.007) on the live SKU, so nothing lands between the two clusters.
+function _matchesAnOutlineLeaf(f, outlineLeaves) {
+    if (!outlineLeaves) return false;
+    var DIST2 = 10 * 10, i, o, dx, dy, ratio;
+    for (i = 0; i < outlineLeaves.length; i++) {
+        o = outlineLeaves[i];
+        if (o.area <= 0) continue;
+        dx = f.c.x - o.c.x; dy = f.c.y - o.c.y;
+        if (dx * dx + dy * dy > DIST2) continue;
+        ratio = f.area / o.area;
+        if (ratio >= 0.75 && ratio <= 1.25) return true;
+    }
+    return false;
 }
 ```
 
@@ -150,10 +189,11 @@ Expected: `PASS [junction-slivers-unit]`
 
 ```bash
 git add utils/aiUtils.jsx tests/integration/unit/test-junction-slivers.js tests/integration/unit/run-test-junction-slivers.sh
-git commit -m "feat(cutline): _junctionSliverLeaves — select overlap slivers to delete
+git commit -m "feat(cutline): _junctionSliverLeaves — compare fused leaves to the outline
 
-Pure, node-tested decision: every fused-cut leaf except the largest whose
-centroid is inside the plate∩art overlap. Parameter-free."
+Pure, node-tested decision: keep the largest fused leaf + any leaf that echoes an
+art-alone outline subpath (a genuine hole); delete the rest (union-invented slivers).
+Replaces the earlier overlap test, which matched zero real slivers live."
 ```
 
 ---
@@ -166,21 +206,21 @@ centroid is inside the plate∩art overlap. Parameter-free."
 - Modify: `tests/integration/ai-normalise-captions/expected.txt` — regenerate (new `[cutline]` log lines).
 
 **Interfaces:**
-- Consumes: `_junctionSliverLeaves` (Task 1); `samplePathToPolygons(item, steps)`, `boundsCenter(bounds)` (return `{x,y}` from a `[left,top,right,bottom]` bounds array).
-- Produces: `removeCaptionJunctionSlivers(cutline, outline, plate) -> { removed:Number }`; `_fusedCutLeaves(item, acc) -> [PathItem]`.
+- Consumes: `_junctionSliverLeaves(fusedLeaves, outlineLeaves)` (Task 1); `boundsCenter(bounds)` (returns `{x,y}` from a `[left,top,right,bottom]` bounds array).
+- Produces: `removeCaptionJunctionSlivers(cutline, outline) -> { removed:Number }`; `_fusedCutLeaves(item, acc) -> [PathItem]`; `_leafMetrics(items) -> [{c,area}]`.
 
 - [ ] **Step 1: Confirm no name collisions**
 
-Run: `grep -c "removeCaptionJunctionSlivers\|_fusedCutLeaves" utils/aiUtils.jsx`
+Run: `grep -c "removeCaptionJunctionSlivers\|_fusedCutLeaves\|_leafMetrics" utils/aiUtils.jsx`
 Expected: `0` (safe to add without redefining).
 
-- [ ] **Step 2: Add the leaf-enumeration helper and the wrapper**
+- [ ] **Step 2: Add the leaf-enumeration helper, metrics helper, and the wrapper**
 
 In `utils/aiUtils.jsx`, immediately AFTER `function deriveCutline(...) { ... }` (ends ~line 1522, `return app.selection[0];` + closing brace), add:
 
 ```javascript
-// Leaf PathItems of a fused cutline (PathItem / CompoundPathItem / GroupItem). deriveCutline's
-// Unite result is usually a GroupItem wrapping several PathItems.
+// Leaf PathItems of a fused cutline or an outline (PathItem / CompoundPathItem / GroupItem).
+// deriveCutline's Unite result is usually a GroupItem wrapping several PathItems.
 function _fusedCutLeaves(item, acc) {
     var t = item.typename, i;
     if (t === "PathItem") { acc.push(item); }
@@ -189,32 +229,30 @@ function _fusedCutLeaves(item, acc) {
     return acc;
 }
 
-// Deletes caption-junction sliver subpaths from a freshly-Unite'd fused cutline: the tiny
-// boolean crumbs that form in the plate∩art overlap where the pill grazes the art edge. Keeps
-// the largest leaf (the real contour) always; drops every other leaf whose centroid lies inside
-// BOTH the plate and the art. Idempotent (a single-leaf cut is a no-op). Returns { removed:N }.
-function removeCaptionJunctionSlivers(cutline, outline, plate) {
-    if (!cutline || !outline || !plate) return { removed: 0 };
-    var steps = (typeof CONFIG !== "undefined" && CONFIG.halfcutSeamSteps)
-              ? CONFIG.halfcutSeamSteps : 16;
-    var items = _fusedCutLeaves(cutline, []);
-    if (items.length < 2) return { removed: 0 };
-
-    var platePolys = samplePathToPolygons(plate, steps);
-    var artPolys   = samplePathToPolygons(outline, steps);
-    if (platePolys.length === 0 || artPolys.length === 0) return { removed: 0 };
-
-    var leaves = [], i, b;
+// [{ c:{x,y}, area:Number }] for a list of leaf PathItems, from each leaf's geometricBounds.
+function _leafMetrics(items) {
+    var out = [], i, b;
     for (i = 0; i < items.length; i++) {
         b = items[i].geometricBounds;                          // [left, top, right, bottom]
-        leaves.push({
-            c: boundsCenter(b),
-            area: Math.abs((b[2] - b[0]) * (b[1] - b[3]))
-        });
+        out.push({ c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) });
     }
-    var doomed = _junctionSliverLeaves(leaves, platePolys, artPolys);
+    return out;
+}
+
+// Deletes caption-junction sliver subpaths from a freshly-Unite'd fused cutline: the boolean
+// crumbs the plate∩art weld invents at the seam. Keeps the largest leaf (the real contour) and
+// any leaf that echoes a subpath of the art-alone `outline` (a genuine art hole, like Tram's);
+// drops the rest. Idempotent (a cut with no unmatched leaves is a no-op). Returns { removed:N }.
+function removeCaptionJunctionSlivers(cutline, outline) {
+    if (!cutline || !outline) return { removed: 0 };
+    var fusedItems = _fusedCutLeaves(cutline, []);
+    if (fusedItems.length < 2) return { removed: 0 };
+    var outlineLeaves = _leafMetrics(_fusedCutLeaves(outline, []));
+    var fusedLeaves   = _leafMetrics(fusedItems);
+    var doomed = _junctionSliverLeaves(fusedLeaves, outlineLeaves);
+    var i;
     for (i = 0; i < doomed.length; i++) {
-        try { items[doomed[i]].remove(); } catch (e) {}
+        try { fusedItems[doomed[i]].remove(); } catch (e) {}
     }
     return { removed: doomed.length };
 }
@@ -233,7 +271,7 @@ Replace those two lines with:
 
 ```javascript
     var fused = app.selection[0];
-    var sw = removeCaptionJunctionSlivers(fused, outline, plate);
+    var sw = removeCaptionJunctionSlivers(fused, outline);
     if (sw.removed > 0) log("[cutline] junction slivers removed | " + sw.removed);
     return fused;
 }
@@ -246,18 +284,20 @@ Replace those two lines with:
 Run: `cp utils/aiUtils.jsx /tmp/aiUtils-check.js && node --check /tmp/aiUtils-check.js && echo OK`
 Expected: `OK` (exit 0). A syntax error here means a typo in the added code.
 
-- [ ] **Step 5: Add the leaf-count assertion to the normalise runner**
+- [ ] **Step 5: Add the sliver assertion to the normalise runner**
+
+The invariant after sliver removal is **fused leaf count == outline leaf count** per captioned
+element — slivers gone, genuine art holes (e.g. Tram's) kept. Do NOT assert "exactly 1 leaf":
+Tram legitimately keeps 2 (contour + hole). The result MUST come back via the AppleScript return
+value — an Illustrator `File.write` to `/tmp` under osascript is silently TCC-blocked on this Mac.
 
 In `tests/integration/ai-normalise-captions/run.sh`, find the block that ends the assertions (after the idempotency PASS/FAIL `if` and before the golden-diff section — search for `# ── Assertions` … the `RESET2`/`ATSPEC2` block). Immediately AFTER that idempotency `if/fi` block, insert:
 
 ```bash
-# ── Leaf-count assertion: every captioned fused cut must be a single contour ──
-# After sliver removal the fused cut = one closed leaf. >1 leaf ⇒ a junction blob survived.
-# (The Slovakia WC fixture's art has no genuine interior holes, so 1 leaf is the correct
-#  target for every captioned element here.)
+# ── Sliver assertion: each captioned fused cut has the SAME leaf count as its outline ──
+# (slivers removed; genuine art holes like Tram's kept). Result returns via the AppleScript
+# value, NOT a /tmp File.write (silently TCC-blocked from Illustrator under osascript).
 LEAFCHK="/tmp/${STEP}-leafcheck.jsx"
-LEAFLOG="/tmp/${STEP}-leafcount.txt"
-rm -f "$LEAFLOG"
 cat > "$LEAFCHK" <<'JSX'
 #target illustrator
 function leaves(item,acc){var t=item.typename,i;
@@ -265,34 +305,33 @@ function leaves(item,acc){var t=item.typename,i;
   else if(t=="CompoundPathItem"){for(i=0;i<item.pathItems.length;i++)acc.push(item.pathItems[i]);}
   else if(t=="GroupItem"){for(i=0;i<item.pageItems.length;i++)leaves(item.pageItems[i],acc);}
   return acc;}
-var doc=app.activeDocument, out=[], ci=-1, L;
+var doc=app.activeDocument, ci=-1, L, checked=0, bad=0;
 for(L=0;L<doc.layers.length;L++){ if(doc.layers[L].name=="Cutlines") ci=L; }
 if(ci>=0){
   var n=doc.layers[ci].pageItems.length, g, m;
   for(g=0;g<n;g++){
     var grp=doc.layers[ci].pageItems[g];
     if(grp.typename!="GroupItem") continue;                 // stamps are bare paths
-    var hasPlate=false, fused=null;
+    var outline=null, fused=null;
     for(m=0;m<grp.pageItems.length;m++){
       var it=grp.pageItems[m];
-      if(it.name==grp.name+" plate") hasPlate=true;
-      if(it.name==grp.name) fused=it;
+      if(it.name==grp.name+" outline") outline=it;
+      else if(it.name==grp.name) fused=it;
     }
-    if(!hasPlate || !fused) continue;                       // captioned groups only
-    out.push("LEAF\t"+leaves(fused,[]).length+"\t"+grp.name);
+    if(!outline || !fused) continue;                        // element groups only
+    checked++;
+    if(leaves(fused,[]).length != leaves(outline,[]).length) bad++;
   }
 }
-var f=new File("__LEAFLOG__"); f.open("w"); f.write(out.join("\n")); f.close();
-out.join("\n");
+"" + checked + " " + bad;                                   // -> osascript stdout
 JSX
-sed -i '' "s#__LEAFLOG__#$LEAFLOG#" "$LEAFCHK"
-osascript -e "tell application \"$APP\" to do javascript file (POSIX file \"$LEAFCHK\")" >/dev/null 2>&1 || true
-if [ -f "$LEAFLOG" ] && grep -q '^LEAF' "$LEAFLOG" \
-   && awk -F'\t' '$1=="LEAF" && $2!="1"{bad=1} END{exit bad?1:0}' "$LEAFLOG"; then
-    echo "PASS [$STEP]: every captioned fused cut is a single contour (no junction slivers)."
+LEAFRES=$(osascript -e "tell application \"$APP\" to do javascript file (POSIX file \"$LEAFCHK\")" 2>/dev/null | tr -d '\r"')
+LC_CHECKED=$(echo "$LEAFRES" | awk '{print $1}')
+LC_BAD=$(echo "$LEAFRES" | awk '{print $2}')
+if [ "${LC_CHECKED:-0}" -gt 0 ] && [ "${LC_BAD:-1}" -eq 0 ]; then
+    echo "PASS [$STEP]: all $LC_CHECKED captioned fused cuts match their outline leaf count (slivers gone, holes kept)."
 else
-    echo "FAIL [$STEP]: a captioned fused cut has >1 leaf (junction sliver present), or no cuts found."
-    cat "$LEAFLOG" 2>/dev/null || true
+    echo "FAIL [$STEP]: fused-vs-outline leaf mismatch (checked=$LC_CHECKED mismatched=$LC_BAD, raw='$LEAFRES')."
     FAIL=1
 fi
 ```
@@ -300,7 +339,7 @@ fi
 - [ ] **Step 6: Run the normalise integration test (needs Illustrator)**
 
 Run: `tests/integration/ai-normalise-captions/run.sh`
-Expected: the existing `reset > 0` and idempotency PASS lines, PLUS `PASS [ai-normalise-captions]: every captioned fused cut is a single contour`. The golden diff will FAIL here — that is expected (new `[cutline] junction slivers removed | N` lines). Confirm the diff shows ONLY added `[cutline] junction slivers removed` lines and no changed `[seat]`/`[step8b]`/count values.
+Expected: the existing `reset > 0` and idempotency PASS lines, PLUS `PASS [ai-normalise-captions]: all N captioned fused cuts match their outline leaf count`. The golden diff will FAIL here — that is expected (new `[cutline] junction slivers removed | N` lines). Confirm the diff shows ONLY added `[cutline] junction slivers removed` lines and no changed `[seat]`/`[step8b]`/count values.
 
 - [ ] **Step 7: Regenerate the normalise golden**
 
@@ -321,8 +360,9 @@ git add utils/aiUtils.jsx tests/integration/ai-normalise-captions/run.sh tests/i
 git commit -m "feat(cutline): strip caption-junction slivers inside deriveCutline
 
 removeCaptionJunctionSlivers runs after every Unite so the blobs never persist
-across regeneration. Normalise runner asserts one leaf per captioned cut; golden
-regenerated for the new [cutline] log line."
+across regeneration; keeps genuine art holes by matching against the outline.
+Normalise runner asserts fused==outline leaf count; golden regenerated for the
+new [cutline] log line."
 ```
 
 ---
@@ -380,7 +420,8 @@ no seat/halfcut/count values changed."
 - Keep largest leaf always → Task 1 (max-area index excluded). ✓
 - Wired inside `deriveCutline`, survives regeneration → Task 2 Step 3. ✓
 - Idempotent → Task 1 single-leaf test + Task 2 `items.length < 2` guard + normalise Run #2. ✓
-- Reuse existing helpers → `samplePathToPolygons`/`_pointInPolysEO`/`pointInPolygon`/`boundsCenter`. ✓
+- Reuse existing helper → `boundsCenter`; decision is centroid+area only (no polygon sampling). ✓
+- Protect genuine art holes (Tram) → compare-to-outline test; Task 1 test case "real hole kept" + Task 2 asserts fused==outline leaf count. ✓
 - Real art hole preserved → Task 1 test case 1 (leaf 2 kept). ✓
 - Testing: normalise runner one-leaf assertion + golden regen + live eyeball → Task 2. ✓
 - Logging `[cutline]` → Task 2 Step 3. ✓ (name-less by design: `deriveCutline` is the DRY chokepoint and has no element name.)

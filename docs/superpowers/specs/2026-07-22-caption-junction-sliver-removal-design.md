@@ -52,68 +52,97 @@ single-anchor `filletJunctionCorners` ("insufficient, fired on 9/22, invisible")
 A single function in `aiUtils.jsx`:
 
 ```
-removeCaptionJunctionSlivers(cutline, outline, plate) -> { removed: N }
+removeCaptionJunctionSlivers(cutline, outline) -> { removed: N }
 ```
 
-### Rule (parameter-free — the "overlap" test)
+### Rule — the "compare against the outline" test
 
-1. Enumerate the fused cut's **leaf** subpaths (a leaf = one closed PathItem loop; the fused
-   cut is a GroupItem / CompoundPathItem holding several).
-2. Identify the **largest** leaf by bbox area — the real sticker contour. **Always keep it.**
-   It is never a deletion candidate.
-3. For every **other** leaf, delete it iff its **centroid lies inside the plate∩art overlap**
-   — i.e. inside the pill polygon AND inside the art-outline polygon.
+Distinguish a junk sliver from a genuine art hole by asking: **did this loop already exist in
+the art before the caption pill was welded on?** The plate `Unite` leaves real art holes
+untouched (same position, same size); junction slivers are *invented* by the union at the
+pill∩art seam and have no counterpart in the art-alone trace.
 
-The overlap (the submerged lens where the pill is inside the art) is exactly where boolean
-crumbs form. A legitimate hole in the art body lives up in the artwork, away from the
-submerged strip, so it fails the "inside the pill" half of the test and is kept. Using the
-leaf's **centroid** (which sits clearly down in the overlap) rather than "all anchors" avoids
-on-edge point-in-polygon twitchiness, since the blob loops straddle the art boundary.
+1. Enumerate the fused cut's **leaf** subpaths (a leaf = one closed loop; the fused cut is a
+   GroupItem/CompoundPathItem holding several). Enumerate the `outline` (art-alone) subpaths
+   the same way.
+2. Keep the **largest** fused leaf always — it's the real sticker contour, never a candidate.
+3. For every **other** fused leaf: keep it if some `outline` subpath **matches** it (centroids
+   nearly coincident AND areas within a wide tolerance); otherwise it's a sliver → delete.
 
-**No tunable parameters.** No `bandPt`, no area cap, no "two endpoints" assumption (the wavy
-edge produces many crossings, and blobs form mid-span, so an endpoints-only rule would miss
-them — the overlap test needs no crossing computation at all).
+Match margins are deliberately **wide-margin, not tuned**: on the live Slovakia SKU real echoes
+coincide exactly (centroid distance ~0 pt, area ratio ~1.00) while slivers miss by a mile
+(distance 20–63 pt, area ratio 0.00–0.007). Defaults: centroid within **10 pt**, area within
+**±25%**. Nothing in the real data lands between the two clusters.
+
+### Why not the earlier candidates
+
+- **Overlap test (centroid inside plate∩art), TRIED AND REJECTED 2026-07-22:** matched **zero**
+  real slivers in live testing. The slivers straddle the seam boundary, so their centroids land
+  inside-art-only, inside-plate-only, or outside-both — never cleanly inside both. Dead.
+- **"Delete all non-largest leaves":** unsafe — some SKUs have genuine art holes (the **Tram**
+  element's outline has 2 subpaths; its 299 pt² hole survives as a separate fused leaf and must
+  be kept). The compare-to-outline test protects these by construction.
+- **Old `bandPt` proximity (from `4bb0f6e`):** would work but needs a tuned junction-distance
+  number and a plate∩art crossing computation. The compare-to-outline test is more principled
+  (self-explaining) and needs neither.
+
+### Evidence (live, `resize-elements.ai` fixture, 2026-07-22)
+
+Per-element, comparing each non-largest fused leaf to the nearest `outline` subpath:
+
+| Element | leaf | centroid dist to outline | area ratio | verdict |
+|---|---|---|---|---|
+| Slovak Paradise | 49 pt² | 55.6 pt | 0.003 | sliver → delete |
+| Slovak Paradise | 15 pt² | 60.8 pt | 0.001 | sliver → delete |
+| Kroje | 104 pt² | 61.2 pt | 0.007 | sliver → delete |
+| Tram | 299 pt² | **0 pt** | **1.000** | real hole → **keep** |
+
+Full-SKU scan: 16 slivers, 2 real holes, 0 ambiguous.
 
 ### Wiring
 
 Called **inside `deriveCutline`**, after `expandStyle` bakes the union and before the result
-is returned. `deriveCutline` already receives `outline` and `plate`, so both polygons are in
-hand. Because every caption regeneration funnels through `deriveCutline`
-(Step 6 → 7B → 8b/normalise), the cleanup re-applies on each one with no per-step wiring.
+is returned. `deriveCutline` already receives `outline`, so the art-alone trace is in hand.
+Because every caption regeneration funnels through `deriveCutline` (Step 6 → 7B → 8b/normalise),
+the cleanup re-applies on each one with no per-step wiring.
 
 Always-on; no CONFIG gate.
 
 ### Idempotency
 
-Each regeneration re-Unites (re-creating the blobs) then strips them, always landing at one
-clean contour. Calling the cleanup on an already-single-leaf cut is a no-op (only the largest
-leaf is present, and it's never a candidate). Safe to loop, which normalise requires.
+Each regeneration re-Unites (re-creating the blobs) then strips them, always landing at the
+same clean state: fused leaf count == outline leaf count. Calling the cleanup on an
+already-clean cut is a no-op (no unmatched non-largest leaves remain). Safe to loop, which
+normalise requires.
 
 ### Reused helpers (all present in current `aiUtils.jsx`)
 
-- `samplePathToPolygons(item, steps)` — polygonise plate + outline.
-- `_largestPoly(polys)` — pick the dominant polygon of a sampled path.
-- `_pointInPolysEO(pt, polys)` / `pointInPolygon(pt, poly)` — point-in-polygon.
-- `boundsCenter(bounds)` — leaf centroid from `geometricBounds`.
+- `boundsCenter(bounds)` — leaf centroid from `geometricBounds` (returns `{x,y}`).
 - A small local leaf-enumeration helper (PathItem / CompoundPathItem / GroupItem → leaf
-  PathItems), mirroring the old `_cjLeafPaths`.
+  PathItems). No polygon sampling or point-in-polygon needed — the decision works purely on
+  each leaf's centroid + bbox area.
 
 ### Logging
 
-`log("[cutline] junction slivers removed | " + name + " | " + removed)` when `removed > 0`
-(name resolved by the caller where available; `deriveCutline` may log a generic line and the
-count).
+`log("[cutline] junction slivers removed | " + removed)` inside `deriveCutline` when
+`removed > 0`. Name-less by design — `deriveCutline` is the DRY chokepoint and has no element
+name. Deterministic (fixed element order), so it appears cleanly in goldens.
 
 ## Testing
 
-- **Integration:** extend `tests/integration/ai-normalise-captions/run.sh` to assert that
-  after normalise **every fused cut has exactly one leaf subpath**, then regenerate the golden
-  (`expected.txt`). This runner already opens the exact fixture that exhibits the blobs.
-- **Idempotency:** the runner's existing Run #2 pass must stay `reset=0`; the new leaf-count
-  assertion must also hold on Run #2 (still one leaf).
-- **Live check:** osascript re-inspection of "Slovak Paradise National Park" (and 2–3 others)
-  confirming leaves 3 → 1, plus the artist's visual eyeball in Illustrator that the blobs are
-  gone and the half-cut span is clean.
+- **Integration:** extend `tests/integration/ai-normalise-captions/run.sh` to assert, per
+  captioned element, that **the fused cut's leaf count equals the `outline`'s leaf count** after
+  normalise (slivers gone, real holes like Tram's kept). Then regenerate the golden
+  (`expected.txt`). The assertion must return its result via the osascript **AppleScript return
+  value**, NOT a `File.write` to `/tmp` — writing to `/tmp` from Illustrator under osascript is
+  silently TCC-blocked on this machine.
+- **Idempotency:** the runner's existing Run #2 pass must stay `reset=0`; the leaf-count-equals
+  assertion must also hold on Run #2.
+- **Unit:** the pure decision (`_junctionSliverLeaves(fusedLeaves, outlineLeaves)`) has a node
+  test covering: a sliver (no outline match) deleted; a real hole (outline match) kept; the
+  largest leaf never deleted; a clean cut (all matched) → no-op.
+- **Live check:** osascript re-inspection confirming Slovak Paradise 3 → 1 leaves and Tram
+  staying at 2 (its real hole intact), plus the artist's visual eyeball.
 
 ## Out of scope
 
@@ -123,11 +152,11 @@ count).
 
 ## Risk / edge cases
 
-- **Element with a genuine small art hole near the caption:** kept, because its centroid is
-  inside the art but NOT inside the pill (not in the overlap). This is the case scope-B safety
-  was chosen to protect.
-- **Fused cut is a single PathItem (no group):** one leaf, largest by definition, no
-  candidates — no-op.
-- **Overlap sampling resolution:** polygonise plate/outline with `CONFIG.halfcutSeamSteps`
-  (the step count the rest of the caption seam geometry already uses), falling back to a
-  small local default (e.g. 16) if `CONFIG` is not in scope — mirroring the old routine.
+- **Element with a genuine art hole (e.g. Tram):** kept, because that hole exists in the
+  `outline` and the fused leaf matches it (centroid ~0, area ~1.0). Protected by construction.
+- **Fused cut is a single PathItem (no extra leaves):** largest by definition, no candidates —
+  no-op.
+- **Match thresholds:** centroid ≤ 10 pt, area within ±25%. Wide-margin vs the live gap
+  (real ~0 pt / ~1.0; sliver ≥20 pt / ≤0.007), so not fragile. If a future SKU shows an art
+  hole whose `Unite` shifts its area/position beyond these margins, widen them (they only need
+  to separate ~1.0 from ~0.01).
