@@ -3256,6 +3256,19 @@ function _bezierPoint(p0, p1, p2, p3, t) {
     return { x: mt * r0x + t * r1x, y: mt * r0y + t * r1y };
 }
 
+// de Casteljau split of a cubic segment {p0,c1,c2,p3} at parameter t in [0,1].
+// Returns { left, right } cubic segments; left covers [0,t], right covers [t,1], sharing the
+// split point (left.p3 === right.p0). Pure — [x,y] arrays only.
+function _splitCubic(seg, t) {
+    function lerp(a, b, u) { return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]; }
+    var p0 = seg.p0, c1 = seg.c1, c2 = seg.c2, p3 = seg.p3;
+    var a = lerp(p0, c1, t), b = lerp(c1, c2, t), c = lerp(c2, p3, t);
+    var d = lerp(a, b, t), e = lerp(b, c, t);
+    var f = lerp(d, e, t);
+    return { left:  { p0: p0, c1: a, c2: d, p3: f },
+             right: { p0: f,  c1: e, c2: c, p3: p3 } };
+}
+
 // Samples one PathItem's bezier segments into a closed polyline of {x, y}.
 function _sampleSubPath(subPath, stepsPerSeg) {
     var pts = subPath.pathPoints;
