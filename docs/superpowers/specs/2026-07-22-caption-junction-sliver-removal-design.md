@@ -52,22 +52,35 @@ single-anchor `filletJunctionCorners` ("insufficient, fired on 9/22, invisible")
 A single function in `aiUtils.jsx`:
 
 ```
-removeCaptionJunctionSlivers(cutline, outline) -> { removed: N }
+removeCaptionJunctionSlivers(cutline, outline, plate) -> { removed: N }
 ```
 
-### Rule — the "compare against the outline" test
+### Rule — the "compare against known keepers" test
 
-Distinguish a junk sliver from a genuine art hole by asking: **did this loop already exist in
-the art before the caption pill was welded on?** The plate `Unite` leaves real art holes
-untouched (same position, same size); junction slivers are *invented* by the union at the
-pill∩art seam and have no counterpart in the art-alone trace.
+Distinguish a junk crumb from something real by asking: **does this loop echo a shape we already
+have — the art, or the caption pill?** The plate `Unite` leaves real art holes untouched (same
+position, same size), and it leaves a shallowly-seated caption pill as its own leaf; junction
+crumbs are *invented* by the union at the pill∩art seam and echo neither.
+
+The **keep-references** are: every subpath of the art-alone `outline` (main contour + any genuine
+art holes) PLUS the caption `plate`.
 
 1. Enumerate the fused cut's **leaf** subpaths (a leaf = one closed loop; the fused cut is a
-   GroupItem/CompoundPathItem holding several). Enumerate the `outline` (art-alone) subpaths
-   the same way.
+   GroupItem/CompoundPathItem holding several). Enumerate the `outline` subpaths and the `plate`
+   the same way to build the keep-reference list.
 2. Keep the **largest** fused leaf always — it's the real sticker contour, never a candidate.
-3. For every **other** fused leaf: keep it if some `outline` subpath **matches** it (centroids
-   nearly coincident AND areas within a wide tolerance); otherwise it's a sliver → delete.
+3. For every **other** fused leaf: keep it if some keep-reference **matches** it (centroids
+   nearly coincident AND areas within a wide tolerance); otherwise it's a crumb → delete.
+
+**Why the plate is a keep-reference (regression fix, 2026-07-22):** when a caption is only
+shallowly seated (e.g. ~1 pt overlap — Tatra chamois in the build-export fixture), the `Unite`
+does not fuse the pill into the contour; it leaves the pill as a **separate leaf**. That leaf has
+no counterpart in the art-alone `outline`, so an outline-only test wrongly deletes it — stripping
+the caption out of the cutline entirely (artist-reported). Matching against the plate keeps the
+pill. A genuine tiny crumb is far smaller than the plate (area ratio ~0), so it never matches the
+plate and is still deleted. (The underlying shallow-seat/detached-caption condition is a
+pre-existing seating issue, out of scope here; this fix just stops the cleanup from making it
+worse by deleting the caption.)
 
 Match margins are deliberately **wide-margin, not tuned**: on the live Slovakia SKU real echoes
 coincide exactly (centroid distance ~0 pt, area ratio ~1.00) while slivers miss by a mile

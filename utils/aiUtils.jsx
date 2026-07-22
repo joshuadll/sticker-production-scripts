@@ -1516,7 +1516,7 @@ function deriveCutline(outline, plate) {
     app.userInteractionLevel = prevLevel;
 
     var fused = app.selection[0];
-    var sw = removeCaptionJunctionSlivers(fused, outline);
+    var sw = removeCaptionJunctionSlivers(fused, outline, plate);
     if (sw.removed > 0) log("[cutline] junction slivers removed | " + sw.removed);
     return fused;
 }
@@ -1543,15 +1543,21 @@ function _leafMetrics(items) {
 
 // Deletes caption-junction sliver subpaths from a freshly-Unite'd fused cutline: the boolean
 // crumbs the plate∩art weld invents at the seam. Keeps the largest leaf (the real contour) and
-// any leaf that echoes a subpath of the art-alone `outline` (a genuine art hole, like Tram's);
-// drops the rest. Idempotent (a cut with no unmatched leaves is a no-op). Returns { removed:N }.
-function removeCaptionJunctionSlivers(cutline, outline) {
+// any leaf that echoes a KEEP-reference: a subpath of the art-alone `outline` (a genuine art
+// hole, like Tram's) OR the caption `plate` itself. The plate reference matters when the caption
+// is only shallowly seated — the Unite then leaves the pill as its OWN leaf instead of fusing it
+// into the contour; without the plate reference that pill has no outline match and would be
+// wrongly deleted as a sliver (it would strip the caption out of the cutline). Everything else
+// non-largest is a true crumb. Idempotent (a cut with no unmatched leaves is a no-op).
+// Returns { removed:N }.
+function removeCaptionJunctionSlivers(cutline, outline, plate) {
     if (!cutline || !outline) return { removed: 0 };
     var fusedItems = _fusedCutLeaves(cutline, []);
     if (fusedItems.length < 2) return { removed: 0 };
-    var outlineLeaves = _leafMetrics(_fusedCutLeaves(outline, []));
-    var fusedLeaves   = _leafMetrics(fusedItems);
-    var doomed = _junctionSliverLeaves(fusedLeaves, outlineLeaves);
+    var keepRefs = _leafMetrics(_fusedCutLeaves(outline, []));
+    if (plate) keepRefs = keepRefs.concat(_leafMetrics(_fusedCutLeaves(plate, [])));
+    var fusedLeaves = _leafMetrics(fusedItems);
+    var doomed = _junctionSliverLeaves(fusedLeaves, keepRefs);
     var removed = 0, i;
     for (i = doomed.length - 1; i >= 0; i--) {      // descending: removing a leaf can't stale a lower index
         try { fusedItems[doomed[i]].remove(); removed++; } catch (e) {}
@@ -3337,12 +3343,13 @@ function _sampleSubPath(subPath, stepsPerSeg) {
 }
 
 // Selects the fused-cut leaf indices that are caption-junction slivers to delete. A fused leaf is
-// REAL (keep) when it echoes a subpath already present in the art-alone `outline` — the plate
-// Unite leaves genuine art holes untouched (same centroid, same area). A non-largest fused leaf
-// with NO outline match was invented by the union at the pill∩art seam = a sliver (delete). The
-// largest fused leaf (the real sticker contour) is never a candidate.
-// fusedLeaves / outlineLeaves = [{ c:{x,y}, area:Number }, ...]. Pure; node-testable.
-function _junctionSliverLeaves(fusedLeaves, outlineLeaves) {
+// REAL (keep) when it echoes a KEEP-reference — a subpath of the art-alone `outline` (a genuine
+// art hole, left untouched by the plate Unite: same centroid, same area) OR the caption `plate`
+// (the pill, which a shallow seat can leave as its own leaf). A non-largest fused leaf that
+// echoes NEITHER was invented by the union at the pill∩art seam = a crumb (delete). The largest
+// fused leaf (the real sticker contour) is never a candidate.
+// fusedLeaves / keepRefs = [{ c:{x,y}, area:Number }, ...]. Pure; node-testable.
+function _junctionSliverLeaves(fusedLeaves, keepRefs) {
     var doomed = [];
     if (!fusedLeaves || fusedLeaves.length < 2) return doomed;
     var maxI = 0, i;
@@ -3351,19 +3358,20 @@ function _junctionSliverLeaves(fusedLeaves, outlineLeaves) {
     }
     for (i = 0; i < fusedLeaves.length; i++) {
         if (i === maxI) continue;                               // never the real contour
-        if (!_matchesAnOutlineLeaf(fusedLeaves[i], outlineLeaves)) doomed.push(i);
+        if (!_matchesAKeepRef(fusedLeaves[i], keepRefs)) doomed.push(i);
     }
     return doomed;
 }
 
-// True when fused leaf f echoes some outline subpath: centroids within 10pt AND areas within
-// +/-25%. Wide margins by design — real echoes coincide (dist~0, ratio~1.0) while slivers miss
-// (dist>=20pt, ratio<=0.007) on the live SKU, so nothing lands between the two clusters.
-function _matchesAnOutlineLeaf(f, outlineLeaves) {
-    if (!outlineLeaves) return false;
+// True when fused leaf f echoes some keep-reference (an outline subpath or the caption plate):
+// centroids within 10pt AND areas within +/-25%. Wide margins by design — real echoes coincide
+// (dist~0, ratio~1.0) while crumbs miss (dist>=20pt, ratio<=0.007) on the live SKU, so nothing
+// lands between the two clusters.
+function _matchesAKeepRef(f, keepRefs) {
+    if (!keepRefs) return false;
     var DIST2 = 10 * 10, i, o, dx, dy, ratio;
-    for (i = 0; i < outlineLeaves.length; i++) {
-        o = outlineLeaves[i];
+    for (i = 0; i < keepRefs.length; i++) {
+        o = keepRefs[i];
         if (o.area <= 0) continue;
         dx = f.c.x - o.c.x; dy = f.c.y - o.c.y;
         if (dx * dx + dy * dy > DIST2) continue;
