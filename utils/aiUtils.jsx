@@ -69,6 +69,24 @@ function boundsCenter(bounds) {
     };
 }
 
+// True iff some fused-cut leaf IS the caption plate — i.e. the caption failed to fuse and remains
+// a separate piece. A leaf matches the plate when its bbox-centroid is within 10pt of the plate's
+// AND its bbox area is within 0.75-1.25x the plate's. leafMetrics = [{c:{x,y},area}], plate =
+// {c:{x,y},area}. A single contour, or a real art-hole leaf (off the plate centroid), is NOT
+// flagged. Pure; node-testable.
+function _captionLeafDetached(leafMetrics, plate) {
+    if (!leafMetrics || !plate || plate.area <= 0) return false;
+    var DIST2 = 100;   // (10pt)^2
+    var i, dx, dy, ratio;
+    for (i = 0; i < leafMetrics.length; i++) {
+        dx = leafMetrics[i].c.x - plate.c.x; dy = leafMetrics[i].c.y - plate.c.y;
+        if (dx * dx + dy * dy > DIST2) continue;
+        ratio = leafMetrics[i].area / plate.area;
+        if (ratio >= 0.75 && ratio <= 1.25) return true;
+    }
+    return false;
+}
+
 // Centroid ({x,y}) of an array of {x,y} points, or null when empty.
 function _anchorCentroid(pts) {
     if (!pts || !pts.length) return null;
