@@ -3269,6 +3269,74 @@ function _splitCubic(seg, t) {
              right: { p0: f,  c1: e, c2: c, p3: p3 } };
 }
 
+// Intersection of segment p1p2 with p3p4. Returns { x, y, tA, tB } (tA on p1p2, tB on p3p4,
+// both in [0,1]) or null if they do not cross within both segments. Pure.
+function _segSegIntersect(p1, p2, p3, p4) {
+    var r0 = p2[0] - p1[0], r1 = p2[1] - p1[1];
+    var s0 = p4[0] - p3[0], s1 = p4[1] - p3[1];
+    var denom = r0 * s1 - r1 * s0;
+    if (denom === 0) return null;                       // parallel
+    var qp0 = p3[0] - p1[0], qp1 = p3[1] - p1[1];
+    var tA = (qp0 * s1 - qp1 * s0) / denom;
+    var tB = (qp0 * r1 - qp1 * r0) / denom;
+    if (tA < 0 || tA > 1 || tB < 0 || tB > 1) return null;
+    return { x: p1[0] + tA * r0, y: p1[1] + tA * r1, tA: tA, tB: tB };
+}
+
+// Sample a cubic path to a polyline, tagging each vertex with its cubic index and in-cubic t.
+// Returns [{ x, y, idx, t }]. Pure. (Local helper for _cubicCrossings.)
+function _cubicPolyline(path, steps) {
+    var out = [], i, j, s, bp, t;
+    for (i = 0; i < path.length; i++) {
+        s = path[i];
+        for (j = 0; j < steps; j++) {
+            t = j / steps;
+            bp = _bezierPoint(s.p0, s.c1, s.c2, s.p3, t);
+            out.push({ x: bp.x, y: bp.y, idx: i, t: t });
+        }
+    }
+    // Close: append the last cubic's true endpoint. For a closed path this equals path[0].p0
+    // (completes the loop); for an open path it is the real path end (no spurious chord to start).
+    var _last = path[path.length - 1];
+    out.push({ x: _last.p3[0], y: _last.p3[1], idx: path.length - 1, t: 1 });
+    return out;
+}
+
+// Every place cubic path A crosses cubic path B. Returns [{ x, y, aIdx, aT, bIdx, bT }], where
+// aIdx/aT locate the crossing on A (cubic index + in-cubic parameter) and bIdx/bT on B. Beziers
+// are sampled to `steps` chords per cubic; the in-cubic t is interpolated across the chord. Pure.
+function _cubicCrossings(pathA, pathB, steps) {
+    var pa = _cubicPolyline(pathA, steps), pb = _cubicPolyline(pathB, steps);
+    var out = [], i, j, hit;
+    for (i = 0; i + 1 < pa.length; i++) {
+        for (j = 0; j + 1 < pb.length; j++) {
+            hit = _segSegIntersect([pa[i].x, pa[i].y], [pa[i + 1].x, pa[i + 1].y],
+                                   [pb[j].x, pb[j].y], [pb[j + 1].x, pb[j + 1].y]);
+            if (!hit) continue;
+            // Only count a crossing at the START vertex's cubic to avoid double counting shared
+            // endpoints; interpolate in-cubic t across this chord (1/steps of a cubic per chord).
+            var aStep = 1 / steps, bStep = 1 / steps;
+            out.push({ x: hit.x, y: hit.y,
+                       aIdx: pa[i].idx, aT: pa[i].t + hit.tA * aStep,
+                       bIdx: pb[j].idx, bT: pb[j].t + hit.tB * bStep });
+        }
+    }
+    return out;
+}
+
+// The two crossings farthest apart (Euclidean). Returns { c0, c1 } (input elements). Pure.
+function _twoOutermost(crossings) {
+    var m = crossings.length, bi = 0, bj = (m > 1 ? 1 : 0), best = -1, i, j, dx, dy, d;
+    for (i = 0; i < m; i++) {
+        for (j = i + 1; j < m; j++) {
+            dx = crossings[i].x - crossings[j].x; dy = crossings[i].y - crossings[j].y;
+            d = dx * dx + dy * dy;
+            if (d > best) { best = d; bi = i; bj = j; }
+        }
+    }
+    return { c0: crossings[bi], c1: crossings[bj] };
+}
+
 // Samples one PathItem's bezier segments into a closed polyline of {x, y}.
 function _sampleSubPath(subPath, stepsPerSeg) {
     var pts = subPath.pathPoints;
