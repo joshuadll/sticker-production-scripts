@@ -3337,6 +3337,84 @@ function _twoOutermost(crossings) {
     return { c0: crossings[bi], c1: crossings[bj] };
 }
 
+// The FORWARD run of cubics from (i0,t0) to (i1,t1) along a closed cubic path (increasing index,
+// wrapping past the end). The first cubic is trimmed to start at t0, the last to end at t1. If
+// (i0,t0) and (i1,t1) fall in the same cubic with t1>t0, returns that single trimmed piece.
+// Returns [segments]. Pure.
+function _arcBetween(path, i0, t0, i1, t1) {
+    var n = path.length, out = [], i, guard = 0;
+    // same-cubic forward slice
+    if (i0 === i1 && t1 > t0) {
+        var mid = _splitCubic(path[i0], t0).right;        // [t0,1]
+        var frac = (t1 - t0) / (1 - t0);
+        out.push(_splitCubic(mid, frac).left);            // [t0,t1]
+        return out;
+    }
+    // first (partial) cubic: [t0,1]
+    out.push(_splitCubic(path[i0], t0).right);
+    // whole middle cubics
+    i = (i0 + 1) % n;
+    while (i !== i1 && guard < n + 1) { out.push(path[i]); i = (i + 1) % n; guard++; }
+    // last (partial) cubic: [0,t1]
+    out.push(_splitCubic(path[i1], t1).left);
+    return out;
+}
+
+// A point near an arc's middle: p0 of the middle segment (or the eval-at-0.5 of a lone segment).
+function _arcMidpoint(arc) {
+    if (arc.length === 1) { return _bezierPoint(arc[0].p0, arc[0].c1, arc[0].c2, arc[0].p3, 0.5); }
+    var m = arc[Math.floor(arc.length / 2)];
+    return { x: m.p0[0], y: m.p0[1] };
+}
+
+// Build the closed union loop: keep the ART arc that lies OUTSIDE the cap and the CAP arc that
+// lies OUTSIDE the art, joined at the two crossings. `cross` = {c0,c1}. capPoly/artPoly are
+// sampled polygons ([{x,y}]) used for the outside tests. Returns the closed cubic loop or null.
+function _stitchUnionLoop(artPath, capPath, cross, capPoly, artPoly) {
+    var c0 = cross.c0, c1 = cross.c1;
+    // Two candidate ART arcs between the crossings; keep the one whose midpoint is OUTSIDE the cap.
+    var artFwd = _arcBetween(artPath, c0.aIdx, c0.aT, c1.aIdx, c1.aT);
+    var artRev = _arcBetween(artPath, c1.aIdx, c1.aT, c0.aIdx, c0.aT);
+    var artArc = pointInPolygon(_arcMidpoint(artFwd), capPoly) ? artRev : artFwd;
+    // Two candidate CAP arcs; keep the one whose midpoint is OUTSIDE the art.
+    var capFwd = _arcBetween(capPath, c0.bIdx, c0.bT, c1.bIdx, c1.bT);
+    var capRev = _arcBetween(capPath, c1.bIdx, c1.bT, c0.bIdx, c0.bT);
+    var capArc = pointInPolygon(_arcMidpoint(capFwd), artPoly) ? capRev : capFwd;
+    if (!artArc.length || !capArc.length) return null;
+
+    // Orient so the loop is continuous: artArc ends at one crossing; capArc must start there.
+    var artEnd = artArc[artArc.length - 1].p3;
+    var capStart = capArc[0].p0;
+    if (!(_pt2(artEnd, capStart) < 1e-6)) { capArc = _reverseArc(capArc); }
+    // Concatenate; snap the two seams to a shared point so the loop closes exactly.
+    var loop = [], i;
+    for (i = 0; i < artArc.length; i++) loop.push(artArc[i]);
+    for (i = 0; i < capArc.length; i++) loop.push(capArc[i]);
+    // Weld endpoints: force continuity at the two joins.
+    for (i = 0; i < loop.length; i++) {
+        var nxt = loop[(i + 1) % loop.length];
+        // share the anchor: set nxt.p0 = loop[i].p3 (keep handles)
+        nxt.p0 = loop[i].p3;
+    }
+    return loop;
+}
+
+// squared distance between two [x,y] points
+function _pt2(a, b) {
+    var dx = a[0] - b[0], dy = a[1] - b[1];
+    return dx * dx + dy * dy;
+}
+
+// Reverse an arc (list of cubics): reverse order AND swap each segment's endpoints/handles.
+function _reverseArc(arc) {
+    var out = [], i, s;
+    for (i = arc.length - 1; i >= 0; i--) {
+        s = arc[i];
+        out.push({ p0: s.p3, c1: s.c2, c2: s.c1, p3: s.p0 });
+    }
+    return out;
+}
+
 // Samples one PathItem's bezier segments into a closed polyline of {x, y}.
 function _sampleSubPath(subPath, stepsPerSeg) {
     var pts = subPath.pathPoints;
