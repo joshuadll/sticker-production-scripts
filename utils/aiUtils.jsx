@@ -1476,46 +1476,115 @@ function _placeCaptionPlateRaster(layer, pill, plateFile, heightMm, widthPadMm) 
     return placed;
 }
 
-// Derives the fused cutline = boolean union of element_outline and plate.
-// Duplicates both inputs so the originals survive as separable components.
-// Returns the resulting item (PathItem, CompoundPathItem, or wrapping GroupItem).
-// If the junction doesn't match expectations, swap this body — callers only
-// depend on the return value. See docs/caption-separability-architecture.md.
+// Largest-area leaf PathItem of a PathItem / CompoundPathItem / GroupItem.
+function _largestLeafPathItem(item) {
+    var acc = [];
+    (function walk(it) {
+        var t = it.typename, i;
+        if (t === "PathItem") acc.push(it);
+        else if (t === "CompoundPathItem") { for (i = 0; i < it.pathItems.length; i++) acc.push(it.pathItems[i]); }
+        else if (t === "GroupItem") { for (i = 0; i < it.pageItems.length; i++) walk(it.pageItems[i]); }
+    })(item);
+    var best = null, bestA = -1, i, b, a;
+    for (i = 0; i < acc.length; i++) {
+        b = acc[i].geometricBounds; a = Math.abs((b[2] - b[0]) * (b[1] - b[3]));
+        if (a > bestA) { bestA = a; best = acc[i]; }
+    }
+    return best;
+}
+
+// Read a closed path's pathPoints into the cubic-segment model. Returns [segments].
+function _pathItemToCubics(item) {
+    var leaf = (item.typename === "PathItem") ? item : _largestLeafPathItem(item);
+    var pts = leaf.pathPoints, n = pts.length, A = [], L = [], R = [], k;
+    for (k = 0; k < n; k++) { A[k] = pts[k].anchor; L[k] = pts[k].leftDirection; R[k] = pts[k].rightDirection; }
+    var segs = [], i, nx;
+    for (i = 0; i < n; i++) {
+        nx = (i + 1) % n;
+        segs.push({ p0: [A[i][0], A[i][1]], c1: [R[i][0], R[i][1]],
+                    c2: [L[nx][0], L[nx][1]], p3: [A[nx][0], A[nx][1]] });
+    }
+    return segs;
+}
+
+// Write a cubic-segment loop to a new closed PathItem under `parent`. Anchor i = segs[i].p0;
+// its rightDirection = segs[i].c1; its leftDirection = segs[i-1].c2 (the previous segment's c2).
+function _cubicsToPathItem(parent, segs) {
+    var n = segs.length, coords = [], i;
+    for (i = 0; i < n; i++) coords.push([segs[i].p0[0], segs[i].p0[1]]);
+    var path = parent.pathItems.add();
+    path.setEntirePath(coords);
+    path.closed = true;                                   // setEntirePath can drop the flag
+    var pp = path.pathPoints;
+    for (i = 0; i < n; i++) {
+        var prev = (i - 1 + n) % n;
+        pp[i].anchor = [segs[i].p0[0], segs[i].p0[1]];
+        pp[i].rightDirection = [segs[i].c1[0], segs[i].c1[1]];
+        pp[i].leftDirection  = [segs[prev].c2[0], segs[prev].c2[1]];
+        pp[i].pointType = PointType.CORNER;
+    }
+    return path;
+}
+
+// Live-validation finding (Task 4, Tram fixture): a two-point-contact seat with
+// captionSeatOverlapMm=0 can place the cap's inner-edge endpoints EXACTLY on the art border —
+// a tangent touch, not a transversal crossing. _cubicCrossings (segment-intersection based) is
+// structurally unable to find a pure tangency: there is no interior/exterior sign swap for it to
+// detect, at ANY sampling density (confirmed live: raising steps 24->96 did not recover a clean
+// second touch — it only produced a near-duplicate pair clustered at the ONE touch point that
+// happened to wobble across the sampling grid). The seat algorithm (_seatNearEndpoint +
+// _seatContactRotation, aiUtils) guarantees the touch points ARE the cap's inner-edge anchor
+// vertices, so this checks those specific anchors against the art curve by nearest-point
+// distance instead of by crossing. Returns [{x,y,aIdx,aT,bIdx,bT}] compatible with
+// _twoOutermost/_stitchUnionLoop (bT=0: the touch is exactly the cap cubic's p0).
+function _capTouchPoints(artCubics, capCubics, artSteps, tolPt) {
+    var artPoly = _cubicPolyline(artCubics, artSteps);
+    var tol2 = tolPt * tolPt;
+    var out = [], i, k, p0, bestD2, bestPt, dx, dy, d2;
+    for (i = 0; i < capCubics.length; i++) {
+        p0 = capCubics[i].p0;
+        bestD2 = Infinity; bestPt = null;
+        for (k = 0; k < artPoly.length; k++) {
+            dx = p0[0] - artPoly[k].x; dy = p0[1] - artPoly[k].y;
+            d2 = dx * dx + dy * dy;
+            if (d2 < bestD2) { bestD2 = d2; bestPt = artPoly[k]; }
+        }
+        if (bestD2 <= tol2) {
+            out.push({ x: p0[0], y: p0[1], aIdx: bestPt.idx, aT: bestPt.t, bIdx: i, bT: 0 });
+        }
+    }
+    return out;
+}
+
+// Fused cutline = the outer boundary of (art ∪ caption), traced from the two junction crossings
+// (NOT a boolean union — that fails to fuse a two-point-contact seat and leaves junction slivers).
+// See docs/superpowers/specs/2026-07-22-stitched-cutline-construction-design.md. Throws on a
+// caption that is not seated into the art (< 2 crossings) — a hard error the caller surfaces.
 function deriveCutline(outline, plate) {
     var parent = outline.parent;
+    var steps = (typeof CONFIG !== "undefined" && CONFIG.seatSampleSteps) ? CONFIG.seatSampleSteps : 24;
 
-    var dupOutline = outline.duplicate();
-    var dupPlate   = plate.duplicate();
+    var artCubics = _pathItemToCubics(outline);
+    var capCubics = _pathItemToCubics(plate);
 
-    // Build the union group via the DOM so the operand set is deterministic
-    // regardless of the global selection (the "group" menu command no-ops here).
-    var unionGroup = parent.groupItems.add();
-    dupOutline.move(unionGroup, ElementPlacement.PLACEATEND);
-    dupPlate.move(unionGroup, ElementPlacement.PLACEATEND);
-
-    // Clear the selection one item at a time via the DOM. The two other ways to
-    // clear are both ruled out on the heavy working doc: `app.selection = null`
-    // deadlocks on redraw once the doc accumulates items, and a cross-document
-    // temp doc crashes Illustrator (stale live-object reference). `deselectall`
-    // (menu) silently no-ops. Per-item `.selected = false` is the remaining
-    // lightweight, in-place, crash-free option.
-    var sel = app.selection;
-    var snap = [];
-    var k;
-    for (k = 0; k < sel.length; k++) { snap.push(sel[k]); }
-    for (k = 0; k < snap.length; k++) { try { snap[k].selected = false; } catch (e) {} }
-
-    unionGroup.selected = true;
-
-    // Live Pathfinder Add unites the selected group's children; expandStyle bakes
-    // the live effect into concrete geometry. (No scriptable DOM equivalent.)
-    var prevLevel = app.userInteractionLevel;
-    app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
-    app.executeMenuCommand("Live Pathfinder Add");
-    app.executeMenuCommand("expandStyle");
-    app.userInteractionLevel = prevLevel;
-
-    return app.selection[0];
+    var crossings = _cubicCrossings(artCubics, capCubics, steps);
+    if (crossings.length < 2) {
+        // Tangent two-point-contact seat (see _capTouchPoints) — not a transversal crossing.
+        var touch = _capTouchPoints(artCubics, capCubics, 100, 1.0);
+        if (touch.length >= 2) crossings = touch;
+    }
+    if (crossings.length < 2) {
+        throw new Error("deriveCutline: caption not seated into the art (" + crossings.length
+            + " crossing(s)); cannot stitch cutline.");
+    }
+    var pair = _twoOutermost(crossings);
+    var capPoly = _largestPoly(samplePathToPolygons(plate, steps));
+    var artPoly = _largestPoly(samplePathToPolygons(outline, steps));
+    var loop = _stitchUnionLoop(artCubics, capCubics, pair, capPoly, artPoly);
+    if (!loop || loop.length < 2) {
+        throw new Error("deriveCutline: could not stitch a closed cutline for the caption.");
+    }
+    return _cubicsToPathItem(parent, loop);
 }
 
 // Assembles the per-element bundle as a GroupItem so the components ride along
@@ -3367,6 +3436,17 @@ function _arcMidpoint(arc) {
     return { x: m.p0[0], y: m.p0[1] };
 }
 
+// Approximate arc length: sum of each segment's chord (p0->p3). Cheap proxy — good enough to
+// tell "the small local notch" from "the rest of the shape" (never needs bezier-accurate length).
+function _arcChordLen(arc) {
+    var total = 0, i, dx, dy;
+    for (i = 0; i < arc.length; i++) {
+        dx = arc[i].p3[0] - arc[i].p0[0]; dy = arc[i].p3[1] - arc[i].p0[1];
+        total += Math.sqrt(dx * dx + dy * dy);
+    }
+    return total;
+}
+
 // Build the closed union loop: keep the ART arc that lies OUTSIDE the cap and the CAP arc that
 // lies OUTSIDE the art, joined at the two crossings. `cross` = {c0,c1}. capPoly/artPoly are
 // sampled polygons ([{x,y}]) used for the outside tests. Returns the closed cubic loop or null.
@@ -3375,11 +3455,34 @@ function _stitchUnionLoop(artPath, capPath, cross, capPoly, artPoly) {
     // Two candidate ART arcs between the crossings; keep the one whose midpoint is OUTSIDE the cap.
     var artFwd = _arcBetween(artPath, c0.aIdx, c0.aT, c1.aIdx, c1.aT);
     var artRev = _arcBetween(artPath, c1.aIdx, c1.aT, c0.aIdx, c0.aT);
-    var artArc = pointInPolygon(_arcMidpoint(artFwd), capPoly) ? artRev : artFwd;
+    var artFwdIn = pointInPolygon(_arcMidpoint(artFwd), capPoly);
+    var artRevIn = pointInPolygon(_arcMidpoint(artRev), capPoly);
+    var artArc;
+    if (artFwdIn !== artRevIn) {
+        artArc = artFwdIn ? artRev : artFwd;
+    } else {
+        // Live-validation finding (Task 4, Spiš Castle et al.): a zero-embed two-point-contact
+        // seat (captionSeatOverlapMm=0) can touch the border WITHOUT the local art arc ever
+        // dipping inside the cap polygon — both candidate midpoints then read "outside", so the
+        // inside/outside test can't discriminate. The plate is always the physically smaller
+        // shape, so the arc it replaces is always the SHORTER of the two candidates — keep the
+        // longer one. (In the normal deep-overlap case this branch is never reached: the two
+        // tests disagree and the code above already picks correctly.)
+        artArc = (_arcChordLen(artFwd) <= _arcChordLen(artRev)) ? artRev : artFwd;
+    }
     // Two candidate CAP arcs; keep the one whose midpoint is OUTSIDE the art.
     var capFwd = _arcBetween(capPath, c0.bIdx, c0.bT, c1.bIdx, c1.bT);
     var capRev = _arcBetween(capPath, c1.bIdx, c1.bT, c0.bIdx, c0.bT);
-    var capArc = pointInPolygon(_arcMidpoint(capFwd), artPoly) ? capRev : capFwd;
+    var capFwdIn = pointInPolygon(_arcMidpoint(capFwd), artPoly);
+    var capRevIn = pointInPolygon(_arcMidpoint(capRev), artPoly);
+    var capArc;
+    if (capFwdIn !== capRevIn) {
+        capArc = capFwdIn ? capRev : capFwd;
+    } else {
+        // Same ambiguity, mirrored: keep the longer cap arc (the outer/visible pill boundary),
+        // discard the shorter one (the inner edge that faces/touches the art).
+        capArc = (_arcChordLen(capFwd) <= _arcChordLen(capRev)) ? capRev : capFwd;
+    }
     if (!artArc.length || !capArc.length) return null;
 
     var artEnd = artArc[artArc.length - 1].p3;
