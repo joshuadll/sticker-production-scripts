@@ -10,6 +10,9 @@ eval(extract('_cubicPolyline'));
 eval(extract('_pt2'));
 eval(extract('_reverseArc'));
 eval(extract('_stitchUnionLoop'));
+eval(extract('_segSegIntersect'));
+eval(extract('_cubicCrossings'));
+eval(extract('_twoOutermost'));
 
 var fails=0;
 function check(c,m){if(!c){console.log('FAIL: '+m);fails++;}}
@@ -34,8 +37,9 @@ var SQ=[seg([0,0],[1,0]),seg([1,0],[1,1]),seg([1,1],[0,1]),seg([0,1],[0,0])];
 (function(){
   var cap=[seg([0.25,0.25],[0.75,0.25]),seg([0.75,0.25],[0.75,-0.5]),
            seg([0.75,-0.5],[0.25,-0.5]),seg([0.25,-0.5],[0.25,0.25])];
-  var cross={ c0:{x:0.25,y:0, aIdx:0,aT:0.25, bIdx:3,bT:0.6666667},
-              c1:{x:0.75,y:0, aIdx:0,aT:0.75, bIdx:0,bT:0.5} };
+  var cr=_cubicCrossings(SQ,cap,24);
+  check(cr.length>=2,'crossings found (got '+cr.length+')');
+  var cross=_twoOutermost(cr);
   var loop=_stitchUnionLoop(SQ,cap,cross,polyOf(cap),polyOf(SQ));
   check(loop!==null,'loop built');
   // The loop must dip BELOW y=0 somewhere (it includes the cap's bottom at y=-0.5).
@@ -44,6 +48,9 @@ var SQ=[seg([0,0],[1,0]),seg([1,0],[1,1]),seg([1,1],[0,1]),seg([0,1],[0,0])];
   // Closed: last.p3 == first.p0
   var f=loop[0].p0,l=loop[loop.length-1].p3;
   check(near(f[0],l[0])&&near(f[1],l[1]),'loop is closed');
+  // Continuity by construction (not a blind weld) — straight-segment inputs give ~0 seam gaps.
+  var gapMax=0; for(i=0;i<loop.length;i++){var nx=loop[(i+1)%loop.length];gapMax=Math.max(gapMax,_pt2(loop[i].p3,nx.p0));}
+  check(gapMax<1e-6,'loop segments are continuous (max seam gap^2='+gapMax+')');
 })();
 
 if(fails===0)console.log('PASS: stitch-loop'); else {console.log(fails+' FAIL');process.exit(1);}

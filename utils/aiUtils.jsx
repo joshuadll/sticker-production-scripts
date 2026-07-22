@@ -3382,20 +3382,25 @@ function _stitchUnionLoop(artPath, capPath, cross, capPoly, artPoly) {
     var capArc = pointInPolygon(_arcMidpoint(capFwd), artPoly) ? capRev : capFwd;
     if (!artArc.length || !capArc.length) return null;
 
-    // Orient so the loop is continuous: artArc ends at one crossing; capArc must start there.
     var artEnd = artArc[artArc.length - 1].p3;
-    var capStart = capArc[0].p0;
-    if (!(_pt2(artEnd, capStart) < 1e-6)) { capArc = _reverseArc(capArc); }
-    // Concatenate; snap the two seams to a shared point so the loop closes exactly.
+    var artStart = artArc[0].p0;
+    // Orient the cap arc so its START meets the art arc's END — pick the NEARER orientation
+    // (not a hard threshold: a legitimate seam still carries sampling-residue).
+    if (_pt2(artEnd, capArc[capArc.length - 1].p3) < _pt2(artEnd, capArc[0].p0)) {
+        capArc = _reverseArc(capArc);
+    }
+    // Both seams meet at the two crossing points. A gap far larger than sampling residue means a
+    // wrong orientation/selection — hard error, not a silent snap. TOL is generous for the residue
+    // curved edges leave (validated on live geometry in Task 4); a gross mismatch is tens of pt.
+    var TOL2 = 1.0;   // (1pt)^2
+    if (_pt2(artEnd, capArc[0].p0) > TOL2) return null;
+    if (_pt2(capArc[capArc.length - 1].p3, artStart) > TOL2) return null;
     var loop = [], i;
     for (i = 0; i < artArc.length; i++) loop.push(artArc[i]);
     for (i = 0; i < capArc.length; i++) loop.push(capArc[i]);
-    // Weld endpoints: force continuity at the two joins.
-    for (i = 0; i < loop.length; i++) {
-        var nxt = loop[(i + 1) % loop.length];
-        // share the anchor: set nxt.p0 = loop[i].p3 (keep handles)
-        nxt.p0 = loop[i].p3;
-    }
+    // Weld only the two seam anchors (sub-TOL residue, verified above).
+    capArc[0].p0 = artEnd;
+    artArc[0].p0 = capArc[capArc.length - 1].p3;
     return loop;
 }
 
