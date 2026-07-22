@@ -357,11 +357,21 @@ new [cutline] log line."
 - [ ] **Step 1: Run the build-and-export test**
 
 Run: `tests/integration/ai-build-and-export-cutlines/run.sh`
-Expected: all functional PASS lines. If the golden diff fails, inspect it: the ONLY differences must be added `[cutline] junction slivers removed` lines. If any `[seat]`, `[step7a]`, or count value changed, STOP — that means sliver removal altered real geometry (a bug); do not regenerate, investigate instead.
+Expected: all functional PASS lines. If the golden diff fails, inspect it. **Allowed (benign, expected) differences:**
+  - Added `[cutline] junction slivers removed | N` lines.
+  - `[step7a]` **extent-ratio** shifts of ≤ ~0.01 (e.g. `ratio=0.944`→`0.94`). This is expected:
+    `extentRatio = pathArea / bboxArea`, and removing sliver subpaths slightly changes the cut's
+    area/bounds. VERIFY it is only the ratio number — the classification word (`regular`/`irregular`)
+    on each line must be UNCHANGED, and the summary `[step7a] classified: R regular, I irregular`
+    counts must be UNCHANGED.
+**STOP (real bug — do not regenerate, investigate)** if: any element's classification FLIPS
+regular↔irregular, the regular/irregular counts change, any `[seat]` value changes, or any caption/tab
+COUNT changes.
 
 - [ ] **Step 2: Regenerate the build-and-export golden IF the diff was benign**
 
-Run (only if Step 1's diff was purely the new `[cutline]` lines):
+Run (only if Step 1's diff was benign per the allowed list — added `[cutline]` lines and/or
+≤0.01 `[step7a]` ratio shifts with NO classification/count change):
 ```bash
 cp /tmp/AI_BuildAndExportCutlines.log tests/integration/ai-build-and-export-cutlines/expected.txt
 ```
@@ -371,8 +381,11 @@ Re-run the runner; confirm `PASS`.
 
 Run: `tests/integration/ai-import-nesting/run.sh`
 - If it PASSES unchanged: nothing to do (Step 7B does not re-Unite → no new lines).
-- If the golden diff fails with ONLY added `[cutline]` lines: regenerate its golden the same way (copy its produced log over `tests/integration/ai-import-nesting/expected/<name>.txt` — use the path the runner prints), re-run, confirm PASS.
-- If any other value changed: STOP and investigate.
+- If the golden diff fails with only benign differences (added `[cutline]` lines and/or ≤0.01
+  extent-ratio shifts, no classification/count change): regenerate its golden the same way (copy
+  its produced log over the expected file the runner diffs against — use the path the runner
+  prints), re-run, confirm PASS.
+- If any classification flips, count changes, or `[seat]`/geometry value changes: STOP and investigate.
 
 - [ ] **Step 4: Full suite sanity**
 
