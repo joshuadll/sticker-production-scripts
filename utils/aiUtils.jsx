@@ -85,6 +85,44 @@ function _farthestPairDist(pts) {
     return Math.sqrt(best);
 }
 
+// Total CONTACT length between a sampled plate polygon and the art: the summed length of every
+// plate edge whose BOTH endpoints lie inside the art. This is what mechanically welds the caption
+// on, and it naturally accumulates across multiple separate contact regions. Deliberately NOT the
+// farthest-pair span of the crossings — that measures tip-to-tip and scores two hairline welds the
+// same as two solid ones (spec amendment 2). Conservative: partially-inside edges are not counted.
+// platePoly = [{x,y}]; artPolys = samplePathToPolygons output. Pure; node-testable.
+function _contactRunsTotal(platePoly, artPolys) {
+    if (!platePoly || platePoly.length < 3 || !artPolys || artPolys.length === 0) return 0;
+    var N = platePoly.length, i, inside = [], total = 0, a, b, dx, dy;
+    for (i = 0; i < N; i++) inside[i] = _pointInPolysEO(platePoly[i], artPolys);
+    for (i = 0; i < N; i++) {
+        if (inside[i] && inside[(i + 1) % N]) {
+            a = platePoly[i]; b = platePoly[(i + 1) % N];
+            dx = b.x - a.x; dy = b.y - a.y;
+            total += Math.sqrt(dx * dx + dy * dy);
+        }
+    }
+    return total;
+}
+
+// True iff some fused-cut leaf IS the caption plate — i.e. the caption failed to fuse and remains
+// a separate piece. A leaf matches the plate when its bbox-centroid is within 10pt of the plate's
+// AND its bbox area is within 0.75-1.25x the plate's. leafMetrics = [{c:{x,y},area}], plate =
+// {c:{x,y},area}. A single contour, or a real art-hole leaf (off the plate centroid), is NOT
+// flagged. Pure; node-testable.
+function _captionLeafDetached(leafMetrics, plate) {
+    if (!leafMetrics || !plate || plate.area <= 0) return false;
+    var DIST2 = 100;   // (10pt)^2
+    var i, dx, dy, ratio;
+    for (i = 0; i < leafMetrics.length; i++) {
+        dx = leafMetrics[i].c.x - plate.c.x; dy = leafMetrics[i].c.y - plate.c.y;
+        if (dx * dx + dy * dy > DIST2) continue;
+        ratio = leafMetrics[i].area / plate.area;
+        if (ratio >= 0.75 && ratio <= 1.25) return true;
+    }
+    return false;
+}
+
 // Centroid ({x,y}) of an array of {x,y} points, or null when empty.
 function _anchorCentroid(pts) {
     if (!pts || !pts.length) return null;
@@ -1516,39 +1554,48 @@ function _plateDiameter(plate) {
     return Math.abs(bb[2] - bb[0]);
 }
 
-// The caption's JUNCTION with the art: the span between the outermost plate-art boundary
-// crossings, and that span divided by the plate's rotation-invariant diameter. ratio 0 means the
-// caption only touches tangentially (or not at all) — the boolean may still pinch that into one
-// contour, but it cuts as two pieces. Measured from plate vs outline directly (no boolean needed).
-// Returns { crossings, span, ratio }.
-function _captionJunctionRatio(plate, outline, steps) {
+// Leaf metrics [{c,area}] of a fused-cut item (PathItem / CompoundPathItem / GroupItem).
+function _fusedLeafMetrics(item) {
+    var acc = [];
+    (function walk(it) {
+        var t = it.typename, i;
+        if (t === "PathItem") acc.push(it);
+        else if (t === "CompoundPathItem") { for (i = 0; i < it.pathItems.length; i++) acc.push(it.pathItems[i]); }
+        else if (t === "GroupItem") { for (i = 0; i < it.pageItems.length; i++) walk(it.pageItems[i]); }
+    })(item);
+    var out = [], i, b;
+    for (i = 0; i < acc.length; i++) {
+        b = acc[i].geometricBounds;
+        out.push({ c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) });
+    }
+    return out;
+}
+
+// {c,area} of a single item's bbox.
+function _plateMetrics(plate) {
+    var b = plate.geometricBounds;
+    return { c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) };
+}
+
+// The caption's CONTACT with the art: total welded edge length / the plate's rotation-invariant
+// diameter. 0 = tangent or detached. NOT bounded by 1 (contact is arc length, diameter a chord).
+function _captionContactRatio(plate, outline, steps) {
     var s = steps || 48;
     var pp = _largestPoly(samplePathToPolygons(plate, s));
     var artPolys = samplePathToPolygons(outline, s);
-    if (!pp || pp.length < 3 || artPolys.length === 0) return { crossings: 0, span: 0, ratio: 0 };
-    var inside = [], k, j;
-    for (k = 0; k < pp.length; k++) inside[k] = _pointInPolysEO(pp[k], artPolys);
-    var cross = [], a, b;
-    for (k = 0; k < pp.length; k++) {
-        j = (k + 1) % pp.length;
-        if (inside[k] !== inside[j]) {
-            a = inside[k] ? pp[j] : pp[k];
-            b = inside[k] ? pp[k] : pp[j];
-            cross.push(_segCrossArt(a, b, artPolys));
-        }
-    }
-    var span = _farthestPairDist(cross);
-    var pw = _plateDiameter(plate);
-    return { crossings: cross.length, span: span, ratio: (pw > 0 ? span / pw : 0) };
+    if (!pp || pp.length < 3 || artPolys.length === 0) return 0;
+    var diam = _plateDiameter(plate);
+    return (diam > 0 ? _contactRunsTotal(pp, artPolys) / diam : 0);
 }
 
-// Unite outline + plate via the boolean deriveCutline; if the caption's junction with the art
-// is wide enough (>= minRatio of plate width), return the stroked cut. If it is NOT
-// (tangential/near-tangential touch — the boolean can pinch that into one contour even though it
-// cuts as two pieces), nudge every item in moveItems stepMm toward the art (direction from
-// _aiSeatGeometry) and re-measure, iterating until the junction is wide enough or capMm is
-// reached (hard error). The seat is untouched; only a non-fusing caption moves. The boolean union
-// runs ONCE, after the loop settles. Returns { cut, embeddedMm, ok, reason, ratio }.
+// Phase 1 (cheap, no boolean): nudge every item in moveItems stepMm toward the art (direction
+// from _aiSeatGeometry) until the caption's total CONTACT with the art (_captionContactRatio) is
+// >= minRatio, or capMm is reached (hard error). Phase 2: unite outline+plate ONCE via
+// deriveCutline, then RE-ASSERT on the ACTUAL boolean result — removeCaptionJunctionSlivers
+// deliberately KEEPS a leaf matching the plate, so a wide-enough measured contact doesn't
+// guarantee the union actually fused; if the result is still a detached plate leaf, keep nudging
+// (re-uniting each time) until it fuses or capMm is reached. The seat is untouched; only a
+// non-fusing caption moves. Returns { cut, embeddedMm, ok, reason, ratio }.
 function fuseCaptionCutline(outline, plate, moveItems, strokePt, opts) {
     opts = opts || {};
     var name   = opts.name || "(caption)";
@@ -1557,33 +1604,52 @@ function fuseCaptionCutline(outline, plate, moveItems, strokePt, opts) {
     var capMm  = (opts.capMm != null) ? opts.capMm
                : ((typeof CONFIG !== "undefined" && CONFIG.captionFuseCapMm != null) ? CONFIG.captionFuseCapMm : 0.3);
     var minRatio = (opts.minRatio != null) ? opts.minRatio
-               : ((typeof CONFIG !== "undefined" && CONFIG.captionMinJunctionRatio != null) ? CONFIG.captionMinJunctionRatio : 0.40);
+               : ((typeof CONFIG !== "undefined" && CONFIG.captionMinJunctionRatio != null) ? CONFIG.captionMinJunctionRatio : 0.15);
     if (stepMm <= 0) stepMm = 0.01;                      // never allow a non-advancing loop
     var geom = _aiSeatGeometry(plate, outline);
     var step = mmToPoints(stepMm);
-    var embeddedMm = 0;
+    var embeddedMm = 0, tx, ty;
 
-    var jr = _captionJunctionRatio(plate, outline, 48);
-    while (jr.ratio < minRatio) {
-        if (embeddedMm + stepMm > capMm + 1e-9) {
-            return { cut: null, embeddedMm: embeddedMm, ok: false, ratio: jr.ratio,
-                     reason: "caption '" + name + "' junction ratio " + jr.ratio.toFixed(3)
-                             + " < " + minRatio + " even after " + capMm + "mm embed" };
-        }
-        var tx = geom.travelIsX ? geom.sign * step : 0;
-        var ty = geom.travelIsX ? 0 : geom.sign * step;
+    function nudge() {
+        tx = geom.travelIsX ? geom.sign * step : 0;
+        ty = geom.travelIsX ? 0 : geom.sign * step;
         _translateItems(moveItems, tx, ty);
         embeddedMm += stepMm;
-        jr = _captionJunctionRatio(plate, outline, 48);
     }
 
+    // Phase 1 (cheap, no boolean): grow the weld until there is enough contact.
+    var ratio = _captionContactRatio(plate, outline, 48);
+    while (ratio < minRatio) {
+        if (embeddedMm + stepMm > capMm + 1e-9) {
+            return { cut: null, embeddedMm: embeddedMm, ok: false, ratio: ratio,
+                     reason: "caption '" + name + "' contact ratio " + ratio.toFixed(3)
+                             + " < " + minRatio + " even after " + capMm + "mm embed" };
+        }
+        nudge();
+        ratio = _captionContactRatio(plate, outline, 48);
+    }
+
+    // Phase 2: unite, then RE-ASSERT on the result — the sliver remover keeps a plate-matching
+    // leaf, so a detached pill would otherwise ship silently.
     var cut = deriveCutline(outline, plate);
+    while (_captionLeafDetached(_fusedLeafMetrics(cut), _plateMetrics(plate))) {
+        if (embeddedMm + stepMm > capMm + 1e-9) {
+            try { cut.remove(); } catch (e0) {}
+            return { cut: null, embeddedMm: embeddedMm, ok: false, ratio: ratio,
+                     reason: "caption '" + name + "' still a separate leaf after " + capMm + "mm embed" };
+        }
+        nudge();
+        try { cut.remove(); } catch (e1) {}
+        cut = deriveCutline(outline, plate);
+        ratio = _captionContactRatio(plate, outline, 48);
+    }
+
     strokeRecursive(cut, strokePt, blackRgb());
     if (embeddedMm > 0) {
         log("[fuse] " + name + " | embedded " + (Math.round(embeddedMm * 1000) / 1000)
-            + "mm -> junction ratio " + jr.ratio.toFixed(3));
+            + "mm -> contact ratio " + ratio.toFixed(3));
     }
-    return { cut: cut, embeddedMm: embeddedMm, ok: true, reason: null, ratio: jr.ratio };
+    return { cut: cut, embeddedMm: embeddedMm, ok: true, reason: null, ratio: ratio };
 }
 
 // Derives the fused cutline = boolean union of element_outline and plate.

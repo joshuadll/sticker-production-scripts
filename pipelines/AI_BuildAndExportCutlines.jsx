@@ -29,7 +29,7 @@ var CONFIG = {
                                  // pinches the Unite. Separate from seatOverlapMm (the TAB embed).
     captionFuseStepMm:   0.01,   // fuse-rescue: nudge a weak-junction caption this far/step
     captionFuseCapMm:    0.3,    // fuse-rescue: give up (hard error) past this total embed
-    captionMinJunctionRatio: 0.40, // required caption-art junction span / plate width
+    captionMinJunctionRatio: 0.15, // required caption-art TOTAL CONTACT length / plate diameter
     seatSampleSteps:     24,
     seatConform:         true,
     seatRotationSign:    1,
