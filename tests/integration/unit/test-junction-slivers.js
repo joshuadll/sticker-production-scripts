@@ -10,6 +10,11 @@ function extract(name) {
     var re = new RegExp('function ' + name + '\\s*\\([\\s\\S]*?\\n}');
     var m = src.match(re); if (!m) throw new Error('could not extract ' + name); return m[0];
 }
+function extractVar(name){var re=new RegExp('var '+name+'\\s*=\\s*[^;]+;');var m=src.match(re);if(!m)throw new Error('could not extract var '+name);return m[0];}
+eval(extractVar('PLATE_ECHO_DIST_PT'));
+eval(extractVar('PLATE_ECHO_AREA_LO'));
+eval(extractVar('PLATE_ECHO_AREA_HI'));
+eval(extract('_bboxEcho'));   // shared plate-echo predicate both consumers delegate to
 eval(extract('_matchesAKeepRef'));
 eval(extract('_junctionSliverLeaves'));
 

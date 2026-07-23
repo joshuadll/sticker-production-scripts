@@ -99,7 +99,10 @@ function _densifyPoly(poly, maxLen) {
         out.push({ x: a.x, y: a.y });
         dx = b.x - a.x; dy = b.y - a.y;
         len = Math.sqrt(dx * dx + dy * dy);
-        cuts = Math.floor(len / maxLen);
+        // CEIL, not floor: with floor, an edge in [maxLen, 2*maxLen) gives cuts === 1 and the loop
+        // below never runs, so the edge is left UNSUBDIVIDED at up to 2x maxLen — the function
+        // silently failed to deliver the spacing it promises.
+        cuts = Math.ceil(len / maxLen);
         for (k = 1; k < cuts; k++) {
             out.push({ x: a.x + dx * (k / cuts), y: a.y + dy * (k / cuts) });
         }
@@ -139,20 +142,38 @@ function _contactRunsTotal(platePoly, artPolys) {
     return total;
 }
 
+// ─── PLATE-ECHO PREDICATE (single source of truth) ────────────────────────────
+// "Does leaf f echo reference shape `ref`?" — bbox-centroid within PLATE_ECHO_DIST_PT and bbox area
+// within PLATE_ECHO_AREA_LO..HI of it.
+//
+// ⚠ THIS MUST STAY A SINGLE DEFINITION. Two consumers depend on being EXACT COMPLEMENTS:
+//   • removeCaptionJunctionSlivers KEEPS a fused-cut leaf that echoes the plate (so a shallow-seated
+//     pill is never deleted as a "crumb"), and
+//   • fuseCaptionCutline's phase-2 re-assert FLAGS that same leaf as a still-detached caption.
+// If the two ever used different tolerances, a detached pill could be deleted by the remover before
+// the re-assert runs — phase 2 would then find no plate-like leaf, report ok:true, and the cutline
+// would ship with NO caption at all (the 079f75b "caption plate deleted" failure). They previously
+// hard-coded the same four literals independently; this predicate removes that drift risk.
+var PLATE_ECHO_DIST_PT = 10;
+var PLATE_ECHO_AREA_LO = 0.75;
+var PLATE_ECHO_AREA_HI = 1.25;
+
+function _bboxEcho(f, ref) {
+    if (!f || !ref || ref.area <= 0) return false;
+    var dx = f.c.x - ref.c.x, dy = f.c.y - ref.c.y;
+    if (dx * dx + dy * dy > PLATE_ECHO_DIST_PT * PLATE_ECHO_DIST_PT) return false;
+    var ratio = f.area / ref.area;
+    return (ratio >= PLATE_ECHO_AREA_LO && ratio <= PLATE_ECHO_AREA_HI);
+}
+
 // True iff some fused-cut leaf IS the caption plate — i.e. the caption failed to fuse and remains
-// a separate piece. A leaf matches the plate when its bbox-centroid is within 10pt of the plate's
-// AND its bbox area is within 0.75-1.25x the plate's. leafMetrics = [{c:{x,y},area}], plate =
-// {c:{x,y},area}. A single contour, or a real art-hole leaf (off the plate centroid), is NOT
-// flagged. Pure; node-testable.
+// a separate piece. leafMetrics = [{c:{x,y},area}], plate = {c:{x,y},area}. A single contour, or a
+// real art-hole leaf (off the plate centroid), is NOT flagged. Pure; node-testable.
 function _captionLeafDetached(leafMetrics, plate) {
     if (!leafMetrics || !plate || plate.area <= 0) return false;
-    var DIST2 = 100;   // (10pt)^2
-    var i, dx, dy, ratio;
+    var i;
     for (i = 0; i < leafMetrics.length; i++) {
-        dx = leafMetrics[i].c.x - plate.c.x; dy = leafMetrics[i].c.y - plate.c.y;
-        if (dx * dx + dy * dy > DIST2) continue;
-        ratio = leafMetrics[i].area / plate.area;
-        if (ratio >= 0.75 && ratio <= 1.25) return true;
+        if (_bboxEcho(leafMetrics[i], plate)) return true;
     }
     return false;
 }
@@ -1578,14 +1599,32 @@ function _placeCaptionPlateRaster(layer, pill, plateFile, heightMm, widthPadMm) 
 // height), which inflates the junction ratio and can let a weak junction pass. Anchors (not the
 // dense sample) keep this cheap — a farthest-pair over the 48-step sample is O(n^2) and too slow.
 function _plateDiameter(plate) {
-    var pp = null, pts = [], i;
-    try { pp = plate.pathPoints; } catch (e) { pp = null; }
-    if (pp && pp.length >= 2) {
-        for (i = 0; i < pp.length; i++) pts.push({ x: pp[i].anchor[0], y: pp[i].anchor[1] });
-        return _farthestPairDist(pts);
+    if (!plate) return 0;
+    var pts = _anchorPointsOf(plate, []);
+    if (pts.length >= 2) return _farthestPairDist(pts);
+    // No anchors anywhere (degenerate plate). Do NOT fall back to bbox width: that is precisely the
+    // rotation-dependent measure this function exists to replace (a 90deg-nested pill's bbox width
+    // is its SHORT side, which inflates the contact ratio and lets a weak weld pass). Returning 0
+    // makes the caller treat the ratio as 0 and rescue/hard-error, which is the safe direction.
+    log("[fuse] WARN | plate has no usable anchors; contact ratio forced to 0 (cannot measure diameter).");
+    return 0;
+}
+
+// All anchor points of a PathItem / CompoundPathItem / GroupItem, as [{x,y}]. Recurses, so a plate
+// that came back from a Unite/expand as a compound or group still yields a real diameter instead of
+// silently degrading to a bbox measure.
+function _anchorPointsOf(item, acc) {
+    var t, i, pp;
+    try { t = item.typename; } catch (eT) { return acc; }
+    if (t === "PathItem") {
+        try { pp = item.pathPoints; } catch (eP) { pp = null; }
+        if (pp) { for (i = 0; i < pp.length; i++) acc.push({ x: pp[i].anchor[0], y: pp[i].anchor[1] }); }
+    } else if (t === "CompoundPathItem") {
+        for (i = 0; i < item.pathItems.length; i++) _anchorPointsOf(item.pathItems[i], acc);
+    } else if (t === "GroupItem") {
+        for (i = 0; i < item.pageItems.length; i++) _anchorPointsOf(item.pageItems[i], acc);
     }
-    var bb = plate.geometricBounds;            // fallback: non-PathItem plate
-    return Math.abs(bb[2] - bb[0]);
+    return acc;
 }
 
 // Leaf metrics [{c,area}] of a fused-cut item (PathItem / CompoundPathItem / GroupItem).
@@ -1653,21 +1692,39 @@ function fuseCaptionCutline(outline, plate, moveItems, strokePt, opts) {
     var geom = _aiSeatGeometry(plate, outline);
     var step = mmToPoints(stepMm);
     var embeddedMm = 0, tx, ty;
+    // Hard iteration ceiling independent of the mm cap: tuning captionFuseStepMm down without
+    // touching captionFuseCapMm would otherwise mean hundreds of live boolean unions per element.
+    var iters = 0, MAX_ITERS = 64;
 
     function nudge() {
         tx = geom.travelIsX ? geom.sign * step : 0;
         ty = geom.travelIsX ? 0 : geom.sign * step;
         _translateItems(moveItems, tx, ty);
         embeddedMm += stepMm;
+        iters++;
+    }
+
+    // Put the caption back where it was seated. A failed rescue must not leave the pill (and the
+    // printed text/raster riding with it) drifted up to capMm from its seated pose with a stale
+    // cutline beside it — the callers have no history snapshot to roll that back.
+    function restore() {
+        if (embeddedMm <= 0) return;
+        var back = mmToPoints(embeddedMm);
+        _translateItems(moveItems, geom.travelIsX ? -geom.sign * back : 0,
+                                   geom.travelIsX ? 0 : -geom.sign * back);
+        embeddedMm = 0;
     }
 
     // Phase 1 (cheap, no boolean): grow the weld until there is enough contact.
     var ratio = _captionContactRatio(plate, outline, CONTACT_SAMPLE_STEPS);
     while (ratio < minRatio) {
-        if (embeddedMm + stepMm > capMm + 1e-9) {
-            return { cut: null, embeddedMm: embeddedMm, ok: false, ratio: ratio,
+        if (embeddedMm + stepMm > capMm + 1e-9 || iters >= MAX_ITERS) {
+            var failedMm1 = embeddedMm;
+            restore();
+            return { cut: null, embeddedMm: 0, ok: false, ratio: ratio,
                      reason: "caption '" + name + "' contact ratio " + ratio.toFixed(3)
-                             + " < " + minRatio + " even after " + capMm + "mm embed" };
+                             + " < " + minRatio + " even after " + _r1(failedMm1) + "mm embed"
+                             + " (caption restored to its seated position)" };
         }
         nudge();
         ratio = _captionContactRatio(plate, outline, CONTACT_SAMPLE_STEPS);
@@ -1677,10 +1734,13 @@ function fuseCaptionCutline(outline, plate, moveItems, strokePt, opts) {
     // leaf, so a detached pill would otherwise ship silently.
     var cut = deriveCutline(outline, plate);
     while (_captionLeafDetached(_fusedLeafMetrics(cut), _plateMetrics(plate))) {
-        if (embeddedMm + stepMm > capMm + 1e-9) {
+        if (embeddedMm + stepMm > capMm + 1e-9 || iters >= MAX_ITERS) {
             try { cut.remove(); } catch (e0) {}
-            return { cut: null, embeddedMm: embeddedMm, ok: false, ratio: ratio,
-                     reason: "caption '" + name + "' still a separate leaf after " + capMm + "mm embed" };
+            var failedMm2 = embeddedMm;
+            restore();
+            return { cut: null, embeddedMm: 0, ok: false, ratio: ratio,
+                     reason: "caption '" + name + "' still a separate leaf after " + _r1(failedMm2)
+                             + "mm embed (caption restored to its seated position)" };
         }
         nudge();
         try { cut.remove(); } catch (e1) {}
@@ -3597,16 +3657,13 @@ function _junctionSliverLeaves(fusedLeaves, keepRefs) {
 // centroids within 10pt AND areas within +/-25%. Wide margins by design — real echoes coincide
 // (dist~0, ratio~1.0) while crumbs miss (dist>=20pt, ratio<=0.007) on the live SKU, so nothing
 // lands between the two clusters.
+// Uses the SHARED _bboxEcho predicate — see the PLATE-ECHO note above. This must stay the exact
+// complement of _captionLeafDetached: what this KEEPS is what phase 2 FLAGS.
 function _matchesAKeepRef(f, keepRefs) {
     if (!keepRefs) return false;
-    var DIST2 = 10 * 10, i, o, dx, dy, ratio;
+    var i;
     for (i = 0; i < keepRefs.length; i++) {
-        o = keepRefs[i];
-        if (o.area <= 0) continue;
-        dx = f.c.x - o.c.x; dy = f.c.y - o.c.y;
-        if (dx * dx + dy * dy > DIST2) continue;
-        ratio = f.area / o.area;
-        if (ratio >= 0.75 && ratio <= 1.25) return true;
+        if (_bboxEcho(f, keepRefs[i])) return true;
     }
     return false;
 }

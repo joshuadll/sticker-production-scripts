@@ -83,7 +83,7 @@
 [buffer] Carpathian Wooden Churches | band 0..+1mm
 [step8b] reset to spec | Carpathian Wooden Churches (WC, x0.904)
 [step8b] at spec | St Elizabeth's Cathedral | (Dóm Svätej Alzbety) (WC)
-[step8b] done | reset=11 atSpec=11 skipped=4
+[step8b] done | reset=11 atSpec=11 skipped=4 failed=0
 [pipeline] caption normalise complete | 11 reset to spec, 11 already at spec, 4 skipped.
 [pipeline] === AI_NormaliseCaptions done ===
 ✅ Captions normalised.

@@ -48,7 +48,7 @@ function runCaptionNormalise(doc) {
     var cutlinesLayer = findLayer(doc, CONFIG.cutlinesLayerName);
     if (!cutlinesLayer) {
         log("[step8b] ERROR | Cutlines layer not found: " + CONFIG.cutlinesLayerName);
-        return { reset: 0, atSpec: 0, skipped: 0 };
+        return { reset: 0, atSpec: 0, skipped: 0, failed: 0 };
     }
 
     // Snapshot top-level GroupItems — re-Unite replaces a member mid-loop.
@@ -59,7 +59,7 @@ function runCaptionNormalise(doc) {
         }
     }
 
-    var reset = 0, atSpec = 0, skipped = 0;
+    var reset = 0, atSpec = 0, skipped = 0, failed = 0;
 
     for (i = 0; i < groups.length; i++) {
         var group  = groups[i];
@@ -159,7 +159,19 @@ function runCaptionNormalise(doc) {
         }
 
         // Re-derive the fused cutline from the seated spec pill + (artist-scaled) outline.
-        reuniteCutline(group, outline, pill, CONFIG.cutlineStrokePt);
+        // reuniteCutline THROWS when the caption cannot be fused (fuse-rescue exhausted). Catch it
+        // PER ELEMENT: an uncaught throw here would abort the whole normalise batch, leaving every
+        // later group un-normalised (still nest-scaled, off spec) instead of just the offender.
+        // The caption is restored to its seated pose by fuseCaptionCutline before it throws, and
+        // the group keeps its previous cutline, so skipping is a safe local outcome.
+        try {
+            reuniteCutline(group, outline, pill, CONFIG.cutlineStrokePt);
+        } catch (eFuse) {
+            failed++;
+            log("[step8b] FUSE FAIL | " + group.name + " — " + eFuse.message
+                + " (kept previous cutline; element left for the artist)");
+            continue;
+        }
 
         // Re-sync the half-cut to the rescaled seam (idempotent). Only the reset path
         // reaches here — atSpec groups 'continue' above, so no redundant work. syncHalfcut
@@ -178,8 +190,9 @@ function runCaptionNormalise(doc) {
         reset++;
     }
 
-    log("[step8b] done | reset=" + reset + " atSpec=" + atSpec + " skipped=" + skipped);
-    return { reset: reset, atSpec: atSpec, skipped: skipped };
+    log("[step8b] done | reset=" + reset + " atSpec=" + atSpec + " skipped=" + skipped
+        + " failed=" + failed);
+    return { reset: reset, atSpec: atSpec, skipped: skipped, failed: failed };
 }
 
 // Uniform-scale a page item by `factor` about an arbitrary document-space point P.
