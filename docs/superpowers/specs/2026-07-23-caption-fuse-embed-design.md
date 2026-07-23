@@ -156,3 +156,42 @@ enumeration) — no new primitives.
 - The junction blob removal (already on this branch, validated separately).
 - Any seat change; any embed for captions that already fuse.
 - The default peel-tab path.
+
+### AMENDMENT 2 (2026-07-23) — measure TOTAL CONTACT; re-assert on the union result
+
+Adversarial review of PR #29 found the junction-WIDTH criterion (Amendment 1) is still the wrong
+measurement, with a live reproduction in the fixture.
+
+**Blocker 1 — tip-to-tip span ignores whether the contact is contiguous.** The span was the
+farthest-apart pair of plate∩art crossings, which does not require those crossings to bound a
+single contact. A caption on a concave base is pinned at both ends with the middle floating →
+4 crossings → the span measures tip-to-tip and scores ~1.0 for two welds with a gap between them.
+Measured live: **7 of 28 elements have 2 contact regions**, scoring 0.62–0.97 under the old metric
+while their largest contiguous weld is only **0.14–0.30**. Nothing shipping today is actually
+broken (every element has ≥5.3 mm of real total weld, vs Tram's pre-fix 0.00 mm), but the metric
+physically cannot distinguish two solid welds from two hairlines.
+
+**Revised metric: TOTAL CONTACT** — the sum of the arc lengths of all contiguous plate-inside-art
+runs, ÷ the plate diameter. This is what mechanically holds the caption on. Measured populations
+separate cleanly with a gap:
+
+| | regions | total contact |
+|---|---|---|
+| multi-region (7) | 2 | 0.208 – 0.477 (5.3–14.1 mm) |
+| single-region (21) | 1 | 0.680 – 1.085 (6.7–33.3 mm) |
+
+**Threshold: `captionMinJunctionRatio` = 0.15** (was 0.40 on the old scale) — safely below the
+observed 0.208 minimum so no current element is nudged (no new bump), while rejecting zero/hairline
+contact. Note the ratio is NOT bounded by 1 (contact is arc length, diameter is a chord).
+
+**Blocker 2 — nothing checked the union's actual output.** The criterion measures the OPERANDS
+(plate vs outline) before uniting; `deriveCutline` then ran unexamined. Meanwhile
+`removeCaptionJunctionSlivers` deliberately KEEPS a leaf matching the plate, so the ratio could
+report good contact while the boolean emitted a detached pill that the sliver remover then
+protected — with nothing flagging it, because the leaf-topology detector had been deleted.
+Amendment 1's claim that the width criterion "supersedes" the topology test was WRONG: they
+measure different objects and are complementary.
+
+**Fix:** keep the contact ratio as the cheap nudge driver, then after `deriveCutline` **re-assert
+on the result** that no leaf matches the plate (the restored `_captionLeafDetached`). If a detached
+pill survives, keep nudging and re-uniting to the cap, then hard error.
