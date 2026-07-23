@@ -9,10 +9,11 @@
 [seat] Tatra chamois | rotated -0.3deg to two-point contact.
 [seat] Tatra chamois | seated (contact) rot=-0.3deg move=6.8pt depth=0pt
 [cutline] junction slivers removed | 1
-[fuse] Tatra chamois | embedded 0.02mm to fuse caption
+[fuse] Tatra chamois | embedded 0.01mm -> junction ratio 0.824
 [ai-pipeline] caption built | Tatra chamois
 [seat] Tram | rotated -1.2deg to two-point contact.
 [seat] Tram | seated (contact) rot=-1.2deg move=8.2pt depth=0pt
+[fuse] Tram | embedded 0.01mm -> junction ratio 0.647
 [ai-pipeline] caption built | Tram
 [seat] Fujara | rotated -2.2deg to two-point contact.
 [seat] Fujara | seated (contact) rot=-2.2deg move=7.4pt depth=0pt

@@ -1501,39 +1501,76 @@ function _placeCaptionPlateRaster(layer, pill, plateFile, heightMm, widthPadMm) 
     return placed;
 }
 
-// Unite outline + plate via the boolean deriveCutline; if the caption fused, return the stroked
-// cut. If it did NOT fuse (caption is a separate leaf), nudge every item in moveItems stepMm toward
-// the art (direction from _aiSeatGeometry) and re-unite, iterating until fused or capMm is reached
-// (hard error). The seat is untouched; only a non-fusing caption moves. Returns
-// { cut, embeddedMm, ok, reason }.
+// The caption's JUNCTION with the art: the span between the outermost plate-art boundary
+// crossings, and that span divided by the plate's width. ratio 0 means the caption only touches
+// tangentially (or not at all) — the boolean may still pinch that into one contour, but it cuts
+// as two pieces. Measured from plate vs outline directly (no boolean needed).
+// NOTE: plate width uses the bbox; the seat's rotations are small (a few degrees) so this is a
+// close proxy for the pill's length. Returns { crossings, span, ratio }.
+function _captionJunctionRatio(plate, outline, steps) {
+    var s = steps || 48;
+    var pp = _largestPoly(samplePathToPolygons(plate, s));
+    var artPolys = samplePathToPolygons(outline, s);
+    if (!pp || pp.length < 3 || artPolys.length === 0) return { crossings: 0, span: 0, ratio: 0 };
+    var inside = [], k, j;
+    for (k = 0; k < pp.length; k++) inside[k] = _pointInPolysEO(pp[k], artPolys);
+    var cross = [], a, b;
+    for (k = 0; k < pp.length; k++) {
+        j = (k + 1) % pp.length;
+        if (inside[k] !== inside[j]) {
+            a = inside[k] ? pp[j] : pp[k];
+            b = inside[k] ? pp[k] : pp[j];
+            cross.push(_segCrossArt(a, b, artPolys));
+        }
+    }
+    var span = _farthestPairDist(cross);
+    var bb = plate.geometricBounds;
+    var pw = Math.abs(bb[2] - bb[0]);
+    return { crossings: cross.length, span: span, ratio: (pw > 0 ? span / pw : 0) };
+}
+
+// Unite outline + plate via the boolean deriveCutline; if the caption's junction with the art
+// is wide enough (>= minRatio of plate width), return the stroked cut. If it is NOT
+// (tangential/near-tangential touch — the boolean can pinch that into one contour even though it
+// cuts as two pieces), nudge every item in moveItems stepMm toward the art (direction from
+// _aiSeatGeometry) and re-measure, iterating until the junction is wide enough or capMm is
+// reached (hard error). The seat is untouched; only a non-fusing caption moves. The boolean union
+// runs ONCE, after the loop settles. Returns { cut, embeddedMm, ok, reason, ratio }.
 function fuseCaptionCutline(outline, plate, moveItems, strokePt, opts) {
     opts = opts || {};
     var name   = opts.name || "(caption)";
     var stepMm = (opts.stepMm != null) ? opts.stepMm
-               : ((typeof CONFIG !== "undefined" && CONFIG.captionFuseStepMm != null) ? CONFIG.captionFuseStepMm : 0.02);
+               : ((typeof CONFIG !== "undefined" && CONFIG.captionFuseStepMm != null) ? CONFIG.captionFuseStepMm : 0.01);
     var capMm  = (opts.capMm != null) ? opts.capMm
                : ((typeof CONFIG !== "undefined" && CONFIG.captionFuseCapMm != null) ? CONFIG.captionFuseCapMm : 0.3);
+    var minRatio = (opts.minRatio != null) ? opts.minRatio
+               : ((typeof CONFIG !== "undefined" && CONFIG.captionMinJunctionRatio != null) ? CONFIG.captionMinJunctionRatio : 0.40);
+    if (stepMm <= 0) stepMm = 0.01;                      // never allow a non-advancing loop
     var geom = _aiSeatGeometry(plate, outline);
     var step = mmToPoints(stepMm);
     var embeddedMm = 0;
 
-    var cut = deriveCutline(outline, plate);
-    while (_captionLeafDetached(_fusedLeafMetrics(cut), _plateMetrics(plate))) {
+    var jr = _captionJunctionRatio(plate, outline, 48);
+    while (jr.ratio < minRatio) {
         if (embeddedMm + stepMm > capMm + 1e-9) {
-            try { cut.remove(); } catch (e0) {}
-            return { cut: null, embeddedMm: embeddedMm, ok: false,
-                     reason: "caption '" + name + "' won't fuse within " + capMm + "mm" };
+            return { cut: null, embeddedMm: embeddedMm, ok: false, ratio: jr.ratio,
+                     reason: "caption '" + name + "' junction ratio " + jr.ratio.toFixed(3)
+                             + " < " + minRatio + " even after " + capMm + "mm embed" };
         }
         var tx = geom.travelIsX ? geom.sign * step : 0;
         var ty = geom.travelIsX ? 0 : geom.sign * step;
         _translateItems(moveItems, tx, ty);
         embeddedMm += stepMm;
-        try { cut.remove(); } catch (e1) {}
-        cut = deriveCutline(outline, plate);
+        jr = _captionJunctionRatio(plate, outline, 48);
     }
+
+    var cut = deriveCutline(outline, plate);
     strokeRecursive(cut, strokePt, blackRgb());
-    if (embeddedMm > 0) log("[fuse] " + name + " | embedded " + (Math.round(embeddedMm * 1000) / 1000) + "mm to fuse caption");
-    return { cut: cut, embeddedMm: embeddedMm, ok: true, reason: null };
+    if (embeddedMm > 0) {
+        log("[fuse] " + name + " | embedded " + (Math.round(embeddedMm * 1000) / 1000)
+            + "mm -> junction ratio " + jr.ratio.toFixed(3));
+    }
+    return { cut: cut, embeddedMm: embeddedMm, ok: true, reason: null, ratio: jr.ratio };
 }
 
 // Derives the fused cutline = boolean union of element_outline and plate.

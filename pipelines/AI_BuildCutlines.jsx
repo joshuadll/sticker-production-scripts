@@ -67,8 +67,9 @@ var CONFIG = {
     captionSeatOverlapMm: 0,     // caption embed PAST two-point contact (mm). 0 = endpoints exactly
                                  // on the border. Raise to a hair (e.g. 0.1) only if a concave base
                                  // pinches the Unite. Separate from seatOverlapMm (the TAB embed).
-    captionFuseStepMm:   0.02,   // fuse-rescue: nudge a non-fusing caption this far/step toward art
+    captionFuseStepMm:   0.01,   // fuse-rescue: nudge a weak-junction caption this far/step
     captionFuseCapMm:    0.3,    // fuse-rescue: give up (hard error) past this total embed
+    captionMinJunctionRatio: 0.40, // required caption-art junction span / plate width
     seatSampleSteps:     24,     // bezier→polygon density for the SEAT probe (per segment). THIS is the
                                  //     floor lever: a finer polygon lets the seat measure the true curve,
                                  //     so a shallow 0.1mm overlap lands accurately. (Do NOT raise
