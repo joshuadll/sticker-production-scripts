@@ -9,11 +9,11 @@
 [seat] Tatra chamois | rotated -0.3deg to two-point contact.
 [seat] Tatra chamois | seated (contact) rot=-0.3deg move=6.8pt depth=0pt
 [cutline] junction slivers removed | 1
-[fuse] Tatra chamois | embedded 0.01mm -> contact ratio 0.154
+[fuse] Tatra chamois | embedded 0.01mm -> contact ratio 0.162
 [ai-pipeline] caption built | Tatra chamois
 [seat] Tram | rotated -1.2deg to two-point contact.
 [seat] Tram | seated (contact) rot=-1.2deg move=8.2pt depth=0pt
-[fuse] Tram | embedded 0.01mm -> contact ratio 0.643
+[fuse] Tram | embedded 0.01mm -> contact ratio 0.647
 [ai-pipeline] caption built | Tram
 [seat] Fujara | rotated -2.2deg to two-point contact.
 [seat] Fujara | seated (contact) rot=-2.2deg move=7.4pt depth=0pt
@@ -52,7 +52,7 @@
 [seat] The Blue Church | Church of St. Elizabeth | rotated -0.2deg to two-point contact.
 [seat] The Blue Church | Church of St. Elizabeth | seated (contact) rot=-0.2deg move=7.5pt depth=0pt
 [cutline] junction slivers removed | 1
-[fuse] The Blue Church | Church of St. Elizabeth | embedded 0.07mm -> contact ratio 0.158
+[fuse] The Blue Church | Church of St. Elizabeth | embedded 0.06mm -> contact ratio 0.158
 [ai-pipeline] caption built | The Blue Church | Church of St. Elizabeth
 [seat] Michael's Gate | rotated -3.0deg to two-point contact.
 [seat] Michael's Gate | seated (contact) rot=-3deg move=6.6pt depth=0pt
@@ -64,7 +64,7 @@
 [seat] Bojnice Castle | rotated 0.7deg to two-point contact.
 [seat] Bojnice Castle | seated (contact) rot=0.7deg move=8pt depth=0pt
 [cutline] junction slivers removed | 1
-[fuse] Bojnice Castle | embedded 0.04mm -> contact ratio 0.167
+[fuse] Bojnice Castle | embedded 0.03mm -> contact ratio 0.154
 [ai-pipeline] caption built | Bojnice Castle
 [seat] Old Town Hall (Bratislava) | rotated 0.4deg to two-point contact.
 [seat] Old Town Hall (Bratislava) | seated (contact) rot=0.4deg move=6.6pt depth=0pt
@@ -86,7 +86,7 @@
 [seat] Štrbské Pleso | rotated 0.1deg to two-point contact.
 [seat] Štrbské Pleso | seated (contact) rot=0.1deg move=7.5pt depth=0pt
 [cutline] junction slivers removed | 1
-[fuse] Štrbské Pleso | embedded 0.03mm -> contact ratio 0.151
+[fuse] Štrbské Pleso | embedded 0.03mm -> contact ratio 0.162
 [ai-pipeline] caption built | Štrbské Pleso
 [seat] Flag + Slovakia(text) | rotated -0.2deg to two-point contact.
 [seat] Flag + Slovakia(text) | seated (contact) rot=-0.2deg move=6.4pt depth=0pt
@@ -97,7 +97,7 @@
 [seat] Spiš Castle | rotated -0.8deg to two-point contact.
 [seat] Spiš Castle | seated (contact) rot=-0.8deg move=7.9pt depth=0pt
 [cutline] junction slivers removed | 1
-[fuse] Spiš Castle | embedded 0.01mm -> contact ratio 0.191
+[fuse] Spiš Castle | embedded 0.01mm -> contact ratio 0.208
 [ai-pipeline] caption built | Spiš Castle
 [seat] Slovak Paradise National Park | rotated 0.4deg to two-point contact.
 [seat] Slovak Paradise National Park | seated (contact) rot=0.4deg move=5.3pt depth=0pt
@@ -118,7 +118,7 @@
 [step7a] regular   | ratio=0.87 | St. Martin's Cathedral
 [step7a] regular   | ratio=0.885 | UFO Observation Deck, Bridge SNP
 [step7a] regular   | ratio=0.918 | Old Town Hall (Bratislava)
-[step7a] regular   | ratio=0.887 | Bojnice Castle
+[step7a] regular   | ratio=0.886 | Bojnice Castle
 [step7a] regular   | ratio=0.88 | Orava Castle
 [step7a] regular   | ratio=0.845 | Michael's Gate
 [step7a] regular   | ratio=0.883 | The Blue Church | Church of St. Elizabeth

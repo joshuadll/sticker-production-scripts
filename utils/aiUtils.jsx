@@ -85,20 +85,54 @@ function _farthestPairDist(pts) {
     return Math.sqrt(best);
 }
 
-// Total CONTACT length between a sampled plate polygon and the art: the summed length of every
-// plate edge whose BOTH endpoints lie inside the art. This is what mechanically welds the caption
-// on, and it naturally accumulates across multiple separate contact regions. Deliberately NOT the
-// farthest-pair span of the crossings — that measures tip-to-tip and scores two hairline welds the
-// same as two solid ones (spec amendment 2). Conservative: partially-inside edges are not counted.
+// Subdivides a closed polygon so no edge is longer than maxLen, WITHOUT decimating anything that
+// is already finer. samplePathToPolygons samples per BEZIER SEGMENT, so a flat caption whose inner
+// edge is ONE segment gets ~40x coarser spacing than a warped one built from ~40 spine segments —
+// which quantized the contact measure and could read a real weld as zero. Densifying to a fixed
+// arc length makes the measurement resolution comparable across captions. Pure.
+function _densifyPoly(poly, maxLen) {
+    var N = poly.length;
+    if (N < 3 || !(maxLen > 0)) return poly;
+    var out = [], i, a, b, dx, dy, len, cuts, k;
+    for (i = 0; i < N; i++) {
+        a = poly[i]; b = poly[(i + 1) % N];
+        out.push({ x: a.x, y: a.y });
+        dx = b.x - a.x; dy = b.y - a.y;
+        len = Math.sqrt(dx * dx + dy * dy);
+        cuts = Math.floor(len / maxLen);
+        for (k = 1; k < cuts; k++) {
+            out.push({ x: a.x + dx * (k / cuts), y: a.y + dy * (k / cuts) });
+        }
+    }
+    return out;
+}
+
+// Total CONTACT length between a sampled plate polygon and the art: the summed length of the parts
+// of the plate boundary that lie INSIDE the art. This is what mechanically welds the caption on,
+// and it accumulates across multiple separate contact regions. Deliberately NOT the farthest-pair
+// span of the crossings — that measures tip-to-tip and scores two hairline welds the same as two
+// solid ones (spec amendment 2).
+// A partially-submerged edge contributes its SUBMERGED PORTION (bisected via _segCrossArt), not 0:
+// counting only both-endpoints-inside edges quantized the result to the sample spacing, so a real
+// weld shorter than one step read as exactly 0.000 — indistinguishable from a detached caption.
 // platePoly = [{x,y}]; artPolys = samplePathToPolygons output. Pure; node-testable.
 function _contactRunsTotal(platePoly, artPolys) {
     if (!platePoly || platePoly.length < 3 || !artPolys || artPolys.length === 0) return 0;
-    var N = platePoly.length, i, inside = [], total = 0, a, b, dx, dy;
+    var N = platePoly.length, i, j, inside = [], total = 0, a, b, c, dx, dy;
     for (i = 0; i < N; i++) inside[i] = _pointInPolysEO(platePoly[i], artPolys);
     for (i = 0; i < N; i++) {
-        if (inside[i] && inside[(i + 1) % N]) {
-            a = platePoly[i]; b = platePoly[(i + 1) % N];
+        j = (i + 1) % N;
+        a = platePoly[i]; b = platePoly[j];
+        if (inside[i] && inside[j]) {                       // fully submerged edge
             dx = b.x - a.x; dy = b.y - a.y;
+            total += Math.sqrt(dx * dx + dy * dy);
+        } else if (inside[i]) {                             // a inside, b outside
+            c = _segCrossArt(b, a, artPolys);               // (outside, inside) -> boundary point
+            dx = c.x - a.x; dy = c.y - a.y;
+            total += Math.sqrt(dx * dx + dy * dy);
+        } else if (inside[j]) {                             // a outside, b inside
+            c = _segCrossArt(a, b, artPolys);
+            dx = b.x - c.x; dy = b.y - c.y;
             total += Math.sqrt(dx * dx + dy * dy);
         }
     }
@@ -1577,13 +1611,23 @@ function _plateMetrics(plate) {
     return { c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) };
 }
 
+// Sampling for the caption CONTACT measure. STEPS is per bezier segment (samplePathToPolygons'
+// convention); MAX_EDGE_PT then densifies the plate to a uniform arc spacing so the measurement
+// resolution does not depend on how many segments a caption happens to be built from.
+var CONTACT_SAMPLE_STEPS = 48;
+var CONTACT_MAX_EDGE_PT  = 0.5;   // ~0.18mm — well under the smallest weld we care about
+
 // The caption's CONTACT with the art: total welded edge length / the plate's rotation-invariant
 // diameter. 0 = tangent or detached. NOT bounded by 1 (contact is arc length, diameter a chord).
 function _captionContactRatio(plate, outline, steps) {
-    var s = steps || 48;
+    var s = steps || CONTACT_SAMPLE_STEPS;
     var pp = _largestPoly(samplePathToPolygons(plate, s));
     var artPolys = samplePathToPolygons(outline, s);
     if (!pp || pp.length < 3 || artPolys.length === 0) return 0;
+    // Densify the PLATE only (the art is just the inside/outside reference): per-segment sampling
+    // leaves a flat caption's one-segment inner edge ~40x coarser than a warped caption's, so a
+    // short weld could fall entirely between two samples and read as 0.
+    pp = _densifyPoly(pp, CONTACT_MAX_EDGE_PT);
     var diam = _plateDiameter(plate);
     return (diam > 0 ? _contactRunsTotal(pp, artPolys) / diam : 0);
 }
@@ -1618,7 +1662,7 @@ function fuseCaptionCutline(outline, plate, moveItems, strokePt, opts) {
     }
 
     // Phase 1 (cheap, no boolean): grow the weld until there is enough contact.
-    var ratio = _captionContactRatio(plate, outline, 48);
+    var ratio = _captionContactRatio(plate, outline, CONTACT_SAMPLE_STEPS);
     while (ratio < minRatio) {
         if (embeddedMm + stepMm > capMm + 1e-9) {
             return { cut: null, embeddedMm: embeddedMm, ok: false, ratio: ratio,
@@ -1626,7 +1670,7 @@ function fuseCaptionCutline(outline, plate, moveItems, strokePt, opts) {
                              + " < " + minRatio + " even after " + capMm + "mm embed" };
         }
         nudge();
-        ratio = _captionContactRatio(plate, outline, 48);
+        ratio = _captionContactRatio(plate, outline, CONTACT_SAMPLE_STEPS);
     }
 
     // Phase 2: unite, then RE-ASSERT on the result — the sliver remover keeps a plate-matching
@@ -1641,7 +1685,7 @@ function fuseCaptionCutline(outline, plate, moveItems, strokePt, opts) {
         nudge();
         try { cut.remove(); } catch (e1) {}
         cut = deriveCutline(outline, plate);
-        ratio = _captionContactRatio(plate, outline, 48);
+        ratio = _captionContactRatio(plate, outline, CONTACT_SAMPLE_STEPS);
     }
 
     strokeRecursive(cut, strokePt, blackRgb());
