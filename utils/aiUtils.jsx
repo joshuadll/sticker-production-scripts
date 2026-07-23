@@ -69,22 +69,20 @@ function boundsCenter(bounds) {
     };
 }
 
-// True iff some fused-cut leaf IS the caption plate — i.e. the caption failed to fuse and remains
-// a separate piece. A leaf matches the plate when its bbox-centroid is within 10pt of the plate's
-// AND its bbox area is within 0.75-1.25x the plate's. leafMetrics = [{c:{x,y},area}], plate =
-// {c:{x,y},area}. A single contour, or a real art-hole leaf (off the plate centroid), is NOT
-// flagged. Pure; node-testable.
-function _captionLeafDetached(leafMetrics, plate) {
-    if (!leafMetrics || !plate || plate.area <= 0) return false;
-    var DIST2 = 100;   // (10pt)^2
-    var i, dx, dy, ratio;
-    for (i = 0; i < leafMetrics.length; i++) {
-        dx = leafMetrics[i].c.x - plate.c.x; dy = leafMetrics[i].c.y - plate.c.y;
-        if (dx * dx + dy * dy > DIST2) continue;
-        ratio = leafMetrics[i].area / plate.area;
-        if (ratio >= 0.75 && ratio <= 1.25) return true;
+// Largest distance between any two points in a set ([{x,y}]). 0 for fewer than 2 points.
+// The caption's junction span = this over the plate-art boundary crossings; 0 means the caption
+// only touches tangentially (a pinch), which cuts as two pieces. Pure.
+function _farthestPairDist(pts) {
+    if (!pts || pts.length < 2) return 0;
+    var best = 0, i, j, dx, dy, d;
+    for (i = 0; i < pts.length; i++) {
+        for (j = i + 1; j < pts.length; j++) {
+            dx = pts[i].x - pts[j].x; dy = pts[i].y - pts[j].y;
+            d = dx * dx + dy * dy;
+            if (d > best) best = d;
+        }
     }
-    return false;
+    return Math.sqrt(best);
 }
 
 // Centroid ({x,y}) of an array of {x,y} points, or null when empty.
@@ -1501,29 +1499,6 @@ function _placeCaptionPlateRaster(layer, pill, plateFile, heightMm, widthPadMm) 
     placed.translate(pcx - (placed.position[0] + placed.width / 2),
                      pcy - (placed.position[1] - placed.height / 2));
     return placed;
-}
-
-// Leaf metrics [{c,area}] of a fused-cut item (PathItem / CompoundPathItem / GroupItem).
-function _fusedLeafMetrics(item) {
-    var acc = [];
-    (function walk(it) {
-        var t = it.typename, i;
-        if (t === "PathItem") acc.push(it);
-        else if (t === "CompoundPathItem") { for (i = 0; i < it.pathItems.length; i++) acc.push(it.pathItems[i]); }
-        else if (t === "GroupItem") { for (i = 0; i < it.pageItems.length; i++) walk(it.pageItems[i]); }
-    })(item);
-    var out = [], i, b;
-    for (i = 0; i < acc.length; i++) {
-        b = acc[i].geometricBounds;
-        out.push({ c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) });
-    }
-    return out;
-}
-
-// {c,area} of a single item's bbox.
-function _plateMetrics(plate) {
-    var b = plate.geometricBounds;
-    return { c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) };
 }
 
 // Unite outline + plate via the boolean deriveCutline; if the caption fused, return the stroked
