@@ -1501,12 +1501,26 @@ function _placeCaptionPlateRaster(layer, pill, plateFile, heightMm, widthPadMm) 
     return placed;
 }
 
+// Rotation-invariant plate length: the farthest distance between the plate's OWN anchor points.
+// bbox width is wrong once nesting rotates an element (a 90deg-rotated pill's bbox width is its
+// height), which inflates the junction ratio and can let a weak junction pass. Anchors (not the
+// dense sample) keep this cheap — a farthest-pair over the 48-step sample is O(n^2) and too slow.
+function _plateDiameter(plate) {
+    var pp = null, pts = [], i;
+    try { pp = plate.pathPoints; } catch (e) { pp = null; }
+    if (pp && pp.length >= 2) {
+        for (i = 0; i < pp.length; i++) pts.push({ x: pp[i].anchor[0], y: pp[i].anchor[1] });
+        return _farthestPairDist(pts);
+    }
+    var bb = plate.geometricBounds;            // fallback: non-PathItem plate
+    return Math.abs(bb[2] - bb[0]);
+}
+
 // The caption's JUNCTION with the art: the span between the outermost plate-art boundary
-// crossings, and that span divided by the plate's width. ratio 0 means the caption only touches
-// tangentially (or not at all) — the boolean may still pinch that into one contour, but it cuts
-// as two pieces. Measured from plate vs outline directly (no boolean needed).
-// NOTE: plate width uses the bbox; the seat's rotations are small (a few degrees) so this is a
-// close proxy for the pill's length. Returns { crossings, span, ratio }.
+// crossings, and that span divided by the plate's rotation-invariant diameter. ratio 0 means the
+// caption only touches tangentially (or not at all) — the boolean may still pinch that into one
+// contour, but it cuts as two pieces. Measured from plate vs outline directly (no boolean needed).
+// Returns { crossings, span, ratio }.
 function _captionJunctionRatio(plate, outline, steps) {
     var s = steps || 48;
     var pp = _largestPoly(samplePathToPolygons(plate, s));
@@ -1524,8 +1538,7 @@ function _captionJunctionRatio(plate, outline, steps) {
         }
     }
     var span = _farthestPairDist(cross);
-    var bb = plate.geometricBounds;
-    var pw = Math.abs(bb[2] - bb[0]);
+    var pw = _plateDiameter(plate);
     return { crossings: cross.length, span: span, ratio: (pw > 0 ? span / pw : 0) };
 }
 
