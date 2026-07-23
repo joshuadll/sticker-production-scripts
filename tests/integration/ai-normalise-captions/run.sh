@@ -115,6 +115,22 @@ else
     FAIL=1
 fi
 
+# ── Sliver-removal assertion: the cleanup fired during a re-derive, and did NOT spuriously
+#    re-fire on the idempotent second pass (nothing re-derived → nothing to remove). The exact
+#    per-element counts are pinned by the golden below; this just guards the fire/no-refire shape.
+FIRED1=$(grep -c "\[cutline\] junction slivers removed" "$RUN1" || true)
+FIRED2=$(grep -c "\[cutline\] junction slivers removed" "$RUN2" || true)
+if [ "${FIRED1:-0}" -gt 0 ]; then
+    echo "PASS [$STEP]: sliver cleanup fired on $FIRED1 re-derived element(s) in run #1."
+else
+    echo "FAIL [$STEP]: run #1 logged no '[cutline] junction slivers removed' — cleanup never ran."; FAIL=1
+fi
+if [ "${FIRED2:-0}" -eq 0 ]; then
+    echo "PASS [$STEP]: idempotent — run #2 re-derived nothing, removed no slivers."
+else
+    echo "FAIL [$STEP]: run #2 re-fired sliver removal ($FIRED2) — not idempotent."; FAIL=1
+fi
+
 if [ "$FAIL" -ne 0 ]; then
     echo "  Run #1 log:"; cat "$RUN1"
     echo "  Run #2 log:"; cat "$RUN2"

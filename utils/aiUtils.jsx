@@ -69,6 +69,115 @@ function boundsCenter(bounds) {
     };
 }
 
+// Largest distance between any two points in a set ([{x,y}]). 0 for fewer than 2 points.
+// The caption's junction span = this over the plate-art boundary crossings; 0 means the caption
+// only touches tangentially (a pinch), which cuts as two pieces. Pure.
+function _farthestPairDist(pts) {
+    if (!pts || pts.length < 2) return 0;
+    var best = 0, i, j, dx, dy, d;
+    for (i = 0; i < pts.length; i++) {
+        for (j = i + 1; j < pts.length; j++) {
+            dx = pts[i].x - pts[j].x; dy = pts[i].y - pts[j].y;
+            d = dx * dx + dy * dy;
+            if (d > best) best = d;
+        }
+    }
+    return Math.sqrt(best);
+}
+
+// Subdivides a closed polygon so no edge is longer than maxLen, WITHOUT decimating anything that
+// is already finer. samplePathToPolygons samples per BEZIER SEGMENT, so a flat caption whose inner
+// edge is ONE segment gets ~40x coarser spacing than a warped one built from ~40 spine segments —
+// which quantized the contact measure and could read a real weld as zero. Densifying to a fixed
+// arc length makes the measurement resolution comparable across captions. Pure.
+function _densifyPoly(poly, maxLen) {
+    var N = poly.length;
+    if (N < 3 || !(maxLen > 0)) return poly;
+    var out = [], i, a, b, dx, dy, len, cuts, k;
+    for (i = 0; i < N; i++) {
+        a = poly[i]; b = poly[(i + 1) % N];
+        out.push({ x: a.x, y: a.y });
+        dx = b.x - a.x; dy = b.y - a.y;
+        len = Math.sqrt(dx * dx + dy * dy);
+        // CEIL, not floor: with floor, an edge in [maxLen, 2*maxLen) gives cuts === 1 and the loop
+        // below never runs, so the edge is left UNSUBDIVIDED at up to 2x maxLen — the function
+        // silently failed to deliver the spacing it promises.
+        cuts = Math.ceil(len / maxLen);
+        for (k = 1; k < cuts; k++) {
+            out.push({ x: a.x + dx * (k / cuts), y: a.y + dy * (k / cuts) });
+        }
+    }
+    return out;
+}
+
+// Total CONTACT length between a sampled plate polygon and the art: the summed length of the parts
+// of the plate boundary that lie INSIDE the art. This is what mechanically welds the caption on,
+// and it accumulates across multiple separate contact regions. Deliberately NOT the farthest-pair
+// span of the crossings — that measures tip-to-tip and scores two hairline welds the same as two
+// solid ones (spec amendment 2).
+// A partially-submerged edge contributes its SUBMERGED PORTION (bisected via _segCrossArt), not 0:
+// counting only both-endpoints-inside edges quantized the result to the sample spacing, so a real
+// weld shorter than one step read as exactly 0.000 — indistinguishable from a detached caption.
+// platePoly = [{x,y}]; artPolys = samplePathToPolygons output. Pure; node-testable.
+function _contactRunsTotal(platePoly, artPolys) {
+    if (!platePoly || platePoly.length < 3 || !artPolys || artPolys.length === 0) return 0;
+    var N = platePoly.length, i, j, inside = [], total = 0, a, b, c, dx, dy;
+    for (i = 0; i < N; i++) inside[i] = _pointInPolysEO(platePoly[i], artPolys);
+    for (i = 0; i < N; i++) {
+        j = (i + 1) % N;
+        a = platePoly[i]; b = platePoly[j];
+        if (inside[i] && inside[j]) {                       // fully submerged edge
+            dx = b.x - a.x; dy = b.y - a.y;
+            total += Math.sqrt(dx * dx + dy * dy);
+        } else if (inside[i]) {                             // a inside, b outside
+            c = _segCrossArt(b, a, artPolys);               // (outside, inside) -> boundary point
+            dx = c.x - a.x; dy = c.y - a.y;
+            total += Math.sqrt(dx * dx + dy * dy);
+        } else if (inside[j]) {                             // a outside, b inside
+            c = _segCrossArt(a, b, artPolys);
+            dx = b.x - c.x; dy = b.y - c.y;
+            total += Math.sqrt(dx * dx + dy * dy);
+        }
+    }
+    return total;
+}
+
+// ─── PLATE-ECHO PREDICATE (single source of truth) ────────────────────────────
+// "Does leaf f echo reference shape `ref`?" — bbox-centroid within PLATE_ECHO_DIST_PT and bbox area
+// within PLATE_ECHO_AREA_LO..HI of it.
+//
+// ⚠ THIS MUST STAY A SINGLE DEFINITION. Two consumers depend on being EXACT COMPLEMENTS:
+//   • removeCaptionJunctionSlivers KEEPS a fused-cut leaf that echoes the plate (so a shallow-seated
+//     pill is never deleted as a "crumb"), and
+//   • fuseCaptionCutline's phase-2 re-assert FLAGS that same leaf as a still-detached caption.
+// If the two ever used different tolerances, a detached pill could be deleted by the remover before
+// the re-assert runs — phase 2 would then find no plate-like leaf, report ok:true, and the cutline
+// would ship with NO caption at all (the 079f75b "caption plate deleted" failure). They previously
+// hard-coded the same four literals independently; this predicate removes that drift risk.
+var PLATE_ECHO_DIST_PT = 10;
+var PLATE_ECHO_AREA_LO = 0.75;
+var PLATE_ECHO_AREA_HI = 1.25;
+
+function _bboxEcho(f, ref) {
+    if (!f || !ref || ref.area <= 0) return false;
+    var dx = f.c.x - ref.c.x, dy = f.c.y - ref.c.y;
+    if (dx * dx + dy * dy > PLATE_ECHO_DIST_PT * PLATE_ECHO_DIST_PT) return false;
+    var ratio = f.area / ref.area;
+    return (ratio >= PLATE_ECHO_AREA_LO && ratio <= PLATE_ECHO_AREA_HI);
+}
+
+// True iff some fused-cut leaf IS the caption plate — i.e. the caption failed to fuse and remains
+// a separate piece. leafMetrics = [{c:{x,y},area}], plate = {c:{x,y},area}. A single contour, or a
+// real art-hole leaf (off the plate centroid), is NOT flagged. Pure; node-testable.
+function _captionLeafDetached(leafMetrics, plate) {
+    if (!leafMetrics || !plate || plate.area <= 0) return false;
+    var i;
+    for (i = 0; i < leafMetrics.length; i++) {
+        if (_bboxEcho(leafMetrics[i], plate)) return true;
+    }
+    return false;
+}
+
 // Centroid ({x,y}) of an array of {x,y} points, or null when empty.
 function _anchorCentroid(pts) {
     if (!pts || !pts.length) return null;
@@ -1361,9 +1470,18 @@ function buildCaption(doc, layer, textFrame, outline, opts) {
         return { ok: false, needsReview: !!seat.needsReview, reason: seat.reason };
     }
 
-    // Unite outline + pill into the fused cut; bundle the separable members.
-    var cut = deriveCutline(outline, pill);
-    strokeRecursive(cut, (opts.strokePt != null ? opts.strokePt : 0.25), blackRgb());
+    // Unite outline + pill into the fused cut (fuse-rescue a caption that won't join at zero embed).
+    var moveItems = [pill, rideGroup];
+    var fuse = fuseCaptionCutline(outline, pill, moveItems,
+        (opts.strokePt != null ? opts.strokePt : 0.25), { name: name });
+    if (!fuse.ok) {
+        try { textFrame.move(layer, ElementPlacement.PLACEATEND); } catch (e1) {}
+        try { if (plateRaster) plateRaster.move(layer, ElementPlacement.PLACEATEND); } catch (e2) {}
+        try { rideGroup.remove(); } catch (e3) {}
+        log("[fuse] " + name + " | " + fuse.reason);
+        return { ok: false, needsReview: true, reason: fuse.reason };
+    }
+    var cut = fuse.cut;
     var group = assembleElementGroup(layer, name, outline, pill, cut);
 
     // PRINTED caption rides the cut group: pill stays VISIBLE (white background), and the text
@@ -1476,6 +1594,168 @@ function _placeCaptionPlateRaster(layer, pill, plateFile, heightMm, widthPadMm) 
     return placed;
 }
 
+// Rotation-invariant plate length: the farthest distance between the plate's OWN anchor points.
+// bbox width is wrong once nesting rotates an element (a 90deg-rotated pill's bbox width is its
+// height), which inflates the junction ratio and can let a weak junction pass. Anchors (not the
+// dense sample) keep this cheap — a farthest-pair over the 48-step sample is O(n^2) and too slow.
+function _plateDiameter(plate) {
+    if (!plate) return 0;
+    var pts = _anchorPointsOf(plate, []);
+    if (pts.length >= 2) return _farthestPairDist(pts);
+    // No anchors anywhere (degenerate plate). Do NOT fall back to bbox width: that is precisely the
+    // rotation-dependent measure this function exists to replace (a 90deg-nested pill's bbox width
+    // is its SHORT side, which inflates the contact ratio and lets a weak weld pass). Returning 0
+    // makes the caller treat the ratio as 0 and rescue/hard-error, which is the safe direction.
+    log("[fuse] WARN | plate has no usable anchors; contact ratio forced to 0 (cannot measure diameter).");
+    return 0;
+}
+
+// All anchor points of a PathItem / CompoundPathItem / GroupItem, as [{x,y}]. Recurses, so a plate
+// that came back from a Unite/expand as a compound or group still yields a real diameter instead of
+// silently degrading to a bbox measure.
+function _anchorPointsOf(item, acc) {
+    var t, i, pp;
+    try { t = item.typename; } catch (eT) { return acc; }
+    if (t === "PathItem") {
+        try { pp = item.pathPoints; } catch (eP) { pp = null; }
+        if (pp) { for (i = 0; i < pp.length; i++) acc.push({ x: pp[i].anchor[0], y: pp[i].anchor[1] }); }
+    } else if (t === "CompoundPathItem") {
+        for (i = 0; i < item.pathItems.length; i++) _anchorPointsOf(item.pathItems[i], acc);
+    } else if (t === "GroupItem") {
+        for (i = 0; i < item.pageItems.length; i++) _anchorPointsOf(item.pageItems[i], acc);
+    }
+    return acc;
+}
+
+// Leaf metrics [{c,area}] of a fused-cut item (PathItem / CompoundPathItem / GroupItem).
+function _fusedLeafMetrics(item) {
+    var acc = [];
+    (function walk(it) {
+        var t = it.typename, i;
+        if (t === "PathItem") acc.push(it);
+        else if (t === "CompoundPathItem") { for (i = 0; i < it.pathItems.length; i++) acc.push(it.pathItems[i]); }
+        else if (t === "GroupItem") { for (i = 0; i < it.pageItems.length; i++) walk(it.pageItems[i]); }
+    })(item);
+    var out = [], i, b;
+    for (i = 0; i < acc.length; i++) {
+        b = acc[i].geometricBounds;
+        out.push({ c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) });
+    }
+    return out;
+}
+
+// {c,area} of a single item's bbox.
+function _plateMetrics(plate) {
+    var b = plate.geometricBounds;
+    return { c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) };
+}
+
+// Sampling for the caption CONTACT measure. STEPS is per bezier segment (samplePathToPolygons'
+// convention); MAX_EDGE_PT then densifies the plate to a uniform arc spacing so the measurement
+// resolution does not depend on how many segments a caption happens to be built from.
+var CONTACT_SAMPLE_STEPS = 48;
+var CONTACT_MAX_EDGE_PT  = 0.5;   // ~0.18mm — well under the smallest weld we care about
+
+// The caption's CONTACT with the art: total welded edge length / the plate's rotation-invariant
+// diameter. 0 = tangent or detached. NOT bounded by 1 (contact is arc length, diameter a chord).
+function _captionContactRatio(plate, outline, steps) {
+    var s = steps || CONTACT_SAMPLE_STEPS;
+    var pp = _largestPoly(samplePathToPolygons(plate, s));
+    var artPolys = samplePathToPolygons(outline, s);
+    if (!pp || pp.length < 3 || artPolys.length === 0) return 0;
+    // Densify the PLATE only (the art is just the inside/outside reference): per-segment sampling
+    // leaves a flat caption's one-segment inner edge ~40x coarser than a warped caption's, so a
+    // short weld could fall entirely between two samples and read as 0.
+    pp = _densifyPoly(pp, CONTACT_MAX_EDGE_PT);
+    var diam = _plateDiameter(plate);
+    return (diam > 0 ? _contactRunsTotal(pp, artPolys) / diam : 0);
+}
+
+// Phase 1 (cheap, no boolean): nudge every item in moveItems stepMm toward the art (direction
+// from _aiSeatGeometry) until the caption's total CONTACT with the art (_captionContactRatio) is
+// >= minRatio, or capMm is reached (hard error). Phase 2: unite outline+plate ONCE via
+// deriveCutline, then RE-ASSERT on the ACTUAL boolean result — removeCaptionJunctionSlivers
+// deliberately KEEPS a leaf matching the plate, so a wide-enough measured contact doesn't
+// guarantee the union actually fused; if the result is still a detached plate leaf, keep nudging
+// (re-uniting each time) until it fuses or capMm is reached. The seat is untouched; only a
+// non-fusing caption moves. Returns { cut, embeddedMm, ok, reason, ratio }.
+function fuseCaptionCutline(outline, plate, moveItems, strokePt, opts) {
+    opts = opts || {};
+    var name   = opts.name || "(caption)";
+    var stepMm = (opts.stepMm != null) ? opts.stepMm
+               : ((typeof CONFIG !== "undefined" && CONFIG.captionFuseStepMm != null) ? CONFIG.captionFuseStepMm : 0.01);
+    var capMm  = (opts.capMm != null) ? opts.capMm
+               : ((typeof CONFIG !== "undefined" && CONFIG.captionFuseCapMm != null) ? CONFIG.captionFuseCapMm : 0.3);
+    var minRatio = (opts.minRatio != null) ? opts.minRatio
+               : ((typeof CONFIG !== "undefined" && CONFIG.captionMinJunctionRatio != null) ? CONFIG.captionMinJunctionRatio : 0.15);
+    if (stepMm <= 0) stepMm = 0.01;                      // never allow a non-advancing loop
+    var geom = _aiSeatGeometry(plate, outline);
+    var step = mmToPoints(stepMm);
+    var embeddedMm = 0, tx, ty;
+    // Hard iteration ceiling independent of the mm cap: tuning captionFuseStepMm down without
+    // touching captionFuseCapMm would otherwise mean hundreds of live boolean unions per element.
+    var iters = 0, MAX_ITERS = 64;
+
+    function nudge() {
+        tx = geom.travelIsX ? geom.sign * step : 0;
+        ty = geom.travelIsX ? 0 : geom.sign * step;
+        _translateItems(moveItems, tx, ty);
+        embeddedMm += stepMm;
+        iters++;
+    }
+
+    // Put the caption back where it was seated. A failed rescue must not leave the pill (and the
+    // printed text/raster riding with it) drifted up to capMm from its seated pose with a stale
+    // cutline beside it — the callers have no history snapshot to roll that back.
+    function restore() {
+        if (embeddedMm <= 0) return;
+        var back = mmToPoints(embeddedMm);
+        _translateItems(moveItems, geom.travelIsX ? -geom.sign * back : 0,
+                                   geom.travelIsX ? 0 : -geom.sign * back);
+        embeddedMm = 0;
+    }
+
+    // Phase 1 (cheap, no boolean): grow the weld until there is enough contact.
+    var ratio = _captionContactRatio(plate, outline, CONTACT_SAMPLE_STEPS);
+    while (ratio < minRatio) {
+        if (embeddedMm + stepMm > capMm + 1e-9 || iters >= MAX_ITERS) {
+            var failedMm1 = embeddedMm;
+            restore();
+            return { cut: null, embeddedMm: 0, ok: false, ratio: ratio,
+                     reason: "caption '" + name + "' contact ratio " + ratio.toFixed(3)
+                             + " < " + minRatio + " even after " + _r1(failedMm1) + "mm embed"
+                             + " (caption restored to its seated position)" };
+        }
+        nudge();
+        ratio = _captionContactRatio(plate, outline, CONTACT_SAMPLE_STEPS);
+    }
+
+    // Phase 2: unite, then RE-ASSERT on the result — the sliver remover keeps a plate-matching
+    // leaf, so a detached pill would otherwise ship silently.
+    var cut = deriveCutline(outline, plate);
+    while (_captionLeafDetached(_fusedLeafMetrics(cut), _plateMetrics(plate))) {
+        if (embeddedMm + stepMm > capMm + 1e-9 || iters >= MAX_ITERS) {
+            try { cut.remove(); } catch (e0) {}
+            var failedMm2 = embeddedMm;
+            restore();
+            return { cut: null, embeddedMm: 0, ok: false, ratio: ratio,
+                     reason: "caption '" + name + "' still a separate leaf after " + _r1(failedMm2)
+                             + "mm embed (caption restored to its seated position)" };
+        }
+        nudge();
+        try { cut.remove(); } catch (e1) {}
+        cut = deriveCutline(outline, plate);
+        ratio = _captionContactRatio(plate, outline, CONTACT_SAMPLE_STEPS);
+    }
+
+    strokeRecursive(cut, strokePt, blackRgb());
+    if (embeddedMm > 0) {
+        log("[fuse] " + name + " | embedded " + (Math.round(embeddedMm * 1000) / 1000)
+            + "mm -> contact ratio " + ratio.toFixed(3));
+    }
+    return { cut: cut, embeddedMm: embeddedMm, ok: true, reason: null, ratio: ratio };
+}
+
 // Derives the fused cutline = boolean union of element_outline and plate.
 // Duplicates both inputs so the originals survive as separable components.
 // Returns the resulting item (PathItem, CompoundPathItem, or wrapping GroupItem).
@@ -1515,7 +1795,54 @@ function deriveCutline(outline, plate) {
     app.executeMenuCommand("expandStyle");
     app.userInteractionLevel = prevLevel;
 
-    return app.selection[0];
+    var fused = app.selection[0];
+    var sw = removeCaptionJunctionSlivers(fused, outline, plate);
+    if (sw.removed > 0) log("[cutline] junction slivers removed | " + sw.removed);
+    return fused;
+}
+
+// Leaf PathItems of a fused cutline or an outline (PathItem / CompoundPathItem / GroupItem).
+// deriveCutline's Unite result is usually a GroupItem wrapping several PathItems.
+function _fusedCutLeaves(item, acc) {
+    var t = item.typename, i;
+    if (t === "PathItem") { acc.push(item); }
+    else if (t === "CompoundPathItem") { for (i = 0; i < item.pathItems.length; i++) acc.push(item.pathItems[i]); }
+    else if (t === "GroupItem") { for (i = 0; i < item.pageItems.length; i++) _fusedCutLeaves(item.pageItems[i], acc); }
+    return acc;
+}
+
+// [{ c:{x,y}, area:Number }] for a list of leaf PathItems, from each leaf's geometricBounds.
+function _leafMetrics(items) {
+    var out = [], i, b;
+    for (i = 0; i < items.length; i++) {
+        b = items[i].geometricBounds;                          // [left, top, right, bottom]
+        out.push({ c: boundsCenter(b), area: Math.abs((b[2] - b[0]) * (b[1] - b[3])) });
+    }
+    return out;
+}
+
+// Deletes caption-junction sliver subpaths from a freshly-Unite'd fused cutline: the boolean
+// crumbs the plate∩art weld invents at the seam. Keeps the largest leaf (the real contour) and
+// any leaf that echoes a KEEP-reference: a subpath of the art-alone `outline` (a genuine art
+// hole, like Tram's) OR the caption `plate` itself. The plate reference matters when the caption
+// is only shallowly seated — the Unite then leaves the pill as its OWN leaf instead of fusing it
+// into the contour; without the plate reference that pill has no outline match and would be
+// wrongly deleted as a sliver (it would strip the caption out of the cutline). Everything else
+// non-largest is a true crumb. Idempotent (a cut with no unmatched leaves is a no-op).
+// Returns { removed:N }.
+function removeCaptionJunctionSlivers(cutline, outline, plate) {
+    if (!cutline || !outline) return { removed: 0 };
+    var fusedItems = _fusedCutLeaves(cutline, []);
+    if (fusedItems.length < 2) return { removed: 0 };
+    var keepRefs = _leafMetrics(_fusedCutLeaves(outline, []));
+    if (plate) keepRefs = keepRefs.concat(_leafMetrics(_fusedCutLeaves(plate, [])));
+    var fusedLeaves = _leafMetrics(fusedItems);
+    var doomed = _junctionSliverLeaves(fusedLeaves, keepRefs);
+    var removed = 0, i;
+    for (i = doomed.length - 1; i >= 0; i--) {      // descending: removing a leaf can't stale a lower index
+        try { fusedItems[doomed[i]].remove(); removed++; } catch (e) {}
+    }
+    return { removed: removed };
 }
 
 // Assembles the per-element bundle as a GroupItem so the components ride along
@@ -1571,8 +1898,18 @@ function reuniteCutline(group, outline, plate, strokePt) {
 
     var oldCutline = findGroupMember(group, "");
 
-    var newCutline = deriveCutline(outline, plate);
-    strokeRecursive(newCutline, strokePt, blackRgb());
+    var moveItems = [plate];
+    var capText   = findGroupMember(group, " caption text");
+    var capRaster = findGroupMember(group, " caption plate");
+    if (capText)   moveItems.push(capText);
+    if (capRaster) moveItems.push(capRaster);
+    var fuse = fuseCaptionCutline(outline, plate, moveItems, strokePt, { name: group.name });
+    if (!fuse.ok) {
+        outline.hidden = outlineHidden;
+        plate.hidden   = plateHidden;
+        throw new Error(fuse.reason);   // surfaced by the pipeline's per-phase try/catch
+    }
+    var newCutline = fuse.cut;
 
     if (oldCutline) oldCutline.remove();
     newCutline.name = group.name;
@@ -3293,6 +3630,42 @@ function _sampleSubPath(subPath, stepsPerSeg) {
         }
     }
     return poly;
+}
+
+// Selects the fused-cut leaf indices that are caption-junction slivers to delete. A fused leaf is
+// REAL (keep) when it echoes a KEEP-reference — a subpath of the art-alone `outline` (a genuine
+// art hole, left untouched by the plate Unite: same centroid, same area) OR the caption `plate`
+// (the pill, which a shallow seat can leave as its own leaf). A non-largest fused leaf that
+// echoes NEITHER was invented by the union at the pill∩art seam = a crumb (delete). The largest
+// fused leaf (the real sticker contour) is never a candidate.
+// fusedLeaves / keepRefs = [{ c:{x,y}, area:Number }, ...]. Pure; node-testable.
+function _junctionSliverLeaves(fusedLeaves, keepRefs) {
+    var doomed = [];
+    if (!fusedLeaves || fusedLeaves.length < 2) return doomed;
+    var maxI = 0, i;
+    for (i = 1; i < fusedLeaves.length; i++) {
+        if (fusedLeaves[i].area > fusedLeaves[maxI].area) maxI = i;
+    }
+    for (i = 0; i < fusedLeaves.length; i++) {
+        if (i === maxI) continue;                               // never the real contour
+        if (!_matchesAKeepRef(fusedLeaves[i], keepRefs)) doomed.push(i);
+    }
+    return doomed;
+}
+
+// True when fused leaf f echoes some keep-reference (an outline subpath or the caption plate):
+// centroids within 10pt AND areas within +/-25%. Wide margins by design — real echoes coincide
+// (dist~0, ratio~1.0) while crumbs miss (dist>=20pt, ratio<=0.007) on the live SKU, so nothing
+// lands between the two clusters.
+// Uses the SHARED _bboxEcho predicate — see the PLATE-ECHO note above. This must stay the exact
+// complement of _captionLeafDetached: what this KEEPS is what phase 2 FLAGS.
+function _matchesAKeepRef(f, keepRefs) {
+    if (!keepRefs) return false;
+    var i;
+    for (i = 0; i < keepRefs.length; i++) {
+        if (_bboxEcho(f, keepRefs[i])) return true;
+    }
+    return false;
 }
 
 // Samples a PathItem/CompoundPathItem/GroupItem into an array of closed polygons
