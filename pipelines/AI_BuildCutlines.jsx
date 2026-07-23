@@ -69,7 +69,9 @@ var CONFIG = {
                                  // pinches the Unite. Separate from seatOverlapMm (the TAB embed).
     captionFuseStepMm:   0.01,   // fuse-rescue: nudge a weak-junction caption this far/step
     captionFuseCapMm:    0.3,    // fuse-rescue: give up (hard error) past this total embed
-    captionMinJunctionRatio: 0.15, // required caption-art TOTAL CONTACT length / plate diameter
+    captionMinJunctionRatio: 0.15, // min caption-art TOTAL CONTACT length / plate diameter.
+                                 // A detached/tangent caption measures 0.000; the accepted healthy
+                                 // population floors at ~0.154, so 0.15 lifts a weak weld to that floor.
     seatSampleSteps:     24,     // bezier→polygon density for the SEAT probe (per segment). THIS is the
                                  //     floor lever: a finer polygon lets the seat measure the true curve,
                                  //     so a shallow 0.1mm overlap lands accurately. (Do NOT raise

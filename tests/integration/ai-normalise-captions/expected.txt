@@ -9,7 +9,8 @@
 [seat] Slovak Paradise National Park | rotated -0.2deg to two-point contact.
 [seat] Slovak Paradise National Park | seated (contact) rot=-0.2deg move=0.4pt depth=0pt
 [cutline] junction slivers removed | 2
-[halfcut] Slovak Paradise National Park | pts=20 end0=(311.9,285.2) endN=(415.8,286.1) straight
+[fuse] Slovak Paradise National Park | embedded 0.02mm -> contact ratio 0.151
+[halfcut] Slovak Paradise National Park | pts=20 end0=(311.8,285.2) endN=(416.4,286.1) straight
 [buffer] Slovak Paradise National Park | band 0..+1mm
 [step8b] reset to spec | Slovak Paradise National Park (WC, x0.923)
 [step8b] at spec | Spiš Castle (WC)
@@ -22,8 +23,8 @@
 [seat] Štrbské Pleso | rotated 0.1deg to two-point contact.
 [seat] Štrbské Pleso | seated (contact) rot=0.1deg move=0.4pt depth=0pt
 [cutline] junction slivers removed | 1
-[fuse] Štrbské Pleso | embedded 0.01mm -> junction ratio 0.783
-[halfcut] Štrbské Pleso | pts=28 end0=(413.3,441.1) endN=(415.4,489.9) straight
+[fuse] Štrbské Pleso | embedded 0.02mm -> contact ratio 0.160
+[halfcut] Štrbské Pleso | pts=28 end0=(413.3,440.9) endN=(415.5,490.2) straight
 [buffer] Štrbské Pleso | band 0..+1mm
 [step8b] reset to spec | Štrbské Pleso (WC, x0.898)
 [step8b] SKIP | National Flower — not a caption (ST).
@@ -39,7 +40,8 @@
 [seat] Orava Castle | rotated -0.1deg to two-point contact.
 [seat] Orava Castle | seated (contact) rot=-0.1deg move=0.3pt depth=0pt
 [cutline] junction slivers removed | 1
-[halfcut] Orava Castle | pts=22 end0=(414.4,173.6) endN=(459.8,172.9) straight
+[fuse] Orava Castle | embedded 0.02mm -> contact ratio 0.163
+[halfcut] Orava Castle | pts=22 end0=(414,173.6) endN=(460.3,172.9) straight
 [buffer] Orava Castle | band 0..+1mm
 [step8b] reset to spec | Orava Castle (WC, x0.900)
 [step8b] at spec | Michael's Gate (WC)
@@ -53,7 +55,7 @@
 [seat] Kroje | rotated 0.3deg to two-point contact.
 [seat] Kroje | seated (contact) rot=0.3deg move=0.8pt depth=0pt
 [cutline] junction slivers removed | 1
-[fuse] Kroje | embedded 0.01mm -> junction ratio 0.630
+[fuse] Kroje | embedded 0.01mm -> contact ratio 0.157
 [halfcut] Kroje | pts=41 end0=(295.6,85.5) endN=(307.3,65.4) straight
 [buffer] Kroje | band 0..+1mm
 [step8b] reset to spec | Kroje (WC, x0.863)
@@ -64,14 +66,15 @@
 [buffer] Fujara | band 0..+1mm
 [step8b] reset to spec | Fujara (WC, x0.917)
 [seat] Tram | seated (contact) rot=0deg move=0.4pt depth=0pt
-[fuse] Tram | embedded 0.01mm -> junction ratio 0.615
+[fuse] Tram | embedded 0.01mm -> contact ratio 0.614
 [halfcut] Tram | pts=41 end0=(499.3,297.2) endN=(519.2,306) straight
 [buffer] Tram | band 0..+1mm
 [step8b] reset to spec | Tram (WC, x1.025)
 [seat] Tatra chamois | rotated -0.0deg to two-point contact.
 [seat] Tatra chamois | seated (contact) rot=0deg move=0pt depth=0pt
 [cutline] junction slivers removed | 1
-[halfcut] Tatra chamois | pts=41 end0=(274.9,170.7) endN=(325.2,172.7) straight
+[fuse] Tatra chamois | embedded 0.02mm -> contact ratio 0.161
+[halfcut] Tatra chamois | pts=28 end0=(274.2,170.7) endN=(325.5,172.7) straight
 [buffer] Tatra chamois | band 0..+1mm
 [step8b] reset to spec | Tatra chamois (WC, x0.940)
 [seat] Carpathian Wooden Churches | rotated 0.2deg to two-point contact.
