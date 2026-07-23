@@ -61,7 +61,47 @@ Both call sites currently call `deriveCutline` directly; they switch to `fuseCap
 `deriveCutline` itself is unchanged (still the boolean, still runs the blob-removal already on
 this branch).
 
-### Detection — "the caption didn't fuse"
+### AMENDMENT 2026-07-23 — stop on JUNCTION WIDTH, not topology
+
+The original stop criterion below ("is the caption still a separate leaf?") shipped and proved
+**too weak**. Live finding on Tram: its caption touches the art at a single tangent point — 0
+plate vertices inside the art, 0 boundary crossings — yet the boolean still produced ONE contour
+by pinching the shapes together at that point. The topology test therefore passed Tram, so it was
+never nudged, and it cuts as two shapes joined by nothing (artist-rejected).
+
+Junction scan across all 28 captioned elements (span between the outermost plate∩art crossings,
+÷ plate width):
+
+| | ratio | span |
+|---|---|---|
+| Tram | **0.000** | 0.00 mm |
+| Orava Castle (next lowest) | 0.519 | 9.32 mm |
+| other 26 | 0.55–1.16 | 5.4–33.5 mm |
+| Tatra (after its nudge) | 0.832 | 16.5 mm |
+
+Tram is the sole outlier with a wide empty gap to the healthy population — no borderline case.
+
+Measured embed→ratio curve for Tram: the junction is a **step function**, not a ramp —
+`0.000 mm → ratio 0.000`, then `0.010 mm → ratio 0.647` (2 crossings, 5.96 mm span), then a slow
+crawl (0.20 mm → 0.786). A near-parallel caption edge engages a long stretch the instant it stops
+being tangent. So any threshold from ~0.01 to ~0.64 costs the SAME single 0.01 mm step — a lower
+bar buys no less bump.
+
+**Revised criterion:** nudge until the **junction ratio ≥ `captionMinJunctionRatio` (0.40)**.
+Chosen because it is reached in one step (free), sits clear of Tram's 0, and stays below the
+0.519 floor of the healthy set so no already-good element is ever touched. **Step drops to
+0.01 mm** (`captionFuseStepMm`) — the curve shows that suffices, and it is the smaller bump.
+Tram's resulting bump: **0.01 mm**, a tenth of the 0.1 mm bump commit `6a3f0f4` removed.
+
+This criterion **supersedes** the leaf-topology test: it catches both failure modes — didn't join
+at all (Tatra, ratio 0) and joined through a hairline pinch (Tram, ratio 0). `_captionLeafDetached`
+and its unit test are removed as dead code.
+
+**Mechanism simplification:** the junction ratio is measured from `plate` vs `outline` directly,
+so the loop no longer re-runs the boolean each iteration. Measure → nudge → repeat; run
+`deriveCutline` **once** at the end. Cheaper and simpler than the original re-unite-per-step loop.
+
+### Detection — "the caption didn't fuse" (SUPERSEDED by the amendment above)
 
 The union result is one item holding ≥1 closed leaf. The caption is **detached** iff some leaf
 **is the pill**: bbox-centroid within **10 pt** of the plate's centroid AND area ratio in
