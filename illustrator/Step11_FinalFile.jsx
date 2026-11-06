@@ -95,6 +95,15 @@ function runFinalFile(doc) {
     // preserves absolute position, so each caption stays exactly inside its cut.
     _s11MoveCaptionsToStickers(fd);
 
+    // Delete the separable helper paths ({name} outline, hidden plate operands) and any
+    // leftover {name} buffer halo from each Cutlines group, leaving ONLY the one fused cut
+    // path per element. These helpers exist solely for the working-phase re-Unite (Step 8b)
+    // and are hidden in the working file — but the cutter cuts EVERY path regardless of
+    // Illustrator visibility (confirmed in production: a hidden path is NOT ignored), so the
+    // shipped file must not carry them. The group wrapper is kept; only its non-cut children
+    // are removed. Final copy only.
+    _s11StripCutlineHelpers(fd);
+
     // Convert live caption text to vector outlines so the final file carries no font
     // dependency (the printer/another machine need not have Kalam installed). Warped
     // captions are already baked to path geometry upstream (Step 7B Expand Appearance);
@@ -203,7 +212,8 @@ function _s11CollectCutlineGroups(container) {
 // the cutter (which cuts every VISIBLE path in Cutlines/Halfcut) never cuts it. Runs on
 // the FINAL-FILE copy only, after all transforms — move() preserves absolute artwork
 // coordinates, so each caption stays exactly inside the cut that traces it. The fused
-// cut path (the one member named === group.name) and hidden helpers stay in Cutlines.
+// cut path (the one member named === group.name) stays; the hidden outline/plate helpers
+// are left here for _s11StripCutlineHelpers (the next step) to delete.
 // Returns { elements: N, items: M }.
 function _s11MoveCaptionsToStickers(fd) {
     var stickersLayer = findLayer(fd, CONFIG.stickersLayerName);
@@ -273,6 +283,89 @@ function _s11MoveCaptionsToStickers(fd) {
     log("[step11] captions relocated to Stickers | " + elementsMoved
         + " element(s), " + itemsMoved + " item(s)");
     return { elements: elementsMoved, items: itemsMoved };
+}
+
+// Strips each Cutlines element group down to its single fused cut path, deleting every
+// other (now hidden) child: the separable `{name} outline` + hidden plate operands and any
+// leftover `{name} buffer` halo. Those helpers exist only for the working-phase re-Unite
+// (Step 8b) — the shipped final file never re-fuses, and the cutter cuts EVERY path even
+// when Illustrator marks it hidden (confirmed in production), so a kept helper prints as a
+// stray cut line. Runs on the FINAL-FILE copy only, AFTER _s11MoveCaptionsToStickers has
+// relocated the visible printed artwork to Stickers (so only non-printing helpers remain
+// here to delete). A group whose cut path can't be identified (no member named ===
+// group.name) is SKIPPED untouched — never guess and delete real cut geometry; the leftover
+// is surfaced by _s11AssertCutlinesSinglePath. Keeps the group wrapper. Returns
+// { groups: N, removed: M }.
+function _s11StripCutlineHelpers(fd) {
+    var cutlinesLayer = findLayer(fd, CONFIG.cutlinesLayerName);
+    if (!cutlinesLayer) {
+        log("[step11] WARN | Cutlines layer '" + CONFIG.cutlinesLayerName
+            + "' not found — no helper strip.");
+        return { groups: 0, removed: 0 };
+    }
+    var groups = _s11CollectCutlineGroups(cutlinesLayer);
+    var groupsStripped = 0, removed = 0, g, c;
+    for (g = 0; g < groups.length; g++) {
+        var group   = groups[g];
+        var cutPath = findGroupMember(group, "");   // member named exactly group.name
+        if (!cutPath) {
+            log("[step11] SKIP | group has no cut path, left intact | " + group.name);
+            continue;
+        }
+        // Snapshot DIRECT children first — remove() re-indexes the live collection, and
+        // group.pageItems recurses into child groups (e.g. the buffer group), so iterate
+        // only parent===group items (removing a child group drops its descendants with it).
+        var doomed = [];
+        for (c = 0; c < group.pageItems.length; c++) {
+            var child = group.pageItems[c];
+            if (child.parent !== group) continue;   // direct children only
+            if (child === cutPath) continue;         // keep the one cut path
+            doomed.push(child);
+        }
+        if (!doomed.length) continue;
+        for (c = 0; c < doomed.length; c++) {
+            try {
+                doomed[c].hidden = false;            // a hidden/locked item resists remove()
+                doomed[c].locked = false;
+                doomed[c].remove();
+                removed++;
+            } catch (e) {
+                log("[step11] WARN | could not remove helper '"
+                    + (doomed[c].name || "(unnamed)") + "' in " + group.name + ": " + e.message);
+            }
+        }
+        groupsStripped++;
+    }
+    log("[step11] cutlines stripped to cut path | " + groupsStripped
+        + " group(s), " + removed + " helper(s) removed");
+    _s11AssertCutlinesSinglePath(cutlinesLayer);
+    return { groups: groupsStripped, removed: removed };
+}
+
+// Post-strip verification (warn-on-all): after _s11StripCutlineHelpers, every Cutlines
+// element group must hold exactly ONE child — its cut path. A group with >1 direct child
+// is a helper that survived (would be cut); a group with a cut path but extra children, or
+// no cut path at all, is surfaced loudly. Advisory marker, does not throw. Returns offender
+// count.
+function _s11AssertCutlinesSinglePath(cutlinesLayer) {
+    var groups = _s11CollectCutlineGroups(cutlinesLayer);
+    var offenders = [], g, c, directKids;
+    for (g = 0; g < groups.length; g++) {
+        var group = groups[g];
+        directKids = 0;
+        for (c = 0; c < group.pageItems.length; c++) {
+            if (group.pageItems[c].parent === group) directKids++;
+        }
+        if (directKids !== 1) {
+            offenders.push((group.name || "(group)") + " (" + directKids + " children)");
+        }
+    }
+    if (offenders.length) {
+        log("[step11] *** HELPER LEFT IN CUTLINES *** | " + offenders.join(", "));
+    } else {
+        log("[step11] cutlines verified | all " + groups.length + " group(s) single-path");
+    }
+    return offenders.length;
 }
 
 // Given the Cutlines GroupItems (already collected by _s11CollectCutlineGroups), logs any
