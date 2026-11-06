@@ -166,6 +166,31 @@ if grep -q "PRINTED ITEM LEFT IN CUTLINES" "$LOG"; then
     FAIL=1
 fi
 
+# ── Verify the separable helpers were DELETED from the Cutlines groups ─────────
+# The cutter cuts every path regardless of Illustrator visibility, so the final file must
+# carry ONLY the one fused cut path per element — the hidden {name} outline / plate helpers
+# and any leftover {name} buffer must be removed, not just hidden. Step 11 logs a strip
+# summary and a per-group single-path verification (or a loud marker if any helper survived).
+STRIP_REMOVED=$(grep -oE "cutlines stripped to cut path \| [0-9]+ group\(s\), [0-9]+ helper" "$LOG" | grep -oE "[0-9]+ helper" | grep -oE "[0-9]+" || echo "0")
+if [ "${STRIP_REMOVED:-0}" -gt 0 ]; then
+    echo "PASS [$STEP]: $STRIP_REMOVED helper path(s) stripped from Cutlines groups."
+else
+    echo "FAIL [$STEP]: 0 helpers stripped (expected > 0) — outline/plate/buffer may still be in Cutlines."
+    FAIL=1
+fi
+
+if grep -q "HELPER LEFT IN CUTLINES" "$LOG"; then
+    echo "FAIL [$STEP]: a helper path survived in a Cutlines group (would be cut)."
+    FAIL=1
+fi
+
+if grep -q "\[step11\] cutlines verified | all" "$LOG"; then
+    echo "PASS [$STEP]: every Cutlines group is a single cut path."
+else
+    echo "FAIL [$STEP]: cutlines single-path verification line missing."
+    FAIL=1
+fi
+
 PNG_LOG=$(grep -oE "pngCount=[0-9]+" "$LOG" | grep -oE "[0-9]+$" | head -1 || echo "0")
 # find (not ls-glob): a no-match glob makes ls exit non-zero, which under
 # `set -euo pipefail` aborts the script at this assignment — precisely in the
